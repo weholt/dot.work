@@ -95,7 +95,7 @@ def install(
     env_config = ENVIRONMENTS[env_key]
     console.print(f"\n[bold blue]📦 Installing prompts for {env_config.name}...[/bold blue]\n")
 
-    install_prompts(env_key, target, prompts_dir, console)
+    install_prompts(env_key, target, prompts_dir, console, force=force)
 
     console.print("\n[bold green]✅ Installation complete![/bold green]")
 

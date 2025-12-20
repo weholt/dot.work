@@ -104,21 +104,55 @@ def render_prompt(
     return template.render(**context)
 
 
+def should_write_file(dest_path: Path, force: bool, console: Console) -> bool:
+    """Check if a file should be written, prompting user if it exists.
+
+    Args:
+        dest_path: Path to the destination file.
+        force: If True, overwrite without prompting.
+        console: Rich console for user interaction.
+
+    Returns:
+        True if the file should be written, False to skip.
+    """
+    if not dest_path.exists():
+        return True
+    if force:
+        return True
+
+    # Prompt user for confirmation
+    console.print(f"  [yellow]⚠[/yellow] File already exists: {dest_path.name}")
+    response = console.input("    Overwrite? [y/N]: ").strip().lower()
+    return response in ("y", "yes")
+
+
 def install_prompts(
     env_key: str,
     target: Path,
     prompts_dir: Path,
     console: Console,
+    *,
+    force: bool = False,
 ) -> None:
-    """Install prompts for the specified environment."""
+    """Install prompts for the specified environment.
+
+    Args:
+        env_key: The environment key (e.g., 'copilot', 'claude').
+        target: Target directory to install prompts to.
+        prompts_dir: Source directory containing prompt templates.
+        console: Rich console for output.
+        force: If True, overwrite existing files without prompting.
+    """
     installer = INSTALLERS.get(env_key)
     if not installer:
         raise ValueError(f"Unknown environment: {env_key}")
 
-    installer(target, prompts_dir, console)
+    installer(target, prompts_dir, console, force=force)
 
 
-def install_for_copilot(target: Path, prompts_dir: Path, console: Console) -> None:
+def install_for_copilot(
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+) -> None:
     """Install prompts for GitHub Copilot (VS Code)."""
     dest_dir = target / ".github" / "prompts"
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -131,10 +165,13 @@ def install_for_copilot(target: Path, prompts_dir: Path, console: Console) -> No
         else:
             dest_name = prompt_file.stem + ".prompt.md"
 
+        dest_path = dest_dir / dest_name
+        if not should_write_file(dest_path, force, console):
+            console.print(f"  [dim]⏭[/dim] Skipped {dest_name}")
+            continue
+
         # Render template with environment-specific values
         rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-
-        dest_path = dest_dir / dest_name
         dest_path.write_text(rendered_content, encoding="utf-8")
         console.print(f"  [green]✓[/green] Installed {dest_name}")
 
@@ -142,9 +179,16 @@ def install_for_copilot(target: Path, prompts_dir: Path, console: Console) -> No
     console.print("[dim]💡 Use with: /project-from-discussion or /issue-tracker-setup[/dim]")
 
 
-def install_for_claude(target: Path, prompts_dir: Path, console: Console) -> None:
+def install_for_claude(
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+) -> None:
     """Install prompts for Claude Code."""
     claude_md = target / "CLAUDE.md"
+
+    if not should_write_file(claude_md, force, console):
+        console.print(f"  [dim]⏭[/dim] Skipped {claude_md.name}")
+        return
+
     env_config = ENVIRONMENTS["claude"]
 
     sections = [
@@ -166,7 +210,9 @@ def install_for_claude(target: Path, prompts_dir: Path, console: Console) -> Non
     console.print("[dim]💡 Claude will automatically read CLAUDE.md[/dim]")
 
 
-def install_for_cursor(target: Path, prompts_dir: Path, console: Console) -> None:
+def install_for_cursor(
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+) -> None:
     """Install prompts for Cursor."""
     rules_dir = target / ".cursor" / "rules"
     rules_dir.mkdir(parents=True, exist_ok=True)
@@ -175,16 +221,19 @@ def install_for_cursor(target: Path, prompts_dir: Path, console: Console) -> Non
 
     for prompt_file in prompts_dir.glob("*.md"):
         dest_name = prompt_file.stem + ".mdc"
+        dest_path = rules_dir / dest_name
+
+        if not should_write_file(dest_path, force, console):
+            console.print(f"  [dim]⏭[/dim] Skipped {dest_name}")
+            continue
 
         # Render template with environment-specific values
         rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-
-        dest_path = rules_dir / dest_name
         dest_path.write_text(rendered_content, encoding="utf-8")
         console.print(f"  [green]✓[/green] Installed {dest_name}")
 
     cursorrules = target / ".cursorrules"
-    if not cursorrules.exists():
+    if should_write_file(cursorrules, force, console):
         cursorrules.write_text(
             "# Cursor Rules\n\n"
             "See .cursor/rules/ for detailed prompts.\n\n"
@@ -195,12 +244,16 @@ def install_for_cursor(target: Path, prompts_dir: Path, console: Console) -> Non
             encoding="utf-8",
         )
         console.print(f"  [green]✓[/green] Created {cursorrules.name}")
+    elif cursorrules.exists():
+        console.print(f"  [dim]⏭[/dim] Skipped {cursorrules.name}")
 
     console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {rules_dir}")
     console.print("[dim]💡 Rules available in Cursor's @ menu[/dim]")
 
 
-def install_for_windsurf(target: Path, prompts_dir: Path, console: Console) -> None:
+def install_for_windsurf(
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+) -> None:
     """Install prompts for Windsurf."""
     rules_dir = target / ".windsurf" / "rules"
     rules_dir.mkdir(parents=True, exist_ok=True)
@@ -208,26 +261,39 @@ def install_for_windsurf(target: Path, prompts_dir: Path, console: Console) -> N
     env_config = ENVIRONMENTS["windsurf"]
 
     for prompt_file in prompts_dir.glob("*.md"):
+        dest_path = rules_dir / prompt_file.name
+
+        if not should_write_file(dest_path, force, console):
+            console.print(f"  [dim]⏭[/dim] Skipped {prompt_file.name}")
+            continue
+
         # Render template with environment-specific values
         rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-
-        dest_path = rules_dir / prompt_file.name
         dest_path.write_text(rendered_content, encoding="utf-8")
         console.print(f"  [green]✓[/green] Installed {prompt_file.name}")
 
     windsurfrules = target / ".windsurfrules"
-    if not windsurfrules.exists():
+    if should_write_file(windsurfrules, force, console):
         windsurfrules.write_text(
             "# Windsurf Rules\n\nSee .windsurf/rules/ for detailed prompts.\n", encoding="utf-8"
         )
         console.print(f"  [green]✓[/green] Created {windsurfrules.name}")
+    elif windsurfrules.exists():
+        console.print(f"  [dim]⏭[/dim] Skipped {windsurfrules.name}")
 
     console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {rules_dir}")
 
 
-def install_for_aider(target: Path, prompts_dir: Path, console: Console) -> None:
+def install_for_aider(
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+) -> None:
     """Install prompts for Aider."""
     conventions_md = target / "CONVENTIONS.md"
+
+    if not should_write_file(conventions_md, force, console):
+        console.print(f"  [dim]⏭[/dim] Skipped {conventions_md.name}")
+        return
+
     env_config = ENVIRONMENTS["aider"]
 
     sections = ["# Project Conventions\n\n"]
@@ -246,7 +312,9 @@ def install_for_aider(target: Path, prompts_dir: Path, console: Console) -> None
     console.print("[dim]💡 Aider will read CONVENTIONS.md automatically[/dim]")
 
 
-def install_for_continue(target: Path, prompts_dir: Path, console: Console) -> None:
+def install_for_continue(
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+) -> None:
     """Install prompts for Continue.dev."""
     dest_dir = target / ".continue" / "prompts"
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -254,10 +322,14 @@ def install_for_continue(target: Path, prompts_dir: Path, console: Console) -> N
     env_config = ENVIRONMENTS["continue"]
 
     for prompt_file in prompts_dir.glob("*.md"):
+        dest_path = dest_dir / prompt_file.name
+
+        if not should_write_file(dest_path, force, console):
+            console.print(f"  [dim]⏭[/dim] Skipped {prompt_file.name}")
+            continue
+
         # Render template with environment-specific values
         rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-
-        dest_path = dest_dir / prompt_file.name
         dest_path.write_text(rendered_content, encoding="utf-8")
         console.print(f"  [green]✓[/green] Installed {prompt_file.name}")
 
@@ -265,14 +337,20 @@ def install_for_continue(target: Path, prompts_dir: Path, console: Console) -> N
     console.print("[dim]💡 Access prompts via Continue's slash commands[/dim]")
 
 
-def install_for_amazon_q(target: Path, prompts_dir: Path, console: Console) -> None:
+def install_for_amazon_q(
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+) -> None:
     """Install prompts for Amazon Q Developer."""
     amazonq_dir = target / ".amazonq"
     amazonq_dir.mkdir(parents=True, exist_ok=True)
 
-    env_config = ENVIRONMENTS["amazon-q"]
-
     rules_md = amazonq_dir / "rules.md"
+
+    if not should_write_file(rules_md, force, console):
+        console.print(f"  [dim]⏭[/dim] Skipped {rules_md.name}")
+        return
+
+    env_config = ENVIRONMENTS["amazon-q"]
     sections = ["# Amazon Q Project Rules\n\n"]
 
     for prompt_file in sorted(prompts_dir.glob("*.md")):
@@ -288,7 +366,9 @@ def install_for_amazon_q(target: Path, prompts_dir: Path, console: Console) -> N
     console.print(f"\n[cyan]📁 Rules installed to:[/cyan] {rules_md}")
 
 
-def install_for_zed(target: Path, prompts_dir: Path, console: Console) -> None:
+def install_for_zed(
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+) -> None:
     """Install prompts for Zed AI."""
     dest_dir = target / ".zed" / "prompts"
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -296,17 +376,23 @@ def install_for_zed(target: Path, prompts_dir: Path, console: Console) -> None:
     env_config = ENVIRONMENTS["zed"]
 
     for prompt_file in prompts_dir.glob("*.md"):
+        dest_path = dest_dir / prompt_file.name
+
+        if not should_write_file(dest_path, force, console):
+            console.print(f"  [dim]⏭[/dim] Skipped {prompt_file.name}")
+            continue
+
         # Render template with environment-specific values
         rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-
-        dest_path = dest_dir / prompt_file.name
         dest_path.write_text(rendered_content, encoding="utf-8")
         console.print(f"  [green]✓[/green] Installed {prompt_file.name}")
 
     console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {dest_dir}")
 
 
-def install_for_opencode(target: Path, prompts_dir: Path, console: Console) -> None:
+def install_for_opencode(
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+) -> None:
     """Install prompts for OpenCode."""
     opencode_prompts_dir = target / ".opencode" / "prompts"
     opencode_prompts_dir.mkdir(parents=True, exist_ok=True)
@@ -314,15 +400,20 @@ def install_for_opencode(target: Path, prompts_dir: Path, console: Console) -> N
     env_config = ENVIRONMENTS["opencode"]
 
     for prompt_file in prompts_dir.glob("*.md"):
+        dest_path = opencode_prompts_dir / prompt_file.name
+
+        if not should_write_file(dest_path, force, console):
+            console.print(f"  [dim]⏭[/dim] Skipped {prompt_file.name}")
+            continue
+
         # Render template with environment-specific values
         rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-
-        dest_path = opencode_prompts_dir / prompt_file.name
         dest_path.write_text(rendered_content, encoding="utf-8")
         console.print(f"  [green]✓[/green] Installed {prompt_file.name}")
 
     agents_md = target / "AGENTS.md"
-    agents_content = """# AI Agent Instructions
+    if should_write_file(agents_md, force, console):
+        agents_content = """# AI Agent Instructions
 
 This file provides instructions for AI agents working on this codebase.
 
@@ -351,16 +442,19 @@ Or use the slash command syntax if supported:
 - Run `python scripts/build.py` before committing
 - Maintain test coverage ≥75%
 """
-
-    agents_md.write_text(agents_content, encoding="utf-8")
-    console.print(f"  [green]✓[/green] Created {agents_md.name}")
+        agents_md.write_text(agents_content, encoding="utf-8")
+        console.print(f"  [green]✓[/green] Created {agents_md.name}")
+    elif agents_md.exists():
+        console.print(f"  [dim]⏭[/dim] Skipped {agents_md.name}")
 
     console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {opencode_prompts_dir}")
     console.print(f"[cyan]📄 Instructions in:[/cyan] {agents_md}")
     console.print("[dim]💡 Reference prompts with: 'Read .opencode/prompts/<name>.prompt.md'[/dim]")
 
 
-def install_for_generic(target: Path, prompts_dir: Path, console: Console) -> None:
+def install_for_generic(
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+) -> None:
     """Install prompts for generic/manual use."""
     dest_dir = target / "prompts"
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -368,15 +462,19 @@ def install_for_generic(target: Path, prompts_dir: Path, console: Console) -> No
     env_config = ENVIRONMENTS["generic"]
 
     for prompt_file in prompts_dir.glob("*.md"):
+        dest_path = dest_dir / prompt_file.name
+
+        if not should_write_file(dest_path, force, console):
+            console.print(f"  [dim]⏭[/dim] Skipped {prompt_file.name}")
+            continue
+
         # Render template with environment-specific values
         rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-
-        dest_path = dest_dir / prompt_file.name
         dest_path.write_text(rendered_content, encoding="utf-8")
         console.print(f"  [green]✓[/green] Installed {prompt_file.name}")
 
     agents_md = target / "AGENTS.md"
-    if not agents_md.exists():
+    if should_write_file(agents_md, force, console):
         agents_md.write_text(
             "# AI Agent Instructions\n\n"
             "See the `prompts/` directory for detailed instructions:\n\n"
@@ -386,6 +484,8 @@ def install_for_generic(target: Path, prompts_dir: Path, console: Console) -> No
             encoding="utf-8",
         )
         console.print(f"  [green]✓[/green] Created {agents_md.name}")
+    elif agents_md.exists():
+        console.print(f"  [dim]⏭[/dim] Skipped {agents_md.name}")
 
     console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {dest_dir}")
     console.print("[dim]💡 Reference these prompts manually in your AI conversations[/dim]")
