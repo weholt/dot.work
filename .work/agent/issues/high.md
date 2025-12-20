@@ -142,6 +142,112 @@ Use parametrized tests to avoid repetition across environments.
 ---
 
 ---
+id: "DOC-001@a7f3b2"
+title: "README documents 2 prompts but package contains 12"
+description: "README 'The Prompts' section is severely outdated"
+created: 2024-12-20
+section: "docs"
+tags: [documentation, readme, delivery-gap]
+type: bug
+priority: high
+status: proposed
+references:
+  - README.md
+  - src/dot_work/prompts/
+---
+
+### Problem
+README.md documents only 2 prompts (`project-from-discussion`, `issue-tracker-setup`) but the package now contains 12 prompt files:
+
+**Documented:**
+- project-from-discussion.prompt.md
+- setup-issue-tracker.prompt.md
+
+**Undocumented (10 files):**
+- do-work.prompt.md
+- bump-version.prompt.md
+- improvement-discovery.prompt.md
+- establish-baseline.prompt.md
+- compare-baseline.prompt.md
+- critical-code-review.prompt.md
+- spec-delivery-auditor.prompt.md
+- agent-prompts-reference.prompt.md
+- api-export.prompt.md
+- new-issue.prompt.md
+
+### Impact
+- Users cannot discover 83% of available functionality
+- Package appears less capable than it is
+- Misalignment between documented and actual behavior
+
+### Proposed Solution
+1. Update "The Prompts" section to document all 12 prompts
+2. Group prompts by category (project setup, workflow, quality)
+3. Add brief description for each prompt's purpose
+
+### Acceptance Criteria
+- [ ] All 12 prompts documented in README
+- [ ] Each prompt has a one-line description
+- [ ] Usage examples updated to reflect full prompt set
+
+---
+
+---
+id: "FEAT-005@d5b2e8"
+title: "Templatize all prompt cross-references"
+description: "11 of 12 prompts use hardcoded paths that break in non-Copilot environments"
+created: 2024-12-20
+section: "prompts"
+tags: [prompts, templates, broken-links]
+type: bug
+priority: high
+status: proposed
+references:
+  - src/dot_work/prompts/
+---
+
+### Problem
+Prompts use hardcoded relative paths like `[do-work.prompt.md](do-work.prompt.md)` instead of template variables. Only `setup-issue-tracker.prompt.md` uses `{{ prompt_path }}` correctly.
+
+### Impact
+Links break when installed to:
+- **Claude**: All content merged into CLAUDE.md - relative links point nowhere
+- **Cursor**: Prompts in .cursor/rules/*.mdc - links incorrect
+- **Aider**: Content in CONVENTIONS.md - relative links broken
+- **Amazon Q**: Content in .amazonq/rules.md - links broken
+- **All 9 non-Copilot environments** have broken cross-references
+
+### Affected Files (11 of 12 prompts)
+- do-work.prompt.md
+- critical-code-review.prompt.md
+- establish-baseline.prompt.md
+- compare-baseline.prompt.md
+- spec-delivery-auditor.prompt.md
+- agent-prompts-reference.prompt.md
+- improvement-discovery.prompt.md
+- bump-version.prompt.md
+- api-export.prompt.md
+- new-issue.prompt.md
+- python-project-from-discussion.prompt.md
+
+### Proposed Solution
+1. Audit all prompt files for cross-references
+2. Replace hardcoded paths with `{{ prompt_path }}/filename.prompt.md`
+3. Add test to detect hardcoded `.prompt.md` references
+4. Verify rendering produces correct paths for each environment
+
+### Acceptance Criteria
+- [ ] All prompt cross-references use `{{ prompt_path }}` variable
+- [ ] Links render correctly for copilot, claude, cursor, generic environments
+- [ ] Test added to detect hardcoded prompt references
+- [ ] No raw `{{` or `}}` in rendered output
+
+### Priority Justification
+Elevated to P1 because broken links affect 9/10 environments immediately upon install.
+
+---
+
+---
 id: "BUG-001@c5e8f1"
 title: "Version mismatch between pyproject.toml and __init__.py"
 description: "Version strings are out of sync: 0.1.0 vs 0.1.1"
