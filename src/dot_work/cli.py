@@ -17,6 +17,9 @@ app = typer.Typer(
 )
 console = Console()
 
+# Create subcommand group for validate
+validate_app = typer.Typer(help="Validate files for syntax and schema errors.")
+
 
 def detect_environment(target: Path) -> str | None:
     """Try to detect which AI environment is configured in the target project."""
@@ -214,6 +217,147 @@ def main(
     # If no command provided, show help
     if ctx.invoked_subcommand is None:
         console.print(ctx.get_help())
+
+
+# =============================================================================
+# Validate Subcommands
+# =============================================================================
+
+
+@validate_app.command("json")
+def validate_json_cmd(
+    file: Annotated[
+        Path,
+        typer.Argument(help="Path to the JSON file to validate"),
+    ],
+    schema: Annotated[
+        Path | None,
+        typer.Option(
+            "--schema",
+            "-s",
+            help="Optional JSON Schema file to validate against",
+        ),
+    ] = None,
+) -> None:
+    """Validate a JSON file for syntax errors and optionally against a schema."""
+    from dot_work.tools.json_validator import validate_against_schema, validate_json_file
+
+    file = file.resolve()
+
+    if not file.exists():
+        console.print(f"[red]❌ File not found:[/red] {file}")
+        raise typer.Exit(1)
+
+    console.print(f"[cyan]📋 Validating:[/cyan] {file.name}\n")
+
+    # Syntax validation
+    result = validate_json_file(file)
+
+    if not result.valid:
+        console.print("[red]❌ Syntax errors found:[/red]\n")
+        for error in result.errors:
+            console.print(f"  [red]•[/red] {error}")
+            if error.context:
+                console.print(f"    [dim]Context: ...{error.context}...[/dim]")
+        raise typer.Exit(1)
+
+    console.print("[green]✓[/green] JSON syntax is valid")
+
+    # Schema validation if provided
+    if schema:
+        if not schema.exists():
+            console.print(f"[red]❌ Schema file not found:[/red] {schema}")
+            raise typer.Exit(1)
+
+        import json
+
+        try:
+            schema_data = json.loads(schema.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            console.print(f"[red]❌ Invalid schema file:[/red] {e}")
+            raise typer.Exit(1) from None
+
+        schema_result = validate_against_schema(result.data, schema_data)
+        if not schema_result.valid:
+            console.print("\n[red]❌ Schema validation errors:[/red]\n")
+            for error in schema_result.errors:
+                console.print(f"  [red]•[/red] {error.message}")
+            raise typer.Exit(1)
+
+        console.print("[green]✓[/green] Schema validation passed")
+
+    # Show warnings
+    if result.warnings:
+        console.print(f"\n[yellow]⚠ {len(result.warnings)} warning(s):[/yellow]\n")
+        for warning in result.warnings:
+            console.print(f"  [yellow]•[/yellow] {warning}")
+
+    console.print("\n[bold green]✅ Validation complete![/bold green]")
+
+
+@validate_app.command("yaml")
+def validate_yaml_cmd(
+    file: Annotated[
+        Path,
+        typer.Argument(help="Path to the YAML file to validate"),
+    ],
+    frontmatter: Annotated[
+        bool,
+        typer.Option(
+            "--frontmatter",
+            "-f",
+            help="Treat file as markdown with YAML frontmatter",
+        ),
+    ] = False,
+) -> None:
+    """Validate a YAML file for syntax errors."""
+    from dot_work.tools.yaml_validator import extract_frontmatter, validate_yaml_file
+
+    file = file.resolve()
+
+    if not file.exists():
+        console.print(f"[red]❌ File not found:[/red] {file}")
+        raise typer.Exit(1)
+
+    console.print(f"[cyan]📋 Validating:[/cyan] {file.name}\n")
+
+    if frontmatter:
+        # Frontmatter mode
+        content = file.read_text(encoding="utf-8")
+        fm_result = extract_frontmatter(content)
+
+        if not fm_result.valid:
+            console.print("[red]❌ Frontmatter errors found:[/red]\n")
+            for error in fm_result.errors:
+                console.print(f"  [red]•[/red] {error}")
+            raise typer.Exit(1)
+
+        console.print("[green]✓[/green] YAML frontmatter is valid")
+        if fm_result.frontmatter:
+            console.print(f"    [dim]Keys: {', '.join(fm_result.frontmatter.keys())}[/dim]")
+    else:
+        # Full file mode
+        yaml_result = validate_yaml_file(file)
+
+        if not yaml_result.valid:
+            console.print("[red]❌ Syntax errors found:[/red]\n")
+            for error in yaml_result.errors:
+                console.print(f"  [red]•[/red] {error}")
+            raise typer.Exit(1)
+
+        console.print("[green]✓[/green] YAML syntax is valid")
+
+        # Show warnings
+        if yaml_result.warnings:
+            console.print(f"\n[yellow]⚠ {len(yaml_result.warnings)} warning(s):[/yellow]\n")
+            for warning in yaml_result.warnings:
+                console.print(f"  [yellow]•[/yellow] {warning}")
+
+    console.print("\n[bold green]✅ Validation complete![/bold green]")
+
+
+# Register the validate subcommand group
+app.add_typer(validate_app, name="validate")
 
 
 if __name__ == "__main__":
