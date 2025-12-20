@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en" data-theme="mocha">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>dot-work review</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Highlight.js for syntax highlighting -->
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/base16/catppuccin-mocha.min.css">
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+    <style type="text/tailwindcss">
+        /* Catppuccin Mocha Theme */
+        @theme {
+            /* Base colors */
+            --color-ctp-rosewater: #f5e0dc;
+            --color-ctp-flamingo: #f2cdcd;
+            --color-ctp-pink: #f5c2e7;
+            --color-ctp-mauve: #cba6f7;
+            --color-ctp-red: #f38ba8;
+            --color-ctp-maroon: #eba0ac;
+            --color-ctp-peach: #fab387;
+            --color-ctp-yellow: #f9e2af;
+            --color-ctp-green: #a6e3a1;
+            --color-ctp-teal: #94e2d5;
+            --color-ctp-sky: #89dceb;
+            --color-ctp-sapphire: #74c7ec;
+            --color-ctp-blue: #89b4fa;
+            --color-ctp-lavender: #b4befe;
+            --color-ctp-text: #cdd6f4;
+            --color-ctp-subtext1: #bac2de;
+            --color-ctp-subtext0: #a6adc8;
+            --color-ctp-overlay2: #9399b2;
+            --color-ctp-overlay1: #7f849c;
+            --color-ctp-overlay0: #6c7086;
+            --color-ctp-surface2: #585b70;
+            --color-ctp-surface1: #45475a;
+            --color-ctp-surface0: #313244;
+            --color-ctp-base: #1e1e2e;
+            --color-ctp-mantle: #181825;
+            --color-ctp-crust: #11111b;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--color-ctp-mantle);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-ctp-surface2);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--color-ctp-overlay0);
+        }
+    </style>
+    <link rel="stylesheet" href="/static/app.css" />
+</head>
+
+<body class="bg-ctp-base text-ctp-text font-mono m-0">
+    <div
+        class="flex justify-between items-center px-3 py-2.5 border-b border-ctp-surface0 bg-ctp-mantle sticky top-0 z-10">
+        <div class="font-bold text-ctp-text">📝 dot-work review</div>
+        <div class="flex items-center gap-4">
+            <span class="text-ctp-subtext0 text-sm">
+                review: <code class="text-ctp-blue">{{ review_id }}</code> · base: <code
+                    class="text-ctp-blue">{{ base_ref }}</code>
+            </span>
+            <span class="text-ctp-overlay0 text-xs hidden md:inline" title="Keyboard shortcuts">
+                <kbd class="px-1 py-0.5 bg-ctp-surface0 rounded text-ctp-subtext1">j</kbd>/<kbd
+                    class="px-1 py-0.5 bg-ctp-surface0 rounded text-ctp-subtext1">k</kbd> nav
+                <kbd class="px-1 py-0.5 bg-ctp-surface0 rounded text-ctp-subtext1 ml-2">n</kbd>/<kbd
+                    class="px-1 py-0.5 bg-ctp-surface0 rounded text-ctp-subtext1">p</kbd> changed
+            </span>
+            <button id="themeToggle"
+                class="px-2 py-1 text-sm rounded-lg bg-ctp-surface0 text-ctp-subtext1 hover:bg-ctp-surface1 border border-ctp-surface1 cursor-pointer transition-colors"
+                title="Toggle theme">
+                🎨
+            </button>
+        </div>
+    </div>
+
+    <div class="flex h-[calc(100vh-42px)]">
+        <aside class="w-[360px] border-r border-ctp-surface0 overflow-auto bg-ctp-mantle flex flex-col">
+            <div
+                class="px-3 py-2.5 font-bold border-b border-ctp-surface0 text-ctp-text flex justify-between items-center">
+                <span>Files</span>
+                <span class="text-xs font-normal text-ctp-subtext0">{{ files|length }} files</span>
+            </div>
+            <div id="fileTree" class="flex flex-col flex-1 overflow-auto text-sm"></div>
+            <div class="p-3 text-xs text-ctp-subtext0 border-t border-ctp-surface0">
+                Export bundle:<br>
+                <code class="text-ctp-blue">dot-work review export</code>
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-auto p-3">
+            {% if not path %}
+            <div class="p-3 text-ctp-subtext0">No file selected</div>
+            {% else %}
+            <div class="flex justify-between items-center mb-3">
+                <div class="flex items-center gap-3">
+                    <code class="text-ctp-text">{{ path }}</code>
+                    {% if file_is_changed and file_diff %}
+                    {% set ns = namespace(adds=0, dels=0) %}
+                    {% for h in file_diff.hunks %}
+                    {% for ln in h.lines %}
+                    {% if ln.kind == 'add' %}{% set ns.adds = ns.adds + 1 %}{% endif %}
+                    {% if ln.kind == 'del' %}{% set ns.dels = ns.dels + 1 %}{% endif %}
+                    {% endfor %}
+                    {% endfor %}
+                    <span class="text-ctp-green text-sm font-medium">+{{ ns.adds }}</span>
+                    <span class="text-ctp-red text-sm font-medium">−{{ ns.dels }}</span>
+                    {% endif %}
+                </div>
+                {% if file_is_changed %}
+                <div class="text-xs px-2 py-0.5 rounded-full border border-ctp-yellow/40 text-ctp-yellow">changed</div>
+                {% else %}
+                <div class="text-xs px-2 py-0.5 rounded-full border border-ctp-green/40 text-ctp-green">clean</div>
+                {% endif %}
+            </div>
+
+            {% if file_is_changed and file_diff and not file_diff.is_binary %}
+            <div class="border border-ctp-surface0 rounded-xl mb-3 overflow-hidden bg-ctp-mantle">
+                <div
+                    class="px-3 py-2.5 font-bold border-b border-ctp-surface0 text-ctp-text flex justify-between items-center">
+                    <span>Diff</span>
+                    <div class="flex gap-2">
+                        <button id="unifiedViewBtn" onclick="setDiffView('unified')"
+                            class="px-2 py-1 text-xs rounded-lg bg-ctp-surface0 text-ctp-text border border-ctp-surface1 cursor-pointer hover:bg-ctp-surface1 transition-colors">Unified</button>
+                        <button id="splitViewBtn" onclick="setDiffView('split')"
+                            class="px-2 py-1 text-xs rounded-lg bg-ctp-surface1 text-ctp-subtext0 border border-ctp-surface2 cursor-pointer hover:bg-ctp-surface1 transition-colors">Split</button>
+                    </div>
+                </div>
+
+                <!-- Unified View -->
+                <div id="unifiedView">
+                    {% for h in file_diff.hunks %}
+                    <div class="hunk">
+                        <div class="px-3 py-2 border-b border-ctp-surface0 text-ctp-subtext0">
+                            <code>{{ h.header }}</code>
+                        </div>
+                        <div class="w-full">
+                            {% for ln in h.lines %}
+                            <div class="group flex gap-2.5 px-3 py-0.5 hover:bg-ctp-surface0 {% if ln.kind == 'add' %}bg-ctp-green/10{% elif ln.kind == 'del' %}bg-ctp-red/10{% endif %}"
+                                data-path="{{ path }}" data-side="{{ 'new' if ln.new_lineno else 'old' }}"
+                                data-line="{{ ln.new_lineno if ln.new_lineno else ln.old_lineno }}">
+                                <button
+                                    class="w-4 opacity-0 group-hover:opacity-100 text-ctp-blue hover:text-ctp-sapphire transition-opacity cursor-pointer bg-transparent border-none p-0 text-sm"
+                                    onclick="openComment(this.parentElement)" title="Add comment">+</button>
+                                <div class="w-16 flex justify-between text-ctp-overlay0 select-none text-xs">
+                                    <span>{{ ln.old_lineno if ln.old_lineno else '' }}</span>
+                                    <span>{{ ln.new_lineno if ln.new_lineno else '' }}</span>
+                                </div>
+                                <pre class="m-0 whitespace-pre overflow-auto flex-1 cursor-pointer {% if ln.kind == 'add' %}text-ctp-green{% elif ln.kind == 'del' %}text-ctp-red{% elif ln.kind == 'meta' %}text-ctp-overlay1 italic{% else %}text-ctp-text{% endif %}"
+                                    onclick="openComment(this.parentElement)">{{ ln.text }}</pre>
+                            </div>
+
+                            {% set key = (('new' if ln.new_lineno else 'old'), (ln.new_lineno if ln.new_lineno else
+                            ln.old_lineno)) %}
+                            {% if key in comments_by_line %}
+                            <div class="py-1.5 px-3 pl-[92px] border-b border-ctp-surface0/50">
+                                {% for c in comments_by_line[key] %}
+                                <div class="border border-ctp-surface0 rounded-xl p-2.5 bg-ctp-base mt-1.5">
+                                    <div><code class="text-ctp-blue text-sm">{{ c.id }}</code></div>
+                                    <div class="mt-1.5 whitespace-pre-wrap text-ctp-text">{{ c.message }}</div>
+                                    {% if c.suggestion %}
+                                    <pre
+                                        class="mt-2 bg-ctp-mantle border border-ctp-surface0 rounded-xl p-2 overflow-auto text-ctp-text">{{ c.suggestion }}</pre>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Split View -->
+                <div id="splitView" class="hidden">
+                    {% for h in file_diff.hunks %}
+                    <div class="hunk">
+                        <div class="px-3 py-2 border-b border-ctp-surface0 text-ctp-subtext0">
+                            <code>{{ h.header }}</code>
+                        </div>
+                        <div class="flex w-full">
+                            <!-- Left pane (old/deletions) -->
+                            <div class="flex-1 border-r border-ctp-surface0 split-pane-left">
+                                {% for ln in h.lines %}
+                                {% if ln.kind != 'add' %}
+                                <div class="flex gap-1.5 px-2 py-0.5 cursor-pointer hover:bg-ctp-surface0 {% if ln.kind == 'del' %}bg-ctp-red/10{% endif %}"
+                                    data-path="{{ path }}" data-side="old"
+                                    data-line="{{ ln.old_lineno if ln.old_lineno else '' }}"
+                                    onclick="openComment(this)">
+                                    <div class="w-10 text-right text-ctp-overlay0 select-none text-xs">{{ ln.old_lineno
+                                        if ln.old_lineno else '' }}</div>
+                                    <pre
+                                        class="m-0 whitespace-pre overflow-auto flex-1 text-sm {% if ln.kind == 'del' %}text-ctp-red{% elif ln.kind == 'meta' %}text-ctp-overlay1 italic{% else %}text-ctp-text{% endif %}">{{ ln.text }}</pre>
+                                </div>
+                                {% else %}
+                                <div class="flex gap-1.5 px-2 py-0.5 bg-ctp-surface0/30">
+                                    <div class="w-10 text-right text-ctp-overlay0 select-none text-xs"></div>
+                                    <pre
+                                        class="m-0 whitespace-pre overflow-auto flex-1 text-sm text-transparent select-none">{{ ln.text }}</pre>
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                            <!-- Right pane (new/additions) -->
+                            <div class="flex-1 split-pane-right">
+                                {% for ln in h.lines %}
+                                {% if ln.kind != 'del' %}
+                                <div class="flex gap-1.5 px-2 py-0.5 cursor-pointer hover:bg-ctp-surface0 {% if ln.kind == 'add' %}bg-ctp-green/10{% endif %}"
+                                    data-path="{{ path }}" data-side="new"
+                                    data-line="{{ ln.new_lineno if ln.new_lineno else '' }}"
+                                    onclick="openComment(this)">
+                                    <div class="w-10 text-right text-ctp-overlay0 select-none text-xs">{{ ln.new_lineno
+                                        if ln.new_lineno else '' }}</div>
+                                    <pre
+                                        class="m-0 whitespace-pre overflow-auto flex-1 text-sm {% if ln.kind == 'add' %}text-ctp-green{% elif ln.kind == 'meta' %}text-ctp-overlay1 italic{% else %}text-ctp-text{% endif %}">{{ ln.text }}</pre>
+                                </div>
+                                {% else %}
+                                <div class="flex gap-1.5 px-2 py-0.5 bg-ctp-surface0/30">
+                                    <div class="w-10 text-right text-ctp-overlay0 select-none text-xs"></div>
+                                    <pre
+                                        class="m-0 whitespace-pre overflow-auto flex-1 text-sm text-transparent select-none">{{ ln.text }}</pre>
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% elif file_is_changed and file_diff and file_diff.is_binary %}
+            <div class="border border-ctp-surface0 rounded-xl mb-3 overflow-hidden bg-ctp-mantle">
+                <div class="px-3 py-2.5 font-bold border-b border-ctp-surface0 text-ctp-text">Binary diff</div>
+                <div class="p-3 text-ctp-subtext0">Binary file; diff not shown.</div>
+            </div>
+            {% endif %}
+
+            <div class="border border-ctp-surface0 rounded-xl mb-3 overflow-hidden bg-ctp-mantle">
+                <div class="px-3 py-2.5 font-bold border-b border-ctp-surface0 text-ctp-text">File content</div>
+                <div id="fileContent" class="w-full" data-path="{{ path }}"
+                    data-lang="{{ path.split('.')[-1] if path else '' }}">
+                    {% for i in range(file_lines|length) %}
+                    {% set lineno = i + 1 %}
+                    <div class="group flex gap-2.5 px-3 py-0.5 hover:bg-ctp-surface0 code-line" data-path="{{ path }}"
+                        data-side="new" data-line="{{ lineno }}">
+                        <button
+                            class="w-4 opacity-0 group-hover:opacity-100 text-ctp-blue hover:text-ctp-sapphire transition-opacity cursor-pointer bg-transparent border-none p-0 text-sm"
+                            onclick="openComment(this.parentElement)" title="Add comment">+</button>
+                        <div class="w-16 flex justify-end text-ctp-overlay0 select-none text-xs">
+                            <span>{{ lineno }}</span>
+                        </div>
+                        <code
+                            class="code-text m-0 whitespace-pre overflow-auto flex-1 cursor-pointer bg-transparent text-sm"
+                            onclick="openComment(this.parentElement)">{{ file_lines[i] }}</code>
+                    </div>
+
+                    {% set key = ('new', lineno) %}
+                    {% if key in comments_by_line %}
+                    <div class="py-1.5 px-3 pl-[92px] border-b border-ctp-surface0/50">
+                        {% for c in comments_by_line[key] %}
+                        <div class="border border-ctp-surface0 rounded-xl p-2.5 bg-ctp-base mt-1.5">
+                            <div><code class="text-ctp-blue text-sm">{{ c.id }}</code></div>
+                            <div class="mt-1.5 whitespace-pre-wrap text-ctp-text">{{ c.message }}</div>
+                            {% if c.suggestion %}
+                            <pre
+                                class="mt-2 bg-ctp-mantle border border-ctp-surface0 rounded-xl p-2 overflow-auto text-ctp-text">{{ c.suggestion }}</pre>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% endif %}
+        </main>
+    </div>
+
+    <div id="modal" class="fixed inset-0 bg-black/65 hidden items-center justify-center z-[999]"
+        onclick="closeIfBackdrop(event)">
+        <div class="w-[min(820px,calc(100vw-24px))] bg-ctp-mantle border border-ctp-surface0 rounded-2xl p-3">
+            <div class="font-bold text-ctp-text mb-1.5">Add comment</div>
+            <div class="text-ctp-subtext0 mb-2.5" id="modalMeta"></div>
+
+            <label class="block mt-2.5 mb-1.5 text-ctp-subtext1">Comment</label>
+            <textarea id="msg"
+                class="w-full min-h-[90px] resize-y bg-ctp-base text-ctp-text border border-ctp-surface0 rounded-xl p-2 box-border font-mono focus:outline-none focus:border-ctp-blue"
+                placeholder="Comment..."></textarea>
+
+            <label class="block mt-2.5 mb-1.5 text-ctp-subtext1">Suggestion (optional)</label>
+            <textarea id="sug"
+                class="w-full min-h-[90px] resize-y bg-ctp-base text-ctp-text border border-ctp-surface0 rounded-xl p-2 box-border font-mono focus:outline-none focus:border-ctp-blue"
+                placeholder="Suggested code..."></textarea>
+
+            <div class="flex gap-2.5 justify-end mt-3">
+                <button
+                    class="bg-ctp-blue text-ctp-base px-3 py-2 rounded-xl cursor-pointer font-mono border-none hover:bg-ctp-sapphire transition-colors"
+                    onclick="submitComment()">Save</button>
+                <button
+                    class="bg-ctp-surface0 text-ctp-text px-3 py-2 rounded-xl cursor-pointer font-mono border border-ctp-surface1 hover:bg-ctp-surface1 transition-colors"
+                    onclick="hideModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+    <script>
+        // File tree data from server
+        const FILES = {{ files | tojson }};
+        const CHANGED = new Set({{ changed | list | tojson }});
+        const CURRENT_PATH = {{ (path or '') | tojson }};
+
+        // Initialize file tree on load
+        document.addEventListener("DOMContentLoaded", () => {
+            initFileTree("fileTree", FILES, CHANGED, CURRENT_PATH);
+
+            // Apply syntax highlighting to file content
+            const fileContent = document.getElementById('fileContent');
+            if (fileContent && typeof hljs !== 'undefined') {
+                const lang = fileContent.dataset.lang;
+                const langMap = {
+                    'py': 'python',
+                    'js': 'javascript',
+                    'ts': 'typescript',
+                    'jsx': 'javascript',
+                    'tsx': 'typescript',
+                    'html': 'html',
+                    'css': 'css',
+                    'json': 'json',
+                    'md': 'markdown',
+                    'yml': 'yaml',
+                    'yaml': 'yaml',
+                    'toml': 'ini',
+                    'sh': 'bash',
+                    'bash': 'bash',
+                    'sql': 'sql',
+                    'rs': 'rust',
+                    'go': 'go',
+                    'java': 'java',
+                    'rb': 'ruby',
+                    'php': 'php',
+                    'c': 'c',
+                    'cpp': 'cpp',
+                    'h': 'c',
+                    'swift': 'swift',
+                    'kt': 'kotlin',
+                };
+                const hljsLang = langMap[lang] || lang;
+
+                // Highlight each code line
+                fileContent.querySelectorAll('.code-text').forEach(el => {
+                    const text = el.textContent;
+                    try {
+                        if (hljsLang && hljs.getLanguage(hljsLang)) {
+                            el.innerHTML = hljs.highlight(text, { language: hljsLang }).value;
+                        } else {
+                            el.innerHTML = hljs.highlightAuto(text).value;
+                        }
+                    } catch (e) {
+                        // Keep original text if highlighting fails
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>

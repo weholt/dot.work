@@ -9,11 +9,12 @@ id: "MIGRATE-001@a1b2c3"
 title: "Create dot_work/review subpackage structure"
 description: "Set up the review/ subpackage directory and __init__.py"
 created: 2024-12-21
+completed: 2024-12-21
 section: "src/dot_work/review"
 tags: [migration, structure, review]
 type: enhancement
 priority: high
-status: proposed
+status: done
 references:
   - incoming/review/src/agent_review/
   - src/dot_work/
@@ -62,11 +63,12 @@ id: "MIGRATE-002@b2c3d4"
 title: "Update all import paths in review subpackage"
 description: "Change agent_review imports to dot_work.review"
 created: 2024-12-21
+completed: 2024-12-21
 section: "src/dot_work/review"
 tags: [migration, imports, review]
 type: enhancement
 priority: high
-status: proposed
+status: done
 depends_on: ["MIGRATE-001@a1b2c3"]
 references:
   - src/dot_work/review/git.py
@@ -120,11 +122,12 @@ id: "MIGRATE-003@c3d4e5"
 title: "Copy static assets and templates for review UI"
 description: "Move templates/ and static/ directories to review subpackage"
 created: 2024-12-21
+completed: 2024-12-21
 section: "src/dot_work/review"
 tags: [migration, assets, templates, review]
 type: enhancement
 priority: high
-status: proposed
+status: done
 depends_on: ["MIGRATE-001@a1b2c3"]
 references:
   - incoming/review/src/agent_review/templates/
@@ -180,11 +183,12 @@ id: "MIGRATE-004@d4e5f6"
 title: "Add new dependencies for review functionality"
 description: "Add fastapi, uvicorn, and pydantic to pyproject.toml"
 created: 2024-12-21
+completed: 2024-12-21
 section: "config"
 tags: [migration, dependencies, review]
 type: enhancement
 priority: high
-status: proposed
+status: done
 references:
   - pyproject.toml
   - incoming/review/pyproject.toml
@@ -252,11 +256,12 @@ id: "MIGRATE-005@e5f6a7"
 title: "Integrate review command into dot-work CLI"
 description: "Add 'review' subcommand with 'export' nested command"
 created: 2024-12-21
+completed: 2024-12-21
 section: "cli"
 tags: [migration, cli, review]
 type: enhancement
 priority: high
-status: proposed
+status: done
 depends_on: ["MIGRATE-001@a1b2c3", "MIGRATE-002@b2c3d4", "MIGRATE-003@c3d4e5", "MIGRATE-004@d4e5f6"]
 references:
   - src/dot_work/cli.py
@@ -496,11 +501,12 @@ id: "MIGRATE-009@c9d0e1"
 title: "Update storage path to .work/reviews/"
 description: "Integrate review storage with .work/ directory structure"
 created: 2024-12-21
+completed: 2024-12-21
 section: "src/dot_work/review"
 tags: [migration, config, storage, review]
 type: enhancement
 priority: medium
-status: proposed
+status: done
 depends_on: ["MIGRATE-002@b2c3d4"]
 references:
   - src/dot_work/review/config.py
