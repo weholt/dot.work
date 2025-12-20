@@ -91,53 +91,44 @@ The prompts document `init work` as a trigger command to create the `.work/` iss
 
 ---
 id: "TEST-001@c4a9f6"
-title: "Add installer and CLI integration tests"
-description: "No tests exist for install_for_* functions or CLI commands"
+title: "Add installer integration tests"
+description: "Installer install_for_* functions lack comprehensive tests"
 created: 2024-12-20
 section: "tests"
-tags: [testing, coverage, cli]
+tags: [testing, coverage, installer]
 type: test
 priority: high
 status: proposed
 references:
   - tests/unit/test_installer.py
-  - src/dot_work/cli.py
   - src/dot_work/installer.py
 ---
 
 ### Problem
-The core functionality (file installation) is not unit tested. CLI commands (`install`, `detect`, `list`, `init`) have no tests. Only template rendering is tested.
+The installer module has 41% coverage. The 10 `install_for_*` functions are not individually tested. CLI command tests (TEST-002) now cover the entry points, but installer internals need more coverage.
 
-### Affected Files
-- `tests/unit/test_installer.py` (expand)
-- `tests/unit/test_cli.py` (create new)
-- `tests/conftest.py` (add fixtures)
+### Remaining Work
+(CLI tests completed in TEST-002@d8c4e1)
 
-### Importance
-Without tests, regressions in installation logic go undetected. The installer functions and CLI are the primary user-facing features.
-
-### Proposed Solution
-1. Create `tests/unit/test_cli.py` using `typer.testing.CliRunner`
-2. Add tests for each CLI command:
-   - `test_install_creates_files_for_each_environment`
-   - `test_install_detects_environment_correctly`
-   - `test_list_shows_all_environments`
-   - `test_detect_finds_environment_markers`
-3. Add installer tests for each `install_for_*` function:
-   - Verify correct directories created
+1. Add tests for each `install_for_*` function:
+   - Verify correct directories created per environment
    - Verify files have expected content
-   - Verify template variables substituted
-4. Add fixtures for temporary project directories with various environment markers
+   - Verify template variables substituted correctly
+2. Add parametrized tests across environments
+3. Test edge cases (missing prompts, permission errors)
 
 ### Acceptance Criteria
 - [ ] Each `install_for_*` function has at least one test
-- [ ] Each CLI command has happy-path and error-path tests
-- [ ] `detect_environment()` tested with fixture directories
-- [ ] Coverage for installer.py ≥ 80%
-- [ ] Coverage for cli.py ≥ 70%
+- [ ] Coverage for installer.py ≥ 80% (currently 41%)
+- [ ] Parametrized tests for all 10 environments
 
 ### Notes
-Use parametrized tests to avoid repetition across environments.
+CLI tests in TEST-002 now cover:
+- ✅ CLI commands (80% coverage)
+- ✅ `detect_environment()`
+- ✅ `initialize_work_directory()`
+
+Focus remaining effort on `install_for_*` functions.
 
 ---
 
@@ -146,49 +137,37 @@ id: "DOC-001@a7f3b2"
 title: "README documents 2 prompts but package contains 12"
 description: "README 'The Prompts' section is severely outdated"
 created: 2024-12-20
+completed: 2024-12-20
 section: "docs"
 tags: [documentation, readme, delivery-gap]
 type: bug
 priority: high
-status: proposed
+status: completed
 references:
   - README.md
   - src/dot_work/prompts/
 ---
 
 ### Problem
-README.md documents only 2 prompts (`project-from-discussion`, `issue-tracker-setup`) but the package now contains 12 prompt files:
+README.md documented only 2 prompts (`project-from-discussion`, `issue-tracker-setup`) but the package contains 12 prompt files.
 
-**Documented:**
-- project-from-discussion.prompt.md
-- setup-issue-tracker.prompt.md
+### Solution Implemented
+1. Updated "What This Does" to reflect 12 prompts with 4 categories
+2. Completely rewrote "The Prompts" section with organized tables:
+   - 🏗️ Project Setup (2 prompts)
+   - 🔄 Workflow & Iteration (3 prompts)
+   - ✅ Quality Assurance (5 prompts)
+   - 🔧 Utilities (2 prompts)
+3. Updated usage examples to match current prompt names
+4. Updated workflow example steps
 
-**Undocumented (10 files):**
-- do-work.prompt.md
-- bump-version.prompt.md
-- improvement-discovery.prompt.md
-- establish-baseline.prompt.md
-- compare-baseline.prompt.md
-- critical-code-review.prompt.md
-- spec-delivery-auditor.prompt.md
-- agent-prompts-reference.prompt.md
-- api-export.prompt.md
-- new-issue.prompt.md
-
-### Impact
-- Users cannot discover 83% of available functionality
-- Package appears less capable than it is
-- Misalignment between documented and actual behavior
-
-### Proposed Solution
-1. Update "The Prompts" section to document all 12 prompts
-2. Group prompts by category (project setup, workflow, quality)
-3. Add brief description for each prompt's purpose
+### Changes
+- README.md: Comprehensive rewrite of prompts section
 
 ### Acceptance Criteria
-- [ ] All 12 prompts documented in README
-- [ ] Each prompt has a one-line description
-- [ ] Usage examples updated to reflect full prompt set
+- [x] All 12 prompts documented in README
+- [x] Each prompt has a one-line description
+- [x] Usage examples updated to reflect full prompt set
 
 ---
 

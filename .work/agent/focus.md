@@ -1,20 +1,33 @@
 # Agent Focus
-Last updated: 2024-12-20T20:15:00Z
+Last updated: 2024-12-21
 
 ## Previous
-- Issue: FEAT-004@b8e1d4 – Implement dot-work init-work CLI command
+- Issue: DOC-001@a7f3b2 – README documents 2 prompts but package contains 12 (P1)
 - Completed: 2024-12-20
-- Outcome: Fixed, validated, 15 new tests, 180 total (46% coverage)
+- Outcome: README now documents all 12 prompts in 4 categories
 
 ## Current
-- Issue: TEST-002@d8c4e1 – CLI has 0% test coverage (P0 - critical)
-- Started: pending
-- Status: proposed
-- Phase: Issue created from improvement-discovery analysis
-- Source: critical.md (P0)
-- Note: Elevated due to regression occurring this session (BUG-001 aftermath)
+- Issue: None (ready for next issue)
+- Status: idle
 
 ## Next
-- Issue: TEST-001@c4a9f6 – Add installer integration tests (P1)
-- Source: high.md
-- Reason: Complements TEST-002, together achieve comprehensive test coverage
+- Issue: MIGRATE-001@a1b2c3 – Create dot_work/review subpackage structure (P1)
+- Source: migration-review.md
+- Reason: First step in integrating agent-review as `dot-work review` command
+
+## Migration Plan
+Created `.work/agent/issues/migration-review.md` with 12 issues to integrate incoming/review:
+| ID | Title | Priority | Dependencies |
+|----|-------|----------|--------------|
+| MIGRATE-001 | Create review subpackage structure | P1 | - |
+| MIGRATE-002 | Update import paths | P1 | 001 |
+| MIGRATE-003 | Copy static assets and templates | P1 | 001 |
+| MIGRATE-004 | Add new dependencies | P1 | - |
+| MIGRATE-005 | Integrate review CLI commands | P1 | 001-004 |
+| MIGRATE-006 | Migrate unit tests | P1 | 002 |
+| MIGRATE-007 | Add integration tests | P2 | 006 |
+| MIGRATE-008 | Update Python version to 3.11+ | P1 | - |
+| MIGRATE-009 | Update storage path to .work/reviews/ | P2 | 002 |
+| MIGRATE-010 | Add README documentation | P2 | 005 |
+| MIGRATE-011 | Add CLI tests for review command | P1 | 005 |
+| MIGRATE-012 | Clean up incoming/review | P3 | all |

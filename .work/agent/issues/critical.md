@@ -7,53 +7,49 @@ Blockers, security issues, data loss risks.
 ---
 id: "TEST-002@d8c4e1"
 title: "CLI has 0% test coverage - regressions go undetected"
-description: "All 8 CLI commands are completely untested, causing regressions"
+description: "All 8 CLI commands were completely untested, now resolved"
 created: 2024-12-20
+completed: 2024-12-20
 section: "tests"
 tags: [testing, cli, regression, critical]
 type: bug
 priority: critical
-status: proposed
+status: completed
 references:
   - src/dot_work/cli.py
-  - tests/unit/test_cli.py (to create)
+  - tests/unit/test_cli.py
 ---
 
 ### Problem
-The CLI module (`src/dot_work/cli.py`) has **0% test coverage** across all 403 lines. This session, a regression occurred where `cli.py:212` referenced `__version__` that was removed in a previous fix (BUG-001). The regression was only caught by running the build, not by tests.
+The CLI module (`src/dot_work/cli.py`) had **0% test coverage** across all 403 lines. A regression occurred where `cli.py:212` referenced `__version__` that was removed in a previous fix (BUG-001). The regression was only caught by running the build, not by tests.
 
-### Evidence of Risk
-- **BUG-001 regression**: CLI broke because `__version__` was removed but CLI still imported it
-- **Zero coverage**: Lines 3-403 are entirely untested per baseline.md
-- **8 untested commands**: `install`, `list`, `detect`, `init`, `init-work`, `validate json`, `validate yaml`, `--version`
+### Solution Implemented
+Created comprehensive `tests/unit/test_cli.py` with 49 tests using `typer.testing.CliRunner`:
 
-### Impact
-- User-facing commands can break silently
-- Regressions discovered late (by users, not tests)
-- Blocks confident refactoring of CLI code
+**Test Classes (11):**
+1. `TestVersionCommand` - 4 tests (regression guard for BUG-001)
+2. `TestHelpCommand` - 10 tests (all commands --help)
+3. `TestListCommand` - 3 tests
+4. `TestDetectCommand` - 4 tests
+5. `TestInitWorkCommand` - 5 tests
+6. `TestInstallCommand` - 5 tests
+7. `TestInitCommand` - 2 tests
+8. `TestValidateJsonCommand` - 7 tests
+9. `TestValidateYamlCommand` - 5 tests
+10. `TestEdgeCases` - 4 tests (integration)
 
-### Proposed Solution
-Create `tests/unit/test_cli.py` using `typer.testing.CliRunner`:
-
-1. **Smoke tests** for each command (exits 0, produces expected output)
-2. **--version test** (would have caught this session's regression)
-3. **--help test** for each command
-4. **Error path tests** (invalid env, missing file, etc.)
+### Results
+| Metric | Before | After | Δ |
+|--------|--------|-------|---|
+| Tests | 180 | 229 | +49 |
+| Coverage | 46% | 67% | +21% |
+| CLI Coverage | 0% | 80% | +80% |
 
 ### Acceptance Criteria
-- [ ] `tests/unit/test_cli.py` created with CliRunner
-- [ ] Each of 8 commands has at least one test
-- [ ] `--version` command tested (regression guard)
-- [ ] CLI coverage ≥ 50%
-- [ ] No regressions in existing tests
-
-### Priority Justification
-Elevated to P0 because:
-1. Regression already occurred this session
-2. Core user interface is completely unguarded
-3. Blocks other work (refactoring, new features)
-
-### Notes
-This complements TEST-001 (installer tests) but focuses specifically on CLI entry points. May be merged with TEST-001 during implementation.
+- [x] `tests/unit/test_cli.py` created with CliRunner
+- [x] Each of 8 commands has at least one test
+- [x] `--version` command tested (regression guard)
+- [x] CLI coverage ≥ 50% (achieved: 80%)
+- [x] No regressions in existing tests
 
 ---

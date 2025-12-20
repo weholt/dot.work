@@ -6,10 +6,12 @@ Works with: GitHub Copilot, Claude Code, Cursor, Windsurf, Aider, Continue.dev, 
 
 ## 🎯 What This Does
 
-This tool contains two powerful prompts:
+This tool provides **12 AI agent prompts** for:
 
-1. **`project-from-discussion`** - Turn a loose project discussion into a production-ready Python project with proper structure, tooling, and tests
-2. **`issue-tracker-setup`** - Set up file-based issue tracking for AI agents working on your project
+- **Project scaffolding** - Turn discussions into production-ready projects
+- **Workflow management** - Issue tracking, focus, and iteration loops
+- **Quality assurance** - Baselines, code reviews, and delivery auditing
+- **Version control** - Semantic versioning with safety checks
 
 The installer detects your AI coding environment and puts the prompts in the right place so they work as slash commands.
 
@@ -90,39 +92,62 @@ After installing, use the prompts in your AI environment:
 
 ## 📋 The Prompts
 
-### project-from-discussion.prompt.md
+### 🏗️ Project Setup
 
-Transforms a project discussion (markdown file or pasted text) into a complete Python project:
+| Prompt | Description |
+|--------|-------------|
+| **`python-project-from-discussion`** | Transform a project discussion into a complete Python project with `pyproject.toml`, `src/` layout, CLI, tests, and `AGENTS.md` |
+| **`setup-issue-tracker`** | Initialize `.work/` directory with priority-based issue tracking, focus management, and agent memory |
 
-- `pyproject.toml` with all dependencies and tool configs
-- Proper `src/<package>/` structure
-- CLI with `typer`
-- `scripts/build.py` for linting, type-checking, and testing
-- Test structure with `pytest`
-- `AGENTS.md` for AI agent guidelines
-- `.gitignore` with proper exclusions
+### 🔄 Workflow & Iteration
 
-**Usage:**
+| Prompt | Description |
+|--------|-------------|
+| **`do-work`** | Optimal iteration loop for AI agents: baseline → select → investigate → implement → validate → complete |
+| **`new-issue`** | Create properly formatted issues with ID, priority, tags, and acceptance criteria |
+| **`agent-prompts-reference`** | Quick reference for all available prompts and their trigger commands |
+
+### ✅ Quality Assurance
+
+| Prompt | Description |
+|--------|-------------|
+| **`establish-baseline`** | Capture current project state (tests, coverage, lint, types) before making changes |
+| **`compare-baseline`** | Compare current state against baseline to detect regressions |
+| **`critical-code-review`** | Deep code review focusing on correctness, security, and maintainability |
+| **`spec-delivery-auditor`** | Verify implementation matches specification with gap analysis |
+| **`improvement-discovery`** | Analyze codebase for justified improvements with cost/benefit analysis |
+
+### 🔧 Utilities
+
+| Prompt | Description |
+|--------|-------------|
+| **`bump-version`** | Semantic version bumping with safety checks and multi-file sync |
+| **`api-export`** | Generate API documentation or export specifications |
+
+---
+
+### Usage Examples
+
+**Start a new project:**
 ```
-/project-from-discussion
+/python-project-from-discussion
 
-Here's my project idea:
-[paste your discussion or reference a file]
+Here's my project idea: [paste discussion]
 ```
 
-### issue-tracker-setup.prompt.md
-
-Sets up a file-based issue tracking system in `.work/`:
-
-- Priority-based issue files (critical, high, medium, low)
-- Agent focus tracking (`focus.md`)
-- Persistent memory across sessions (`memory.md`)
-- User-assigned shortlist
-- Issue history and archiving
-
-**Usage:**
+**Set up issue tracking:**
 ```
-init work
+/setup-issue-tracker
+```
+
+**Begin an iteration:**
+```
+/do-work
+```
+
+**Bump version after changes:**
+```
+/bump-version patch
 ```
 
 ## 🔄 Workflow Example
@@ -139,20 +164,26 @@ init work
 
 3. **Use the project prompt** in your AI tool:
    ```
-   /project-from-discussion
+   /python-project-from-discussion
    
    I want to build a CLI tool that...
    ```
 
-4. **Set up issue tracking** (automatic with project prompt, or manually):
+4. **Set up issue tracking**:
    ```
-   init work
+   /setup-issue-tracker
    ```
 
-5. **Start building!** The AI agent now has:
+5. **Start iterating** with the workflow prompt:
+   ```
+   /do-work
+   ```
+
+6. **The AI agent now has:**
    - Complete project structure
    - Issue tracking for tasks
    - Memory persistence across sessions
+   - Quality assurance workflows
 
 ## 🛠️ Development
 
