@@ -1,14 +1,14 @@
 """CLI entry point for dot-work."""
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from dot_work.environments import ENVIRONMENTS, Environment
-from dot_work.installer import install_prompts, get_prompts_dir
+from dot_work.environments import ENVIRONMENTS
+from dot_work.installer import get_prompts_dir, install_prompts
 
 app = typer.Typer(
     name="dot-work",
@@ -30,41 +30,44 @@ def detect_environment(target: Path) -> str | None:
 @app.command("install")
 def install(
     env: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
-            "--env", "-e",
+            "--env",
+            "-e",
             help="AI environment to install for (copilot, claude, cursor, opencode, etc.)",
         ),
     ] = None,
     target: Annotated[
         Path,
         typer.Option(
-            "--target", "-t",
+            "--target",
+            "-t",
             help="Target project directory (default: current directory)",
         ),
     ] = Path("."),
     force: Annotated[
         bool,
         typer.Option(
-            "--force", "-f",
+            "--force",
+            "-f",
             help="Overwrite existing files without asking",
         ),
     ] = False,
 ) -> None:
     """Install AI prompts to your project directory."""
     target = target.resolve()
-    
+
     if not target.exists():
         console.print(f"[red]❌ Target directory does not exist:[/red] {target}")
         raise typer.Exit(1)
-    
+
     # Get prompts directory
     try:
         prompts_dir = get_prompts_dir()
     except FileNotFoundError as e:
         console.print(f"[red]❌ {e}[/red]")
-        raise typer.Exit(1)
-    
+        raise typer.Exit(1) from None
+
     # Determine environment
     env_key = env
     if not env_key:
@@ -74,23 +77,23 @@ def install(
             console.print(f"[cyan]🔍 Detected environment:[/cyan] {ENVIRONMENTS[detected].name}")
             if typer.confirm("Use this environment?", default=True):
                 env_key = detected
-        
+
         # Fall back to interactive selection
         if not env_key:
             env_key = prompt_for_environment()
-    
+
     # Validate environment
     if env_key not in ENVIRONMENTS:
         console.print(f"[red]❌ Unknown environment:[/red] {env_key}")
         console.print(f"Available: {', '.join(ENVIRONMENTS.keys())}")
         raise typer.Exit(1)
-    
+
     # Install
     env_config = ENVIRONMENTS[env_key]
     console.print(f"\n[bold blue]📦 Installing prompts for {env_config.name}...[/bold blue]\n")
-    
+
     install_prompts(env_key, target, prompts_dir, console)
-    
+
     console.print("\n[bold green]✅ Installation complete![/bold green]")
 
 
@@ -102,11 +105,11 @@ def list_envs() -> None:
     table.add_column("Name", style="green")
     table.add_column("Prompt Location", style="yellow")
     table.add_column("Notes", style="dim")
-    
+
     for key, env in ENVIRONMENTS.items():
         location = env.prompt_dir or env.instructions_file or "-"
         table.add_row(key, env.name, location, env.notes)
-    
+
     console.print(table)
 
 
@@ -115,18 +118,19 @@ def detect(
     target: Annotated[
         Path,
         typer.Option(
-            "--target", "-t",
+            "--target",
+            "-t",
             help="Target project directory (default: current directory)",
         ),
     ] = Path("."),
 ) -> None:
     """Detect the AI environment in a project directory."""
     target = target.resolve()
-    
+
     if not target.exists():
         console.print(f"[red]❌ Directory does not exist:[/red] {target}")
         raise typer.Exit(1)
-    
+
     detected = detect_environment(target)
     if detected:
         env = ENVIRONMENTS[detected]
@@ -142,16 +146,18 @@ def detect(
 @app.command("init")
 def init_project(
     env: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
-            "--env", "-e",
+            "--env",
+            "-e",
             help="AI environment to use",
         ),
     ] = None,
     target: Annotated[
         Path,
         typer.Option(
-            "--target", "-t",
+            "--target",
+            "-t",
             help="Target project directory (default: current directory)",
         ),
     ] = Path("."),
@@ -164,19 +170,19 @@ def init_project(
 def prompt_for_environment() -> str:
     """Interactively ask the user which environment to use."""
     console.print("\n[bold]🤖 Which AI coding environment are you using?[/bold]\n")
-    
+
     options = list(ENVIRONMENTS.keys())
     for i, key in enumerate(options, 1):
         env = ENVIRONMENTS[key]
         console.print(f"  [cyan][{i}][/cyan] {env.name}")
         if env.notes:
             console.print(f"      [dim]└─ {env.notes}[/dim]")
-    
+
     console.print()
-    
+
     while True:
         choice = typer.prompt("Enter number (or environment key)")
-        
+
         # Check if it's a number
         try:
             idx = int(choice) - 1
@@ -201,9 +207,10 @@ def main(
     """dot-work: Install AI coding prompts for your environment."""
     if version:
         from dot_work import __version__
+
         console.print(f"dot-work version {__version__}")
         raise typer.Exit()
-    
+
     # If no command provided, show help
     if ctx.invoked_subcommand is None:
         console.print(ctx.get_help())

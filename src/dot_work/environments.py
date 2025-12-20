@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 @dataclass
 class Environment:
     """Represents an AI coding environment configuration."""
-    
+
     key: str
     name: str
     prompt_dir: str | None
