@@ -23,5 +23,13 @@
 - Must use `uv run` for all Python commands
 - Coverage minimum: 15% (growing)
 
+## Version Management (MANDATORY)
+- **Scheme:** SemVer (MAJOR.MINOR.PATCH)
+- **Source of truth:** `pyproject.toml`
+- **Sync locations:** none (removed `__version__` from `__init__.py`)
+- **Default bump:** patch (no argument = increment patch)
+- **Added:** 2024-12-20
+
 ## Lessons Learned
-(To be populated after completing issues)
+- [BUG-001@c5e8f1] 2024-12-20: Use `importlib.metadata.version()` to get package version at runtime instead of maintaining `__version__` in code. Single source of truth = pyproject.toml
+- [FEAT-004@b8e1d4] 2024-12-20: Project context detection can auto-populate memory.md by scanning pyproject.toml, package.json, Cargo.toml, go.mod etc.

@@ -1,7 +1,7 @@
 # Project Baseline
 
-**Captured:** 2024-12-20T16:27:00Z
-**Commit:** 92a3cbb
+**Captured:** 2024-12-20T19:55:00Z
+**Commit:** pending (unstaged changes)
 **Branch:** main
 
 ---
@@ -13,43 +13,44 @@
 - **Build Tool:** scripts/build.py
 - **Total Python Files:** 7 source files, 4 test files
 - **Entry Points:** CLI via `dot-work` command
+- **Version:** 0.1.1 (single source: pyproject.toml)
 
 ### Source Files
-| File | Lines | Purpose |
+| File | Stmts | Purpose |
 |------|-------|---------|
-| src/dot_work/__init__.py | 3 | Package exports |
-| src/dot_work/cli.py | 174 stmts | CLI entry point (typer) |
-| src/dot_work/environments.py | 12 stmts | Environment configurations |
-| src/dot_work/installer.py | 177 stmts | Prompt installation logic |
-| src/dot_work/tools/__init__.py | 3 stmts | Tools subpackage |
-| src/dot_work/tools/json_validator.py | 109 stmts | JSON validation |
-| src/dot_work/tools/yaml_validator.py | 90 stmts | YAML validation |
+| src/dot_work/__init__.py | 0 | Package exports (no version) |
+| src/dot_work/cli.py | 185 | CLI entry point (typer) |
+| src/dot_work/environments.py | 12 | Environment configurations |
+| src/dot_work/installer.py | 297 | Prompt installation + work dir initialization |
+| src/dot_work/tools/__init__.py | 3 | Tools subpackage |
+| src/dot_work/tools/json_validator.py | 109 | JSON validation |
+| src/dot_work/tools/yaml_validator.py | 90 | YAML validation |
 
 ## Build Status
 
 - **Status:** ✓ passing
-- **Execution Time:** 3.98s
+- **Execution Time:** 4.55s
 - **Dependencies:** All synced
 
 ## Test Evidence
 
-- **Total Tests:** 156
-- **Passing:** 156
+- **Total Tests:** 180
+- **Passing:** 180
 - **Failing:** 0
 - **Skipped:** 0
-- **Execution Time:** 1.72s
+- **Execution Time:** 1.96s
 
 ### Coverage Summary
-- **Overall Coverage:** 41%
+- **Overall Coverage:** 46%
 - **Required Threshold:** 15% (passing)
 
 ### Coverage by File
 | File | Coverage | Uncovered Lines |
 |------|----------|-----------------|
 | src/dot_work/__init__.py | 100% | — |
-| src/dot_work/cli.py | 0% | 3-364 (entire file) |
+| src/dot_work/cli.py | 0% | 3-403 (entire file) |
 | src/dot_work/environments.py | 100% | — |
-| src/dot_work/installer.py | 19% | 21-36, 114-391 (all install_for_* functions) |
+| src/dot_work/installer.py | 41% | 21-36, 166, 186-491, 653-680 (install_for_* + some context) |
 | src/dot_work/tools/__init__.py | 100% | — |
 | src/dot_work/tools/json_validator.py | 92% | 35, 50, 130-136, 165, 192-193 |
 | src/dot_work/tools/yaml_validator.py | 92% | 81, 134-140, 196, 199 |
@@ -60,44 +61,32 @@
 - **Total Warnings:** 0
 - **Tool:** ruff 0.14.10
 
-### Warnings by File
-(No warnings - all files clean)
-
 ## Type Checking
 
 - **Total Errors:** 0
 - **Total Warnings:** 0
 - **Tool:** mypy 1.19.1
 
-### Type Warnings by File
-(No warnings - all files clean)
-
 ## Security
 
 - **Critical:** 0
 - **High:** 0
 - **Medium:** 0
-- **Tool:** ruff security checks (--select S)
 
 ## Known Gaps
 
 | ID | Description | Location |
 |----|-------------|----------|
 | GAP-001 | CLI commands have 0% test coverage | cli.py |
-| GAP-002 | install_for_* functions have 19% coverage | installer.py |
-| GAP-003 | --force flag documented but not implemented | cli.py:55-60 |
-| GAP-004 | init-work command documented in prompts but not implemented | cli.py |
+| GAP-002 | install_for_* functions have low coverage | installer.py |
 
-## Documentation Status
+## Completed This Session
 
-- **README.md:** Current
-- **AGENTS.md:** Current
-- **Prompt files:** 8 prompts in src/dot_work/prompts/
-
-## Unknowns
-
-- UNK-001: Windows-specific path handling not tested in CI
-- UNK-002: Performance with large prompt files (>1MB) not verified
+| ID | Description | Status |
+|----|-------------|--------|
+| FEAT-003@a3f7c2 | --force flag implementation | ✓ Completed |
+| BUG-001@c5e8f1 | Version mismatch fix | ✓ Completed |
+| FEAT-004@b8e1d4 | init-work CLI command | ✓ Completed |
 
 ---
 
@@ -105,8 +94,8 @@
 
 The following must not regress:
 
-1. All 156 tests pass
-2. Coverage ≥ 41%
+1. All 180 tests pass
+2. Coverage ≥ 46%
 3. Lint errors = 0
 4. Type errors = 0
 5. Security issues = 0

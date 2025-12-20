@@ -1,6 +1,6 @@
 # 📋 Issue Tracker Setup Guide
 
-This document defines **how to initialize** the file-based issue tracking system. For detailed workflow documentation, see [do-work.prompt.md]({{ prompt_path }}/do-work.prompt.md).
+This document defines **how to initialize** the file-based issue tracking system. For detailed workflow documentation, see [do-work.prompt.md](.github/prompts/do-work.prompt.md).
 
 ---
 
@@ -317,9 +317,9 @@ This prompt system uses Jinja2 templates. The following variables are resolved a
 
 | Variable | Description | Example Value |
 |----------|-------------|---------------|
-| `{{ prompt_path }}` | Path to prompt files | `.github/prompts`, `.work/prompts` |
-| `{{ ai_tool }}` | Current AI tool name | `copilot`, `claude`, `cursor` |
-| `{{ project_root }}` | Project root directory | `/home/user/myproject` |
+| `.github/prompts` | Path to prompt files | `.github/prompts`, `.work/prompts` |
+| `copilot` | Current AI tool name | `copilot`, `claude`, `cursor` |
+| `` | Project root directory | `/home/user/myproject` |
 
 ### AI Tool Prompt Locations
 
@@ -343,7 +343,7 @@ Add the following to your agent configuration, using the template variable:
 
 When working on issues or tasks, follow the workflow defined in:
 
-- [do-work.prompt.md]({{ prompt_path }}/do-work.prompt.md)
+- [do-work.prompt.md](.github/prompts/do-work.prompt.md)
 
 Key commands:
 - `init work` – Initialize the issue tracking system
@@ -356,7 +356,7 @@ Key commands:
 Copy the prompt files to your project's prompt directory:
 
 ```
-{{ prompt_path }}/
+.github/prompts/
 ├── do-work.prompt.md              # Workflow documentation
 └── setup-issue-tracker.prompt.md  # This setup guide
 ```
@@ -372,7 +372,7 @@ Copy the prompt files to your project's prompt directory:
 ## Workflow
 
 This project uses file-based issue tracking. Follow the workflow in:
-- [do-work.prompt.md]({{ prompt_path }}/do-work.prompt.md)
+- [do-work.prompt.md](.github/prompts/do-work.prompt.md)
 
 Before making any code changes:
 1. Run `init work` if `.work/` doesn't exist
@@ -397,4 +397,4 @@ For complete workflow documentation including:
 - **Regression handling** (create issues first, then fix)
 - **Session handoff**
 
-**See:** [do-work.prompt.md]({{ prompt_path }}/do-work.prompt.md)
+**See:** [do-work.prompt.md](.github/prompts/do-work.prompt.md)

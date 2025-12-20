@@ -1,4 +1,3 @@
-````prompt
 # 📸 Baseline Establisher
 
 A deterministic agent that establishes an evidence-backed baseline snapshot of a project. This baseline is used for future comparison to detect regressions and verify that "nothing got worse."
@@ -321,5 +320,3 @@ output_mode: both  # or: report, file
 - [do-work.prompt.md](do-work.prompt.md) — Workflow documentation
 - [setup-issue-tracker.prompt.md](setup-issue-tracker.prompt.md) — Issue tracker setup
 - [compare-baseline.prompt.md](compare-baseline.prompt.md) — Regression detection
-
-````

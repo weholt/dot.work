@@ -8,6 +8,8 @@ import pytest
 from dot_work.environments import ENVIRONMENTS
 from dot_work.installer import (
     create_jinja_env,
+    detect_project_context,
+    initialize_work_directory,
     install_for_copilot,
     install_prompts,
     render_prompt,
@@ -194,3 +196,189 @@ class TestRenderPrompt:
 
         assert "prompts" in result
         assert "generic" in result
+
+
+class TestDetectProjectContext:
+    """Tests for detect_project_context function."""
+
+    def test_detects_python_with_pyproject(self, tmp_path: Path) -> None:
+        """Test detection of Python project with pyproject.toml."""
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text('[project]\nname = "test"\n', encoding="utf-8")
+
+        result = detect_project_context(tmp_path)
+
+        assert result["language"] == "Python"
+        assert "uv" in result["package_manager"] or "pip" in result["package_manager"]
+
+    def test_detects_pytest(self, tmp_path: Path) -> None:
+        """Test detection of pytest from pyproject.toml."""
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text(
+            '[project]\nname = "test"\n[tool.pytest]\n', encoding="utf-8"
+        )
+
+        result = detect_project_context(tmp_path)
+
+        assert result["test_framework"] == "pytest"
+
+    def test_detects_typer_framework(self, tmp_path: Path) -> None:
+        """Test detection of Typer framework from pyproject.toml."""
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text(
+            '[project]\ndependencies = ["typer"]\n', encoding="utf-8"
+        )
+
+        result = detect_project_context(tmp_path)
+
+        assert result["framework"] == "Typer (CLI)"
+
+    def test_detects_nodejs(self, tmp_path: Path) -> None:
+        """Test detection of Node.js project."""
+        package_json = tmp_path / "package.json"
+        package_json.write_text('{"name": "test"}', encoding="utf-8")
+
+        result = detect_project_context(tmp_path)
+
+        assert result["language"] == "JavaScript/TypeScript"
+        assert "npm" in result["package_manager"]
+
+    def test_detects_rust(self, tmp_path: Path) -> None:
+        """Test detection of Rust project."""
+        cargo = tmp_path / "Cargo.toml"
+        cargo.write_text('[package]\nname = "test"\n', encoding="utf-8")
+
+        result = detect_project_context(tmp_path)
+
+        assert result["language"] == "Rust"
+        assert result["package_manager"] == "cargo"
+
+    def test_detects_go(self, tmp_path: Path) -> None:
+        """Test detection of Go project."""
+        gomod = tmp_path / "go.mod"
+        gomod.write_text("module test\n", encoding="utf-8")
+
+        result = detect_project_context(tmp_path)
+
+        assert result["language"] == "Go"
+
+    def test_returns_unknown_for_empty_dir(self, tmp_path: Path) -> None:
+        """Test that empty directory returns unknown values."""
+        result = detect_project_context(tmp_path)
+
+        assert result["language"] == "unknown"
+        assert result["framework"] == "unknown"
+
+
+class TestInitializeWorkDirectory:
+    """Tests for initialize_work_directory function."""
+
+    def test_creates_work_directory_structure(self, tmp_path: Path) -> None:
+        """Test that all directories are created."""
+        console = MagicMock()
+
+        initialize_work_directory(tmp_path, console, force=True)
+
+        assert (tmp_path / ".work").is_dir()
+        assert (tmp_path / ".work" / "agent").is_dir()
+        assert (tmp_path / ".work" / "agent" / "issues").is_dir()
+        assert (tmp_path / ".work" / "agent" / "notes").is_dir()
+        assert (tmp_path / ".work" / "agent" / "issues" / "references").is_dir()
+
+    def test_creates_all_issue_files(self, tmp_path: Path) -> None:
+        """Test that all issue priority files are created."""
+        console = MagicMock()
+
+        initialize_work_directory(tmp_path, console, force=True)
+
+        issues_dir = tmp_path / ".work" / "agent" / "issues"
+        assert (issues_dir / "critical.md").exists()
+        assert (issues_dir / "high.md").exists()
+        assert (issues_dir / "medium.md").exists()
+        assert (issues_dir / "low.md").exists()
+        assert (issues_dir / "backlog.md").exists()
+        assert (issues_dir / "shortlist.md").exists()
+        assert (issues_dir / "history.md").exists()
+
+    def test_creates_focus_and_memory_files(self, tmp_path: Path) -> None:
+        """Test that focus.md and memory.md are created."""
+        console = MagicMock()
+
+        initialize_work_directory(tmp_path, console, force=True)
+
+        agent_dir = tmp_path / ".work" / "agent"
+        assert (agent_dir / "focus.md").exists()
+        assert (agent_dir / "memory.md").exists()
+
+    def test_creates_baseline_placeholder(self, tmp_path: Path) -> None:
+        """Test that baseline.md placeholder is created."""
+        console = MagicMock()
+
+        initialize_work_directory(tmp_path, console, force=True)
+
+        baseline = tmp_path / ".work" / "baseline.md"
+        assert baseline.exists()
+        assert "Not yet generated" in baseline.read_text(encoding="utf-8")
+
+    def test_creates_gitkeep_files(self, tmp_path: Path) -> None:
+        """Test that .gitkeep files are created in empty directories."""
+        console = MagicMock()
+
+        initialize_work_directory(tmp_path, console, force=True)
+
+        assert (tmp_path / ".work" / "agent" / "notes" / ".gitkeep").exists()
+        assert (
+            tmp_path / ".work" / "agent" / "issues" / "references" / ".gitkeep"
+        ).exists()
+
+    def test_skips_existing_files_without_force(self, tmp_path: Path) -> None:
+        """Test that existing files are skipped when force=False."""
+        console = MagicMock()
+        console.input.return_value = "n"  # Decline overwrite
+
+        # Create the structure first
+        initialize_work_directory(tmp_path, console, force=True)
+
+        # Modify a file
+        focus_file = tmp_path / ".work" / "agent" / "focus.md"
+        original_content = focus_file.read_text(encoding="utf-8")
+        focus_file.write_text("Modified content", encoding="utf-8")
+
+        # Run again without force
+        initialize_work_directory(tmp_path, console, force=False)
+
+        # File should still have modified content
+        assert focus_file.read_text(encoding="utf-8") == "Modified content"
+
+    def test_overwrites_with_force(self, tmp_path: Path) -> None:
+        """Test that existing files are overwritten when force=True."""
+        console = MagicMock()
+
+        # Create the structure first
+        initialize_work_directory(tmp_path, console, force=True)
+
+        # Modify a file
+        focus_file = tmp_path / ".work" / "agent" / "focus.md"
+        focus_file.write_text("Modified content", encoding="utf-8")
+
+        # Run again with force
+        initialize_work_directory(tmp_path, console, force=True)
+
+        # File should be reset
+        assert "Modified content" not in focus_file.read_text(encoding="utf-8")
+        assert "Agent Focus" in focus_file.read_text(encoding="utf-8")
+
+    def test_memory_has_detected_context(self, tmp_path: Path) -> None:
+        """Test that memory.md contains detected project context."""
+        console = MagicMock()
+
+        # Create a Python project marker
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text('[project]\nname = "test"\n', encoding="utf-8")
+
+        initialize_work_directory(tmp_path, console, force=True)
+
+        memory_content = (tmp_path / ".work" / "agent" / "memory.md").read_text(
+            encoding="utf-8"
+        )
+        assert "Python" in memory_content

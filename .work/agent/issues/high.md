@@ -47,47 +47,45 @@ id: "FEAT-004@b8e1d4"
 title: "Implement dot-work init-work CLI command"
 description: "Add command to initialize .work/ issue tracker structure"
 created: 2024-12-20
+completed: 2024-12-20
 section: "cli"
 tags: [cli, workflow, issue-tracker]
 type: enhancement
 priority: high
-status: proposed
+status: completed
 references:
   - src/dot_work/cli.py
+  - src/dot_work/installer.py
   - src/dot_work/prompts/setup-issue-tracker.prompt.md
 ---
 
 ### Problem
 The prompts document `init work` as a trigger command to create the `.work/` issue tracking structure, but no CLI command implements this functionality.
 
-### Affected Files
-- `src/dot_work/cli.py` (add new command)
-- `src/dot_work/installer.py` (add initialization logic)
+### Solution Implemented
+1. Added `dot-work init-work` command to CLI with `--target` and `--force` options
+2. Created `initialize_work_directory()` function in installer.py
+3. Created `detect_project_context()` function to auto-detect language/framework
+4. Full `.work/` structure is created with proper templates
+5. Added 15 new tests (TestDetectProjectContext: 7, TestInitializeWorkDirectory: 8)
 
-### Importance
-Users following the workflow documentation cannot initialize the issue tracker without manually creating the directory structure. This is a gap between documented and actual functionality.
-
-### Proposed Solution
-1. Add `dot-work init-work` command to CLI
-2. Create function `initialize_work_directory(target: Path, console: Console)` in installer.py
-3. Create the full `.work/` structure as defined in setup-issue-tracker.prompt.md:
-   - `.work/baseline.md` (placeholder)
-   - `.work/agent/focus.md`
-   - `.work/agent/memory.md`
-   - `.work/agent/notes/.gitkeep`
-   - `.work/agent/issues/{critical,high,medium,low,backlog,shortlist,history}.md`
-   - `.work/agent/issues/references/.gitkeep`
-4. Populate files with initial content from the prompt template
+### Changes
+- `src/dot_work/cli.py`: Added `init-work` command, imported `initialize_work_directory`
+- `src/dot_work/installer.py`: Added template constants, `detect_project_context()`, `initialize_work_directory()`
+- `tests/unit/test_installer.py`: Added `TestDetectProjectContext` and `TestInitializeWorkDirectory` classes
 
 ### Acceptance Criteria
-- [ ] `dot-work init-work` creates complete `.work/` structure
-- [ ] `dot-work init-work --target ./other` works for non-current directories
-- [ ] Command is idempotent (doesn't overwrite existing files unless --force)
-- [ ] Initial file content matches setup-issue-tracker.prompt.md templates
-- [ ] Tests verify directory creation and file content
+- [x] `dot-work init-work` creates complete `.work/` structure
+- [x] `dot-work init-work --target ./other` works for non-current directories
+- [x] Command is idempotent (doesn't overwrite existing files unless --force)
+- [x] Initial file content matches setup-issue-tracker.prompt.md templates
+- [x] Tests verify directory creation and file content
+- [x] Project context (language, framework) detected for memory.md
 
-### Notes
-Consider detecting project context (language, framework) to populate memory.md.
+### Verification
+- 180 tests passing (was 165, +15)
+- 46% coverage (was 42%, +4%)
+- All quality checks pass
 
 ---
 
@@ -140,3 +138,51 @@ Without tests, regressions in installation logic go undetected. The installer fu
 
 ### Notes
 Use parametrized tests to avoid repetition across environments.
+
+---
+
+---
+id: "BUG-001@c5e8f1"
+title: "Version mismatch between pyproject.toml and __init__.py"
+description: "Version strings are out of sync: 0.1.0 vs 0.1.1"
+created: 2024-12-20
+completed: 2024-12-20
+section: "versioning"
+tags: [bug, versioning, config, sync]
+type: bug
+priority: high
+status: completed
+references:
+  - pyproject.toml
+  - src/dot_work/__init__.py
+---
+
+### Problem
+The project has two version definitions that are out of sync:
+- `pyproject.toml` line 3: `version = "0.1.0"`
+- `src/dot_work/__init__.py` line 3: `__version__ = "0.1.1"`
+
+This causes confusion about the actual version and can lead to incorrect version reporting.
+
+### Solution Implemented
+1. Set correct version to `0.1.1` in `pyproject.toml`
+2. Removed `__version__` from `src/dot_work/__init__.py` entirely
+3. Established `pyproject.toml` as single source of truth (no sync needed)
+4. Updated memory.md with version management rules
+5. Created language-agnostic bump-version.prompt.md
+6. Updated CLI to use `importlib.metadata.version()` instead of `__version__`
+
+### Changes
+- `pyproject.toml`: Updated to `version = "0.1.1"`
+- `src/dot_work/__init__.py`: Removed `__version__` line
+- `src/dot_work/cli.py`: Changed version display to use `importlib.metadata.version("dot-work")`
+- `.work/agent/memory.md`: Updated Version Management section
+- `.github/prompts/bump-version.prompt.md`: Complete rewrite, now language-agnostic
+
+### Acceptance Criteria
+- [x] Single source of truth established (pyproject.toml)
+- [x] No duplicate version definitions to get out of sync
+- [x] Memory.md documents version management rules
+- [x] bump-version.prompt.md created with investigation-first workflow
+- [x] CLI uses importlib.metadata for version (no __version__ import)
+

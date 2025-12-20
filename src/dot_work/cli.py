@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.table import Table
 
 from dot_work.environments import ENVIRONMENTS
-from dot_work.installer import get_prompts_dir, install_prompts
+from dot_work.installer import get_prompts_dir, initialize_work_directory, install_prompts
 
 app = typer.Typer(
     name="dot-work",
@@ -170,6 +170,44 @@ def init_project(
     install(env=env, target=target, force=False)
 
 
+@app.command("init-work")
+def init_work(
+    target: Annotated[
+        Path,
+        typer.Option(
+            "--target",
+            "-t",
+            help="Target project directory (default: current directory)",
+        ),
+    ] = Path("."),
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Overwrite existing files without asking",
+        ),
+    ] = False,
+) -> None:
+    """Initialize the .work/ issue tracking directory structure.
+
+    Creates the complete .work/ directory structure for file-based issue tracking,
+    including priority files, focus tracking, and project memory.
+    """
+    target = target.resolve()
+
+    if not target.exists():
+        console.print(f"[red]❌ Target directory does not exist:[/red] {target}")
+        raise typer.Exit(1)
+
+    console.print("\n[bold blue]📋 Initializing work directory...[/bold blue]\n")
+
+    initialize_work_directory(target, console, force=force)
+
+    console.print("\n[bold green]✅ Work directory initialized![/bold green]")
+    console.print("[dim]Next: Run 'generate-baseline' before making code changes[/dim]")
+
+
 def prompt_for_environment() -> str:
     """Interactively ask the user which environment to use."""
     console.print("\n[bold]🤖 Which AI coding environment are you using?[/bold]\n")
@@ -209,9 +247,10 @@ def main(
 ) -> None:
     """dot-work: Install AI coding prompts for your environment."""
     if version:
-        from dot_work import __version__
+        from importlib.metadata import version as get_version
 
-        console.print(f"dot-work version {__version__}")
+        pkg_version = get_version("dot-work")
+        console.print(f"dot-work version {pkg_version}")
         raise typer.Exit()
 
     # If no command provided, show help

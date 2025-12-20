@@ -504,3 +504,256 @@ INSTALLERS = {
     "opencode": install_for_opencode,
     "generic": install_for_generic,
 }
+
+
+# =============================================================================
+# Work Directory Initialization
+# =============================================================================
+
+# Template content for .work/ files
+_FOCUS_TEMPLATE = """# Agent Focus
+Last updated: {timestamp}
+
+## Previous
+None
+
+## Current
+None
+
+## Next
+None
+"""
+
+_MEMORY_TEMPLATE = """# Agent Memory
+
+## Project Context
+- Primary language: {language}
+- Framework: {framework}
+- Package manager: {package_manager}
+- Test framework: {test_framework}
+
+## User Preferences
+(To be populated as preferences are discovered)
+
+## Architectural Decisions
+(To be populated as decisions are made)
+
+## Patterns & Conventions
+(To be populated as patterns are identified)
+
+## Known Constraints
+(To be populated as constraints are discovered)
+
+## Lessons Learned
+(To be populated after completing issues)
+"""
+
+_SHORTLIST_TEMPLATE = """# Shortlist (User-Directed Priority)
+
+This file represents **explicit user intent**. Agent may only modify when explicitly instructed.
+
+---
+
+(No issues yet)
+"""
+
+_CRITICAL_TEMPLATE = """# Critical Issues (P0)
+
+Blockers, security issues, data loss risks.
+
+---
+
+(No issues)
+"""
+
+_HIGH_TEMPLATE = """# High Priority Issues (P1)
+
+Core functionality broken or missing documented features.
+
+---
+
+(No issues)
+"""
+
+_MEDIUM_TEMPLATE = """# Medium Priority Issues (P2)
+
+Enhancements, technical debt.
+
+---
+
+(No issues)
+"""
+
+_LOW_TEMPLATE = """# Low Priority Issues (P3)
+
+Cosmetic, incremental improvements.
+
+---
+
+(No issues)
+"""
+
+_BACKLOG_TEMPLATE = """# Backlog
+
+Untriaged ideas and future work.
+
+---
+
+(No issues)
+"""
+
+_HISTORY_TEMPLATE = """# Issue History (Append-Only)
+
+Completed and closed issues are archived here.
+
+---
+
+(No completed issues yet)
+"""
+
+_BASELINE_TEMPLATE = """# Project Baseline
+
+**Captured:** Not yet generated
+**Commit:** N/A
+**Branch:** N/A
+
+---
+
+Run `generate-baseline` to populate this file with quality metrics.
+"""
+
+
+def detect_project_context(target: Path) -> dict[str, str]:
+    """Detect project context from files in the target directory.
+
+    Args:
+        target: Path to the project directory.
+
+    Returns:
+        Dictionary with detected project context values.
+    """
+    context = {
+        "language": "unknown",
+        "framework": "unknown",
+        "package_manager": "unknown",
+        "test_framework": "unknown",
+    }
+
+    # Detect Python
+    if (target / "pyproject.toml").exists():
+        context["language"] = "Python"
+        context["package_manager"] = "uv or pip"
+
+        pyproject_content = (target / "pyproject.toml").read_text(encoding="utf-8")
+        if "pytest" in pyproject_content:
+            context["test_framework"] = "pytest"
+        if "typer" in pyproject_content:
+            context["framework"] = "Typer (CLI)"
+        elif "fastapi" in pyproject_content:
+            context["framework"] = "FastAPI"
+        elif "django" in pyproject_content:
+            context["framework"] = "Django"
+        elif "flask" in pyproject_content:
+            context["framework"] = "Flask"
+
+    elif (target / "requirements.txt").exists():
+        context["language"] = "Python"
+        context["package_manager"] = "pip"
+
+    # Detect Node.js
+    elif (target / "package.json").exists():
+        context["language"] = "JavaScript/TypeScript"
+        context["package_manager"] = "npm or yarn"
+
+        pkg_content = (target / "package.json").read_text(encoding="utf-8")
+        if "jest" in pkg_content:
+            context["test_framework"] = "Jest"
+        elif "mocha" in pkg_content:
+            context["test_framework"] = "Mocha"
+        if "next" in pkg_content:
+            context["framework"] = "Next.js"
+        elif "react" in pkg_content:
+            context["framework"] = "React"
+        elif "vue" in pkg_content:
+            context["framework"] = "Vue"
+        elif "express" in pkg_content:
+            context["framework"] = "Express"
+
+    # Detect Rust
+    elif (target / "Cargo.toml").exists():
+        context["language"] = "Rust"
+        context["package_manager"] = "cargo"
+        context["test_framework"] = "cargo test"
+
+    # Detect Go
+    elif (target / "go.mod").exists():
+        context["language"] = "Go"
+        context["package_manager"] = "go modules"
+        context["test_framework"] = "go test"
+
+    return context
+
+
+def initialize_work_directory(
+    target: Path,
+    console: Console,
+    *,
+    force: bool = False,
+) -> None:
+    """Initialize the .work/ directory structure for issue tracking.
+
+    Args:
+        target: Path to the project directory.
+        console: Rich console for output.
+        force: Whether to overwrite existing files without prompting.
+    """
+    from datetime import datetime, timezone
+
+    work_dir = target / ".work"
+    agent_dir = work_dir / "agent"
+    issues_dir = agent_dir / "issues"
+    notes_dir = agent_dir / "notes"
+    refs_dir = issues_dir / "references"
+
+    # Create directories
+    for dir_path in [work_dir, agent_dir, issues_dir, notes_dir, refs_dir]:
+        dir_path.mkdir(parents=True, exist_ok=True)
+
+    # Detect project context
+    context = detect_project_context(target)
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Define files to create
+    files_to_create: list[tuple[Path, str]] = [
+        (work_dir / "baseline.md", _BASELINE_TEMPLATE),
+        (agent_dir / "focus.md", _FOCUS_TEMPLATE.format(timestamp=timestamp)),
+        (
+            agent_dir / "memory.md",
+            _MEMORY_TEMPLATE.format(
+                language=context["language"],
+                framework=context["framework"],
+                package_manager=context["package_manager"],
+                test_framework=context["test_framework"],
+            ),
+        ),
+        (issues_dir / "shortlist.md", _SHORTLIST_TEMPLATE),
+        (issues_dir / "critical.md", _CRITICAL_TEMPLATE),
+        (issues_dir / "high.md", _HIGH_TEMPLATE),
+        (issues_dir / "medium.md", _MEDIUM_TEMPLATE),
+        (issues_dir / "low.md", _LOW_TEMPLATE),
+        (issues_dir / "backlog.md", _BACKLOG_TEMPLATE),
+        (issues_dir / "history.md", _HISTORY_TEMPLATE),
+        (notes_dir / ".gitkeep", ""),
+        (refs_dir / ".gitkeep", ""),
+    ]
+
+    # Create files
+    for file_path, content in files_to_create:
+        if should_write_file(file_path, force, console):
+            file_path.write_text(content, encoding="utf-8")
+            console.print(f"  [green]✓[/green] Created {file_path.relative_to(target)}")
+        else:
+            console.print(f"  [dim]⏭[/dim] Skipped {file_path.relative_to(target)}")
+
+    console.print(f"\n[cyan]📁 Work directory initialized at:[/cyan] {work_dir}")
+    console.print("[dim]💡 Run 'generate-baseline' before making code changes[/dim]")
