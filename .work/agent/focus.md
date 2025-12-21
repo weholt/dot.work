@@ -2,35 +2,31 @@
 Last updated: 2024-12-21
 
 ## Previous
-- Issue: MIGRATE-006@f6a7b8 ‚Äì Migrate review unit tests
+- Issue: MIGRATE-011@e1f2a3 ‚Äì Add CLI tests for review command
 - Completed: 2024-12-21
-- Outcome: 56 unit tests migrated and passing
-  - Created test_review_git.py (17 tests)
-  - Created test_review_models.py (16 tests)
-  - Created test_review_storage.py (12 tests)
-  - Created test_review_exporter.py (6 tests)
-  - Created test_review_config.py (5 tests)
-  - Added git_repo fixture to conftest.py
-  - Coverage improved from 42% to 63%
-  - All 285 tests passing
+- Outcome: 8 CLI tests added for review commands
+  - TestReviewHelpCommands: 4 tests for help output
+  - TestReviewExportCommand: 2 tests for export functionality
+  - TestReviewClearCommand: 2 tests for clear functionality
+  - Coverage improved from 63% to 66%
+  - All 293 tests passing
 
 ## Current
-- Issue: MIGRATE-011@e1f2a3 ‚Äì Add CLI tests for review command
+- Issue: MIGRATE-007@a7b8c9 ‚Äì Add review integration tests
 - Started: (ready to start)
 - Status: proposed
 - Phase: Testing
 - Progress:
-  - [ ] Add TestReviewCommand class to test_cli.py
-  - [ ] Test review --help command
-  - [ ] Test review export --help command
-  - [ ] Test review export with no reviews (exit code 2)
-  - [ ] Test review clear command
-  - [ ] Verify all tests pass
+  - [ ] Create tests/integration/ directory
+  - [ ] Add FastAPI test client tests
+  - [ ] Add async fixtures
+  - [ ] Mark tests with @pytest.mark.integration
+  - [ ] Verify tests pass
 
 ## Next
-- Issue: MIGRATE-007@a7b8c9 ‚Äì Add review integration tests
+- Issue: MIGRATE-010@d0e1f2 ‚Äì Add README documentation
 - Source: migration-review.md
-- Reason: Full server workflow testing
+- Reason: Document the new review command
 
 ## Migration Progress
 | ID | Title | Status | Completed |
@@ -41,9 +37,9 @@ Last updated: 2024-12-21
 | MIGRATE-004 | Add new dependencies | ‚úÖ done | 2024-12-21 |
 | MIGRATE-005 | Integrate review CLI commands | ‚úÖ done | 2024-12-21 |
 | MIGRATE-006 | Migrate unit tests | ‚úÖ done | 2024-12-21 |
-| MIGRATE-007 | Add integration tests | Ì≥ã proposed | - |
+| MIGRATE-007 | Add integration tests | ‚è≥ next | - |
 | MIGRATE-008 | Update Python version to 3.11+ | Ì≥ã proposed | - |
 | MIGRATE-009 | Update storage path to .work/reviews/ | ‚úÖ done | 2024-12-21 |
 | MIGRATE-010 | Add README documentation | Ì≥ã proposed | - |
-| MIGRATE-011 | Add CLI tests for review command | ‚è≥ next | - |
+| MIGRATE-011 | Add CLI tests for review command | ‚úÖ done | 2024-12-21 |
 | MIGRATE-012 | Clean up incoming/review | Ì≥ã proposed | - |

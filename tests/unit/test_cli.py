@@ -502,3 +502,103 @@ class TestEdgeCases:
         environments = ["copilot", "cursor", "claude", "windsurf", "aider"]
         found = sum(1 for env in environments if env in result.stdout.lower())
         assert found >= 3, f"Expected at least 3 environments in output: {result.stdout}"
+
+
+# =============================================================================
+# Review Command Tests (MIGRATE-011)
+# =============================================================================
+
+
+class TestReviewHelpCommands:
+    """Tests for review command help output."""
+
+    def test_review_help(self) -> None:
+        """review --help should show subcommands."""
+        result = runner.invoke(app, ["review", "--help"])
+        assert result.exit_code == 0
+        assert "start" in result.stdout
+        assert "export" in result.stdout
+        assert "clear" in result.stdout
+
+    def test_review_start_help(self) -> None:
+        """review start --help should show options."""
+        result = runner.invoke(app, ["review", "start", "--help"])
+        assert result.exit_code == 0
+        assert "--port" in result.stdout
+        assert "--base" in result.stdout
+        assert "--head" in result.stdout
+
+    def test_review_export_help(self) -> None:
+        """review export --help should show options."""
+        result = runner.invoke(app, ["review", "export", "--help"])
+        assert result.exit_code == 0
+        assert "--output" in result.stdout
+        assert "--review-id" in result.stdout
+
+    def test_review_clear_help(self) -> None:
+        """review clear --help should show options."""
+        result = runner.invoke(app, ["review", "clear", "--help"])
+        assert result.exit_code == 0
+        assert "--review-id" in result.stdout
+        assert "--force" in result.stdout
+
+
+class TestReviewExportCommand:
+    """Tests for review export command."""
+
+    def test_review_export_no_git_repo(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """review export should fail when not in a git repo."""
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["review", "export"])
+        # Should fail - not in a git repo
+        assert result.exit_code == 1
+        output = result.stdout.lower()
+        assert "git" in output or "repository" in output or "no review" in output
+
+    def test_review_export_no_reviews(self, git_repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """review export should fail when no reviews exist."""
+        monkeypatch.chdir(git_repo)
+
+        result = runner.invoke(app, ["review", "export"])
+        # Should exit with code 1 - no reviews found
+        assert result.exit_code == 1
+        output = result.stdout.lower()
+        assert "no review" in output or "not found" in output
+
+
+class TestReviewClearCommand:
+    """Tests for review clear command."""
+
+    def test_review_clear_no_reviews_dir(
+        self, git_repo: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """review clear should handle missing reviews directory."""
+        monkeypatch.chdir(git_repo)
+
+        result = runner.invoke(app, ["review", "clear", "--force"])
+        # Should succeed or warn - no reviews to clear
+        assert result.exit_code == 0
+        output = result.stdout.lower()
+        assert "no review" in output or "warning" in output or "⚠" in result.stdout
+
+    def test_review_clear_specific_review_not_found(
+        self, git_repo: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """review clear with non-existent review ID should fail."""
+        monkeypatch.chdir(git_repo)
+
+        # Create the reviews directory but no reviews
+        reviews_dir = git_repo / ".work" / "reviews" / "reviews"
+        reviews_dir.mkdir(parents=True, exist_ok=True)
+
+        result = runner.invoke(
+            app, ["review", "clear", "--review-id", "nonexistent-review", "--force"]
+        )
+        # Should exit with code 1 - review not found
+        assert result.exit_code == 1
+        output = result.stdout.lower()
+        assert "not found" in output or "nonexistent" in output
+
