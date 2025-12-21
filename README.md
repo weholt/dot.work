@@ -51,8 +51,70 @@ uvx dot-work install --env copilot --target .
 dot-work install    # Install prompts to your project
 dot-work list       # List supported AI environments
 dot-work detect     # Detect environment in current directory
+dot-work init work  # Initialize .work/ issue tracking directory
+dot-work review     # Interactive code review with AI export
+dot-work validate   # Validate JSON/YAML files
 dot-work --help     # Show help
 ```
+
+## 🔍 Code Review
+
+The `review` command provides an interactive web interface for reviewing code changes and exporting comments for AI agents.
+
+### Start a Review
+
+```bash
+# Start the review server (opens web UI)
+dot-work review start
+
+# Review against a specific base commit
+dot-work review start --base main
+
+# Use a custom port
+dot-work review start --port 3000
+```
+
+The web interface shows:
+- File tree with changed files highlighted
+- Side-by-side and unified diff views
+- Click any line to add comments or suggestions
+- Syntax highlighting for common languages
+
+### Export Comments
+
+```bash
+# Export review comments as markdown (for AI agents)
+dot-work review export
+
+# Export to a specific file
+dot-work review export --output review-feedback.md
+
+# Export a specific review
+dot-work review export --review-id 20241221-143500
+```
+
+The exported markdown is formatted for AI consumption with:
+- File paths and line numbers
+- Comment text and suggestions
+- Context for each comment
+
+### Clear Reviews
+
+```bash
+# Clear all stored reviews
+dot-work review clear --force
+
+# Clear a specific review
+dot-work review clear --review-id 20241221-143500
+```
+
+### Review Workflow
+
+1. Make changes to your code
+2. Run `dot-work review start` to open the review UI
+3. Click lines to add comments and suggestions
+4. Run `dot-work review export` to generate markdown
+5. Pass the exported file to your AI agent for fixes
 
 ## 📦 Supported Environments
 
