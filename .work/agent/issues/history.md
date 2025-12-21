@@ -4,6 +4,76 @@ Completed and closed issues are archived here.
 
 ---
 
+## 2024-12-21: MIGRATE-018 - kg Optional Dependencies
+
+| ID | Title | Completed |
+|----|-------|-----------|
+| MIGRATE-018@f2a8b7 | Add kg optional dependencies to pyproject.toml | 2024-12-21 |
+
+### Summary
+- **Task**: Add optional dependency groups for kg module features
+- **Dependencies Added**:
+  - `kg-http = ["httpx>=0.27.0"]` - HTTP embedding backends
+  - `kg-ann = ["hnswlib>=0.8.0"]` - Approximate nearest neighbor
+  - `kg-all` - Combined meta-group
+- **Note**: PyYAML already in core deps, not duplicated
+- **Verification**: `kg --help` works without optional deps installed
+
+---
+
+## 2024-12-21: MIGRATE-014 - Import Path Updates
+
+| ID | Title | Completed |
+|----|-------|-----------|
+| MIGRATE-014@b8c4d3 | Update imports from kgshred to dot_work.knowledge_graph | 2024-12-21 |
+
+### Summary
+- **Task**: Replace all `from kgshred` imports with `from dot_work.knowledge_graph`
+- **Files Modified**: 9 Python files in knowledge_graph module
+- **Imports Updated**: 25 total import statements
+- **Method**: Global sed replacement
+
+### Verification
+- ✅ All modules now importable: `from dot_work.knowledge_graph import cli, db, graph, ...`
+- ✅ 298 tests pass (existing tests unaffected)
+- ⚠️ Pre-existing code quality issues logged as REFACTOR-001@d3f7a9
+
+---
+
+## 2024-12-21: MIGRATE-013 - knowledge_graph Module Structure
+
+| ID | Title | Completed |
+|----|-------|-----------|
+| MIGRATE-013@a7f3b2 | Create knowledge_graph module structure | 2024-12-21 |
+
+### Summary
+- **Source**: `incoming/kg/src/kgshred/` (15 Python files)
+- **Target**: `src/dot_work/knowledge_graph/` 
+- **Files Copied**: 10 root modules + 5 embed submodule files
+- **Approach**: MINIMAL ALTERATION - files copied verbatim
+- **Status**: Imports still use `kgshred` (MIGRATE-014 will update)
+
+### Files Created
+| File | Purpose |
+|------|---------|
+| `__init__.py` | Package init with version |
+| `config.py` | Database path configuration |
+| `ids.py` | Blake2s IDs, Crockford Base32 |
+| `parse_md.py` | Streaming Markdown parser |
+| `db.py` | SQLite database layer (~1000 lines) |
+| `graph.py` | Graph builder from parsed blocks |
+| `render.py` | Document reconstruction |
+| `search_fts.py` | FTS5 search |
+| `search_semantic.py` | Cosine similarity search |
+| `cli.py` | 18 Typer CLI commands |
+| `embed/__init__.py` | Embed submodule init |
+| `embed/base.py` | Embedder protocol |
+| `embed/factory.py` | get_embedder factory |
+| `embed/ollama.py` | Ollama embedder |
+| `embed/openai.py` | OpenAI embedder |
+
+---
+
 ## 2024-12-21: agent-review Migration Complete
 
 Successfully migrated the standalone `agent-review` project into `dot_work.review` subpackage.
