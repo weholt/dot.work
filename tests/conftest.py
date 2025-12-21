@@ -1,9 +1,54 @@
 """Pytest configuration and fixtures for dot-work tests."""
 
+from __future__ import annotations
+
+import subprocess
 from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+
+
+@pytest.fixture
+def git_repo(tmp_path: Path) -> Generator[Path, None, None]:
+    """Create a temporary git repository for tests."""
+    # Initialize git repo
+    subprocess.run(
+        ["git", "init"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+
+    # Create an initial commit
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("initial content\n")
+    subprocess.run(
+        ["git", "add", "."],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "Initial commit"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+
+    yield tmp_path
 
 
 @pytest.fixture
