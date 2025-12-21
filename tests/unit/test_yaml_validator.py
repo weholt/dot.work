@@ -2,10 +2,7 @@
 
 from pathlib import Path
 
-import pytest
-
 from dot_work.tools.yaml_validator import (
-    FrontmatterResult,
     YAMLError,
     YAMLValidationResult,
     YAMLWarning,

@@ -3,7 +3,7 @@ name = "dot-work"
 version = "0.1.1"
 description = "Portable AI coding prompts for project scaffolding and issue tracking"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Your Name", email = "you@example.com" }]
 keywords = ["ai", "prompts", "scaffolding", "copilot", "claude", "cursor"]
@@ -13,9 +13,9 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development",
 ]
 dependencies = [
@@ -68,7 +68,7 @@ include = [
 package = true
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
@@ -88,5 +88,5 @@ markers = [
 asyncio_mode = "auto"
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 warn_unused_ignores = true

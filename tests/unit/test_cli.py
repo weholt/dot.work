@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
@@ -16,7 +15,7 @@ from typer.testing import CliRunner
 from dot_work.cli import app
 
 if TYPE_CHECKING:
-    from pytest_mock import MockerFixture
+    pass
 
 
 runner = CliRunner()

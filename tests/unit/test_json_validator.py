@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from dot_work.tools.json_validator import (
     JSONError,
     JSONWarning,

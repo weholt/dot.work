@@ -341,7 +341,6 @@ class TestInitializeWorkDirectory:
 
         # Modify a file
         focus_file = tmp_path / ".work" / "agent" / "focus.md"
-        original_content = focus_file.read_text(encoding="utf-8")
         focus_file.write_text("Modified content", encoding="utf-8")
 
         # Run again without force

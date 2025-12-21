@@ -1,6 +1,7 @@
 """Installer functions for different AI environments."""
 
 import importlib.resources
+from datetime import UTC
 from pathlib import Path
 
 from jinja2 import Environment as JinjaEnvironment
@@ -707,7 +708,7 @@ def initialize_work_directory(
         console: Rich console for output.
         force: Whether to overwrite existing files without prompting.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     work_dir = target / ".work"
     agent_dir = work_dir / "agent"
@@ -721,7 +722,7 @@ def initialize_work_directory(
 
     # Detect project context
     context = detect_project_context(target)
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Define files to create
     files_to_create: list[tuple[Path, str]] = [
