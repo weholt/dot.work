@@ -10,6 +10,15 @@ import pytest
 
 
 @pytest.fixture
+def temp_dir(tmp_path: Path) -> Path:
+    """Create a temporary directory for tests.
+
+    This is an alias for pytest's tmp_path for compatibility.
+    """
+    return tmp_path
+
+
+@pytest.fixture
 def git_repo(tmp_path: Path) -> Generator[Path, None, None]:
     """Create a temporary git repository for tests."""
     # Initialize git repo

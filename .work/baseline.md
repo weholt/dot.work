@@ -1,7 +1,7 @@
 # Project Baseline
 
-**Captured:** 2024-12-21T10:00:00Z
-**Commit:** 21e5e0c
+**Captured:** 2024-12-21T14:30:00Z
+**Commit:** c0868fe
 **Branch:** main
 
 ---
@@ -11,7 +11,7 @@
 - **Primary Language:** Python 3.10+
 - **Package Manager:** uv
 - **Build Tool:** scripts/build.py
-- **Total Python Files:** 13 source files, 4 test files
+- **Total Python Files:** 13 source files, 9 test files
 - **Entry Points:** CLI via `dot-work` command
 - **Version:** 0.1.1 (single source: pyproject.toml)
 
@@ -36,38 +36,38 @@
 ## Build Status
 
 - **Status:** ✓ passing
-- **Execution Time:** 5.55s
+- **Execution Time:** 9.32s
 - **Dependencies:** All synced
 
 ## Test Evidence
 
-- **Total Tests:** 229
-- **Passing:** 229
+- **Total Tests:** 293
+- **Passing:** 293
 - **Failing:** 0
 - **Skipped:** 0
-- **Execution Time:** 3.14s
+- **Execution Time:** 6.55s
 
 ### Coverage Summary
-- **Overall Coverage:** 42%
+- **Overall Coverage:** 66%
 - **Required Threshold:** 15% (passing)
 
 ### Coverage by File
 | File | Coverage | Uncovered Lines |
 |------|----------|-----------------|
 | src/dot_work/__init__.py | 100% | — |
-| src/dot_work/cli.py | 59% | 73-75, 81-89, 216-240, ... |
+| src/dot_work/cli.py | 69% | 73-75, 81-89, 216-240, 261, 333-335, 394-396, 441-452, 483-485, 502-517, 546-548, 553-555, 570-589, 597 |
 | src/dot_work/environments.py | 100% | — |
-| src/dot_work/installer.py | 41% | 21-36, 166, 186-491, 653-680 |
+| src/dot_work/installer.py | 41% | 21-36, 166, 186-210, 217-251, 258-284, 291-312, 319-337, 344-366, 373-390, 397-452, 459-491, 653-680 |
 | src/dot_work/tools/__init__.py | 100% | — |
 | src/dot_work/tools/json_validator.py | 92% | 35, 50, 130-136, 165, 192-193 |
 | src/dot_work/tools/yaml_validator.py | 93% | 81, 134-140, 199 |
-| src/dot_work/review/__init__.py | 0% | 6-8 |
-| src/dot_work/review/config.py | 0% | 3-35 |
-| src/dot_work/review/exporter.py | 0% | 3-73 |
-| src/dot_work/review/git.py | 0% | 3-296 |
-| src/dot_work/review/models.py | 0% | 3-54 |
+| src/dot_work/review/__init__.py | 100% | — |
+| src/dot_work/review/config.py | 100% | — |
+| src/dot_work/review/exporter.py | 100% | — |
+| src/dot_work/review/git.py | 77% | 89-125, 141-150, 228-229, 292 |
+| src/dot_work/review/models.py | 100% | — |
 | src/dot_work/review/server.py | 0% | 3-193 |
-| src/dot_work/review/storage.py | 0% | 3-115 |
+| src/dot_work/review/storage.py | 98% | 91 |
 
 ## Linting
 
@@ -91,15 +91,17 @@
 
 | ID | Description | Location |
 |----|-------------|----------|
-| GAP-001 | CLI commands have 59% test coverage | cli.py |
+| GAP-001 | CLI commands have 69% test coverage | cli.py |
 | GAP-002 | install_for_* functions have low coverage | installer.py |
-| GAP-003 | Review module has 0% test coverage | src/dot_work/review/ |
+| GAP-003 | review/server.py has 0% test coverage | src/dot_work/review/server.py |
 
 ## Completed This Session
 
 | ID | Description | Status |
 |----|-------------|--------|
 | MIGRATE-001→005,009 | Review module migration | ✓ Committed (21e5e0c) |
+| MIGRATE-006 | Migrate unit tests (56 tests) | ✓ Committed (6315b32) |
+| MIGRATE-011 | Add CLI tests (8 tests) | ✓ Committed (c0868fe) |
 
 ---
 
@@ -107,9 +109,9 @@
 
 The following must not regress:
 
-1. All 229 tests pass
-2. Coverage >= 42%
+1. All 293 tests pass
+2. Coverage >= 66%
 3. Lint errors = 0
 4. Type errors = 0
 5. Security issues = 0
-6. Build completes in < 10s
+6. Build completes in < 15s
