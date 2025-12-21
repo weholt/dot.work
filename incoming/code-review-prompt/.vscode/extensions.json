@@ -1,0 +1,44 @@
+{
+  "recommendations": [
+    "github.copilot",
+    "github.copilot-chat",
+    "github.vscode-pull-request-github",
+    "eamodio.gitlens",
+
+    // C#
+    "ms-dotnettools.csdevkit",
+    "ms-dotnettools.csharp",
+    "ms-dotnettools.vscode-dotnet-runtime",
+    "ms-dotnettools.vscodeintellicode-csharp",
+
+    // JS / TS
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "biomejs.biome",
+    "ms-vscode.vscode-typescript-next",
+
+    // Quality & Security
+    "sonarsource.sonarlint-vscode",
+    "GitHub.vscode-codeql",
+    "streetsidesoftware.code-spell-checker",
+    "redhat.vscode-yaml",
+
+    // Python
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "charliermarsh.ruff",
+    "ms-python.black-formatter",
+    "ms-pyright.pyright",
+
+    // Tooling
+    "ms-azuretools.vscode-docker",
+    "tamasfe.even-better-toml",
+    "davidanson.vscode-markdownlint",
+    "mhutchie.git-graph",
+    "ms-vscode.remote-repositories",
+    "ms-vscode-remote.remote-containers"
+  ],
+  "unwantedRecommendations": [
+    "ms-vscode.vscode-typescript-tslint-plugin"
+  ]
+}

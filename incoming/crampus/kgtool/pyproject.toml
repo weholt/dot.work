@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "knowledge-graph-tool"
+version = "0.3.0"
+description = "Lightweight document-to-knowledge-graph extractor and topic-based context exporter."
+authors = [{ name = "Thomas Weholt" }]
+requires-python = ">=3.10"
+
+dependencies = [
+    "yake",
+    "networkx",
+    "rapidfuzz",
+    "scikit-learn"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-benchmark"
+]
+
+[project.scripts]
+kgtool = "kgtool.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["kgtool"]

@@ -1,0 +1,35 @@
+name: repo-agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      instructions:
+        description: "Path to markdown instructions file"
+        required: true
+        default: ".github/repo-agent/instructions.md"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  run-repo-agent:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+        env:
+          UV_INSTALL_DIR: $HOME/.local/bin
+
+      - name: Ensure uv on PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Run repo-agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uvx repo-agent "${{ github.workspace }}/${{ github.event.inputs.instructions }}"

@@ -1,0 +1,217 @@
+{
+  "features": [
+    {
+      "name": "APIRouter",
+      "qualified_name": "demo_project\\api.py:APIRouter",
+      "kind": "class",
+      "module_path": "demo_project\\api.py",
+      "parent": null,
+      "docstring": "Minimal stub to mimic a router decorator for static analysis.",
+      "args": [],
+      "returns": null,
+      "avg_complexity": 0.0,
+      "maintainability_index": 0.0,
+      "api": false,
+      "cli": false,
+      "mcp": false,
+      "web": false,
+      "user_facing": true,
+      "doc_refs": [],
+      "feature_id": "F-0001"
+    },
+    {
+      "name": "get",
+      "qualified_name": "demo_project\\api.py:APIRouter.get",
+      "kind": "method",
+      "module_path": "demo_project\\api.py",
+      "parent": "APIRouter",
+      "docstring": null,
+      "args": [
+        {
+          "name": "self",
+          "type": null
+        },
+        {
+          "name": "_path",
+          "type": "str"
+        }
+      ],
+      "returns": "Callable[[F], F]",
+      "avg_complexity": 0.0,
+      "maintainability_index": 0.0,
+      "api": false,
+      "cli": false,
+      "mcp": false,
+      "web": false,
+      "user_facing": false,
+      "doc_refs": [],
+      "feature_id": "F-0004"
+    },
+    {
+      "name": "decorator",
+      "qualified_name": "demo_project\\api.py:APIRouter.decorator",
+      "kind": "method",
+      "module_path": "demo_project\\api.py",
+      "parent": "APIRouter",
+      "docstring": null,
+      "args": [
+        {
+          "name": "func",
+          "type": "F"
+        }
+      ],
+      "returns": "F",
+      "avg_complexity": 0.0,
+      "maintainability_index": 0.0,
+      "api": false,
+      "cli": false,
+      "mcp": false,
+      "web": false,
+      "user_facing": false,
+      "doc_refs": [],
+      "feature_id": "F-0003"
+    },
+    {
+      "name": "read_greeting",
+      "qualified_name": "demo_project\\api.py:read_greeting",
+      "kind": "function",
+      "module_path": "demo_project\\api.py",
+      "parent": null,
+      "docstring": "Return a greeting payload for web clients.",
+      "args": [
+        {
+          "name": "name",
+          "type": "str"
+        }
+      ],
+      "returns": "dict[str, str]",
+      "avg_complexity": 0.0,
+      "maintainability_index": 0.0,
+      "api": true,
+      "cli": true,
+      "mcp": false,
+      "web": true,
+      "user_facing": true,
+      "doc_refs": [],
+      "feature_id": "F-0002"
+    },
+    {
+      "name": "greet",
+      "qualified_name": "demo_project\\cli.py:greet",
+      "kind": "function",
+      "module_path": "demo_project\\cli.py",
+      "parent": null,
+      "docstring": "Print a greeting for command line users.",
+      "args": [
+        {
+          "name": "name",
+          "type": "str"
+        }
+      ],
+      "returns": "None",
+      "avg_complexity": 1.0,
+      "maintainability_index": 100.0,
+      "api": false,
+      "cli": true,
+      "mcp": false,
+      "web": false,
+      "user_facing": true,
+      "doc_refs": [
+        "demo_project/docs/feature-guide.md#feature-guide-greet"
+      ],
+      "feature_id": "F-0005"
+    },
+    {
+      "name": "BaseModel",
+      "qualified_name": "demo_project\\models.py:BaseModel",
+      "kind": "class",
+      "module_path": "demo_project\\models.py",
+      "parent": null,
+      "docstring": "Minimal stand-in for Pydantic's BaseModel.",
+      "args": [],
+      "returns": null,
+      "avg_complexity": 0.0,
+      "maintainability_index": 0.0,
+      "api": false,
+      "cli": false,
+      "mcp": false,
+      "web": false,
+      "user_facing": false,
+      "doc_refs": [],
+      "feature_id": "F-0006"
+    },
+    {
+      "name": "GreetingService",
+      "qualified_name": "demo_project\\services.py:GreetingService",
+      "kind": "class",
+      "module_path": "demo_project\\services.py",
+      "parent": null,
+      "docstring": "Coordinates greeting flows for user-facing surfaces.",
+      "args": [],
+      "returns": null,
+      "avg_complexity": 0.0,
+      "maintainability_index": 0.0,
+      "api": false,
+      "cli": false,
+      "mcp": false,
+      "web": false,
+      "user_facing": true,
+      "doc_refs": [],
+      "feature_id": "F-0007"
+    },
+    {
+      "name": "greet",
+      "qualified_name": "demo_project\\services.py:GreetingService.greet",
+      "kind": "method",
+      "module_path": "demo_project\\services.py",
+      "parent": "GreetingService",
+      "docstring": "Return a greeting string that UIs or bots can render.",
+      "args": [
+        {
+          "name": "self",
+          "type": null
+        },
+        {
+          "name": "name",
+          "type": "str"
+        }
+      ],
+      "returns": "str",
+      "avg_complexity": 0.0,
+      "maintainability_index": 0.0,
+      "api": false,
+      "cli": false,
+      "mcp": false,
+      "web": false,
+      "user_facing": false,
+      "doc_refs": [
+        "demo_project/docs/feature-guide.md#feature-guide-greet",
+        "demo_project/README.md#greetingservice-greet"
+      ],
+      "feature_id": "F-0008"
+    }
+  ],
+  "models": [
+    {
+      "name": "Profile",
+      "qualified_name": "demo_project\\models.py:Profile",
+      "bases": [
+        "BaseModel"
+      ],
+      "docstring": "Profile details shared with end users.",
+      "fields": [
+        {
+          "name": "username",
+          "annotation": "str",
+          "default": null
+        },
+        {
+          "name": "bio",
+          "annotation": "str | None",
+          "default": "None"
+        }
+      ],
+      "module_path": "demo_project\\models.py"
+    }
+  ]
+}

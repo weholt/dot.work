@@ -1,0 +1,113 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    // ---- JS/TS ----
+    {
+      "label": "js:install",
+      "type": "shell",
+      "command": "npm ci",
+      "problemMatcher": []
+    },
+    {
+      "label": "js:lint",
+      "type": "shell",
+      "command": "npm run lint",
+      "problemMatcher": ["$eslint-stylish"],
+      "group": "build"
+    },
+    {
+      "label": "js:typecheck",
+      "type": "shell",
+      "command": "npm run typecheck",
+      "problemMatcher": []
+    },
+    {
+      "label": "js:test",
+      "type": "shell",
+      "command": "npm test --silent",
+      "problemMatcher": []
+    },
+
+    // ---- C# /.NET ----
+    {
+      "label": "dotnet:restore",
+      "type": "shell",
+      "command": "dotnet restore",
+      "problemMatcher": []
+    },
+    {
+      "label": "dotnet:build",
+      "type": "shell",
+      "command": "dotnet build --no-restore -warnaserror",
+      "dependsOn": ["dotnet:restore"],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "dotnet:test",
+      "type": "shell",
+      "command": "dotnet test --no-build --logger trx;LogFileName=test-results.trx",
+      "dependsOn": ["dotnet:build"],
+      "problemMatcher": []
+    },
+
+    // ---- Repository Extraction ----
+    {
+      "label": "repo:extract",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/repo_extract.ps1",
+        "${input:repoUrl}",
+        "${input:languages}"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "repo:extract-bash",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/scripts/repo_extract.sh",
+        "${input:repoUrl}",
+        "${input:languages}"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "repoUrl",
+      "description": "GitHub repository URL",
+      "default": "https://github.com/owner/repo",
+      "type": "promptString"
+    },
+    {
+      "id": "languages",
+      "description": "Languages to extract (comma-separated)",
+      "default": "typescript",
+      "type": "promptString"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "source_path": "README.md",
+    "heading": "GreetingService greet",
+    "level": 1,
+    "content": "Use this sample project to see how Birdseye summarizes features.\nProvide a name and expect the returned greeting payload to match it."
+  },
+  {
+    "source_path": "docs\\feature-guide.md",
+    "heading": "Feature Guide",
+    "level": 1,
+    "content": ""
+  },
+  {
+    "source_path": "docs\\feature-guide.md",
+    "heading": "greet",
+    "level": 2,
+    "content": "- Supply `name` through the API or CLI.\n- Expect the response message to include that name.\n- Log any unexpected formats for follow-up tests."
+  }
+]

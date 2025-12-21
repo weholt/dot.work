@@ -1,0 +1,853 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "title": "Enterprise System Architecture Specification",
+      "body": "Version 4.7 – Internal Use Only  \nAuthor: Acme Systems Group  \nDate: 2025-01-22",
+      "keywords": [
+        "group",
+        "01 22",
+        "internal use",
+        "group date",
+        "date 2025",
+        "22",
+        "2025 01",
+        "2025"
+      ],
+      "keyphrases": [
+        "Acme Systems Group",
+        "Systems Group Date",
+        "Acme Systems",
+        "Group Date",
+        "Systems Group",
+        "Version",
+        "Internal",
+        "Author",
+        "Acme",
+        "Date"
+      ],
+      "tags": [
+        "security"
+      ],
+      "id": 0
+    },
+    {
+      "title": "1. Executive Overview",
+      "body": "The Acme Unified Operations Platform (UOP) is designed to support enterprise-scale workflows involving\nreal-time data ingestion, multi-tenant resource partitioning, analytics processing, and domain-specific client\napplications including web, desktop, and field-service apps.\n\nThe purpose of this document is to provide end-to-end architectural guidance for engineering teams:\nfrontend, backend, data engineering, SRE/DevOps, security analysts, QA, and support teams.",
+      "keywords": [
+        "support",
+        "engineering",
+        "end",
+        "teams",
+        "data",
+        "client applications",
+        "data engineering",
+        "document provide"
+      ],
+      "keyphrases": [
+        "Unified Operations Platform",
+        "Acme Unified Operations",
+        "multi-tenant resource partitioning",
+        "applications including web",
+        "Operations Platform",
+        "enterprise-scale workflows involving",
+        "workflows involving real-time",
+        "domain-specific client applications",
+        "client applications including",
+        "Acme Unified"
+      ],
+      "tags": [
+        "backend"
+      ],
+      "id": 1
+    },
+    {
+      "title": "Key objectives",
+      "body": "- Modern, modular architecture\n- Efficiency at scale (100k+ DAU)\n- UI consistency across channels\n- Strong domain integrity\n- Federated dev teams with shared standards\n\n---",
+      "keywords": [
+        "integrity",
+        "integrity federated",
+        "federated dev",
+        "federated",
+        "efficiency scale",
+        "efficiency",
+        "domain integrity",
+        "dev teams"
+      ],
+      "keyphrases": [
+        "Strong domain integrity",
+        "Federated dev teams",
+        "Efficiency at scale",
+        "modular architecture",
+        "Strong domain",
+        "Federated dev",
+        "Modern",
+        "DAU",
+        "consistency across channels",
+        "domain integrity"
+      ],
+      "tags": [
+        "security"
+      ],
+      "id": 2
+    },
+    {
+      "title": "2. System Domains",
+      "body": "The platform includes five major semi-independent domains:\n\n1. **Frontend Delivery Layer**  \n   - React SPA  \n   - Native Desktop Shell  \n   - Mobile companion app (React Native)  \n   - Shared Design Language System (DLS)\n\n2. **Application Services Layer (Backend Microservices)**  \n   - Identity & Access  \n   - Resource Scheduling  \n   - Inventory Tracking  \n   - Document Processing  \n   - Analytics Pipeline  \n   - Notification Hub\n\n3. **Data Management Layer**  \n   - OLTP DB (PostgreSQL)  \n   - Caching (Redis)  \n   - Data Lake (S3)  \n   - OLAP Data Warehouse  \n   - Event Stream (Kafka)\n\n4. **Infrastructure Layer (Cloud + Kubernetes)**  \n   - Multi-region cluster  \n   - Service mesh (Istio)  \n   - Zero-trust network segments  \n   - Autoscaling policies  \n   - Observability stack\n\n5. **Security & Compliance Layer**  \n   - IAM Policies  \n   - SIEM Integration  \n   - Audit Logs  \n   - Key Management  \n   - Compliance mapping (SOC2, ISO)\n\n---",
+      "keywords": [
+        "layer",
+        "data",
+        "native",
+        "policies",
+        "management",
+        "compliance",
+        "react",
+        "kafka infrastructure"
+      ],
+      "keyphrases": [
+        "major semi-independent domains",
+        "Shared Design Language",
+        "Design Language System",
+        "Native Desktop Shell",
+        "Frontend Delivery Layer",
+        "Application Services Layer",
+        "semi-independent domains",
+        "React SPA",
+        "platform includes",
+        "includes five major"
+      ],
+      "tags": [
+        "backend"
+      ],
+      "id": 3
+    },
+    {
+      "title": "3. User Interface (Frontend)",
+      "body": "",
+      "keywords": [],
+      "keyphrases": [],
+      "tags": [
+        "frontend"
+      ],
+      "id": 4
+    },
+    {
+      "title": "3.1 Application Shell",
+      "body": "The SPA is bootstrapped with Vite and uses:\n\n- React 18\n- React Router v6\n- Redux Toolkit Query\n- Framer Motion animation layer\n- TailwindCSS + internal DLS tokens (variables, semantic colors, spacing presets)\n- Integration with Webpack Module Federation runtime for plugin injection\n\nKey deliverables for frontend teams:\n\n- Reusable primitive components  \n- Page-level layouts  \n- Full accessibility coverage (WCAG 2.2 AA)  \n- SSR-compatible fetch layer  \n- Client-side error boundary strategy",
+      "keywords": [
+        "react",
+        "layer",
+        "layouts accessibility",
+        "client error",
+        "boundary strategy",
+        "boundary",
+        "level layouts",
+        "level"
+      ],
+      "keyphrases": [
+        "Redux Toolkit Query",
+        "Webpack Module Federation",
+        "Framer Motion animation",
+        "internal DLS tokens",
+        "Reusable primitive components",
+        "Full accessibility coverage",
+        "Module Federation runtime",
+        "Client-side error boundary",
+        "Motion animation layer",
+        "SSR-compatible fetch layer"
+      ],
+      "tags": [
+        "backend"
+      ],
+      "id": 5
+    },
+    {
+      "title": "3.2 Component Categories",
+      "body": "| Category | Examples |\n|---------|----------|\n| Primitives | Button, Link, Badge, Stack, Surface |\n| Data Inputs | Select, MultiSelect, DatePicker, FileUpload |\n| Complex | DataGrid, Scheduler, ResourceTimeline |\n| Visualization | DonutChart, LineSeries, Heatmap |",
+      "keywords": [
+        "inputs",
+        "fileupload",
+        "fileupload complex",
+        "lineseries heatmap",
+        "lineseries",
+        "heatmap",
+        "badge stack",
+        "badge"
+      ],
+      "keyphrases": [
+        "Data Inputs",
+        "Category",
+        "Primitives",
+        "Button",
+        "Link",
+        "Badge",
+        "Stack",
+        "Surface",
+        "Select",
+        "Complex"
+      ],
+      "tags": [
+        "backend"
+      ],
+      "id": 6
+    },
+    {
+      "title": "3.3 State Management",
+      "body": "Global state uses a hybrid model:\n\n- Business state → Redux Toolkit\n- Remote server state → Redux Toolkit Query\n- Ephemeral UI state → Recoil\n- Cross-tab sync → BroadcastChannel API\n\nGuidelines include:\n\n- No direct fetch calls inside components  \n- All server interactions via unified \"Service Hooks\"  \n- UI mutation goes through RTL reducers or Recoil atoms",
+      "keywords": [
+        "state",
+        "recoil",
+        "server",
+        "state redux",
+        "redux",
+        "redux toolkit",
+        "toolkit",
+        "ui"
+      ],
+      "keyphrases": [
+        "Redux Toolkit Query",
+        "BroadcastChannel API Guidelines",
+        "API Guidelines include",
+        "Redux Toolkit",
+        "calls inside components",
+        "Remote server state",
+        "direct fetch calls",
+        "fetch calls inside",
+        "Service Hooks",
+        "Toolkit Query"
+      ],
+      "tags": [
+        "data"
+      ],
+      "id": 7
+    },
+    {
+      "title": "3.4 Frontend Security",
+      "body": "Frontend must:\n\n- Never store tokens in localStorage  \n- Use `Authorization: Bearer` + memory-only tokens  \n- Require re-authentication after idle timeout  \n- Reject untrusted HTML  \n- Enforce strict CSP  \n- Validate user permissions client-side (UI gating), but never rely solely on it  \n\n---",
+      "keywords": [
+        "tokens",
+        "bearer",
+        "html enforce",
+        "html",
+        "gating rely",
+        "idle timeout",
+        "idle",
+        "gating"
+      ],
+      "keyphrases": [
+        "Reject untrusted HTML",
+        "Enforce strict CSP",
+        "Validate user permissions",
+        "user permissions client-side",
+        "Require re-authentication",
+        "Reject untrusted",
+        "untrusted HTML",
+        "Enforce strict",
+        "strict CSP",
+        "Validate user"
+      ],
+      "tags": [
+        "infrastructure"
+      ],
+      "id": 8
+    },
+    {
+      "title": "4. Backend Services",
+      "body": "",
+      "keywords": [],
+      "keyphrases": [],
+      "tags": [
+        "frontend"
+      ],
+      "id": 9
+    },
+    {
+      "title": "4.1 Common Principles",
+      "body": "- Each service independently deployable  \n- Public contracts via versioned OpenAPI  \n- Immutable event logs  \n- Outbox pattern for reliable delivery  \n- CI/CD-driven migrations  \n- Rate limiting per client and tenant",
+      "keywords": [
+        "limiting client",
+        "logs outbox",
+        "limiting",
+        "independently deployable",
+        "independently",
+        "immutable event",
+        "event logs",
+        "driven migrations"
+      ],
+      "keyphrases": [
+        "Immutable event logs",
+        "service independently deployable",
+        "CD-driven migrations",
+        "Public contracts",
+        "Immutable event",
+        "Outbox pattern",
+        "Rate limiting",
+        "independently deployable",
+        "versioned OpenAPI",
+        "event logs"
+      ],
+      "tags": [
+        "frontend"
+      ],
+      "id": 10
+    },
+    {
+      "title": "4.2 Identity Service",
+      "body": "- OAuth2 Authorization Code  \n- JWT RS512 with key rotation  \n- Password policy rules configurable per tenant  \n- Webhooks for login events  \n- SAML 2.0 compatibility",
+      "keywords": [
+        "login events",
+        "login",
+        "jwt",
+        "key rotation",
+        "jwt rs512",
+        "events saml",
+        "events",
+        "configurable tenant"
+      ],
+      "keyphrases": [
+        "Authorization Code",
+        "Password policy rules",
+        "Password policy",
+        "Webhooks for login",
+        "JWT",
+        "SAML",
+        "policy rules configurable",
+        "compatibility",
+        "key rotation",
+        "configurable per tenant"
+      ],
+      "tags": [
+        "frontend"
+      ],
+      "id": 11
+    },
+    {
+      "title": "4.3 Inventory Service",
+      "body": "Manages:\n\n- Assets  \n- Warehouse locations  \n- Inventory deltas  \n- Supplier relationships  \n\nPatterns:\n\n- Domain-driven aggregates  \n- Event-sourced asset movements  \n- Async reconciliation jobs",
+      "keywords": [
+        "locations",
+        "inventory deltas",
+        "locations inventory",
+        "event sourced",
+        "driven aggregates",
+        "domain driven",
+        "deltas supplier",
+        "deltas"
+      ],
+      "keyphrases": [
+        "Supplier relationships Patterns",
+        "Event-sourced asset movements",
+        "Async reconciliation jobs",
+        "Warehouse locations",
+        "Inventory deltas",
+        "Domain-driven aggregates",
+        "Event-sourced asset",
+        "Supplier relationships",
+        "relationships Patterns",
+        "Async reconciliation"
+      ],
+      "tags": [
+        "security"
+      ],
+      "id": 12
+    },
+    {
+      "title": "4.4 Document Processing Service",
+      "body": "Supports:\n\n- PDF extraction  \n- Image OCR  \n- Classification  \n- Retention policy enforcement  \n\nDependencies:\n\n- S3 (raw documents)  \n- Redis (work queue)  \n- OCR Engine (Tesseract cluster)",
+      "keywords": [
+        "ocr",
+        "image",
+        "image ocr",
+        "extraction image",
+        "extraction",
+        "engine tesseract",
+        "enforcement dependencies",
+        "enforcement"
+      ],
+      "keyphrases": [
+        "Retention policy enforcement",
+        "policy enforcement Dependencies",
+        "PDF extraction",
+        "Tesseract cluster",
+        "Image OCR",
+        "OCR Engine",
+        "Retention policy",
+        "enforcement Dependencies",
+        "raw documents",
+        "work queue"
+      ],
+      "tags": [
+        "infrastructure"
+      ],
+      "id": 13
+    },
+    {
+      "title": "4.5 Notification Hub",
+      "body": "Supports:\n\n- Email (SMTP)  \n- SMS (provider pool)  \n- Mobile push notifications  \n- Web push  \n- Delivery logs + analytics  \n\n---",
+      "keywords": [
+        "push",
+        "logs analytics",
+        "email smtp",
+        "email",
+        "delivery logs",
+        "web push",
+        "mobile",
+        "supports"
+      ],
+      "keyphrases": [
+        "Mobile push notifications",
+        "Delivery logs",
+        "provider pool",
+        "Mobile push",
+        "Web push",
+        "push notifications",
+        "Email",
+        "SMTP",
+        "SMS",
+        "Supports"
+      ],
+      "tags": [
+        "frontend"
+      ],
+      "id": 14
+    },
+    {
+      "title": "5. Data Engineering",
+      "body": "",
+      "keywords": [],
+      "keyphrases": [],
+      "tags": [
+        "frontend"
+      ],
+      "id": 15
+    },
+    {
+      "title": "5.1 Data Lake",
+      "body": "- Raw tables partitioned by ingestion date  \n- Parquet format  \n- Automatic schema evolution  \n- Late-arriving data handling",
+      "keywords": [
+        "late",
+        "format",
+        "handling",
+        "ingestion date",
+        "format automatic",
+        "late arriving",
+        "evolution late",
+        "evolution"
+      ],
+      "keyphrases": [
+        "Automatic schema evolution",
+        "Late-arriving data handling",
+        "Raw tables partitioned",
+        "Parquet format",
+        "Raw tables",
+        "Automatic schema",
+        "Late-arriving data",
+        "ingestion date",
+        "schema evolution",
+        "data handling"
+      ],
+      "tags": [
+        "security"
+      ],
+      "id": 16
+    },
+    {
+      "title": "5.2 ETL / ELT",
+      "body": "- Orchestration on Airflow  \n- Spark jobs for transformation  \n- Materialized OLAP tables in columnar warehouse  \n- Data quality tests via Great Expectations",
+      "keywords": [
+        "jobs transformation",
+        "great expectations",
+        "great",
+        "expectations",
+        "data quality",
+        "columnar warehouse",
+        "columnar",
+        "tables"
+      ],
+      "keyphrases": [
+        "Materialized OLAP tables",
+        "Orchestration on Airflow",
+        "Data quality tests",
+        "Materialized OLAP",
+        "Great Expectations",
+        "Spark jobs",
+        "Data quality",
+        "OLAP tables",
+        "tests via Great",
+        "jobs for transformation"
+      ],
+      "tags": [
+        "security"
+      ],
+      "id": 17
+    },
+    {
+      "title": "5.3 Real-time Stream Processing",
+      "body": "Uses Kafka → Flink for:\n\n- Metrics aggregation  \n- Anomaly detection  \n- Alert triggering  \n- Change propagation to search index (Elasticsearch cluster)  \n\n---",
+      "keywords": [
+        "flink metrics",
+        "flink",
+        "elasticsearch",
+        "index elasticsearch",
+        "kafka flink",
+        "index",
+        "elasticsearch cluster",
+        "detection alert"
+      ],
+      "keyphrases": [
+        "Metrics aggregation",
+        "Anomaly detection",
+        "Alert triggering",
+        "Elasticsearch cluster",
+        "Change propagation",
+        "search index",
+        "Kafka",
+        "Flink",
+        "Metrics",
+        "Anomaly"
+      ],
+      "tags": [
+        "data"
+      ],
+      "id": 18
+    },
+    {
+      "title": "6. Infrastructure",
+      "body": "",
+      "keywords": [],
+      "keyphrases": [],
+      "tags": [
+        "frontend"
+      ],
+      "id": 19
+    },
+    {
+      "title": "6.1 Kubernetes",
+      "body": "- Multi-zone  \n- Node pools: general, compute-optimized, memory-optimized  \n- Pod disruption budgets  \n- Cluster autoscaler integration",
+      "keywords": [
+        "optimized",
+        "general",
+        "general compute",
+        "disruption budgets",
+        "disruption",
+        "compute optimized",
+        "compute",
+        "cluster autoscaler"
+      ],
+      "keyphrases": [
+        "Pod disruption budgets",
+        "Cluster autoscaler integration",
+        "Node pools",
+        "Pod disruption",
+        "Cluster autoscaler",
+        "Multi-zone",
+        "general",
+        "compute-optimized",
+        "memory-optimized",
+        "disruption budgets"
+      ],
+      "tags": [
+        "data"
+      ],
+      "id": 20
+    },
+    {
+      "title": "6.2 Networking",
+      "body": "- Istio mutual TLS  \n- Internal-only egress for sensitive workloads  \n- Gateway API instead of Ingress for new services",
+      "keywords": [
+        "ingress",
+        "gateway api",
+        "gateway",
+        "ingress new",
+        "istio mutual",
+        "instead ingress",
+        "instead",
+        "internal egress"
+      ],
+      "keyphrases": [
+        "Istio mutual TLS",
+        "Gateway API",
+        "Istio mutual",
+        "mutual TLS",
+        "Internal-only egress",
+        "sensitive workloads",
+        "egress for sensitive",
+        "Istio",
+        "TLS",
+        "Internal-only"
+      ],
+      "tags": [
+        "backend"
+      ],
+      "id": 21
+    },
+    {
+      "title": "6.3 Observability",
+      "body": "- OpenTelemetry instrumentation  \n- Loki for logs  \n- Tempo for traces  \n- Prometheus remote-write  \n\n---",
+      "keywords": [
+        "instrumentation",
+        "logs tempo",
+        "instrumentation loki",
+        "write",
+        "remote",
+        "logs",
+        "uses",
+        "aggregates"
+      ],
+      "keyphrases": [
+        "Loki for logs",
+        "Tempo for traces",
+        "Prometheus remote-write",
+        "OpenTelemetry instrumentation",
+        "Loki",
+        "Tempo",
+        "Prometheus",
+        "OpenTelemetry",
+        "instrumentation",
+        "logs"
+      ],
+      "tags": [
+        "frontend"
+      ],
+      "id": 22
+    },
+    {
+      "title": "7. Compliance, Governance & Security",
+      "body": "",
+      "keywords": [],
+      "keyphrases": [],
+      "tags": [
+        "frontend"
+      ],
+      "id": 23
+    },
+    {
+      "title": "7.1 Zero-Trust",
+      "body": "All traffic authenticated + encrypted inside cluster.",
+      "keywords": [
+        "inside cluster",
+        "encrypted inside",
+        "encrypted",
+        "inside",
+        "cluster",
+        "analytics",
+        "zero",
+        "based cluster"
+      ],
+      "keyphrases": [
+        "encrypted inside cluster",
+        "traffic authenticated",
+        "encrypted inside",
+        "inside cluster",
+        "authenticated",
+        "encrypted",
+        "cluster",
+        "traffic",
+        "inside"
+      ],
+      "tags": [
+        "data"
+      ],
+      "id": 24
+    },
+    {
+      "title": "7.2 Key Management",
+      "body": "Keys stored in HSM-backed vault.",
+      "keywords": [
+        "keys stored",
+        "keys",
+        "hsm",
+        "hsm backed",
+        "bearer",
+        "uses",
+        "aggregates",
+        "analytics"
+      ],
+      "keyphrases": [
+        "Keys stored",
+        "HSM-backed vault",
+        "stored in HSM-backed",
+        "Keys",
+        "vault",
+        "stored",
+        "HSM-backed"
+      ],
+      "tags": [
+        "data"
+      ],
+      "id": 25
+    },
+    {
+      "title": "7.3 Audit Trail",
+      "body": "Immutable append-only logs, exposed to admins via UI.\n\n---",
+      "keywords": [
+        "immutable append",
+        "exposed admins",
+        "immutable",
+        "logs exposed",
+        "exposed",
+        "ui",
+        "logs",
+        "aggregates"
+      ],
+      "keyphrases": [
+        "Immutable append-only logs",
+        "Immutable append-only",
+        "append-only logs",
+        "exposed to admins",
+        "Immutable",
+        "logs",
+        "exposed",
+        "append-only",
+        "admins"
+      ],
+      "tags": [
+        "frontend"
+      ],
+      "id": 26
+    },
+    {
+      "title": "8. Workflows",
+      "body": "",
+      "keywords": [],
+      "keyphrases": [],
+      "tags": [
+        "frontend"
+      ],
+      "id": 27
+    },
+    {
+      "title": "8.1 Resource Scheduling Workflow",
+      "body": "1. Frontend user selects resources on timeline.  \n2. SPA sends POST `/api/v2/schedule/apply`.  \n3. Backend validates business rules.  \n4. Scheduler engine updates aggregates.  \n5. Kafka event `ScheduleApplied` emitted.  \n6. Analytics pipeline consumes event.",
+      "keywords": [
+        "event",
+        "kafka event",
+        "backend validates",
+        "event scheduleapplied",
+        "engine updates",
+        "emitted analytics",
+        "consumes event",
+        "consumes"
+      ],
+      "keyphrases": [
+        "SPA sends POST",
+        "SPA sends",
+        "sends POST",
+        "SPA",
+        "POST",
+        "event",
+        "Frontend user selects",
+        "Kafka event",
+        "Backend validates",
+        "api"
+      ],
+      "tags": [
+        "infrastructure"
+      ],
+      "id": 28
+    },
+    {
+      "title": "8.2 Document Upload Workflow",
+      "body": "1. User uploads via DropZone.  \n2. SPA sends file to Upload API.  \n3. Storage service streams file to S3.  \n4. OCR is scheduled.  \n5. Classification runs.  \n6. Document indexed in search.  \n7. Audit log entry emitted.  \n\n---",
+      "keywords": [
+        "file",
+        "indexed",
+        "log entry",
+        "log",
+        "file upload",
+        "file s3",
+        "indexed search",
+        "entry emitted"
+      ],
+      "keyphrases": [
+        "Upload API",
+        "SPA sends",
+        "SPA",
+        "API",
+        "User uploads",
+        "file",
+        "OCR is scheduled",
+        "Storage",
+        "Storage service",
+        "SPA sends file"
+      ],
+      "tags": [
+        "infrastructure"
+      ],
+      "id": 29
+    },
+    {
+      "title": "9. Glossary",
+      "body": "- **UOP** – Unified Operations Platform  \n- **RTQ** – Remote Task Queue  \n- **HPA** – Horizontal Pod Autoscaler  \n\n---",
+      "keywords": [
+        "horizontal pod",
+        "horizontal",
+        "hpa horizontal",
+        "rtq",
+        "operations platform",
+        "operations",
+        "pod",
+        "uop"
+      ],
+      "keyphrases": [
+        "Unified Operations Platform",
+        "Remote Task Queue",
+        "Horizontal Pod Autoscaler",
+        "Unified Operations",
+        "Operations Platform",
+        "Remote Task",
+        "Task Queue",
+        "Horizontal Pod",
+        "Pod Autoscaler",
+        "UOP"
+      ],
+      "tags": [
+        "backend"
+      ],
+      "id": 30
+    },
+    {
+      "title": "10. Cross-domain mixed content (for testing classification)",
+      "body": "The frontend requires caching of backend queries using RTQ, while the backend inventory service may scale\ndifferently based on cluster HPA rules. Infrastructure failures may affect frontend user experience if not isolated\nusing service mesh timeouts. Compliance also mandates audit logs exposed partly via the frontend admin panels\nbut enforced through backend IAM.\n\n---",
+      "keywords": [
+        "backend",
+        "frontend",
+        "using",
+        "service",
+        "based cluster",
+        "failures",
+        "exposed partly",
+        "experience isolated"
+      ],
+      "keyphrases": [
+        "cluster HPA rules",
+        "scale differently based",
+        "HPA rules",
+        "queries using RTQ",
+        "cluster HPA",
+        "frontend requires caching",
+        "requires caching",
+        "scale differently",
+        "differently based",
+        "based on cluster"
+      ],
+      "tags": [
+        "backend"
+      ],
+      "id": 31
+    },
+    {
+      "title": "End of Document",
+      "body": "",
+      "keywords": [],
+      "keyphrases": [],
+      "tags": [
+        "frontend"
+      ],
+      "id": 32
+    }
+  ],
+  "edges": []
+}

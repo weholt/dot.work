@@ -1,0 +1,356 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "solace"
+version = "1.0.0"
+description = "Solace: unified MCP server and HTML to Markdown conversion toolkit"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Solace Team", email = "dev@example.com"}
+]
+keywords = ["mcp", "rag", "search", "markdown", "semantic", "vector", "server", "html", "converter"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: Indexing",
+    "Topic :: Utilities",
+]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "beautifulsoup4>=4.12.0",
+    "html2text>=2024.2.26",
+    "mcp>=1.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-ai>=0.0.13",
+    "lxml>=4.9.0",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "python-dotenv>=1.0.0",
+    "python-frontmatter>=1.0.0",
+    "GitPython>=3.1.0",
+    "rich>=13.0.0",
+    "typer>=0.9.0",
+    "pydantic-ai-slim>=0.0.15",
+    "markdown>=3.4.0",
+    "pygments>=2.15.0",
+    "jinja2>=3.1.0",
+    "cookiecutter>=2.5.0",
+    "chromadb>=1.1.1",
+    "sentence-transformers>=3.0.0",
+    "torch>=2.0.0",
+    "sqlmodel>=0.0.16",
+    "PyGithub>=2.1.0",
+    "watchdog>=3.0.0",
+    "psutil>=7.1.0",
+    "youtube-transcript-api>=1.2.3",
+    "yt-dlp>=2025.10.14",
+]
+
+[project.optional-dependencies]
+docker = [
+    # Ultra-minimal dependencies for Docker with TF-IDF RAG
+    "mcp>=1.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-ai>=0.0.13",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "python-dotenv>=1.0.0",
+    "pydantic-ai-slim>=0.0.15",
+    "markdown>=3.4.0",
+    "jinja2>=3.1.0",
+]
+
+performance = [
+    # Performance testing dataset generation
+    "jinja2>=3.1.0",
+    "GitPython>=3.1.0",
+    "python-frontmatter>=1.0.0",
+    "tqdm>=4.66.0",
+    "pytest-benchmark>=4.0.0",
+]
+
+[project.scripts]
+solace = "solace.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/your-username/solace"
+Repository = "https://github.com/your-username/solace"
+Issues = "https://github.com/your-username/solace/issues"
+Documentation = "https://github.com/your-username/solace#readme"
+
+[tool.hatch.build.targets.wheel]
+packages = ["solace"]
+
+[tool.bandit]
+targets = ["solace"]
+exclude_dirs = ["tests", "build", "scripts", ".venv"]
+skips = []
+
+[tool.pylint.main]
+# Pylint configuration for code quality and duplication detection
+# Alternative to jscpd (Node.js tool - install separately: npm install -g jscpd)
+fail-under = 8.0
+ignore = ["tests", "build", "scripts", ".venv"]
+recursive = true
+
+[tool.pylint.messages_control]
+disable = [
+    "C0103",  # Invalid name (snake_case vs camelCase)
+    "C0114",  # Missing module docstring
+    "C0115",  # Missing class docstring
+    "C0116",  # Missing function docstring
+    "R0913",  # Too many arguments
+    "R0914",  # Too many local variables
+]
+
+[tool.pylint.similarities]
+# Detect code duplication (alternative to jscpd)
+min-similarity-lines = 4
+ignore-comments = true
+ignore-docstrings = true
+ignore-imports = true
+
+[tool.black]
+target-version = ["py313"]
+line-length = 180
+skip-string-normalization = false
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.pytest_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+line_length = 180
+
+[tool.ruff]
+target-version = "py313"
+line-length = 180
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "tests",
+    "scripts",
+    "tools",
+    "test_memory_tracking.py",
+    "test_quick.py",
+    "test_system_info.py",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "S",    # flake8-bandit (security)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S110", "T201", "S311", "S603", "S607"]  # Allow assert, try-except-pass in tests
+"tests/e2e/*" = ["S101", "T201", "S311", "S603", "S607"]
+"tests/integration/*" = ["S101", "T201", "S311", "S603", "S607"]
+"build.py" = ["T201", "S603"]
+"demo_concept.py" = ["T201"]
+"scripts/run_integration_tests.py" = ["T201", "S603", "S607"]
+"scripts/run_e2e_tests.py" = ["T201", "S603", "S607"]
+"scripts/run_docker_e2e_tests.py" = ["T201", "S603", "S607"]
+"solace/cookiecutter_manager.py" = ["S603"]
+"solace/web_routes.py" = ["S108"]  # Allow /tmp paths in test filtering
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+show_error_codes = true
+strict_optional = false
+exclude = [
+    "tests",
+    "scripts",
+    "build",
+    "dist",
+    "solace/mcp_tools.py",  # Complex union return types from process_mcp_response
+    "solace/_mcp_tools_legacy.py",  # Legacy file with many type issues
+    "solace/mcp_tools/",  # New MCP tools with complex return types
+]
+
+# Ignore missing imports for third-party libraries
+[[tool.mypy.overrides]]
+module = [
+    "sentence_transformers.*",
+    "faiss.*",
+    "markdownify.*",
+    "beautifulsoup4.*",
+    "bs4.*",
+    "frontmatter.*",
+    "git.*",
+    "sklearn.*",
+    "psutil",
+    "psutil.*",
+    "pynvml",
+    "pynvml.*",
+    "yt_dlp",
+    "yt_dlp.*",
+]
+ignore_missing_imports = true
+
+# Additional override for converter module with complex BeautifulSoup typing
+[[tool.mypy.overrides]]
+module = "solace.html2markdown.converter"
+ignore_errors = true
+
+# E2E test fixtures have complex Playwright/pytest typing
+[[tool.mypy.overrides]]
+module = "tests.e2e.conftest"
+ignore_errors = true
+
+# Integration test fixtures have complex Playwright/pytest typing
+[[tool.mypy.overrides]]
+module = "tests.integration.*"
+ignore_errors = true
+
+# MCP tools with process_mcp_response() wrapper have union return types
+[[tool.mypy.overrides]]
+module = "solace.mcp_tools"
+warn_return_any = false
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--cov=.",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    # Coverage threshold adjusted to 70% for logic-focused testing
+    "--cov-fail-under=68",
+    "--timeout=5",
+    "--timeout-method=thread",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# Default timeout for unit tests - can be overridden with @pytest.mark.timeout()
+timeout = 5
+timeout_func_only = true  # Allow per-test timeout overrides
+# Filter out known third-party warnings
+filterwarnings = [
+    "ignore::DeprecationWarning:starlette.templating",
+    "ignore::ResourceWarning:sqlalchemy.*",
+    "ignore::ResourceWarning:sqlmodel.*",
+    "ignore::ResourceWarning",  # Ignore any remaining ResourceWarnings from stdlib/third-party
+]
+# Test markers
+markers = [
+    "e2e: End-to-end tests using Playwright (deselect with '-m \\\"not e2e\\\"')",
+    "integration: Integration tests that start the server (deselect with '-m \\\"not integration\\\"')",
+    "slow: Slow tests that may take longer than 5 seconds",
+    "docker_e2e: Docker container end-to-end tests (requires Docker)",
+    "playwright: Tests that require Playwright browser",
+]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "tests/*",
+    "scripts/*",
+    ".venv/*",
+    "build/*",
+    "dist/*",
+    "*.egg-info/*",
+    ".pytest_cache/*",
+    ".mypy_cache/*",
+    ".ruff_cache/*",
+    "htmlcov/*",
+    "demo_concept.py",
+    "simple_test.py",
+    "build.py",
+    "main.py",
+    "solace/cli.py",  # Thin UI layer - logic tested via integration tests
+    "test_*.py",  # Manual test scripts in root directory
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.18.2",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=7.0.0",
+    "pytest-timeout>=2.4.0",
+    "pytest-playwright>=0.4.0",
+    "pytest-benchmark>=4.0.0",
+    "playwright>=1.40.0",
+    "ruff>=0.13.1",
+    "types-markdown>=3.9.0.20250906",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "pre-commit>=3.5.0",
+    "psutil>=7.1.0",
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.26.0",
+    "bandit>=1.8.6",
+    "pylint>=4.0.0",
+    "types-pyyaml>=6.0.12.20250915",
+]
