@@ -24,6 +24,9 @@ validate_app = typer.Typer(help="Validate files for syntax and schema errors.")
 # Create subcommand group for review
 review_app = typer.Typer(help="Interactive code review with AI-friendly export.")
 
+# Create subcommand group for canonical prompts
+canonical_app = typer.Typer(help="Validate and install canonical prompt files.")
+
 
 def detect_environment(target: Path) -> str | None:
     """Try to detect which AI environment is configured in the target project."""
@@ -589,6 +592,101 @@ def review_clear(
             f.unlink()
         console.print(f"[green]✅ Cleared {len(jsonl_files)} reviews[/green]")
 
+
+# Register the review subcommand group
+app.add_typer(review_app, name="review")
+
+
+@canonical_app.command("validate")
+def canonical_validate(
+    prompt_file: Annotated[
+        Path,
+        typer.Argument(help="Path to canonical prompt file to validate"),
+    ],
+    strict: Annotated[
+        bool,
+        typer.Option("--strict", "-s", help="Use strict validation mode"),
+    ] = False,
+) -> None:
+    """Validate a canonical prompt file."""
+    from dot_work.installer import validate_canonical_prompt_file
+
+    try:
+        validate_canonical_prompt_file(prompt_file, strict=strict)
+        console.print(f"[green]✅[/green] {prompt_file} is a valid canonical prompt")
+    except Exception as e:
+        console.print(f"[red]❌[/red] Validation failed: {e}")
+        raise typer.Exit(1) from e
+
+
+@canonical_app.command("install")
+def canonical_install(
+    prompt_file: Annotated[
+        Path,
+        typer.Argument(help="Path to canonical prompt file to install"),
+    ],
+    env: Annotated[
+        str,
+        typer.Option("--env", "-e", help="Target environment (copilot, claude, etc.)"),
+    ],
+    target: Annotated[
+        Path,
+        typer.Option(
+            "--target",
+            "-t",
+            help="Target project directory (default: current directory)",
+        ),
+    ] = Path("."),
+    force: Annotated[
+        bool,
+        typer.Option("--force", "-f", help="Overwrite existing files"),
+    ] = False,
+) -> None:
+    """Install a canonical prompt file to specified environment."""
+    from dot_work.installer import install_canonical_prompt
+
+    target = target.resolve()
+
+    if not target.exists():
+        console.print(f"[red]❌ Target directory does not exist:[/red] {target}")
+        raise typer.Exit(1)
+
+    try:
+        install_canonical_prompt(prompt_file, env, target, console, force=force)
+        console.print(f"[green]✅[/green] Installed {prompt_file} for {env}")
+    except Exception as e:
+        console.print(f"[red]❌[/red] Installation failed: {e}")
+        raise typer.Exit(1) from e
+
+
+@canonical_app.command("extract")
+def canonical_extract(
+    prompt_file: Annotated[
+        Path,
+        typer.Argument(help="Path to canonical prompt file"),
+    ],
+    env: Annotated[
+        str,
+        typer.Option("--env", "-e", help="Environment to extract"),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Output directory (default: current directory)"),
+    ] = Path("."),
+) -> None:
+    """Extract environment-specific prompt from canonical prompt."""
+    from dot_work.prompts.canonical import extract_environment_file
+
+    try:
+        output_path = extract_environment_file(prompt_file, env, output_dir)
+        console.print(f"[green]✅[/green] Extracted {env} prompt to {output_path}")
+    except Exception as e:
+        console.print(f"[red]❌[/red] Extraction failed: {e}")
+        raise typer.Exit(1) from e
+
+
+# Register the canonical subcommand group
+app.add_typer(canonical_app, name="canonical")
 
 # Register the review subcommand group
 app.add_typer(review_app, name="review")

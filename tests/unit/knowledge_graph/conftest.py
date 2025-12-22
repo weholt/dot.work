@@ -1,4 +1,4 @@
-"""Pytest configuration and shared fixtures for knowledge_graph tests."""
+"""Pytest configuration and shared fixtures."""
 
 import os
 import tempfile
@@ -24,11 +24,11 @@ def temp_db_path(temp_dir: Path) -> Path:
 @pytest.fixture
 def clean_env() -> Generator[None, None, None]:
     """Ensure clean environment variables for tests."""
-    original = os.environ.get("DOT_WORK_KG_DB_PATH")
-    if "DOT_WORK_KG_DB_PATH" in os.environ:
-        del os.environ["DOT_WORK_KG_DB_PATH"]
+    original = os.environ.get("KG_DB_PATH")
+    if "KG_DB_PATH" in os.environ:
+        del os.environ["KG_DB_PATH"]
     yield
     if original is not None:
-        os.environ["DOT_WORK_KG_DB_PATH"] = original
-    elif "DOT_WORK_KG_DB_PATH" in os.environ:
-        del os.environ["DOT_WORK_KG_DB_PATH"]
+        os.environ["KG_DB_PATH"] = original
+    elif "KG_DB_PATH" in os.environ:
+        del os.environ["KG_DB_PATH"]

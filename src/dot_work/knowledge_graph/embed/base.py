@@ -11,7 +11,7 @@ class EmbeddingError(Exception):
 
 
 class RateLimitError(EmbeddingError):
-    """Raised when rate limited by provider."""
+    """Raised when rate limited by backend."""
 
     def __init__(self, message: str, retry_after: float | None = None) -> None:
         super().__init__(message)
@@ -23,21 +23,22 @@ class EmbedderConfig:
     """Configuration for embedding providers.
 
     Attributes:
-        provider: The embedding provider ('ollama' or 'openai').
+        backend: The embedding provider ('ollama' or 'openai').
         model: The model to use for embeddings.
         api_key: API key for providers that require it.
-        base_url: Base URL for the API endpoint.
+        base_url: Base URL for API endpoint.
         dimensions: Output embedding dimensions (if supported).
         batch_size: Maximum batch size for embedding requests.
         extra: Additional provider-specific options.
     """
 
-    provider: str = "ollama"
+    backend: str = "ollama"
     model: str = "nomic-embed-text"
     api_key: str | None = None
     base_url: str | None = None
+    timeout: float = 30.0
+    batch_size: int = 32
     dimensions: int | None = None
-    batch_size: int = 100
     extra: dict[str, str] = field(default_factory=dict)
 
 

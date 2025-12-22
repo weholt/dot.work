@@ -52,7 +52,13 @@ class OpenAIEmbedder(Embedder):
             msg = "OpenAI API key required (set OPENAI_API_KEY or pass api_key)"
             raise EmbeddingError(msg)
 
-        self.base_url = config.base_url or self.DEFAULT_URL
+        # Handle OpenRouter-specific defaults
+        if config.backend == "openrouter" and not config.base_url:
+            self.base_url = "https://openrouter.ai/api/v1"
+        else:
+            url = config.base_url or self.DEFAULT_URL
+            # Normalize URL by removing trailing slash
+            self.base_url = url.rstrip("/")
         self.model = config.model or self.DEFAULT_MODEL
         self.dimensions = config.dimensions
         self.batch_size = config.batch_size
@@ -153,7 +159,13 @@ class OpenAIEmbedder(Embedder):
             data = result["data"]
             # Sort by index to ensure correct order
             sorted_data = sorted(data, key=lambda x: x["index"])
-            return [item["embedding"] for item in sorted_data]
+            embeddings = [item["embedding"] for item in sorted_data]
+
+            # Update dimensions if not set
+            if self.dimensions is None and embeddings:
+                self.dimensions = len(embeddings[0])
+
+            return embeddings
         except (KeyError, TypeError) as e:
             msg = f"Invalid OpenAI response format: {e}"
             raise EmbeddingError(msg) from e

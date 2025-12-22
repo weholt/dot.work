@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dot_work.knowledge_graph.embed.base import Embedder, EmbedderConfig
+from dot_work.knowledge_graph.embed.base import Embedder, EmbedderConfig, EmbeddingError
 
 
 def get_embedder(config: EmbedderConfig | None = None) -> Embedder:
@@ -15,21 +15,21 @@ def get_embedder(config: EmbedderConfig | None = None) -> Embedder:
         Configured Embedder instance.
 
     Raises:
-        ValueError: If provider is not supported.
+        ValueError: If backend is not supported.
     """
     if config is None:
         config = EmbedderConfig()
 
-    provider = config.provider.lower()
+    backend = config.backend.lower()
 
-    if provider == "ollama":
+    if backend == "ollama":
         from dot_work.knowledge_graph.embed.ollama import OllamaEmbedder
 
         return OllamaEmbedder(config)
-    elif provider == "openai":
+    elif backend == "openai" or backend == "openrouter":
         from dot_work.knowledge_graph.embed.openai import OpenAIEmbedder
 
         return OpenAIEmbedder(config)
     else:
-        msg = f"Unknown embedding provider: {provider}"
-        raise ValueError(msg)
+        msg = f"Unknown embedding backend: {backend}"
+        raise EmbeddingError(msg)

@@ -758,3 +758,229 @@ def initialize_work_directory(
 
     console.print(f"\n[cyan]📁 Work directory initialized at:[/cyan] {work_dir}")
     console.print("[dim]💡 Run 'generate-baseline' before making code changes[/dim]")
+
+
+def validate_canonical_prompt_file(prompt_file: Path, strict: bool = False) -> None:
+    """Validate a canonical prompt file and raise exception if invalid.
+
+    Args:
+        prompt_file: Path to canonical prompt file (.canon.md or similar).
+        strict: Whether to use strict validation mode.
+
+    Raises:
+        ValueError: If the file is not a valid canonical prompt.
+    """
+    from dot_work.prompts.canonical import CanonicalPromptParser, CanonicalPromptValidator
+
+    if not prompt_file.exists():
+        raise FileNotFoundError(f"Canonical prompt file not found: {prompt_file}")
+
+    try:
+        parser = CanonicalPromptParser()
+        prompt = parser.parse(prompt_file)
+
+        validator = CanonicalPromptValidator()
+        errors = validator.validate(prompt, strict=strict)
+
+        # Filter errors by severity
+        error_messages = [e.message for e in errors if e.severity == "error"]
+        warning_messages = [e.message for e in errors if e.severity == "warning"]
+
+        # In strict mode, treat errors starting with "Strict mode:" differently
+        strict_mode_errors = [msg for msg in error_messages if msg.startswith("Strict mode:")]
+        regular_errors = [msg for msg in error_messages if not msg.startswith("Strict mode:")]
+
+        if regular_errors:
+            error_text = "\n  ".join(regular_errors)
+            raise ValueError(f"Canonical prompt validation failed:\n  {error_text}")
+
+        if strict_mode_errors or (warning_messages and strict):
+            all_strict_issues = strict_mode_errors + (warning_messages if strict else [])
+            error_text = "\n  ".join(all_strict_issues)
+            raise ValueError(f"Canonical prompt strict validation failed:\n  {error_text}")
+
+    except ValueError as e:
+        # For strict validation failures, wrap them appropriately
+        if "Canonical prompt strict validation failed" in str(e):
+            raise
+        # For validation errors from parse/validate, wrap them
+        if "Canonical prompt validation failed" in str(e):
+            raise
+        # For other ValueError exceptions from parsing, wrap them
+        error_msg = str(e)
+        raise ValueError(f"Canonical prompt validation failed:\n  {error_msg}") from e
+    except Exception as e:
+        raise ValueError(f"Canonical prompt validation failed:\n  {e}") from e
+
+
+def install_canonical_prompt(
+    prompt_file: Path,
+    env_key: str,
+    target: Path,
+    console: Console,
+    *,
+    force: bool = False,
+) -> None:
+    """Install a canonical prompt file to the specified environment.
+
+    Args:
+        prompt_file: Path to canonical prompt file.
+        env_key: Environment key to install for (e.g., 'copilot', 'claude').
+        target: Target directory to install in.
+        console: Rich console for output.
+        force: Whether to overwrite existing files.
+
+    Raises:
+        ValueError: If the environment is not supported or prompt is invalid.
+        FileNotFoundError: If the prompt file doesn't exist.
+    """
+    from dot_work.prompts.canonical import CanonicalPromptError, CanonicalPromptParser
+
+    # First validate canonical prompt
+    validate_canonical_prompt_file(prompt_file, strict=False)
+
+    # Parse canonical prompt
+    parser = CanonicalPromptParser()
+    prompt = parser.parse(prompt_file)
+
+    # Get environment configuration (will raise CanonicalPromptError if not found)
+    try:
+        env_config = prompt.get_environment(env_key)
+    except CanonicalPromptError as e:
+        # Convert CanonicalPromptError to ValueError for consistent API
+        raise ValueError(str(e)) from e
+
+    # Validate target path is not empty
+    if not env_config.target or not env_config.target.strip():
+        raise ValueError(
+            f"Environment '{env_key}' has an empty or missing 'target' path. "
+            f"The target path must be specified and non-empty."
+        )
+
+    # Determine output path
+    if env_config.target.startswith("/"):
+        # Absolute path
+        output_dir = Path(env_config.target.lstrip("/"))
+    elif env_config.target.startswith("./"):
+        # Relative to current directory
+        output_dir = target / env_config.target[2:]
+    else:
+        # Relative to target
+        output_dir = target / env_config.target
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Determine filename
+    if env_config.filename:
+        # Validate filename is not empty
+        if not env_config.filename or not env_config.filename.strip():
+            raise ValueError(
+                f"Environment '{env_key}' has an empty 'filename'. The filename must be non-empty."
+            )
+        output_filename = env_config.filename
+    elif env_config.filename_suffix:
+        # Validate filename_suffix is not empty
+        if not env_config.filename_suffix or not env_config.filename_suffix.strip():
+            raise ValueError(
+                f"Environment '{env_key}' has an empty 'filename_suffix'. "
+                f"The filename_suffix must be non-empty."
+            )
+        # Use prompt file stem with suffix, stripping .canon/.canonical prefix
+        base_name = prompt_file.stem
+        # Remove .canon or .canonical suffix if present
+        if base_name.endswith(".canon"):
+            base_name = base_name[:-6]  # Remove ".canon"
+        elif base_name.endswith(".canonical"):
+            base_name = base_name[:-10]  # Remove ".canonical"
+        output_filename = base_name + env_config.filename_suffix
+    else:
+        raise ValueError(
+            f"Environment '{env_key}' must specify either 'filename' or 'filename_suffix'. "
+            f"Both are missing or None."
+        )
+
+    output_path = output_dir / output_filename
+
+    # Check if we should write the file
+    if not should_write_file(output_path, force, console):
+        console.print(f"  [dim]⏭[/dim] Skipped {output_filename}")
+        return
+
+    # Build environment-specific frontmatter
+    env_config_dict = {k: v for k, v in vars(env_config).items() if k != "target" and v is not None}
+    frontmatter = {
+        "meta": prompt.meta,
+        "filename": output_filename,
+        **env_config_dict,
+    }
+
+    # Write the prompt with environment-specific frontmatter
+    import yaml
+
+    output_content = f"""---
+{yaml.safe_dump(frontmatter, default_flow_style=False)}---
+
+{prompt.content}"""
+
+    output_path.write_text(output_content, encoding="utf-8")
+    console.print(f"  [green]✓[/green] Installed {output_filename}")
+
+
+def install_canonical_prompt_directory(
+    prompts_dir: Path,
+    env_key: str,
+    target: Path,
+    console: Console,
+    *,
+    force: bool = False,
+) -> None:
+    """Install all canonical prompt files from a directory to the specified environment.
+
+    Args:
+        prompts_dir: Directory containing canonical prompt files.
+        env_key: Environment key to install for.
+        target: Target directory to install in.
+        console: Rich console for output.
+        force: Whether to overwrite existing files.
+
+    Raises:
+        ValueError: If no canonical prompts found or invalid.
+    """
+    from dot_work.prompts.canonical import CanonicalPromptParser
+
+    # Find canonical prompt files
+    canonical_files = list(prompts_dir.glob("*.canon.md"))
+    canonical_files.extend(prompts_dir.glob("*.canonical.md"))
+
+    if not canonical_files:
+        raise ValueError(f"No canonical prompt files found in {prompts_dir}")
+
+    parser = CanonicalPromptParser()
+    installed_count = 0
+
+    console.print(f"Installing {len(canonical_files)} canonical prompt(s) for {env_key}...")
+
+    for prompt_file in canonical_files:
+        try:
+            # Check if this file has the target environment before installing
+            prompt = parser.parse(prompt_file)
+            if env_key not in prompt.environments:
+                available = ", ".join(prompt.list_environments())
+                console.print(
+                    f"  [dim]⏭[/dim] Skipped {prompt_file.name} (no '{env_key}' environment, available: {available})"
+                )
+                continue
+
+            install_canonical_prompt(prompt_file, env_key, target, console, force=force)
+            installed_count += 1
+        except Exception as e:
+            console.print(f"  [red]✗[/red] Failed to install {prompt_file.name}: {e}")
+
+    if installed_count == 0:
+        raise ValueError(
+            f"Environment '{env_key}' not found in any canonical prompt. "
+            f"Processed {len(canonical_files)} canonical prompt file(s), but none contained "
+            f"the '{env_key}' environment."
+        )
+
+    console.print(f"[green]✓[/green] Completed installation of {installed_count} canonical prompts")

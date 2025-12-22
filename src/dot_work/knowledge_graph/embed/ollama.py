@@ -33,6 +33,7 @@ class OllamaEmbedder(Embedder):
         super().__init__(config)
         self.base_url = config.base_url or self.DEFAULT_URL
         self.model = config.model or "nomic-embed-text"
+        self.dimensions = config.dimensions
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings using Ollama.
@@ -56,6 +57,9 @@ class OllamaEmbedder(Embedder):
 
             try:
                 embedding = self._request_embedding(payload)
+                # Update dimensions if not set
+                if self.dimensions is None:
+                    self.dimensions = len(embedding)
                 results.append(embedding)
             except Exception as e:
                 raise EmbeddingError(f"Ollama embedding failed: {e}") from e
@@ -87,7 +91,18 @@ class OllamaEmbedder(Embedder):
         try:
             with urllib.request.urlopen(request, timeout=60) as response:
                 result = json.loads(response.read().decode("utf-8"))
-                return result["embedding"]
+                # Handle both modern (embeddings) and legacy (embedding) formats
+                if "embeddings" in result:
+                    embeddings = result["embeddings"]
+                    if len(embeddings) != 1:
+                        msg = f"Expected single embedding, got {len(embeddings)}"
+                        raise EmbeddingError(msg) from None
+                    return embeddings[0]
+                elif "embedding" in result:
+                    return result["embedding"]
+                else:
+                    msg = "Ollama response missing 'embedding' or 'embeddings' field"
+                    raise EmbeddingError(msg) from None
         except urllib.error.URLError as e:
             msg = f"Failed to connect to Ollama at {self.base_url}: {e}"
             raise EmbeddingError(msg) from e
