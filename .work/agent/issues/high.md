@@ -13,7 +13,7 @@ section: "tests"
 tags: [testing, coverage, installer]
 type: test
 priority: high
-status: proposed
+status: completed
 references:
   - tests/unit/test_installer.py
   - src/dot_work/installer.py

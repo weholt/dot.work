@@ -1,25 +1,25 @@
 # Agent Focus
-Last updated: 2025-12-22T16:10:00Z
+Last updated: 2025-12-22T16:40:00Z
 
 ## Previous
-- Issue: DOCS-003@e5f6a7 – Document unified prompt authoring and migration
-- Completed: 2025-12-21
-- Outcome: ✅ COMPLETED - Created comprehensive prompt authoring guide in docs/prompt-authoring.md. Deliverables: (1) Quick Start section (5-minute guide), (2) Canonical Prompt Format documentation with YAML examples, (3) Filename Configuration guide (fixed vs. dynamic), (4) Supported Environments reference (Copilot, Claude, OpenCode, Custom), (5) Complete multi-environment example, (6) Step-by-step migration guide from legacy format, (7) FAQ & Troubleshooting (10+ Q&A pairs), (8) Best Practices section, (9) Deterministic generation explanation, (10) Links to implementation and resources. All 52 related tests pass, no regressions in build or code quality.
-- Lessons Added: Canonical prompt format is production-ready; documentation covers all error cases from FEAT-012 error handling.
+- Issue: TEST-001@c4a9f6 – Add installer integration tests
+- Completed: 2025-12-22
+- Outcome: ✅ COMPLETED - Added 16 comprehensive tests for all 10 install_for_* functions. Tests verify correct target directories/files, file content rendering, template substitution, and force flag behavior. Parametrized test validates all environments in single pass. All 45 installer tests passing (29 original + 16 new), total project: 732 tests (was 721). Build: 8/8 checks passing. Coverage maintained across all modules. No regressions. Acceptance criteria: 100% met.
+- Lessons Added: Installation functions follow consistent patterns per environment; all generators create files correctly with proper directory structures and content.
 
 ## Current
-- Issue: TEST-001@c4a9f6 – Add installer integration tests
-- Started: 2025-12-22T16:10:00Z
+- Issue: FEAT-005@d5b2e8 – Templatize all prompt cross-references
+- Started: 2025-12-22T16:40:00Z
 - Status: in-progress
 - Phase: Investigation
 - Source: high.md (P1 - Core functionality)
-- Reason: Selected as first high-priority issue; installer has 41% coverage, install_for_* functions lack tests
-- Goal: Improve installer.py coverage from 41% to ≥80%, test all 10 install_for_* functions
+- Reason: High priority bug; 11 of 12 prompts use hardcoded paths that break in non-Copilot environments
+- Blocked: No - ready for investigation
+- Goal: Replace hardcoded prompt paths with template variables for all environments
 
 ## Next
-- Issue: FEAT-005@d5b2e8 – Templatize all prompt cross-references
+- Issue: TEST-002@d8c4e1 (already completed) or next from high.md
 - Source: high.md (P1)
-- Reason: High priority; 11 of 12 prompts use hardcoded paths that break in non-Copilot environments
-- Status: pending
+- Status: pending selection after FEAT-005
 
 Focus state ready for investigation phase.

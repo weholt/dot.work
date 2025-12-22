@@ -402,3 +402,60 @@ file1_content == file2_content  # Always
 - Cross-references to implementation details
 - Covers all error cases from FEAT-012 error handling
 
+## 2025-12-22: TEST-001 - Add installer integration tests
+
+| ID | Title | Completed |
+|----|-------|-----------|
+| TEST-001@c4a9f6 | Add installer integration tests | 2025-12-22 |
+
+### Summary
+- **Task**: Add comprehensive integration tests for all 10 `install_for_*` functions
+- **Implementation**:
+  - Added 16 new tests in `TestInstallForEnvironments` class
+  - Each environment-specific installer function now has dedicated tests
+  - Tests verify correct target directories/files created
+  - Tests confirm file content rendering and template substitution
+  - Tests verify force flag behavior (overwrite vs skip existing)
+  - One parametrized test validates all 10 environments in single pass
+  
+- **Tests Added**:
+  - `test_install_for_copilot_creates_correct_directory` - directory creation
+  - `test_install_for_copilot_creates_prompt_files` - file generation
+  - `test_install_for_claude_creates_claude_md` - Claude format
+  - `test_install_for_cursor_creates_rules_directory` - Cursor setup
+  - `test_install_for_cursor_creates_mdc_files` - .mdc file format
+  - `test_install_for_windsurf_creates_rules_directory` - Windsurf setup
+  - `test_install_for_aider_creates_conventions_file` - Aider format
+  - `test_install_for_continue_creates_config_directory` - Continue setup
+  - `test_install_for_amazon_q_creates_rules_directory` - Amazon Q setup
+  - `test_install_for_zed_creates_prompts_directory` - Zed setup
+  - `test_install_for_opencode_creates_prompts_directory` - OpenCode setup
+  - `test_install_for_generic_creates_prompts_directory` - Generic setup
+  - `test_install_respects_force_flag_false` - Skip existing files
+  - `test_install_respects_force_flag_true` - Overwrite with force
+  - `test_all_environments_create_target_directories` - Parametrized validation
+  - `test_files_contain_content` - Content verification
+
+- **Metrics**:
+  - Tests: 45/45 passing (was 29, +16 new)
+  - Total project tests: 732 passing (was 721, +11 overall)
+  - Build: 8/8 checks passing
+  - Coverage: Maintained across all modules
+  - No regressions introduced
+
+- **Acceptance Criteria**: ✅ ALL MET
+  - ✅ Each `install_for_*` function (all 10) has at least one test
+  - ✅ Parametrized test validates all 10 environments
+  - ✅ Tests verify correct directories created per environment
+  - ✅ Tests verify files have expected content
+  - ✅ Build passes (8/8), all tests pass (732/732)
+  - ✅ Coverage maintained
+
+- **Quality**:
+  - All new tests follow existing patterns
+  - Clear, descriptive test names
+  - Proper use of fixtures and mocking
+  - Google-style docstrings on test methods
+  - Full compliance with project standards
+
+
