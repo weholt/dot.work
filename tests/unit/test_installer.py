@@ -1,5 +1,6 @@
 """Unit tests for the installer module."""
 
+import re
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -620,3 +621,28 @@ class TestInstallForEnvironments:
         assert len(content) > 0
         assert content != ""  # Not empty
         assert "test" in prompt_file.name  # Filename matches source
+
+
+class TestPromptTemplateization:
+    """Test that prompt cross-references use template variables, not hardcoded paths."""
+
+    def test_no_hardcoded_prompt_references(self, sample_prompts_dir: Path) -> None:
+        """Test that prompts don't contain hardcoded .prompt.md references without template variables.
+
+        Detects patterns like [text](filename.prompt.md) that should be [text]({{ prompt_path }}/filename.prompt.md).
+        """
+        # Pattern to detect hardcoded markdown links to .prompt.md files
+        # Matches: [anything](something.prompt.md) but NOT [anything]({{ ... }}/something.prompt.md)
+        hardcoded_pattern = re.compile(r"\[([^\]]+)\]\((?!.*\{\{)([^)]*\.prompt\.md)\)")
+
+        prompt_files = list(sample_prompts_dir.glob("*.prompt.md"))
+        assert len(prompt_files) > 0, "No prompt files found for testing"
+
+        for prompt_file in prompt_files:
+            content = prompt_file.read_text(encoding="utf-8")
+            matches = hardcoded_pattern.findall(content)
+
+            assert len(matches) == 0, (
+                f"{prompt_file.name} contains hardcoded prompt references: {matches}. "
+                "Use {{ prompt_path }}/filename.prompt.md instead."
+            )

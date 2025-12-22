@@ -11,11 +11,17 @@ Last updated: 2025-12-22T16:40:00Z
 - Issue: FEAT-005@d5b2e8 – Templatize all prompt cross-references
 - Started: 2025-12-22T16:40:00Z
 - Status: in-progress
-- Phase: Investigation
+- Phase: Implementation (Investigation ✅ complete)
 - Source: high.md (P1 - Core functionality)
 - Reason: High priority bug; 11 of 12 prompts use hardcoded paths that break in non-Copilot environments
-- Blocked: No - ready for investigation
+- Blocked: No - ready for implementation
 - Goal: Replace hardcoded prompt paths with template variables for all environments
+- Investigation Summary:
+  - ✅ Audited all 12 prompt files
+  - ✅ Found 28 hardcoded refs in 6 files (agent-prompts-reference, compare-baseline, critical-code-review, establish-baseline, spec-delivery-auditor, setup-issue-tracker)
+  - ✅ Identified patterns: simple refs `[text](file.prompt.md)` and prefixed refs `[text](.github/prompts/file.prompt.md)`
+  - ✅ Template var available: `{{ prompt_path }}`
+  - Notes: .work/agent/notes/feat-005-investigation.md
 
 ## Next
 - Issue: TEST-002@d8c4e1 (already completed) or next from high.md
