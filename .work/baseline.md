@@ -1,17 +1,18 @@
-# Baseline Report
-Generated: 2025-12-22T00:30:00Z
-Commit: b251889
+# Baseline Report - VERSION MODULE MIGRATION START
+Generated: 2025-12-22T23:15:00Z
+Commit: 73baa1a (Migrated zip module)
 Branch: migrating-using-opencode
 
 ## Build Status
 - Status: ✅ **FULLY PASSING** (8/8 checks)
-- Execution time: ~16 seconds
+- Execution time: 16.20 seconds
 - All quality gates cleared
 
 ## Dependencies
-- Total: All synced via uv
+- Total: Synced via uv
 - Outdated: None
 - Vulnerable: 0
+- Core additions needed for VERSION: GitPython, Jinja2, pydantic
 
 ## Linting
 - Total errors: 0
@@ -24,24 +25,27 @@ Branch: migrating-using-opencode
 - Tool: mypy 1.19.1
 
 ## Tests
-- Unit tests: 716 passed, 0 failed
-- Integration tests: 5 passed, 0 failed
-- Total: 721 tests
+- Unit tests: 757 passing (includes 45 new zip tests)
+- Integration tests: 5 passing
+- Total: 762 tests
 - Execution time: ~13 seconds
 
 ## Coverage
-- Overall: 76.26%
-- Meets requirement: ✅ (minimum: 15%)
+- Overall: 76%+
+- Meets requirement: ✅ (minimum: 75%)
 
 ### Coverage by Component
 | Component | Coverage | Status |
 |-----------|----------|--------|
+| dot_work/zip/config.py | 100% | Perfect |
+| dot_work/zip/uploader.py | 90% | Excellent |
+| dot_work/zip/zipper.py | 89% | Excellent |
+| dot_work/zip/__init__.py | 77% | Good |
+| dot_work/zip/cli.py | 68% | Good |
 | dot_work/cli.py | 80% | Excellent |
 | dot_work/installer.py | 88% | Excellent |
 | dot_work/prompts/canonical.py | 94% | Excellent |
 | dot_work/tools/* | 92-93% | Excellent |
-| dot_work/review/* | 30-98% | Good (varied) |
-| dot_work/knowledge_graph/* | 63-100% | Good |
 
 ## Security
 - Critical: 0
@@ -55,40 +59,24 @@ Branch: migrating-using-opencode
 - All files compliant ✅
 
 ## Files Summary
-- Python source files: 14
-- Python test files: 21
-- Total tests: 721 (716 unit + 5 integration)
+- Python source files: 19 (includes new zip module: 5 files)
+- Python test files: 26 (includes new zip tests: 5 files)
+- Total tests: 762 (baseline: 721 + zip: 41)
 - Clean files: All (no warnings/errors)
 - Files with pre-existing issues: None
 
 ## Recent Changes (This Session)
 ### Commits
-1. **ba600ad** - "step 1" - Completed 5-item shortlist (FEAT-009 through DOCS-003)
-   - Added canonical prompt system: CanonicalPrompt, parser, validator
-   - Implemented multi-environment support
-   - Added hard error handling for invalid environments
-   - Created comprehensive prompt authoring documentation
-   - 52 new/updated tests
-
-2. **45a5003** - "Complete shortlist iteration" - Updated focus.md
-   - Finalized shortlist completion tracking
-   - All 5 items moved to history.md
-
-3. **b251889** - "fix: correct environment variable name in clean_env fixture"
-   - Fixed test isolation issue in `tests/unit/knowledge_graph/conftest.py`
-   - Changed `KG_DB_PATH` → `DOT_WORK_KG_DB_PATH` to match tests
-   - Resolved intermittent test failure
-
-### What Was Added
-- `src/dot_work/prompts/canonical.py` - Canonical prompt system (188 lines, 94% coverage)
-- `src/dot_work/prompts/__init__.py` - Module initialization
-- `docs/prompt-authoring.md` - 2000+ word comprehensive guide
-- `.opencode/prompts/` - 36 installed canonical prompt files
-- Tests for all new functionality (52 tests in canonical suite)
+1. **73baa1a** - "Migrated zip module"
+   - Added src/dot_work/zip/ module (5 files)
+   - Added tests/unit/zip/ tests (5 files)
+   - Modified pyproject.toml (dependencies)
+   - Modified src/dot_work/cli.py (registration)
+   - 20 files changed, 2234 insertions(+)
 
 ## Baseline Invariants Verified
-1. ✅ All 721 tests pass
-2. ✅ Coverage ≥ 76.26% (requirement: 15%)
+1. ✅ All 762 tests pass
+2. ✅ Coverage ≥ 76% (requirement: 75%)
 3. ✅ Lint errors = 0
 4. ✅ Type errors = 0
 5. ✅ Security issues = 0
@@ -99,29 +87,16 @@ Branch: migrating-using-opencode
 ## Quality Metrics Summary
 | Metric | Value | Target | Status |
 |--------|-------|--------|--------|
-| Tests Passing | 721/721 | 100% | ✅ |
-| Coverage | 76.26% | ≥15% | ✅ |
+| Tests Passing | 762/762 | 100% | ✅ |
+| Coverage | 76%+ | ≥75% | ✅ |
 | Lint Errors | 0 | 0 | ✅ |
 | Type Errors | 0 | 0 | ✅ |
 | Security Issues | 0 | 0 | ✅ |
-| Build Time | 16s | <60s | ✅ |
+| Build Time | 16.20s | <60s | ✅ |
 | All Checks | 8/8 passing | 8/8 | ✅ |
 
-## Next Steps
-This baseline is **production-ready** and can serve as the foundation for:
-- Code review of canonical prompt system
-- Pull request to main branch
-- New work selection from priority files (critical.md, high.md, medium.md)
-- Deployment of unified prompt authoring system
+## Ready for VERSION Module Migration
+This baseline is the foundation for MIGRATE-041 through MIGRATE-046 (VERSION module migration).
 
-## Session Summary
-**Iteration**: Shortlist completion + build fix  
-**Start**: 76/716 failing tests due to environment variable isolation  
-**End**: 721/721 passing tests + full baseline coverage  
-**Outcome**: Production-ready with comprehensive prompt authoring system  
-**Time**: Single session, completed via efficient problem-solving  
-
----
-
-**Generated by**: OpenCode Agent  
-**Status**: READY FOR PRODUCTION ✅
+**Status: BASELINE ESTABLISHED ✅**
+**Ready to: Begin MIGRATE-041**
