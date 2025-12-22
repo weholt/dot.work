@@ -1,26 +1,44 @@
 """Tests for version commit_parser module."""
 
+from unittest.mock import Mock
+
 from dot_work.version.commit_parser import CommitInfo, ConventionalCommitParser
+
+
+def _create_mock_commit(hexsha: str, message: str, author_name: str = "Test Author") -> Mock:
+    """Create a mock git commit object.
+
+    Args:
+        hexsha: Commit hash
+        message: Commit message
+        author_name: Author name
+
+    Returns:
+        Mock commit object
+    """
+    commit = Mock()
+    commit.hexsha = hexsha
+    commit.message = message
+    commit.author.name = author_name
+    commit.author.email = "test@example.com"
+    commit.committed_datetime = Mock()
+    commit.committed_datetime.strftime = Mock(return_value="2025-01-01")
+    return commit
 
 
 def test_parse_commit_basic_feature():
     """Test parsing a basic feature commit."""
     parser = ConventionalCommitParser()
 
-    commit = parser.parse_commit(
-        hash="abc123",
-        message="feat: add new feature",
-        author="Test Author",
-        date="2025-01-01"
-    )
+    mock_commit = _create_mock_commit("abc123", "feat: add new feature")
+    commit = parser.parse_commit(mock_commit)
 
-    assert commit.hash == "abc123"
+    assert commit.commit_hash == "abc123"
     assert commit.short_hash == "abc123"
-    assert commit.message == "feat: add new feature"
     assert commit.subject == "add new feature"
     assert commit.commit_type == "feat"
     assert commit.scope is None
-    assert commit.breaking is False
+    assert commit.is_breaking is False
     assert commit.author == "Test Author"
     assert commit.date == "2025-01-01"
 
@@ -29,32 +47,24 @@ def test_parse_commit_with_scope():
     """Test parsing a commit with scope."""
     parser = ConventionalCommitParser()
 
-    commit = parser.parse_commit(
-        hash="def456",
-        message="feat(ui): add button component",
-        author="Test Author",
-        date="2025-01-01"
-    )
+    mock_commit = _create_mock_commit("def456", "feat(ui): add button component")
+    commit = parser.parse_commit(mock_commit)
 
     assert commit.commit_type == "feat"
     assert commit.scope == "ui"
     assert commit.subject == "add button component"
-    assert commit.breaking is False
+    assert commit.is_breaking is False
 
 
 def test_parse_commit_breaking_change():
     """Test parsing a breaking change commit."""
     parser = ConventionalCommitParser()
 
-    commit = parser.parse_commit(
-        hash="ghi789",
-        message="feat!: change API",
-        author="Test Author",
-        date="2025-01-01"
-    )
+    mock_commit = _create_mock_commit("ghi789", "feat!: change API")
+    commit = parser.parse_commit(mock_commit)
 
     assert commit.commit_type == "feat"
-    assert commit.breaking is True
+    assert commit.is_breaking is True
     assert commit.subject == "change API"
 
 
@@ -67,12 +77,8 @@ def test_parse_commit_with_body():
 This is the body of the commit
 with multiple lines.
 """
-    commit = parser.parse_commit(
-        hash="jkl012",
-        message=message,
-        author="Test Author",
-        date="2025-01-01"
-    )
+    mock_commit = _create_mock_commit("jkl012", message)
+    commit = parser.parse_commit(mock_commit)
 
     assert commit.commit_type == "feat"
     assert commit.subject == "add new feature"
@@ -84,57 +90,63 @@ def test_parse_commit_non_conventional():
     """Test parsing a non-conventional commit."""
     parser = ConventionalCommitParser()
 
-    commit = parser.parse_commit(
-        hash="mno345",
-        message="Just a regular commit message",
-        author="Test Author",
-        date="2025-01-01"
-    )
+    mock_commit = _create_mock_commit("mno345", "Just a regular commit message")
+    commit = parser.parse_commit(mock_commit)
 
-    assert commit.commit_type == "chore"  # Default type
+    assert commit.commit_type == "other"  # Default type for non-conventional
     assert commit.scope is None
-    assert commit.breaking is False
+    assert commit.is_breaking is False
     assert commit.subject == "Just a regular commit message"
 
 
-def test_group_commits_by_type(mock_commit_info):
+def test_group_commits_by_type():
     """Test grouping commits by type."""
     parser = ConventionalCommitParser()
 
     commits = [
-        mock_commit_info,  # feat type
         CommitInfo(
-            hash="fix123",
-            short_hash="fix123",
-            message="fix: fix bug",
-            subject="fix bug",
-            commit_type="fix",
-            scope=None,
-            breaking=False,
-            author="Test Author",
-            date="2025-01-01"
-        ),
-        CommitInfo(
-            hash="feat456",
-            short_hash="feat456",
-            message="feat: another feature",
-            subject="another feature",
+            commit_hash="abc123",
+            short_hash="abc123",
             commit_type="feat",
             scope=None,
-            breaking=False,
+            subject="add new feature",
+            body="",
             author="Test Author",
-            date="2025-01-01"
+            date="2025-01-01",
+            is_breaking=False,
         ),
         CommitInfo(
-            hash="docs789",
+            commit_hash="fix123",
+            short_hash="fix123",
+            commit_type="fix",
+            scope=None,
+            subject="fix bug",
+            body="",
+            author="Test Author",
+            date="2025-01-01",
+            is_breaking=False,
+        ),
+        CommitInfo(
+            commit_hash="feat456",
+            short_hash="feat456",
+            commit_type="feat",
+            scope=None,
+            subject="another feature",
+            body="",
+            author="Test Author",
+            date="2025-01-01",
+            is_breaking=False,
+        ),
+        CommitInfo(
+            commit_hash="docs789",
             short_hash="docs789",
-            message="docs: update readme",
-            subject="update readme",
             commit_type="docs",
             scope=None,
-            breaking=False,
+            subject="update readme",
+            body="",
             author="Test Author",
-            date="2025-01-01"
+            date="2025-01-01",
+            is_breaking=False,
         ),
     ]
 

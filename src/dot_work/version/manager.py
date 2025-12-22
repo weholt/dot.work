@@ -33,7 +33,13 @@ class VersionManager:
         """
         self.project_root = Path(project_root)
         self.version_file = self.project_root / "version.json"
-        self.repo = Repo(self.project_root)
+
+        # Try to initialize git repo, but allow non-git directories
+        self.repo: Repo | None = None
+        try:
+            self.repo = Repo(self.project_root)
+        except Exception:
+            pass
 
         # Load project information from pyproject.toml
         parser = PyProjectParser()
@@ -116,10 +122,13 @@ class VersionManager:
         if version is None:
             version = self.calculate_next_version(None)
 
+        # Get git commit if available
+        git_commit = self.repo.head.commit.hexsha if self.repo else "unknown"
+
         version_info = VersionInfo(
             version=version,
             build_date=datetime.now().isoformat(),
-            git_commit=self.repo.head.commit.hexsha,
+            git_commit=git_commit,
             git_tag=f"version-{version}",
             previous_version=None,
             changelog_generated=False,
@@ -145,22 +154,27 @@ class VersionManager:
         current = self.read_version()
         next_version = self.calculate_next_version(current)
 
-        # Get commits since last tag
-        parser = ConventionalCommitParser()
-        last_tag = current.git_tag if current else None
-        commits = parser.get_commits_since_tag(self.repo, last_tag)
+        # Get commits since last tag (only if repo exists)
+        commits = []
+        if self.repo:
+            parser = ConventionalCommitParser()
+            last_tag = current.git_tag if current else None
+            commits = parser.get_commits_since_tag(self.repo, last_tag)
 
         # Generate changelog
         generator = ChangelogGenerator()
         changelog_entry = generator.generate_entry(
             version=next_version,
             commits=commits,
-            repo_stats=self._get_repo_statistics(last_tag),
+            repo_stats=self._get_repo_statistics(current.git_tag if current else None),
             use_llm=use_llm,
             project_name=self.project_info.name,
         )
 
-        if not dry_run:
+        # Get git commit if available
+        git_commit = self.repo.head.commit.hexsha if self.repo else "unknown"
+
+        if not dry_run and self.repo:
             # Create git tag
             tag_name = f"version-{next_version}"
             self.repo.create_tag(tag_name, message=f"Release {next_version}")
@@ -169,7 +183,7 @@ class VersionManager:
             version_info = VersionInfo(
                 version=next_version,
                 build_date=datetime.now().isoformat(),
-                git_commit=self.repo.head.commit.hexsha,
+                git_commit=git_commit,
                 git_tag=tag_name,
                 previous_version=current.version if current else None,
                 changelog_generated=True,
@@ -189,7 +203,7 @@ class VersionManager:
             version_info = VersionInfo(
                 version=next_version,
                 build_date=datetime.now().isoformat(),
-                git_commit=self.repo.head.commit.hexsha,
+                git_commit=git_commit,
                 git_tag=f"version-{next_version}",
                 previous_version=current.version if current else None,
                 changelog_generated=False,
@@ -206,6 +220,9 @@ class VersionManager:
         Returns:
             Statistics dictionary
         """
+        if not self.repo:
+            return {"commit_count": 0, "contributor_count": 0, "contributors": []}
+
         # Simplified statistics
         if from_tag:
             commits = list(self.repo.iter_commits(f"{from_tag}..HEAD"))
@@ -226,6 +243,9 @@ class VersionManager:
         Returns:
             Tag name or None
         """
+        if not self.repo:
+            return None
+
         tags = sorted(
             [t for t in self.repo.tags if t.name.startswith("version-")],
             key=lambda t: t.commit.committed_datetime,
@@ -242,6 +262,9 @@ class VersionManager:
         Returns:
             List of version dicts
         """
+        if not self.repo:
+            return []
+
         tags = sorted(
             [t for t in self.repo.tags if t.name.startswith("version-")],
             key=lambda t: t.commit.committed_datetime,
@@ -267,6 +290,9 @@ class VersionManager:
         Returns:
             List of CommitInfo objects
         """
+        if not self.repo:
+            return []
+
         from dot_work.version.commit_parser import ConventionalCommitParser
 
         parser = ConventionalCommitParser()
@@ -274,7 +300,8 @@ class VersionManager:
 
     def push_tags(self) -> None:
         """Push all tags to remote."""
-        self.repo.remote().push(tags=True)
+        if self.repo and self.repo.remote():
+            self.repo.remote().push(tags=True)
 
     def load_config(self) -> dict:
         """Load configuration from .version-management.yaml.

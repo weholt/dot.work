@@ -1,7 +1,6 @@
 """Tests for version changelog module."""
 
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 from dot_work.version.changelog import ChangelogEntry, ChangelogGenerator
 from dot_work.version.commit_parser import CommitInfo
@@ -9,20 +8,37 @@ from dot_work.version.commit_parser import CommitInfo
 
 def test_changelog_entry():
     """Test ChangelogEntry dataclass."""
+    commits_by_type = {
+        "Features": [
+            CommitInfo(
+                commit_hash="abc123",
+                short_hash="abc123",
+                commit_type="feat",
+                scope=None,
+                subject="Add new feature",
+                body="",
+                author="Test Author",
+                date="2025-01-01",
+                is_breaking=False,
+            )
+        ]
+    }
+
     entry = ChangelogEntry(
         version="2025.01.001",
         date="2025-01-01",
-        changes=[
-            "feat: Add new feature",
-            "fix: Fix bug",
-        ],
-        author="Test Author"
+        summary="Test release",
+        highlights=["Added new feature", "Fixed bug"],
+        commits_by_type=commits_by_type,
+        statistics={"commit_count": 1, "contributor_count": 1},
+        contributors=[("Test Author", 1)],
+        project_name="Test Project"
     )
 
     assert entry.version == "2025.01.001"
     assert entry.date == "2025-01-01"
-    assert len(entry.changes) == 2
-    assert entry.author == "Test Author"
+    assert len(entry.highlights) == 2
+    assert entry.project_name == "Test Project"
 
 
 def test_generate_conventional_summary():
@@ -31,26 +47,26 @@ def test_generate_conventional_summary():
 
     commits = [
         CommitInfo(
-            hash="abc123",
+            commit_hash="abc123",
             short_hash="abc123",
-            message="feat: add new feature",
-            subject="add new feature",
             commit_type="feat",
             scope=None,
-            breaking=False,
+            subject="add new feature",
+            body="",
             author="Test Author",
-            date="2025-01-01"
+            date="2025-01-01",
+            is_breaking=False,
         ),
         CommitInfo(
-            hash="def456",
+            commit_hash="def456",
             short_hash="def456",
-            message="fix: fix bug",
-            subject="fix bug",
             commit_type="fix",
             scope=None,
-            breaking=False,
+            subject="fix bug",
+            body="",
             author="Test Author",
-            date="2025-01-01"
+            date="2025-01-01",
+            is_breaking=False,
         ),
     ]
 
@@ -70,9 +86,11 @@ def test_generate_with_template(temp_dir: Path):
 {% for entry in entries %}
 ## {{ entry.version }} - {{ entry.date }}
 
-### Changes
-{% for change in entry.changes %}
-- {{ change }}
+### Summary
+{{ entry.summary }}
+
+{% for highlight in entry.highlights %}
+- {{ highlight }}
 {% endfor %}
 
 {% endfor %}
@@ -80,12 +98,32 @@ def test_generate_with_template(temp_dir: Path):
     template = Path(temp_dir) / "template.md"
     template.write_text(template_content)
 
+    commits_by_type = {
+        "Features": [
+            CommitInfo(
+                commit_hash="abc123",
+                short_hash="abc123",
+                commit_type="feat",
+                scope=None,
+                subject="Add new feature",
+                body="",
+                author="Test Author",
+                date="2025-01-01",
+                is_breaking=False,
+            )
+        ]
+    }
+
     entries = [
         ChangelogEntry(
             version="2025.01.001",
             date="2025-01-01",
-            changes=["feat: Add new feature"],
-            author="Test Author"
+            summary="Test release",
+            highlights=["Added new feature"],
+            commits_by_type=commits_by_type,
+            statistics={"commit_count": 1, "contributor_count": 1},
+            contributors=[("Test Author", 1)],
+            project_name="Test Project"
         )
     ]
 
@@ -93,19 +131,50 @@ def test_generate_with_template(temp_dir: Path):
 
     assert "# Changelog" in changelog
     assert "## 2025.01.001 - 2025-01-01" in changelog
-    assert "- feat: Add new feature" in changelog
+    assert "- Added new feature" in changelog
 
 
 def test_generate_with_default_template():
     """Test generating changelog with default template."""
     generator = ChangelogGenerator()
 
+    commits_by_type = {
+        "Features": [
+            CommitInfo(
+                commit_hash="abc123",
+                short_hash="abc123",
+                commit_type="feat",
+                scope=None,
+                subject="Add new feature",
+                body="",
+                author="Test Author",
+                date="2025-01-01",
+                is_breaking=False,
+            ),
+            CommitInfo(
+                commit_hash="def456",
+                short_hash="def456",
+                commit_type="fix",
+                scope=None,
+                subject="Fix bug",
+                body="",
+                author="Test Author",
+                date="2025-01-01",
+                is_breaking=False,
+            ),
+        ]
+    }
+
     entries = [
         ChangelogEntry(
             version="2025.01.001",
             date="2025-01-01",
-            changes=["feat: Add new feature", "fix: Fix bug"],
-            author="Test Author"
+            summary="Test release",
+            highlights=["Added new feature", "Fixed bug"],
+            commits_by_type=commits_by_type,
+            statistics={"commit_count": 2, "contributor_count": 1},
+            contributors=[("Test Author", 2)],
+            project_name="Test Project"
         )
     ]
 
@@ -122,15 +191,15 @@ def test_generate_summary_with_use_llm_false():
 
     commits = [
         CommitInfo(
-            hash="abc123",
+            commit_hash="abc123",
             short_hash="abc123",
-            message="feat: add feature",
-            subject="add feature",
             commit_type="feat",
             scope=None,
-            breaking=False,
+            subject="add feature",
+            body="",
             author="Test Author",
-            date="2025-01-01"
+            date="2025-01-01",
+            is_breaking=False,
         )
     ]
 
@@ -147,15 +216,15 @@ def test_generate_summary_with_use_llm_true():
 
     commits = [
         CommitInfo(
-            hash="abc123",
+            commit_hash="abc123",
             short_hash="abc123",
-            message="feat: add feature",
-            subject="add feature",
             commit_type="feat",
             scope=None,
-            breaking=False,
+            subject="add feature",
+            body="",
             author="Test Author",
-            date="2025-01-01"
+            date="2025-01-01",
+            is_breaking=False,
         )
     ]
 

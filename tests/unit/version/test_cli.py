@@ -13,13 +13,14 @@ runner = CliRunner()
 
 def test_version_init_command():
     """Test version init command."""
-    with patch("dot_work.version.manager.VersionManager") as mock_manager_class:
+    with patch("dot_work.version.cli.VersionManager") as mock_manager_class:
         mock_manager = Mock()
         mock_manager_class.return_value = mock_manager
 
         mock_result = Mock()
         mock_result.version = "2025.01.001"
         mock_manager.init_version.return_value = mock_result
+        mock_manager.version_file = Path.cwd() / ".work" / "version" / "version.json"
 
         result = runner.invoke(app, ["init"])
 
@@ -30,13 +31,14 @@ def test_version_init_command():
 
 def test_version_init_with_version():
     """Test version init command with custom version."""
-    with patch("dot_work.version.manager.VersionManager") as mock_manager_class:
+    with patch("dot_work.version.cli.VersionManager") as mock_manager_class:
         mock_manager = Mock()
         mock_manager_class.return_value = mock_manager
 
         mock_result = Mock()
         mock_result.version = "2024.12.001"
         mock_manager.init_version.return_value = mock_result
+        mock_manager.version_file = Path.cwd() / ".work" / "version" / "version.json"
 
         result = runner.invoke(app, ["init", "--version", "2024.12.001"])
 
@@ -47,7 +49,7 @@ def test_version_init_with_version():
 
 def test_version_show_command():
     """Test version show command."""
-    with patch("dot_work.version.manager.VersionManager") as mock_manager_class:
+    with patch("dot_work.version.cli.VersionManager") as mock_manager_class:
         mock_manager = Mock()
         mock_manager_class.return_value = mock_manager
 
@@ -55,7 +57,7 @@ def test_version_show_command():
         mock_current.version = "2025.01.001"
         mock_current.build_date = "2025-01-01"
         mock_current.git_commit = "abc123def456"
-        mock_current.git_tag = "v2025.01.001"
+        mock_current.git_tag = "version-2025.01.001"
         mock_current.previous_version = None
 
         mock_project_info = Mock()
@@ -74,7 +76,7 @@ def test_version_show_command():
 
 def test_version_show_no_version():
     """Test version show command when no version exists."""
-    with patch("dot_work.version.manager.VersionManager") as mock_manager_class:
+    with patch("dot_work.version.cli.VersionManager") as mock_manager_class:
         mock_manager = Mock()
         mock_manager_class.return_value = mock_manager
         mock_manager.read_version.return_value = None
@@ -87,19 +89,19 @@ def test_version_show_no_version():
 
 def test_version_history_command():
     """Test version history command."""
-    with patch("dot_work.version.manager.VersionManager") as mock_manager_class:
+    with patch("dot_work.version.cli.VersionManager") as mock_manager_class:
         mock_manager = Mock()
         mock_manager_class.return_value = mock_manager
 
         mock_versions = [
             {
-                "version": "v2025.01.002",
+                "version": "2025.01.002",
                 "date": "2025-01-02",
                 "commit": "def456",
                 "author": "Test Author"
             },
             {
-                "version": "v2025.01.001",
+                "version": "2025.01.001",
                 "date": "2025-01-01",
                 "commit": "abc123",
                 "author": "Test Author"
@@ -111,13 +113,26 @@ def test_version_history_command():
         result = runner.invoke(app, ["history"])
 
         assert result.exit_code == 0
-        assert "v2025.01.002" in result.output
-        assert "v2025.01.001" in result.output
+        assert "2025.01.002" in result.output
+        assert "2025.01.001" in result.output
+
+
+def test_version_history_empty():
+    """Test version history command when no history."""
+    with patch("dot_work.version.cli.VersionManager") as mock_manager_class:
+        mock_manager = Mock()
+        mock_manager_class.return_value = mock_manager
+        mock_manager.get_version_history.return_value = []
+
+        result = runner.invoke(app, ["history"])
+
+        assert result.exit_code == 0
+        assert "No version history found" in result.output
 
 
 def test_version_commits_command():
     """Test version commits command."""
-    with patch("dot_work.version.manager.VersionManager") as mock_manager_class:
+    with patch("dot_work.version.cli.VersionManager") as mock_manager_class:
         mock_manager = Mock()
         mock_manager_class.return_value = mock_manager
 
@@ -137,7 +152,7 @@ def test_version_commits_command():
         ]
 
         mock_manager.get_commits_since.return_value = mock_commits
-        mock_manager.get_latest_tag.return_value = "v2025.01.001"
+        mock_manager.get_latest_tag.return_value = "version-2025.01.001"
 
         result = runner.invoke(app, ["commits"])
 
@@ -146,16 +161,45 @@ def test_version_commits_command():
         assert "fix bug" in result.output
 
 
+def test_version_commits_no_tag():
+    """Test version commits command when no tag exists."""
+    with patch("dot_work.version.cli.VersionManager") as mock_manager_class:
+        mock_manager = Mock()
+        mock_manager_class.return_value = mock_manager
+
+        mock_commits = [
+            Mock(
+                commit_type="feat",
+                subject="add new feature",
+                author="Test Author",
+                short_hash="abc123"
+            ),
+        ]
+
+        mock_manager.get_commits_since.return_value = mock_commits
+        mock_manager.get_latest_tag.return_value = None
+
+        result = runner.invoke(app, ["commits"])
+
+        assert result.exit_code == 0
+        assert "Showing all commits" in result.output
+        assert "add new feature" in result.output
+
+
 def test_version_config_command():
     """Test version config command."""
-    with patch("dot_work.version.manager.VersionManager") as mock_manager_class:
+    with patch("dot_work.version.cli.VersionManager") as mock_manager_class:
         mock_manager = Mock()
         mock_manager_class.return_value = mock_manager
 
         config_data = {
-            "version_file": ".version",
-            "changelog_file": "CHANGELOG.md",
-            "commit_types": ["feat", "fix"]
+            "format": "YYYY.MM.build-number",
+            "tag_prefix": "version-",
+            "changelog": {
+                "file": "CHANGELOG.md",
+                "include_authors": True,
+                "group_by_type": True
+            }
         }
 
         mock_manager.load_config.return_value = config_data
@@ -164,7 +208,8 @@ def test_version_config_command():
 
         assert result.exit_code == 0
         # Should display JSON config
-        assert ".version" in result.output
+        assert "tag_prefix" in result.output
+        assert "version-" in result.output
 
 
 def test_version_config_without_show():
@@ -177,13 +222,13 @@ def test_version_config_without_show():
 
 def test_version_freeze_command():
     """Test version freeze command."""
-    with patch("dot_work.version.manager.VersionManager") as mock_manager_class:
+    with patch("dot_work.version.cli.VersionManager") as mock_manager_class:
         mock_manager = Mock()
         mock_manager_class.return_value = mock_manager
 
         mock_result = Mock()
         mock_result.version = "2025.01.002"
-        mock_result.git_tag = "v2025.01.002"
+        mock_result.git_tag = "version-2025.01.002"
         mock_result.changelog_generated = True
 
         mock_manager.freeze_version.return_value = mock_result
@@ -192,19 +237,19 @@ def test_version_freeze_command():
 
         assert result.exit_code == 0
         assert "2025.01.002" in result.output
-        assert "v2025.01.002" in result.output
+        assert "version-2025.01.002" in result.output
         mock_manager.freeze_version.assert_called_once_with(use_llm=False, dry_run=False)
 
 
 def test_version_freeze_dry_run():
     """Test version freeze command with dry run."""
-    with patch("dot_work.version.manager.VersionManager") as mock_manager_class:
+    with patch("dot_work.version.cli.VersionManager") as mock_manager_class:
         mock_manager = Mock()
         mock_manager_class.return_value = mock_manager
 
         mock_result = Mock()
         mock_result.version = "2025.01.002"
-        mock_result.git_tag = "v2025.01.002"
+        mock_result.git_tag = "version-2025.01.002"
         mock_result.changelog_generated = True
 
         mock_manager.freeze_version.return_value = mock_result
@@ -219,13 +264,13 @@ def test_version_freeze_dry_run():
 
 def test_version_freeze_with_llm():
     """Test version freeze command with LLM."""
-    with patch("dot_work.version.manager.VersionManager") as mock_manager_class:
+    with patch("dot_work.version.cli.VersionManager") as mock_manager_class:
         mock_manager = Mock()
         mock_manager_class.return_value = mock_manager
 
         mock_result = Mock()
         mock_result.version = "2025.01.002"
-        mock_result.git_tag = "v2025.01.002"
+        mock_result.git_tag = "version-2025.01.002"
         mock_result.changelog_generated = True
 
         mock_manager.freeze_version.return_value = mock_result
@@ -238,13 +283,13 @@ def test_version_freeze_with_llm():
 
 def test_version_freeze_push():
     """Test version freeze command with push."""
-    with patch("dot_work.version.manager.VersionManager") as mock_manager_class:
+    with patch("dot_work.version.cli.VersionManager") as mock_manager_class:
         mock_manager = Mock()
         mock_manager_class.return_value = mock_manager
 
         mock_result = Mock()
         mock_result.version = "2025.01.002"
-        mock_result.git_tag = "v2025.01.002"
+        mock_result.git_tag = "version-2025.01.002"
         mock_result.changelog_generated = True
 
         mock_manager.freeze_version.return_value = mock_result

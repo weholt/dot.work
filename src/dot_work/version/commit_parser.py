@@ -54,23 +54,26 @@ class ConventionalCommitParser:
         first_line = lines[0]
         body = "\n".join(lines[1:]).strip() if len(lines) > 1 else ""
 
+        # Check for breaking changes (check for "!" suffix or BREAKING CHANGE in body)
+        is_breaking = (
+            "BREAKING CHANGE" in message or "BREAKING-CHANGE" in message or "!:" in first_line
+        )
+
+        # Replace "!:" with ":" for pattern matching (breaking change notation)
+        parse_line = first_line.replace("!:", ":") if "!:" in first_line else first_line
+
         # Try to parse conventional commit format
-        match = self.COMMIT_PATTERN.match(first_line)
+        match = self.COMMIT_PATTERN.match(parse_line)
 
         if match:
             commit_type = match.group("type")
             scope = match.group("scope")
-            subject = match.group("subject")
+            subject = match.group("subject").rstrip()
         else:
             # Fallback for non-conventional commits
             commit_type = "other"
             scope = None
             subject = first_line
-
-        # Check for breaking changes
-        is_breaking = (
-            "BREAKING CHANGE" in message or "BREAKING-CHANGE" in message or first_line.endswith("!")
-        )
 
         return CommitInfo(
             commit_hash=commit.hexsha,

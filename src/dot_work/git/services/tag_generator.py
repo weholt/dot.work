@@ -11,117 +11,292 @@ class TagGenerator:
     def __init__(self):
         # Common tag patterns and their associated keywords
         self.tag_patterns = {
-            'feature': [
-                'add', 'implement', 'create', 'build', 'new', 'introduce',
-                'feature', 'enhancement', 'improve', 'upgrade', 'extend'
+            "feature": [
+                "add",
+                "implement",
+                "create",
+                "build",
+                "new",
+                "introduce",
+                "feature",
+                "enhancement",
+                "improve",
+                "upgrade",
+                "extend",
             ],
-            'fix': [
-                'fix', 'bug', 'error', 'issue', 'problem', 'resolve', 'patch',
-                'correct', 'repair', 'debug', 'hotfix', 'solve'
+            "fix": [
+                "fix",
+                "bug",
+                "error",
+                "issue",
+                "problem",
+                "resolve",
+                "patch",
+                "correct",
+                "repair",
+                "debug",
+                "hotfix",
+                "solve",
             ],
-            'refactor': [
-                'refactor', 'restructure', 'reorganize', 'cleanup', 'simplify',
-                'optimize', 'improve', 'rework', 'streamline', 'consolidate'
+            "refactor": [
+                "refactor",
+                "restructure",
+                "reorganize",
+                "cleanup",
+                "simplify",
+                "optimize",
+                "improve",
+                "rework",
+                "streamline",
+                "consolidate",
             ],
-            'test': [
-                'test', 'testing', 'spec', 'assert', 'mock', 'fixture',
-                'coverage', 'unittest', 'integration', 'e2e', 'tdd'
+            "test": [
+                "test",
+                "testing",
+                "spec",
+                "assert",
+                "mock",
+                "fixture",
+                "coverage",
+                "unittest",
+                "integration",
+                "e2e",
+                "tdd",
             ],
-            'docs': [
-                'doc', 'documentation', 'readme', 'guide', 'manual',
-                'comment', 'wiki', 'changelog', 'release', 'notes'
+            "docs": [
+                "doc",
+                "documentation",
+                "readme",
+                "guide",
+                "manual",
+                "comment",
+                "wiki",
+                "changelog",
+                "release",
+                "notes",
             ],
-            'security': [
-                'security', 'auth', 'authentication', 'authorization', 'permission',
-                'vulnerability', 'patch', 'encrypt', 'secure', 'protect', 'token'
+            "security": [
+                "security",
+                "auth",
+                "authentication",
+                "authorization",
+                "permission",
+                "vulnerability",
+                "patch",
+                "encrypt",
+                "secure",
+                "protect",
+                "token",
             ],
-            'performance': [
-                'performance', 'optimize', 'speed', 'fast', 'slow', 'memory',
-                'cache', 'latency', 'benchmark', 'profile', 'improve', 'enhance'
+            "performance": [
+                "performance",
+                "optimize",
+                "speed",
+                "fast",
+                "slow",
+                "memory",
+                "cache",
+                "latency",
+                "benchmark",
+                "profile",
+                "improve",
+                "enhance",
             ],
-            'ui': [
-                'ui', 'frontend', 'interface', 'user', 'visual', 'design',
-                'component', 'view', 'page', 'layout', 'style', 'css'
+            "ui": [
+                "ui",
+                "frontend",
+                "interface",
+                "user",
+                "visual",
+                "design",
+                "component",
+                "view",
+                "page",
+                "layout",
+                "style",
+                "css",
             ],
-            'api': [
-                'api', 'endpoint', 'route', 'controller', 'handler', 'service',
-                'rest', 'graphql', 'websocket', 'request', 'response'
+            "api": [
+                "api",
+                "endpoint",
+                "route",
+                "controller",
+                "handler",
+                "service",
+                "rest",
+                "graphql",
+                "websocket",
+                "request",
+                "response",
             ],
-            'database': [
-                'database', 'db', 'sql', 'migration', 'schema', 'model',
-                'query', 'table', 'index', 'seed', 'fixture', 'entity'
+            "database": [
+                "database",
+                "db",
+                "sql",
+                "migration",
+                "schema",
+                "model",
+                "query",
+                "table",
+                "index",
+                "seed",
+                "fixture",
+                "entity",
             ],
-            'config': [
-                'config', 'configuration', 'setting', 'environment', 'env',
-                'deploy', 'deployment', 'infrastructure', 'provision'
+            "config": [
+                "config",
+                "configuration",
+                "setting",
+                "environment",
+                "env",
+                "deploy",
+                "deployment",
+                "infrastructure",
+                "provision",
             ],
-            'ci/cd': [
-                'ci', 'cd', 'pipeline', 'workflow', 'automation', 'build',
-                'test', 'deploy', 'release', 'integration', 'continuous'
+            "ci/cd": [
+                "ci",
+                "cd",
+                "pipeline",
+                "workflow",
+                "automation",
+                "build",
+                "test",
+                "deploy",
+                "release",
+                "integration",
+                "continuous",
             ],
-            'dependency': [
-                'dependency', 'package', 'library', 'module', 'import',
-                'require', 'install', 'update', 'upgrade', 'version'
+            "dependency": [
+                "dependency",
+                "package",
+                "library",
+                "module",
+                "import",
+                "require",
+                "install",
+                "update",
+                "upgrade",
+                "version",
             ],
-            'breaking': [
-                'breaking', 'deprecate', 'remove', 'delete', 'replace',
-                'migration', 'incompatible', 'major', 'semver-major'
+            "breaking": [
+                "breaking",
+                "deprecate",
+                "remove",
+                "delete",
+                "replace",
+                "migration",
+                "incompatible",
+                "major",
+                "semver-major",
             ],
-            'chore': [
-                'chore', 'maintenance', 'update', 'upgrade', 'patch',
-                'version', 'bump', 'format', 'lint', 'style', 'fixup'
+            "chore": [
+                "chore",
+                "maintenance",
+                "update",
+                "upgrade",
+                "patch",
+                "version",
+                "bump",
+                "format",
+                "lint",
+                "style",
+                "fixup",
             ],
-            'merge': [
-                'merge', 'merge request', 'pull request', 'pr', 'feature branch'
-            ],
-            'wip': [
-                'wip', 'work in progress', 'draft', 'todo', 'fixme', 'hack'
-            ]
+            "merge": ["merge", "merge request", "pull request", "pr", "feature branch"],
+            "wip": ["wip", "work in progress", "draft", "todo", "fixme", "hack"],
         }
 
         # File category to tag mappings
         self.category_tags = {
-            FileCategory.CODE: ['code'],
-            FileCategory.TESTS: ['test'],
-            FileCategory.CONFIG: ['config', 'dependency'],
-            FileCategory.DOCUMENTATION: ['docs'],
-            FileCategory.DATA: ['data', 'database'],
-            FileCategory.BUILD: ['build', 'ci/cd'],
-            FileCategory.DEPLOYMENT: ['deployment', 'config'],
-            FileCategory.UNKNOWN: []
+            FileCategory.CODE: ["code"],
+            FileCategory.TESTS: ["test"],
+            FileCategory.CONFIG: ["config", "dependency"],
+            FileCategory.DOCUMENTATION: ["docs"],
+            FileCategory.DATA: ["data", "database"],
+            FileCategory.BUILD: ["build", "ci/cd"],
+            FileCategory.DEPLOYMENT: ["deployment", "config"],
+            FileCategory.UNKNOWN: [],
         }
 
         # High-impact file patterns
         self.impact_patterns = {
-            'security': [
-                'auth', 'password', 'token', 'key', 'secret', 'encryption',
-                'permission', 'role', 'access', 'login', 'register', 'session'
+            "security": [
+                "auth",
+                "password",
+                "token",
+                "key",
+                "secret",
+                "encryption",
+                "permission",
+                "role",
+                "access",
+                "login",
+                "register",
+                "session",
             ],
-            'database': [
-                'migration', 'schema', 'seed', 'fixture', 'model', 'entity',
-                'query', 'table', 'index', 'sql', 'database', 'db'
+            "database": [
+                "migration",
+                "schema",
+                "seed",
+                "fixture",
+                "model",
+                "entity",
+                "query",
+                "table",
+                "index",
+                "sql",
+                "database",
+                "db",
             ],
-            'api': [
-                'route', 'endpoint', 'controller', 'handler', 'middleware',
-                'api', 'rest', 'graphql', 'websocket', 'request', 'response'
+            "api": [
+                "route",
+                "endpoint",
+                "controller",
+                "handler",
+                "middleware",
+                "api",
+                "rest",
+                "graphql",
+                "websocket",
+                "request",
+                "response",
             ],
-            'infrastructure': [
-                'docker', 'kubernetes', 'deploy', 'ci', 'cd', 'pipeline',
-                'infrastructure', 'provision', 'terraform', 'ansible'
+            "infrastructure": [
+                "docker",
+                "kubernetes",
+                "deploy",
+                "ci",
+                "cd",
+                "pipeline",
+                "infrastructure",
+                "provision",
+                "terraform",
+                "ansible",
             ],
-            'ui': [
-                'component', 'view', 'page', 'layout', 'style', 'css',
-                'frontend', 'ui', 'interface', 'react', 'vue', 'angular'
-            ]
+            "ui": [
+                "component",
+                "view",
+                "page",
+                "layout",
+                "style",
+                "css",
+                "frontend",
+                "ui",
+                "interface",
+                "react",
+                "vue",
+                "angular",
+            ],
         }
 
         # Complexity-based tags
         self.complexity_tags = {
-            'low': [],
-            'medium': [],
-            'high': ['refactor', 'complex', 'architecture'],
-            'very_high': ['breaking', 'major', 'infrastructure'],
-            'critical': ['breaking', 'security', 'critical', 'emergency']
+            "low": [],
+            "medium": [],
+            "high": ["refactor", "complex", "architecture"],
+            "very_high": ["breaking", "major", "infrastructure"],
+            "critical": ["breaking", "security", "critical", "emergency"],
         }
 
     def generate_tags(self, analysis: ChangeAnalysis) -> list[str]:
@@ -154,10 +329,10 @@ class TagGenerator:
 
         # Generate special tags for breaking changes and security
         if analysis.breaking_change:
-            tags.update(['breaking', 'deprecation'])
+            tags.update(["breaking", "deprecation"])
 
         if analysis.security_relevant:
-            tags.add('security')
+            tags.add("security")
 
         # Generate emoji-based tags
         emoji_tags = self._extract_emoji_tags(analysis.message)
@@ -168,7 +343,7 @@ class TagGenerator:
 
         # Ensure we have some tags
         if not final_tags:
-            final_tags = ['misc']
+            final_tags = {"misc"}
 
         return list(final_tags)
 
@@ -190,7 +365,7 @@ class TagGenerator:
         tags = set()
 
         # Category-based tags
-        categories = set(f.category for f in files_changed)
+        categories = {f.category for f in files_changed}
         for category in categories:
             tags.update(self.category_tags.get(category, []))
 
@@ -204,11 +379,11 @@ class TagGenerator:
 
             # Change type tags
             if file_change.change_type == ChangeType.ADDED:
-                tags.add('add')
+                tags.add("add")
             elif file_change.change_type == ChangeType.DELETED:
-                tags.add('remove')
+                tags.add("remove")
             elif file_change.change_type == ChangeType.RENAMED:
-                tags.add('refactor')
+                tags.add("refactor")
             elif file_change.change_type == ChangeType.MODIFIED:
                 # Change type is already reflected in other tags
                 pass
@@ -223,18 +398,18 @@ class TagGenerator:
         normalized_areas = [area.lower() for area in impact_areas]
 
         for area in normalized_areas:
-            if 'auth' in area or 'security' in area:
-                tags.add('security')
-            if 'api' in area:
-                tags.add('api')
-            if 'ui' in area or 'frontend' in area:
-                tags.add('ui')
-            if 'database' in area or 'db' in area:
-                tags.add('database')
-            if 'config' in area:
-                tags.add('config')
-            if 'deploy' in area:
-                tags.add('deployment')
+            if "auth" in area or "security" in area:
+                tags.add("security")
+            if "api" in area:
+                tags.add("api")
+            if "ui" in area or "frontend" in area:
+                tags.add("ui")
+            if "database" in area or "db" in area:
+                tags.add("database")
+            if "config" in area:
+                tags.add("config")
+            if "deploy" in area:
+                tags.add("deployment")
 
         return tags
 
@@ -243,58 +418,58 @@ class TagGenerator:
         tags = set()
 
         if complexity_score >= 80:
-            tags.update(self.complexity_tags['critical'])
+            tags.update(self.complexity_tags["critical"])
         elif complexity_score >= 60:
-            tags.update(self.complexity_tags['very_high'])
+            tags.update(self.complexity_tags["very_high"])
         elif complexity_score >= 40:
-            tags.update(self.complexity_tags['high'])
+            tags.update(self.complexity_tags["high"])
         elif complexity_score >= 20:
-            tags.update(self.complexity_tags['medium'])
+            tags.update(self.complexity_tags["medium"])
         else:
-            tags.update(self.complexity_tags['low'])
+            tags.update(self.complexity_tags["low"])
 
         return tags
 
     def _extract_emoji_tags(self, message: str) -> set[str]:
         """Extract semantic tags from emoji in commit message."""
         emoji_to_tag = {
-            '🚀': 'feature',      # Rocket - new feature
-            '✨': 'enhancement',  # Sparkles - improvement
-            '🐛': 'fix',          # Bug - bug fix
-            '💥': 'breaking',     # Collision explosion - breaking change
-            '🔥': 'urgent',        # Fire - urgent change
-            '⚡': 'performance',   # Lightning - performance improvement
-            '🎉': 'release',       # Party popper - release
-            '🔒': 'security',      # Lock - security change
-            '🔑': 'security',      # Key - authentication/security
-            '🔧': 'refactor',      # Wrench - refactoring
-            '📝': 'docs',          # Memo - documentation
-            '🧪': 'test',          # Test tube - testing
-            '♻️': 'refactor',      # Recycle - refactoring
-            '♿': 'accessibility', # Wheelchair - accessibility
-            '🌐': 'i18n',          # Globe - internationalization
-            '🏗️': 'architecture',  # Building - architectural change
-            '🎨': 'ui',           # Palette - UI/styling
-            '📊': 'data',          # Bar chart - data/analytics
-            '🔬': 'analysis',      # Microscope - analysis/code review
-            '🚨': 'urgent',        # Warning - urgent fix
-            '🆙': 'security',      # Police car - security update
-            '🔄': 'refactor',      # Refresh - refactoring
-            '⏪': 'revert',        # Undo button - revert
-            '⏭️': 'skip',          # Next button - skip test/validation
-            '⏯️': 'play',          # Play button - enabling feature
-            '⏹️': 'pause',         # Pause button - disabling feature
-            '⏸️': 'stop',          # Square button - stopping process
-            '⚠️': 'warning',       # Warning sign - warning
-            '❗': 'breaking',      # Heavy exclamation - breaking change
-            '❓': 'question',      # Question mark - investigation/research
-            '✅': 'test',          # Check mark - test passing
-            '❌': 'fix',           # Cross mark - fix/bug fix
-            '➕': 'feature',       # Plus - addition/feature
-            '➖': 'remove',        # Minus - removal
-            '🔀': 'merge',         # Twisted right arrows - merge
-            '🔁': 'sync',          # Refresh - sync/update
-            '🔂': 'repeat',        # Repeat button - repeat operation
+            "🚀": "feature",  # Rocket - new feature
+            "✨": "enhancement",  # Sparkles - improvement
+            "🐛": "fix",  # Bug - bug fix
+            "💥": "breaking",  # Collision explosion - breaking change
+            "🔥": "urgent",  # Fire - urgent change
+            "⚡": "performance",  # Lightning - performance improvement
+            "🎉": "release",  # Party popper - release
+            "🔒": "security",  # Lock - security change
+            "🔑": "security",  # Key - authentication/security
+            "🔧": "refactor",  # Wrench - refactoring
+            "📝": "docs",  # Memo - documentation
+            "🧪": "test",  # Test tube - testing
+            "♻️": "refactor",  # Recycle - refactoring
+            "♿": "accessibility",  # Wheelchair - accessibility
+            "🌐": "i18n",  # Globe - internationalization
+            "🏗️": "architecture",  # Building - architectural change
+            "🎨": "ui",  # Palette - UI/styling
+            "📊": "data",  # Bar chart - data/analytics
+            "🔬": "analysis",  # Microscope - analysis/code review
+            "🚨": "urgent",  # Warning - urgent fix
+            "🆙": "security",  # Police car - security update
+            "🔄": "refactor",  # Refresh - refactoring
+            "⏪": "revert",  # Undo button - revert
+            "⏭️": "skip",  # Next button - skip test/validation
+            "⏯️": "play",  # Play button - enabling feature
+            "⏹️": "pause",  # Pause button - disabling feature
+            "⏸️": "stop",  # Square button - stopping process
+            "⚠️": "warning",  # Warning sign - warning
+            "❗": "breaking",  # Heavy exclamation - breaking change
+            "❓": "question",  # Question mark - investigation/research
+            "✅": "test",  # Check mark - test passing
+            "❌": "fix",  # Cross mark - fix/bug fix
+            "➕": "feature",  # Plus - addition/feature
+            "➖": "remove",  # Minus - removal
+            "🔀": "merge",  # Twisted right arrows - merge
+            "🔁": "sync",  # Refresh - sync/update
+            "🔂": "repeat",  # Repeat button - repeat operation
         }
 
         tags = set()
@@ -310,24 +485,24 @@ class TagGenerator:
 
         # Remove duplicate or redundant tags
         redundant_mappings = {
-            'enhancement': 'feature',
-            'implement': 'feature',
-            'create': 'feature',
-            'bug': 'fix',
-            'patch': 'fix',
-            'hotfix': 'fix',
-            'error': 'fix',
-            'debug': 'fix',
-            'optimize': 'performance',
-            'speed': 'performance',
-            'refactor': 'refactor',
-            'cleanup': 'refactor',
-            'reorganize': 'refactor',
-            'documentation': 'docs',
-            'comment': 'docs',
-            'guide': 'docs',
-            'manual': 'docs',
-            'note': 'docs'
+            "enhancement": "feature",
+            "implement": "feature",
+            "create": "feature",
+            "bug": "fix",
+            "patch": "fix",
+            "hotfix": "fix",
+            "error": "fix",
+            "debug": "fix",
+            "optimize": "performance",
+            "speed": "performance",
+            "refactor": "refactor",
+            "cleanup": "refactor",
+            "reorganize": "refactor",
+            "documentation": "docs",
+            "comment": "docs",
+            "guide": "docs",
+            "manual": "docs",
+            "note": "docs",
         }
 
         for tag in tags:
@@ -343,8 +518,17 @@ class TagGenerator:
         if len(filtered) > 5:
             # Keep the most important ones
             priority_tags = [
-                'breaking', 'security', 'critical', 'feature', 'fix',
-                'refactor', 'performance', 'ui', 'api', 'database', 'docs'
+                "breaking",
+                "security",
+                "critical",
+                "feature",
+                "fix",
+                "refactor",
+                "performance",
+                "ui",
+                "api",
+                "database",
+                "docs",
             ]
 
             # Keep priority tags first
@@ -352,13 +536,15 @@ class TagGenerator:
 
             # Add remaining tags up to limit
             remaining = [tag for tag in filtered if tag not in prioritized]
-            final_tags = prioritized + remaining[:5 - len(prioritized)]
+            final_tags = prioritized + remaining[: 5 - len(prioritized)]
 
             return set(final_tags)
 
         return filtered
 
-    def generate_tag_suggestions(self, message: str, files_changed=None, complexity_score=0.0) -> list[str]:
+    def generate_tag_suggestions(
+        self, message: str, files_changed=None, complexity_score=0.0
+    ) -> list[str]:
         """
         Generate tag suggestions for a commit message.
 
@@ -386,7 +572,7 @@ class TagGenerator:
             timestamp=datetime.now(),
             branch="main",
             message=message,
-            short_message=message.split('\n')[0],
+            short_message=message.split("\n")[0],
             files_changed=[],
             lines_added=0,
             lines_deleted=0,
@@ -396,7 +582,7 @@ class TagGenerator:
             complexity_score=complexity_score,
             summary="",
             tags=[],
-            impact_areas=[]
+            impact_areas=[],
         )
 
         # Add files if provided
@@ -405,7 +591,7 @@ class TagGenerator:
                 FileChange(
                     path=file_path,
                     change_type=ChangeType.MODIFIED,
-                    category=self._guess_file_category(file_path)
+                    category=self._guess_file_category(file_path),
                 )
                 for file_path in files_changed
             ]
@@ -416,17 +602,26 @@ class TagGenerator:
         """Guess file category from path."""
         path_lower = file_path.lower()
 
-        if any(pattern in path_lower for pattern in ['.py', '.js', '.ts', '.java', '.go', '.rs', '.c', '.cpp']):
+        if any(
+            pattern in path_lower
+            for pattern in [".py", ".js", ".ts", ".java", ".go", ".rs", ".c", ".cpp"]
+        ):
             return FileCategory.CODE
-        elif any(pattern in path_lower for pattern in ['test', 'spec']):
+        elif any(pattern in path_lower for pattern in ["test", "spec"]):
             return FileCategory.TESTS
-        elif any(pattern in path_lower for pattern in ['.json', '.yaml', '.yml', '.toml', '.ini', '.env', 'config']):
+        elif any(
+            pattern in path_lower
+            for pattern in [".json", ".yaml", ".yml", ".toml", ".ini", ".env", "config"]
+        ):
             return FileCategory.CONFIG
-        elif any(pattern in path_lower for pattern in ['.md', '.rst', '.txt', '.doc', 'readme']):
+        elif any(pattern in path_lower for pattern in [".md", ".rst", ".txt", ".doc", "readme"]):
             return FileCategory.DOCUMENTATION
-        elif any(pattern in path_lower for pattern in ['dockerfile', 'docker-compose', 'k8s', 'terraform']):
+        elif any(
+            pattern in path_lower
+            for pattern in ["dockerfile", "docker-compose", "k8s", "terraform"]
+        ):
             return FileCategory.DEPLOYMENT
-        elif any(pattern in path_lower for pattern in ['sql', '.db', 'migration']):
+        elif any(pattern in path_lower for pattern in ["sql", ".db", "migration"]):
             return FileCategory.DATA
         else:
             return FileCategory.UNKNOWN
@@ -441,7 +636,7 @@ class TagGenerator:
         Returns:
             Dictionary with tag statistics
         """
-        tag_counter = Counter()
+        tag_counter: Counter[str] = Counter()
         total_tags = 0
 
         for commit in commits:
@@ -450,12 +645,12 @@ class TagGenerator:
 
         # Calculate statistics
         stats = {
-            'total_commits': len(commits),
-            'total_tags': total_tags,
-            'average_tags_per_commit': total_tags / len(commits) if commits else 0,
-            'unique_tags': len(tag_counter),
-            'top_tags': tag_counter.most_common(20),
-            'tag_distribution': dict(tag_counter)
+            "total_commits": len(commits),
+            "total_tags": total_tags,
+            "average_tags_per_commit": total_tags / len(commits) if commits else 0,
+            "unique_tags": len(tag_counter),
+            "top_tags": tag_counter.most_common(20),
+            "tag_distribution": dict(tag_counter),
         }
 
         return stats
@@ -471,19 +666,19 @@ class TagGenerator:
             List of suggested related tags
         """
         related_mappings = {
-            'feature': ['enhancement', 'improvement', 'add', 'new'],
-            'fix': ['bug', 'patch', 'hotfix', 'debug', 'resolve'],
-            'refactor': ['cleanup', 'reorganize', 'improve', 'optimize'],
-            'performance': ['optimize', 'speed', 'memory', 'cache'],
-            'security': ['auth', 'permission', 'encrypt', 'protect'],
-            'ui': ['frontend', 'component', 'design', 'style'],
-            'api': ['endpoint', 'route', 'service', 'handler'],
-            'database': ['db', 'sql', 'migration', 'schema'],
-            'docs': ['documentation', 'readme', 'guide', 'manual'],
-            'test': ['testing', 'spec', 'coverage', 'assert'],
-            'config': ['configuration', 'setting', 'environment'],
-            'breaking': ['deprecate', 'major', 'incompatible'],
-            'ci/cd': ['pipeline', 'build', 'deploy', 'automation']
+            "feature": ["enhancement", "improvement", "add", "new"],
+            "fix": ["bug", "patch", "hotfix", "debug", "resolve"],
+            "refactor": ["cleanup", "reorganize", "improve", "optimize"],
+            "performance": ["optimize", "speed", "memory", "cache"],
+            "security": ["auth", "permission", "encrypt", "protect"],
+            "ui": ["frontend", "component", "design", "style"],
+            "api": ["endpoint", "route", "service", "handler"],
+            "database": ["db", "sql", "migration", "schema"],
+            "docs": ["documentation", "readme", "guide", "manual"],
+            "test": ["testing", "spec", "coverage", "assert"],
+            "config": ["configuration", "setting", "environment"],
+            "breaking": ["deprecate", "major", "incompatible"],
+            "ci/cd": ["pipeline", "build", "deploy", "automation"],
         }
 
         suggestions = set()
@@ -494,6 +689,6 @@ class TagGenerator:
                 suggestions.update(related_mappings[tag])
 
         # Remove existing tags from suggestions
-        suggestions = [tag for tag in suggestions if tag not in existing_tags_lower]
+        suggestions = {tag for tag in suggestions if tag not in existing_tags_lower}
 
         return list(suggestions)[:5]  # Limit suggestions

@@ -9,6 +9,7 @@ from typing import Any
 
 class ChangeType(Enum):
     """Types of changes in a commit."""
+
     ADDED = "added"
     DELETED = "deleted"
     MODIFIED = "modified"
@@ -18,6 +19,7 @@ class ChangeType(Enum):
 
 class FileCategory(Enum):
     """Categories of files based on their purpose."""
+
     CODE = "code"
     TESTS = "tests"
     CONFIG = "config"
@@ -26,11 +28,15 @@ class FileCategory(Enum):
     BUILD = "build"
     DEPLOYMENT = "deployment"
     UNKNOWN = "unknown"
+    API = "api"
+    DATABASE = "database"
+    FRONTEND = "frontend"
 
 
 @dataclass
 class CommitInfo:
     """Basic commit information."""
+
     hash: str
     short_hash: str
     author: str
@@ -44,6 +50,7 @@ class CommitInfo:
 @dataclass
 class FileChange:
     """Information about a changed file."""
+
     path: str
     old_path: str | None = None  # For renames/copies
     change_type: ChangeType = ChangeType.MODIFIED
@@ -56,6 +63,7 @@ class FileChange:
 @dataclass
 class ChangeAnalysis:
     """Detailed analysis of a single commit."""
+
     commit_hash: str
     author: str
     email: str
@@ -83,6 +91,7 @@ class ChangeAnalysis:
 @dataclass
 class ContributorStats:
     """Statistics for a contributor."""
+
     name: str
     email: str
     commits: int
@@ -97,6 +106,7 @@ class ContributorStats:
 @dataclass
 class ComparisonMetadata:
     """Metadata for a comparison between two git references."""
+
     from_ref: str
     to_ref: str
     from_commit_hash: str
@@ -114,6 +124,7 @@ class ComparisonMetadata:
 @dataclass
 class ComparisonResult:
     """Result of comparing two git references."""
+
     metadata: ComparisonMetadata
     commits: list[ChangeAnalysis]
     contributors: dict[str, ContributorStats]
@@ -129,6 +140,7 @@ class ComparisonResult:
 @dataclass
 class ComparisonDiff:
     """Natural language description of differences between commits."""
+
     commit_a_hash: str
     commit_b_hash: str
     similarity_score: float
@@ -142,6 +154,7 @@ class ComparisonDiff:
 @dataclass
 class AnalysisConfig:
     """Configuration for git analysis."""
+
     repo_path: Path = field(default_factory=lambda: Path.cwd())
     cache_dir: Path | None = None
     use_llm: bool = False
@@ -169,7 +182,9 @@ class AnalysisConfig:
     # Filtering settings
     file_ignore_patterns: list[str] = field(default_factory=list)
     author_ignore_patterns: list[str] = field(default_factory=list)
-    commit_message_ignore_patterns: list[str] = field(default_factory=lambda: ["^Merge pull request", "^Auto-matic"])
+    commit_message_ignore_patterns: list[str] = field(
+        default_factory=lambda: ["^Merge pull request", "^Auto-matic"]
+    )
 
     # Caching settings
     cache_ttl_hours: int = 24
@@ -179,6 +194,7 @@ class AnalysisConfig:
 @dataclass
 class CacheEntry:
     """Entry in the analysis cache."""
+
     key: str
     data: dict[str, Any]
     timestamp: datetime
@@ -187,12 +203,14 @@ class CacheEntry:
     def is_expired(self) -> bool:
         """Check if cache entry is expired."""
         from datetime import timedelta
+
         return datetime.now() - self.timestamp > timedelta(hours=self.ttl_hours)
 
 
 @dataclass
 class AnalysisError:
     """Error information for failed analysis."""
+
     error_type: str
     message: str
     commit_hash: str | None = None
@@ -204,6 +222,7 @@ class AnalysisError:
 @dataclass
 class AnalysisProgress:
     """Progress information for long-running analysis."""
+
     total_commits: int
     processed_commits: int
     current_step: str

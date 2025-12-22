@@ -84,4 +84,4 @@ def test_compute_file_hash(tmp_path: Path) -> None:
     hash2 = compute_file_hash(file_path)
 
     assert hash1 == hash2
-    assert len(hash1) == 32  # MD5 hex digest
+    assert len(hash1) == 64  # SHA256 hex digest

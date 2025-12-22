@@ -24,8 +24,8 @@ def setup_logging(verbose: bool = False):
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[
             logging.FileHandler(logs_dir / "git-analysis.log"),
-            logging.StreamHandler(sys.stdout) if verbose else logging.NullHandler()
-        ]
+            logging.StreamHandler(sys.stdout) if verbose else logging.NullHandler(),
+        ],
     )
 
     # Set specific logger levels
@@ -38,7 +38,7 @@ def setup_logging(verbose: bool = False):
 def format_duration(seconds: float) -> str:
     """Format duration in human-readable format."""
     if seconds < 1:
-        return f"{seconds*1000:.0f}ms"
+        return f"{seconds * 1000:.0f}ms"
     elif seconds < 60:
         return f"{seconds:.1f}s"
     elif seconds < 3600:
@@ -52,12 +52,13 @@ def format_duration(seconds: float) -> str:
 def safe_filename(filename: str) -> str:
     """Convert string to safe filename."""
     import re
+
     # Remove invalid characters
-    safe_name = re.sub(r'[<>:"/\\|?*]', '_', filename)
+    safe_name = re.sub(r'[<>:"/\\|?*]', "_", filename)
     # Replace spaces with underscores
-    safe_name = re.sub(r'\s+', '_', safe_name)
+    safe_name = re.sub(r"\s+", "_", safe_name)
     # Remove leading/trailing underscores
-    safe_name = safe_name.strip('_')
+    safe_name = safe_name.strip("_")
     # Limit length
     if len(safe_name) > 255:
         safe_name = safe_name[:255]
@@ -68,17 +69,14 @@ def truncate_string(text: str, max_length: int = 100, suffix: str = "...") -> st
     """Truncate string to maximum length."""
     if len(text) <= max_length:
         return text
-    return text[:max_length - len(suffix)] + suffix
+    return text[: max_length - len(suffix)] + suffix
 
 
 def generate_cache_key(*args, **kwargs) -> str:
     """Generate a cache key from arguments."""
-    key_data = {
-        'args': args,
-        'kwargs': sorted(kwargs.items())
-    }
+    key_data = {"args": args, "kwargs": sorted(kwargs.items())}
     key_str = json.dumps(key_data, sort_keys=True, default=str)
-    return hashlib.md5(key_str.encode()).hexdigest()
+    return hashlib.sha256(key_str.encode()).hexdigest()
 
 
 def get_env_var(key: str, default: Any = None, var_type: type = str) -> Any:
@@ -89,14 +87,14 @@ def get_env_var(key: str, default: Any = None, var_type: type = str) -> Any:
         return default
 
     try:
-        if var_type == bool:
-            return value.lower() in ('true', '1', 'yes', 'on')
-        elif var_type == int:
+        if var_type is bool:
+            return value.lower() in ("true", "1", "yes", "on")
+        elif var_type is int:
             return int(value)
-        elif var_type == float:
+        elif var_type is float:
             return float(value)
-        elif var_type == list:
-            return [item.strip() for item in value.split(',')]
+        elif var_type is list:
+            return [item.strip() for item in value.split(",")]
         else:
             return var_type(value)
     except (ValueError, TypeError):
@@ -110,19 +108,21 @@ def sanitize_log_message(message: str) -> str:
 
     # Remove common sensitive patterns
     patterns = [
-        r'password[=:]\s*[^\s]+',
-        r'token[=:]\s*[^\s]+',
-        r'key[=:]\s*[^\s]+',
-        r'secret[=:]\s*[^\s]+',
-        r'api[_-]?key[=:]\s*[^\s]+',
-        r'auth[=:]\s*[^\s]+',
-        r'ghp_[a-zA-Z0-9]{36}',  # GitHub personal access tokens
-        r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}',  # Email addresses
+        r"password[=:]\s*[^\s]+",
+        r"token[=:]\s*[^\s]+",
+        r"key[=:]\s*[^\s]+",
+        r"secret[=:]\s*[^\s]+",
+        r"api[_-]?key[=:]\s*[^\s]+",
+        r"auth[=:]\s*[^\s]+",
+        r"ghp_[a-zA-Z0-9]{36}",  # GitHub personal access tokens
+        r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",  # Email addresses
     ]
 
     sanitized = message
     for pattern in patterns:
-        sanitized = re.sub(pattern, lambda m: m.group(0).split('=')[0] + "=***", sanitized, flags=re.IGNORECASE)
+        sanitized = re.sub(
+            pattern, lambda m: m.group(0).split("=")[0] + "=***", sanitized, flags=re.IGNORECASE
+        )
 
     return sanitized
 
@@ -130,20 +130,21 @@ def sanitize_log_message(message: str) -> str:
 def is_valid_git_ref(ref: str) -> bool:
     """Check if a git reference is valid."""
     import re
+
     # Basic validation for git refs
     if not ref or len(ref) > 255:
         return False
 
     # Check for invalid characters
-    if re.search(r'[~^:?*\[\\]', ref):
+    if re.search(r"[~^:?*\[\\]", ref):
         return False
 
     # Cannot start with dot
-    if ref.startswith('.'):
+    if ref.startswith("."):
         return False
 
     # Cannot end with .lock
-    if ref.endswith('.lock'):
+    if ref.endswith(".lock"):
         return False
 
     return True
@@ -151,10 +152,10 @@ def is_valid_git_ref(ref: str) -> bool:
 
 def parse_commit_range(range_str: str) -> tuple[str, str]:
     """Parse commit range string like 'main..feature' or 'HEAD~5..HEAD'."""
-    if '..' not in range_str:
+    if ".." not in range_str:
         raise ValueError("Invalid range format. Expected 'from..to'")
 
-    from_ref, to_ref = range_str.split('..', 1)
+    from_ref, to_ref = range_str.split("..", 1)
     return from_ref.strip(), to_ref.strip()
 
 
@@ -185,15 +186,16 @@ def calculate_time_ago(timestamp: datetime) -> str:
         return f"{years} year{'s' if years != 1 else ''} ago"
 
 
-def get_git_config_value(key: str, repo_path: Path = None) -> str | None:
+def get_git_config_value(key: str, repo_path: Path | None = None) -> str | None:
     """Get git configuration value."""
     try:
         import subprocess
-        cmd = ['git', 'config', '--get', key]
-        if repo_path:
-            cmd.extend(['-C', str(repo_path)])
 
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        cmd = ["git", "config", "--get", key]
+        if repo_path:
+            cmd.extend(["-C", str(repo_path)])
+
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)  # noqa: S603
         return result.stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
@@ -203,38 +205,41 @@ def is_git_repository(path: Path) -> bool:
     """Check if path is a git repository."""
     try:
         import git
+
         git.Repo(path)
         return True
-    except:
+    except Exception:
         return False
 
 
-def get_repository_root(path: Path = None) -> Path | None:
+def get_repository_root(path: Path | None = None) -> Path | None:
     """Get the root directory of the git repository."""
     try:
         if path is None:
             path = Path.cwd()
 
         import git
+
         repo = git.Repo(path, search_parent_directories=True)
         return Path(repo.git_dir).parent
-    except:
+    except Exception:
         return None
 
 
 def detect_encoding(file_path: Path) -> str:
     """Detect file encoding."""
     try:
-        import chardet
-        with open(file_path, 'rb') as f:
+        import chardet  # type: ignore[import-not-found]
+
+        with open(file_path, "rb") as f:
             raw_data = f.read(10000)  # Read first 10KB
         result = chardet.detect(raw_data)
-        return result['encoding'] or 'utf-8'
+        return result["encoding"] or "utf-8"
     except ImportError:
         # Fallback to utf-8 if chardet is not available
-        return 'utf-8'
-    except:
-        return 'utf-8'
+        return "utf-8"
+    except (OSError, ValueError):
+        return "utf-8"
 
 
 class ProgressTracker:
@@ -267,8 +272,11 @@ class ProgressTracker:
         else:
             eta_str = ""
 
-        print(f"\r{self.description}: {self.current}/{self.total} ({percentage:.1f}%)"
-              f" Elapsed: {format_duration(elapsed.total_seconds())}{eta_str}", end="")
+        print(
+            f"\r{self.description}: {self.current}/{self.total} ({percentage:.1f}%)"
+            f" Elapsed: {format_duration(elapsed.total_seconds())}{eta_str}",
+            end="",
+        )
 
         if self.current >= self.total:
             print()  # New line when complete
@@ -316,7 +324,8 @@ def merge_dicts(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
 def validate_email(email: str) -> bool:
     """Validate email address format."""
     import re
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+
+    pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     return bool(re.match(pattern, email))
 
 
@@ -324,10 +333,44 @@ def extract_emoji_indicators(text: str) -> list[str]:
     """Extract emoji indicators from text."""
     # Common emoji patterns in commit messages
     emoji_patterns = [
-        '🚀', '✨', '🐛', '💥', '🔥', '⚡', '🎉', '🔒', '🔑', '🔧',
-        '📝', '📚', '🏗️', '🎨', '♻️', '♿', '🌐', '📊', '🔬', '🧪',
-        '⚠️', '❗', '❓', '➕', '➖', '🔄', '🔀', '🔁', '🔂', '⏪',
-        '⏩', '⏭', '⏹️', '⏯️', '⏮️', '⏸️', '⏹️', '🏁'
+        "🚀",
+        "✨",
+        "🐛",
+        "💥",
+        "🔥",
+        "⚡",
+        "🎉",
+        "🔒",
+        "🔑",
+        "🔧",
+        "📝",
+        "📚",
+        "🏗️",
+        "🎨",
+        "♻️",
+        "♿",
+        "🌐",
+        "📊",
+        "🔬",
+        "🧪",
+        "⚠️",
+        "❗",
+        "❓",
+        "➕",
+        "➖",
+        "🔄",
+        "🔀",
+        "🔁",
+        "🔂",
+        "⏪",
+        "⏩",
+        "⏭",
+        "⏹️",
+        "⏯️",
+        "⏮️",
+        "⏸️",
+        "⏹️",
+        "🏁",
     ]
 
     found = []
@@ -341,16 +384,16 @@ def extract_emoji_indicators(text: str) -> list[str]:
 def normalize_branch_name(branch: str) -> str:
     """Normalize branch name."""
     # Remove remote prefix (origin/main -> main)
-    if '/' in branch:
-        parts = branch.split('/')
-        if parts[0] in ['origin', 'upstream', 'fork', 'remote']:
-            branch = '/'.join(parts[1:])
+    if "/" in branch:
+        parts = branch.split("/")
+        if parts[0] in ["origin", "upstream", "fork", "remote"]:
+            branch = "/".join(parts[1:])
 
     # Remove common prefixes
-    prefixes_to_remove = ['feature/', 'feat/', 'bugfix/', 'fix/', 'hotfix/', 'release/', 'rel/']
+    prefixes_to_remove = ["feature/", "feat/", "bugfix/", "fix/", "hotfix/", "release/", "rel/"]
     for prefix in prefixes_to_remove:
         if branch.startswith(prefix):
-            branch = branch[len(prefix):]
+            branch = branch[len(prefix) :]
             break
 
     return branch
@@ -358,7 +401,7 @@ def normalize_branch_name(branch: str) -> str:
 
 def get_file_extension_stats(file_paths: list[str]) -> dict[str, int]:
     """Get statistics of file extensions."""
-    extensions = {}
+    extensions: dict[str, int] = {}
 
     for file_path in file_paths:
         path = Path(file_path)
@@ -366,7 +409,7 @@ def get_file_extension_stats(file_paths: list[str]) -> dict[str, int]:
         if ext:
             extensions[ext] = extensions.get(ext, 0) + 1
         else:
-            extensions['(no extension)'] = extensions.get('(no extension)', 0) + 1
+            extensions["(no extension)"] = extensions.get("(no extension)", 0) + 1
 
     return dict(sorted(extensions.items(), key=lambda x: x[1], reverse=True))
 
@@ -385,49 +428,49 @@ def calculate_commit_velocity(commits: list, time_window_days: int = 30) -> floa
 def identify_commit_patterns(commits: list) -> dict[str, int]:
     """Identify common patterns in commit messages."""
     patterns = {
-        'fix': 0,
-        'feature': 0,
-        'refactor': 0,
-        'test': 0,
-        'docs': 0,
-        'chore': 0,
-        'perf': 0,
-        'style': 0,
-        'build': 0,
-        'ci': 0,
-        'revert': 0,
-        'merge': 0,
-        'initial': 0,
+        "fix": 0,
+        "feature": 0,
+        "refactor": 0,
+        "test": 0,
+        "docs": 0,
+        "chore": 0,
+        "perf": 0,
+        "style": 0,
+        "build": 0,
+        "ci": 0,
+        "revert": 0,
+        "merge": 0,
+        "initial": 0,
     }
 
     for commit in commits:
         message = commit.message.lower()
 
-        if any(keyword in message for keyword in ['fix', 'bug', 'error', 'issue']):
-            patterns['fix'] += 1
-        if any(keyword in message for keyword in ['feature', 'feat', 'add', 'new', 'implement']):
-            patterns['feature'] += 1
-        if any(keyword in message for keyword in ['refactor', 'refact', 'restructure']):
-            patterns['refactor'] += 1
-        if any(keyword in message for keyword in ['test', 'spec', 'testing']):
-            patterns['test'] += 1
-        if any(keyword in message for keyword in ['doc', 'readme', 'documentation']):
-            patterns['docs'] += 1
-        if any(keyword in message for keyword in ['chore', 'maintenance', 'update']):
-            patterns['chore'] += 1
-        if any(keyword in message for keyword in ['perf', 'performance', 'optimize']):
-            patterns['perf'] += 1
-        if any(keyword in message for keyword in ['style', 'format', 'lint']):
-            patterns['style'] += 1
-        if any(keyword in message for keyword in ['build', 'compile', 'makefile']):
-            patterns['build'] += 1
-        if any(keyword in message for keyword in ['ci', 'cd', 'pipeline', 'workflow']):
-            patterns['ci'] += 1
-        if 'revert' in message:
-            patterns['revert'] += 1
-        if 'merge' in message:
-            patterns['merge'] += 1
-        if any(keyword in message for keyword in ['initial', 'first', 'skeleton', 'setup']):
-            patterns['initial'] += 1
+        if any(keyword in message for keyword in ["fix", "bug", "error", "issue"]):
+            patterns["fix"] += 1
+        if any(keyword in message for keyword in ["feature", "feat", "add", "new", "implement"]):
+            patterns["feature"] += 1
+        if any(keyword in message for keyword in ["refactor", "refact", "restructure"]):
+            patterns["refactor"] += 1
+        if any(keyword in message for keyword in ["test", "spec", "testing"]):
+            patterns["test"] += 1
+        if any(keyword in message for keyword in ["doc", "readme", "documentation"]):
+            patterns["docs"] += 1
+        if any(keyword in message for keyword in ["chore", "maintenance", "update"]):
+            patterns["chore"] += 1
+        if any(keyword in message for keyword in ["perf", "performance", "optimize"]):
+            patterns["perf"] += 1
+        if any(keyword in message for keyword in ["style", "format", "lint"]):
+            patterns["style"] += 1
+        if any(keyword in message for keyword in ["build", "compile", "makefile"]):
+            patterns["build"] += 1
+        if any(keyword in message for keyword in ["ci", "cd", "pipeline", "workflow"]):
+            patterns["ci"] += 1
+        if "revert" in message:
+            patterns["revert"] += 1
+        if "merge" in message:
+            patterns["merge"] += 1
+        if any(keyword in message for keyword in ["initial", "first", "skeleton", "setup"]):
+            patterns["initial"] += 1
 
     return patterns

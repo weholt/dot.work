@@ -54,8 +54,7 @@ class VersionConfig:
             version_file = work_dir / "version" / "version.json"
 
         changelog_file_path = os.getenv("DOT_WORK_VERSION_CHANGELOG")
-        if changelog_file_path:
-            changelog_file = Path(changelog_file_path)
+        changelog_file = Path(changelog_file_path) if changelog_file_path else None
 
         tag_prefix = os.getenv("DOT_WORK_VERSION_TAG_PREFIX", "version-")
         include_authors = os.getenv("DOT_WORK_VERSION_INCLUDE_AUTHORS", "true").lower() == "true"
@@ -67,6 +66,34 @@ class VersionConfig:
             git_tag_prefix=tag_prefix,
             include_authors=include_authors,
             group_by_type=group_by_type,
+        )
+
+    @classmethod
+    def load_config(cls, project_root: Path) -> "VersionConfig":
+        """Load configuration from project directory.
+
+        Args:
+            project_root: Path to project root directory
+
+        Returns:
+            VersionConfig instance
+        """
+        config_file = project_root / ".version-management.yaml"
+
+        if not config_file.exists():
+            return cls()
+
+        import yaml
+
+        with open(config_file, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+
+        return cls(
+            version_file=data.get("version_file"),
+            changelog_file=data.get("changelog", {}).get("file"),
+            git_tag_prefix=data.get("tag_prefix", "version-"),
+            include_authors=data.get("changelog", {}).get("include_authors", True),
+            group_by_type=data.get("changelog", {}).get("group_by_type", True),
         )
 
     def validate(self) -> None:

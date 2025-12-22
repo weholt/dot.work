@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import frontmatter
+import frontmatter  # type: ignore[import-untyped]
 
 # Default values for configuration
 DEFAULT_DOCKER_IMAGE = "repo-agent:latest"

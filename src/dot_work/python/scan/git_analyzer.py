@@ -85,8 +85,8 @@ class GitAnalyzer:
             Author name or None.
         """
         try:
-            output = check_output(
-                ["git", "log", "-1", "--pretty=format:%an", str(rel_path)],
+            output = check_output(  # noqa: S603, S607
+                ["git", "log", "-1", "--pretty=format:%an", str(rel_path)],  # noqa: S607
                 cwd=self.repo_root,
                 text=True,
             )
@@ -104,8 +104,8 @@ class GitAnalyzer:
             Commit hash or None.
         """
         try:
-            output = check_output(
-                ["git", "log", "-1", "--pretty=format:%H", str(rel_path)],
+            output = check_output(  # noqa: S603, S607
+                ["git", "log", "-1", "--pretty=format:%H", str(rel_path)],  # noqa: S607
                 cwd=self.repo_root,
                 text=True,
             )
@@ -123,8 +123,8 @@ class GitAnalyzer:
             Commit date or None.
         """
         try:
-            output = check_output(
-                ["git", "log", "-1", "--pretty=format:%ct", str(rel_path)],
+            output = check_output(  # noqa: S603, S607
+                ["git", "log", "-1", "--pretty=format:%ct", str(rel_path)],  # noqa: S607
                 cwd=self.repo_root,
                 text=True,
             )
@@ -145,8 +145,8 @@ class GitAnalyzer:
             Number of lines changed.
         """
         try:
-            output = check_output(
-                ["git", "log", "-1", "--numstat", "--pretty=format:", str(rel_path)],
+            output = check_output(  # noqa: S603, S607
+                ["git", "log", "-1", "--numstat", "--pretty=format:", str(rel_path)],  # noqa: S607
                 cwd=self.repo_root,
                 text=True,
             )

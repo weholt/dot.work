@@ -11,7 +11,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 try:
-    from gitignore_parser import parse_gitignore  # type: ignore[import-not-found]
+    from gitignore_parser import parse_gitignore  # type: ignore[import-untyped]
 except ImportError as e:
     raise ImportError(
         "gitignore_parser is required for zip functionality. "

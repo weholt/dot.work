@@ -71,6 +71,41 @@ class ChangelogGenerator:
         else:
             self.template = Template(self.DEFAULT_TEMPLATE)
 
+    def generate(
+        self,
+        entries: list[ChangelogEntry],
+        template_path: str | None = None,
+    ) -> str:
+        """Generate changelog from entries.
+
+        Args:
+            entries: List of ChangelogEntry objects
+            template_path: Optional custom template path
+
+        Returns:
+            Generated changelog text
+        """
+        if template_path:
+            custom_template = Template(Path(template_path).read_text(encoding="utf-8"))
+            return custom_template.render(entries=entries)
+
+        # Generate with default template
+        output = []
+        for entry in entries:
+            output.append(
+                self.template.render(
+                    version=entry.version,
+                    date=entry.date,
+                    summary=entry.summary,
+                    highlights=entry.highlights,
+                    commits_by_type=entry.commits_by_type,
+                    statistics=entry.statistics,
+                    contributors=entry.contributors,
+                    project_name=entry.project_name,
+                )
+            )
+        return "\n".join(output)
+
     def generate_entry(
         self,
         version: str,

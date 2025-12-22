@@ -56,15 +56,15 @@ def should_ignore(path: Path, ignore_patterns: list[str] | None = None) -> bool:
 
 
 def compute_file_hash(path: Path) -> str:
-    """Compute MD5 hash of a file's contents.
+    """Compute SHA256 hash of a file's contents.
 
     Args:
         path: Path to file.
 
     Returns:
-        Hex digest of MD5 hash.
+        Hex digest of SHA256 hash.
     """
-    hasher = hashlib.md5()
+    hasher = hashlib.sha256()
     with path.open("rb") as f:
         for chunk in iter(lambda: f.read(8192), b""):
             hasher.update(chunk)

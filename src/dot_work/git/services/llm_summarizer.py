@@ -2,9 +2,9 @@
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, cast
 
-from dot_work.git.models import AnalysisConfig, ChangeAnalysis, ComparisonResult
+from dot_work.git.models import AnalysisConfig, ChangeAnalysis, ComparisonResult, FileCategory
 
 
 class LLMSummarizer:
@@ -13,7 +13,8 @@ class LLMSummarizer:
     def __init__(self, config: AnalysisConfig):
         self.config = config
         self.logger = logging.getLogger(__name__)
-        self._client = None
+        self._client: Any = None
+        self._provider: str | None = None
         self._initialize_client()
 
     def _initialize_client(self):
@@ -31,7 +32,6 @@ class LLMSummarizer:
     def _initialize_openai(self):
         """Initialize OpenAI client."""
         try:
-            import openai
             from openai import OpenAI
 
             api_key = self._get_api_key("OPENAI_API_KEY")
@@ -42,10 +42,12 @@ class LLMSummarizer:
             self._provider = "openai"
             self.logger.info("Initialized OpenAI client")
 
-        except ImportError:
-            raise ImportError("OpenAI package not installed. Install with: pip install openai")
+        except ImportError as e:
+            raise ImportError(
+                "OpenAI package not installed. Install with: pip install openai"
+            ) from e
         except Exception as e:
-            raise Exception(f"Failed to initialize OpenAI: {e}")
+            raise Exception(f"Failed to initialize OpenAI: {e}") from e
 
     def _initialize_anthropic(self):
         """Initialize Anthropic client."""
@@ -60,19 +62,43 @@ class LLMSummarizer:
             self._provider = "anthropic"
             self.logger.info("Initialized Anthropic client")
 
-        except ImportError:
-            raise ImportError("Anthropic package not installed. Install with: pip install anthropic")
+        except ImportError as e:
+            raise ImportError(
+                "Anthropic package not installed. Install with: pip install anthropic"
+            ) from e
         except Exception as e:
-            raise Exception(f"Failed to initialize Anthropic: {e}")
+            raise Exception(f"Failed to initialize Anthropic: {e}") from e
 
     def _get_api_key(self, env_var: str) -> str | None:
         """Get API key from environment variables."""
         import os
+
         return os.getenv(env_var)
 
     def is_available(self) -> bool:
         """Check if LLM client is available."""
         return self._client is not None
+
+    def summarize_commit_sync(self, analysis: ChangeAnalysis) -> str:
+        """
+        Synchronous wrapper for summarize_commit.
+
+        This method runs the async summarize_commit in an event loop
+        for use in synchronous contexts.
+
+        Args:
+            analysis: ChangeAnalysis object
+
+        Returns:
+            Enhanced summary string
+        """
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        return loop.run_until_complete(self.summarize_commit(analysis))
 
     async def summarize_commit(self, analysis: ChangeAnalysis) -> str:
         """
@@ -199,12 +225,12 @@ Please analyze the following git commit and provide a concise, human-readable su
 Commit Details:
 - Hash: {analysis.commit_hash[:8]}
 - Author: {analysis.author}
-- Date: {analysis.timestamp.strftime('%Y-%m-%d %H:%M')}
+- Date: {analysis.timestamp.strftime("%Y-%m-%d %H:%M")}
 - Message: {analysis.message}
 - Files changed: {len(analysis.files_changed)}
 - Lines changed: +{analysis.lines_added}/-{analysis.lines_deleted}
 - Complexity score: {analysis.complexity_score:.1f}
-- Tags: {', '.join(analysis.tags) if analysis.tags else 'None'}
+- Tags: {", ".join(analysis.tags) if analysis.tags else "None"}
 
 Files changed:
 {chr(10).join(files_info)}
@@ -263,7 +289,7 @@ Format your response as a clear, professional summary suitable for release notes
 Analyze the impact areas for this commit:
 
 Commit: {analysis.short_message}
-Files: {', '.join(f.path for f in analysis.files_changed[:10])}
+Files: {", ".join(f.path for f in analysis.files_changed[:10])}
 Changes: +{analysis.lines_added}/-{analysis.lines_deleted} lines
 Complexity: {analysis.complexity_score:.1f}
 
@@ -288,8 +314,8 @@ Suggest a testing strategy for this commit:
 
 Commit: {analysis.short_message}
 Files changed: {len(analysis.files_changed)}
-File types: {', '.join(set(f.category.value for f in analysis.files_changed))}
-Impact areas: {', '.join(analysis.impact_areas)}
+File types: {", ".join({f.category.value for f in analysis.files_changed})}
+Impact areas: {", ".join(analysis.impact_areas)}
 Breaking change: {analysis.breaking_change}
 Security relevant: {analysis.security_relevant}
 
@@ -315,7 +341,7 @@ Commit: {analysis.short_message}
 Files: {len(analysis.files_changed)}
 Changes: +{analysis.lines_added}/-{analysis.lines_deleted} lines
 Complexity: {analysis.complexity_score:.1f}
-Impact areas: {', '.join(analysis.impact_areas)}
+Impact areas: {", ".join(analysis.impact_areas)}
 Breaking change: {analysis.breaking_change}
 
 Please assess:
@@ -349,16 +375,19 @@ Provide specific, actionable assessment.
                 self._client.chat.completions.create,
                 model=self.config.llm_model or "gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that analyzes git changes and provides clear, professional summaries."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that analyzes git changes and provides clear, professional summaries.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 max_tokens=self.config.llm_max_tokens or 1000,
-                temperature=self.config.llm_temperature or 0.3
+                temperature=self.config.llm_temperature or 0.3,
             )
             return response.choices[0].message.content
 
         except Exception as e:
-            raise Exception(f"OpenAI API call failed: {e}")
+            raise Exception(f"OpenAI API call failed: {e}") from e
 
     async def _call_anthropic(self, prompt: str) -> str:
         """Call Anthropic API."""
@@ -368,14 +397,12 @@ Provide specific, actionable assessment.
                 model=self.config.llm_model or "claude-3-sonnet-20240229",
                 max_tokens=self.config.llm_max_tokens or 1000,
                 temperature=self.config.llm_temperature or 0.3,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
+                messages=[{"role": "user", "content": prompt}],
             )
             return response.content[0].text
 
         except Exception as e:
-            raise Exception(f"Anthropic API call failed: {e}")
+            raise Exception(f"Anthropic API call failed: {e}") from e
 
     def _process_response(self, response: str) -> str:
         """Process and clean LLM response."""
@@ -386,12 +413,12 @@ Provide specific, actionable assessment.
         cleaned = response.strip()
 
         # Remove any markdown formatting that might interfere
-        if cleaned.startswith('```'):
-            lines = cleaned.split('\n')
-            if lines[-1].strip() == '```':
-                cleaned = '\n'.join(lines[1:-1])
+        if cleaned.startswith("```"):
+            lines = cleaned.split("\n")
+            if lines[-1].strip() == "```":
+                cleaned = "\n".join(lines[1:-1])
             else:
-                cleaned = '\n'.join(lines[1:])
+                cleaned = "\n".join(lines[1:])
 
         return cleaned.strip()
 
@@ -401,17 +428,17 @@ Provide specific, actionable assessment.
         areas = []
 
         # Split by lines and clean up
-        lines = response.split('\n')
+        lines = response.split("\n")
         for line in lines:
             line = line.strip()
             # Remove common prefixes
-            for prefix in ['-', '•', '*', '1.', '2.', '3.', '4.', '5.', '6.', '7.']:
+            for prefix in ["-", "•", "*", "1.", "2.", "3.", "4.", "5.", "6.", "7."]:
                 if line.startswith(prefix):
-                    line = line[len(prefix):].strip()
+                    line = line[len(prefix) :].strip()
                     break
 
             # Add if not empty and not too long
-            if line and len(line) < 50 and not line.lower().startswith(('please', 'here', 'the')):
+            if line and len(line) < 50 and not line.lower().startswith(("please", "here", "the")):
                 areas.append(line)
 
         return areas[:7]  # Limit to 7 areas
@@ -420,16 +447,20 @@ Provide specific, actionable assessment.
         """Parse testing suggestions from LLM response."""
         suggestions = []
 
-        lines = response.split('\n')
+        lines = response.split("\n")
         for line in lines:
             line = line.strip()
             # Remove common prefixes and clean up
-            for prefix in ['-', '•', '*', 'Test', 'Consider', 'Run', 'Add', 'Verify']:
+            for prefix in ["-", "•", "*", "Test", "Consider", "Run", "Add", "Verify"]:
                 if line.startswith(prefix):
-                    line = line[len(prefix):].strip()
+                    line = line[len(prefix) :].strip()
                     break
 
-            if line and len(line) < 100 and not line.lower().startswith(('please', 'here', 'you should')):
+            if (
+                line
+                and len(line) < 100
+                and not line.lower().startswith(("please", "here", "you should"))
+            ):
                 suggestions.append(line)
 
         return suggestions[:6]  # Limit to 6 suggestions
@@ -442,36 +473,38 @@ Provide specific, actionable assessment.
             "risk_factors": [],
             "prerequisites": [],
             "rollback_strategy": "Standard",
-            "downtime_expected": "None"
+            "downtime_expected": "None",
         }
 
         # Simple keyword-based parsing
         response_lower = response.lower()
 
         # Complexity level
-        if any(word in response_lower for word in ['critical', 'very high', 'extremely complex']):
+        if any(word in response_lower for word in ["critical", "very high", "extremely complex"]):
             assessment["complexity_level"] = "Critical"
-        elif any(word in response_lower for word in ['high', 'complex']):
+        elif any(word in response_lower for word in ["high", "complex"]):
             assessment["complexity_level"] = "High"
-        elif any(word in response_lower for word in ['low', 'simple', 'straightforward']):
+        elif any(word in response_lower for word in ["low", "simple", "straightforward"]):
             assessment["complexity_level"] = "Low"
 
         # Extract lines for detailed info
-        lines = response.split('\n')
+        lines = response.split("\n")
         for line in lines:
             line_lower = line.lower()
-            if any(word in line_lower for word in ['hours', 'days', 'effort']):
-                if 'hours' in line_lower or 'day' in line_lower:
+            if any(word in line_lower for word in ["hours", "days", "effort"]):
+                if "hours" in line_lower or "day" in line_lower:
                     assessment["estimated_effort"] = line.strip()
-            elif any(word in line_lower for word in ['risk', 'factor', 'concern']):
+            elif any(word in line_lower for word in ["risk", "factor", "concern"]):
                 if len(line.strip()) < 100:
-                    assessment["risk_factors"].append(line.strip())
-            elif any(word in line_lower for word in ['prerequisite', 'requirement', 'depend']):
+                    risk_factors = cast(list[str], assessment["risk_factors"])
+                    risk_factors.append(line.strip())
+            elif any(word in line_lower for word in ["prerequisite", "requirement", "depend"]):
                 if len(line.strip()) < 100:
-                    assessment["prerequisites"].append(line.strip())
-            elif any(word in line_lower for word in ['rollback', 'backout', 'revert']):
+                    prerequisites = cast(list[str], assessment["prerequisites"])
+                    prerequisites.append(line.strip())
+            elif any(word in line_lower for word in ["rollback", "backout", "revert"]):
                 assessment["rollback_strategy"] = line.strip()
-            elif any(word in line_lower for word in ['downtime', 'disruption', 'outage']):
+            elif any(word in line_lower for word in ["downtime", "disruption", "outage"]):
                 assessment["downtime_expected"] = line.strip()
 
         # Limit lists
@@ -485,7 +518,7 @@ Provide specific, actionable assessment.
         """Generate basic summary without LLM."""
         parts = [
             f"Changed {len(analysis.files_changed)} files",
-            f"added {analysis.lines_added} lines, deleted {analysis.lines_deleted} lines"
+            f"added {analysis.lines_added} lines, deleted {analysis.lines_deleted} lines",
         ]
 
         if analysis.impact_areas:
@@ -507,7 +540,7 @@ Provide specific, actionable assessment.
         suggestions = []
 
         # Based on file categories
-        categories = set(f.category for f in analysis.files_changed)
+        categories = {f.category for f in analysis.files_changed}
 
         if analysis.breaking_change:
             suggestions.append("Comprehensive regression testing required")
@@ -543,7 +576,7 @@ Provide specific, actionable assessment.
                 "risk_factors": ["Breaking changes require careful coordination"],
                 "prerequisites": ["Backup current state", "Prepare rollback plan"],
                 "rollback_strategy": "Use version control to revert if needed",
-                "downtime_expected": "Possible brief service interruption"
+                "downtime_expected": "Possible brief service interruption",
             }
         else:
             return {
@@ -552,5 +585,5 @@ Provide specific, actionable assessment.
                 "risk_factors": [],
                 "prerequisites": [],
                 "rollback_strategy": "Standard revert procedures",
-                "downtime_expected": "None"
+                "downtime_expected": "None",
             }
