@@ -4,368 +4,481 @@ This file represents **explicit user intent**. Agent may only modify when explic
 
 ---
 
-## VERSION MODULE MIGRATION (Option 2)
-
-Complete migration of version-management utility as dot-work version module.
+## MIGRATE-064@8f2a1b
 
 ---
-id: "MIGRATE-041@e5f6a7"
-title: "Create version module structure in dot-work"
-description: "Create src/dot_work/version/ module from version-management project"
+id: "MIGRATE-064@8f2a1b"
+title: "Create git history module structure"
+description: "Set up the module structure for git history analysis under src/dot_work/git/"
 created: 2024-12-21
-section: "version"
-tags: [migration, version-management, versioning, changelog]
-type: enhancement
+section: "src/dot_work/git"
+tags: [migration, git-analysis, module-structure]
+type: migration
 priority: medium
 status: proposed
+source: "incoming/crampus/git-analysis"
 references:
-   - incoming/crampus/version-management/
-   - src/dot_work/version/
+  - incoming/crampus/git-analysis/src/git_analysis/
 ---
 
 ### Problem
-The version-management project in `incoming/crampus/version-management/` provides date-based versioning (`YYYY.MM.build`) with automatic changelog generation from conventional commits. To integrate as `dot-work version`, we need to migrate the module.
 
-### Source Files to Migrate
-From `incoming/crampus/version-management/version_management/`:
-- `cli.py` - Typer CLI (init, freeze, show, history, commits, config)
-- `version_manager.py` - Core version management logic
-- `commit_parser.py` - Conventional commit parsing
-- `changelog_generator.py` - Changelog generation with Jinja2
-- `project_parser.py` - pyproject.toml parsing
+Migrate git-analysis functionality as `dot-work git history`. Need to create the module structure first.
+
+### Source Files
+```
+incoming/crampus/git-analysis/src/git_analysis/
+├── __init__.py
+├── cli.py
+├── models.py
+├── utils.py
+└── services/
+    ├── __init__.py
+    ├── cache.py
+    ├── complexity.py
+    ├── file_analyzer.py
+    ├── git_service.py
+    ├── llm_summarizer.py
+    └── tag_generator.py
+```
 
 ### Target Structure
 ```
-src/dot_work/version/
-├── __init__.py           # Package exports
-├── cli.py                # Typer CLI commands
-├── manager.py            # Core version management
-├── commit_parser.py      # Conventional commit parsing
-├── changelog.py          # Changelog generation
-└── config.py             # Configuration
+src/dot_work/git/
+├── __init__.py
+├── models.py
+├── utils.py
+└── services/
+    ├── __init__.py
+    ├── cache.py
+    ├── complexity.py
+    ├── file_analyzer.py
+    ├── git_service.py
+    ├── llm_summarizer.py
+    └── tag_generator.py
 ```
 
-### Proposed Solution
-1. Create `src/dot_work/version/` directory
-2. Copy and adapt version_manager.py → manager.py
-3. Copy commit_parser.py (minimal changes)
-4. Copy changelog_generator.py → changelog.py
-5. Create config.py for dot-work patterns
-6. Adapt cli.py for dot-work registration
+### Tasks
+1. Create `src/dot_work/git/` directory
+2. Copy models.py with import updates (`from dot_work.git.models import ...`)
+3. Copy utils.py with import updates
+4. Create services/ subdirectory
+5. Copy all service files with import updates
+6. Omit `mcp/` directory (not needed)
 
 ### Acceptance Criteria
-- [x] Directory `src/dot_work/version/` created
-- [x] All core modules present
-- [x] No syntax errors in module files
-- [x] `__init__.py` exports main classes
+- [ ] Module structure created
+- [ ] All source files copied
+- [ ] Imports updated to `dot_work.git.*`
+- [ ] No MCP dependencies
 
 ### Notes
-The original uses GitPython, Jinja2, rich, pydantic. These will be added as dependencies.
+First step of git history migration. MCP server omitted per user decision. LLM integration preserved.
+
+**⚠️ MINIMAL ALTERATION PRINCIPLE:** Copy source files verbatim. Only change:
+1. Import paths (relative → `dot_work.git.*`)
+2. Nothing else in the source logic
+
+Do NOT refactor, rename variables, restructure classes, or "improve" the code. The goal is to preserve original functionality exactly.
 
 ---
 
+## MIGRATE-065@9c3b2d
+
 ---
-id: "MIGRATE-042@f6a7b8"
-title: "Update version module imports and config"
-description: "Refactor imports from version_management.* to dot_work.version.*"
+id: "MIGRATE-065@9c3b2d"
+title: "Update git history imports and dependencies"
+description: "Update all imports in git module and add required dependencies to pyproject.toml"
 created: 2024-12-21
-section: "version"
-tags: [migration, version, imports, refactor]
-type: refactor
+section: "src/dot_work/git"
+tags: [migration, git-analysis, imports, dependencies]
+type: migration
 priority: medium
 status: proposed
+source: "incoming/crampus/git-analysis"
 references:
-   - src/dot_work/version/
+  - incoming/crampus/git-analysis/pyproject.toml
+  - pyproject.toml
 ---
 
 ### Problem
-After copying files, imports reference `version_management.*` which doesn't exist.
 
-### Import Changes Required
+After copying files, need to update all imports and add dependencies.
 
-| Old Import | New Import |
-|------------|------------|
-| `from version_management.version_manager import VersionManager` | `from dot_work.version.manager import VersionManager` |
-| `from version_management.commit_parser import CommitParser` | `from dot_work.version.commit_parser import CommitParser` |
-| `from version_management.changelog_generator import ChangelogGenerator` | `from dot_work.version.changelog import ChangelogGenerator` |
+### Import Updates
 
-### Config Updates
-- Store version.json in `.work/version/version.json`
-- Config file: `.work/version/config.yaml` or env vars
-- Env var prefix: `DOT_WORK_VERSION_*`
+All files in `src/dot_work/git/`:
+```python
+# OLD
+from .models import AnalysisConfig, ChangeAnalysis, ComparisonResult
+from .services import GitAnalysisService
 
-### Proposed Solution
-1. Update all internal imports
-2. Create config.py with VersionConfig dataclass
-3. Update storage paths to use `.work/version/`
-4. Verify: `uv run python -c "from dot_work.version import VersionManager"`
+# NEW
+from dot_work.git.models import AnalysisConfig, ChangeAnalysis, ComparisonResult
+from dot_work.git.services import GitAnalysisService
+```
+
+### Dependencies to Add
+
+**Required (pyproject.toml):**
+```toml
+"gitpython>=3.1.0",
+```
+
+**Optional (LLM support):**
+```toml
+[project.optional-dependencies]
+llm = [
+    "openai>=1.0.0",
+    "anthropic>=0.3.0",
+]
+```
+
+### Tasks
+1. Update imports in all git module files
+2. Add `gitpython>=3.1.0` to main dependencies
+3. Add optional `llm` extras group
+4. Run `uv sync` to install
 
 ### Acceptance Criteria
-- [ ] All imports updated to `dot_work.version.*`
-- [ ] Config uses `DOT_WORK_VERSION_*` env vars
-- [ ] Storage in `.work/version/`
-- [ ] Module imports work correctly
+- [ ] All imports use `dot_work.git.*` paths
+- [ ] gitpython added to dependencies
+- [ ] Optional llm extras defined
+- [ ] `uv sync` succeeds
 
 ### Notes
-Depends on MIGRATE-041 (files must exist first).
+Depends on: MIGRATE-064.
+
+**⚠️ MINIMAL ALTERATION PRINCIPLE:** Import changes ONLY. Do not:
+- Rename functions/classes/variables
+- Change function signatures
+- Restructure module organization beyond what's specified
+- "Clean up" or "improve" existing code
+- Add type hints that weren't there
+- Change docstrings
+
+Preserve the original code exactly as-is except for import paths.
 
 ---
 
+## MIGRATE-066@a4d3e5
+
 ---
-id: "MIGRATE-043@a7b8c9"
-title: "Register version as subcommand in dot-work CLI"
-description: "Add version commands as 'dot-work version <cmd>' CLI structure"
+id: "MIGRATE-066@a4d3e5"
+title: "Register git history CLI commands"
+description: "Create git command group with history subcommand containing all analysis commands"
 created: 2024-12-21
-section: "cli"
-tags: [migration, version, cli, integration]
-type: enhancement
+section: "src/dot_work/cli.py"
+tags: [migration, git-analysis, cli, typer]
+type: migration
 priority: medium
 status: proposed
+source: "incoming/crampus/git-analysis"
 references:
-   - src/dot_work/cli.py
-   - src/dot_work/version/cli.py
+  - incoming/crampus/git-analysis/src/git_analysis/cli.py
+  - src/dot_work/cli.py
 ---
 
 ### Problem
-The version module needs CLI integration as `dot-work version <command>`.
 
-### CLI Design
-```bash
-# Initialize versioning
-dot-work version init
-dot-work version init --version 2025.12.001
-
-# Freeze new version with changelog
-dot-work version freeze
-dot-work version freeze --llm       # LLM-enhanced summary
-dot-work version freeze --dry-run   # Preview
-dot-work version freeze --push      # Push tags
-
-# Show version info
-dot-work version show
-
-# Show version history
-dot-work version history
-dot-work version history --limit 20
-
-# Show commits since last version
-dot-work version commits
-dot-work version commits --since v1.0.0
-
-# Show/edit config
-dot-work version config --show
-```
+Need to register git-analysis commands under `dot-work git history <subcommand>`.
 
 ### CLI Structure
+
+```
+dot-work git history compare <from_ref> <to_ref>
+dot-work git history analyze <commit_hash>
+dot-work git history diff-commits <commit_a> <commit_b>
+dot-work git history contributors <from_ref> <to_ref>
+dot-work git history complexity <from_ref> <to_ref>
+dot-work git history releases
+```
+
+### Implementation
+
+**src/dot_work/git/cli.py** (new file):
 ```python
-version_app = typer.Typer(help="Date-based version management with changelog generation.")
+"""CLI commands for git history analysis."""
 
-@version_app.command("init")
-def version_init(version: str | None = None) -> None:
-    """Initialize version management."""
+import typer
 
-@version_app.command("freeze")
-def version_freeze(llm: bool = False, dry_run: bool = False, push: bool = False) -> None:
-    """Freeze new version with changelog."""
+from dot_work.git.models import AnalysisConfig
+from dot_work.git.services import GitAnalysisService
 
-@version_app.command("show")
-def version_show() -> None:
-    """Show current version."""
+history_app = typer.Typer(
+    name="history",
+    help="Analyze git history between refs",
+    no_args_is_help=True,
+)
 
-@version_app.command("history")
-def version_history(limit: int = 10) -> None:
-    """Show version history."""
+@history_app.command()
+def compare(...): ...
 
-@version_app.command("commits")
-def version_commits(since: str | None = None) -> None:
-    """Show commits since last version."""
+@history_app.command()
+def analyze(...): ...
+
+# ... other commands
 ```
 
-### Proposed Solution
-1. Create `version_app = typer.Typer()` in version/cli.py
-2. Implement commands: init, freeze, show, history, commits, config
-3. Register: `app.add_typer(version_app, name="version")`
+**src/dot_work/cli.py** (update):
+```python
+from dot_work.git.cli import history_app
+
+git_app = typer.Typer(name="git", help="Git analysis tools")
+git_app.add_typer(history_app, name="history")
+app.add_typer(git_app, name="git")
+```
+
+### Tasks
+1. Create `src/dot_work/git/cli.py` with history_app
+2. Copy command implementations from source cli.py
+3. Update main cli.py to register git command group
+4. Add history subgroup under git
 
 ### Acceptance Criteria
-- [ ] `dot-work version --help` shows commands
-- [ ] `dot-work version init` creates version.json
-- [ ] `dot-work version freeze` creates version + changelog
-- [ ] `dot-work version show` displays current version
-- [ ] `dot-work version history` shows git tag history
+- [ ] `dot-work git --help` shows history subcommand
+- [ ] `dot-work git history --help` shows 6 commands
+- [ ] Commands delegate to GitAnalysisService
 
 ### Notes
-Depends on MIGRATE-042 (imports must work first).
+Depends on: MIGRATE-064, MIGRATE-065.
+
+**⚠️ MINIMAL ALTERATION PRINCIPLE:** The CLI commands must be copied from the source `cli.py` with minimal changes:
+- Keep all original command names, arguments, options, and help text
+- Keep all display helper functions (`_display_table_results`, etc.) exactly as-is
+- Only change: (1) imports, (2) Typer app registration to nest under `history_app`
+- Do NOT rename `compare` to `compare-refs`, do NOT change `--verbose` to `-v` only, etc.
+
+The CLI should behave identically to the original, just under `dot-work git history` prefix.
 
 ---
 
+## MIGRATE-067@b5e4f6
+
 ---
-id: "MIGRATE-044@b8c9d0"
-title: "Add version dependencies to pyproject.toml"
-description: "Add GitPython, Jinja2, pydantic for version management"
+id: "MIGRATE-067@b5e4f6"
+title: "Add tests for git history module"
+description: "Create unit tests for git history models, services, and CLI commands"
 created: 2024-12-21
-section: "dependencies"
-tags: [migration, version, dependencies, pyproject]
-type: enhancement
+section: "tests/unit"
+tags: [migration, git-analysis, testing]
+type: migration
 priority: medium
 status: proposed
+source: "incoming/crampus/git-analysis"
 references:
-   - pyproject.toml
+  - incoming/crampus/git-analysis/tests/
+  - tests/unit/
 ---
 
 ### Problem
-The version module requires external dependencies.
 
-### Dependencies from version-management
-```toml
-dependencies = [
-    "GitPython>=3.1.0",   # Git operations
-    "Jinja2>=3.1.0",      # Changelog templates
-    "pydantic>=2.0.0",    # Data models
-    "tomli>=2.0.0; python_version < '3.11'",  # pyproject.toml parsing
-]
+Need comprehensive tests for the migrated git history functionality.
 
-[project.optional-dependencies]
-version-llm = ["httpx>=0.24.0"]  # For Ollama integration
+### Test Files
+
 ```
-
-### Proposed Solution
-1. Add core dependencies to pyproject.toml
-2. Add `version-llm` optional group for LLM features
-3. Run `uv sync` to install
-4. Verify imports work
-
-### Acceptance Criteria
-- [ ] `GitPython`, `Jinja2`, `pydantic` in core deps
-- [ ] `httpx` in optional `version-llm` group
-- [ ] `uv sync` succeeds
-- [ ] Version module imports work
-
-### Notes
-Some deps may already exist (rich, typer). GitPython may conflict with kg module - verify.
-
-Depends on MIGRATE-041 (module must exist).
-
----
-
----
-id: "MIGRATE-045@c9d0e1"
-title: "Add tests for version module"
-description: "Create unit tests for version management functionality"
-created: 2024-12-21
-section: "tests"
-tags: [migration, version, tests]
-type: test
-priority: medium
-status: proposed
-references:
-   - tests/unit/version/
-   - src/dot_work/version/
----
-
-### Problem
-The version module needs tests to ensure correct behavior.
-
-### Test Structure
-```
-tests/unit/version/
+tests/unit/git/
 ├── __init__.py
-├── conftest.py          # Fixtures (mock git repo)
-├── test_manager.py      # VersionManager tests
-├── test_commit_parser.py # Commit parsing tests
-├── test_changelog.py    # Changelog generation tests
-├── test_config.py       # Config tests
-└── test_cli.py          # CLI command tests
+├── test_models.py
+├── test_complexity.py
+├── test_file_analyzer.py
+├── test_tag_generator.py
+└── test_cli.py
 ```
 
-### Key Test Cases
+### Test Coverage
 
-**test_manager.py:**
-- `test_init_creates_version_file`
-- `test_freeze_increments_build_number`
-- `test_freeze_resets_on_new_month`
-- `test_read_version_returns_current`
+**test_models.py:**
+- ChangeType enum values
+- FileCategory classification
+- AnalysisConfig defaults
+- ComparisonResult structure
 
-**test_commit_parser.py:**
-- `test_parse_conventional_commit`
-- `test_parse_with_scope`
-- `test_parse_breaking_change`
-- `test_parse_non_conventional`
+**test_complexity.py:**
+- Complexity score calculation
+- Threshold comparisons
+- Risk level assignment
 
-**test_changelog.py:**
-- `test_generate_changelog_groups_by_type`
-- `test_changelog_includes_authors`
+**test_file_analyzer.py:**
+- File category detection (code, tests, config, docs)
+- Binary file detection
+- Path parsing
+
+**test_cli.py:**
+- Command invocation (mocked GitAnalysisService)
+- Output format handling (table, json, yaml)
+- Error handling
+
+### Tasks
+1. Create tests/unit/git/ directory
+2. Copy and adapt tests from source
+3. Add new tests for CLI commands
+4. Mock git repository for unit tests
 
 ### Acceptance Criteria
-- [ ] Tests in `tests/unit/version/`
-- [ ] Coverage ≥ 80% for version module
-- [ ] All tests pass
-- [ ] Mock git operations (no real repos)
+- [ ] All test files created
+- [ ] Tests pass with `uv run pytest tests/unit/git/`
+- [ ] Coverage >=75% for git module
+- [ ] No external git repo required for unit tests
 
 ### Notes
-Depends on MIGRATE-042 (module must be functional).
+Depends on: MIGRATE-064, MIGRATE-065, MIGRATE-066.
+
+**⚠️ MINIMAL ALTERATION PRINCIPLE:** Copy existing tests from source first, then adapt:
+- Keep original test structure and assertions
+- Only update imports to `dot_work.git.*`
+- Add new tests for CLI wiring, but don't rewrite existing test logic
+- If source tests pass, migrated tests should pass with same assertions
 
 ---
 
+## MIGRATE-068@c6f5a7
+
 ---
-id: "MIGRATE-046@d0e1f2"
-title: "Verify version migration with full build"
-description: "Run complete build pipeline and verify version functionality"
+id: "MIGRATE-068@c6f5a7"
+title: "Add integration tests for git history"
+description: "Create integration tests that use a real git repository for end-to-end validation"
 created: 2024-12-21
-section: "version"
-tags: [migration, version, verification, qa]
-type: test
+section: "tests/integration"
+tags: [migration, git-analysis, testing, integration]
+type: migration
 priority: medium
 status: proposed
+source: "incoming/crampus/git-analysis"
 references:
-   - scripts/build.py
+  - tests/integration/
 ---
 
 ### Problem
-After completing all migration steps, verify the version migration works correctly.
 
-### Verification Checklist
+Need integration tests that validate git history commands against a real repository.
+
+### Test File
+
+**tests/integration/test_git_history.py:**
+```python
+"""Integration tests for git history commands."""
+
+import pytest
+from typer.testing import CliRunner
+
+from dot_work.cli import app
+
+runner = CliRunner()
+
+@pytest.mark.integration
+class TestGitHistoryIntegration:
+    """Integration tests using the dot-work repo itself."""
+
+    def test_compare_refs(self):
+        """Test comparing HEAD~5 to HEAD."""
+        result = runner.invoke(app, ["git", "history", "compare", "HEAD~5", "HEAD"])
+        assert result.exit_code == 0
+        assert "Commits:" in result.output
+
+    def test_analyze_commit(self):
+        """Test analyzing HEAD commit."""
+        result = runner.invoke(app, ["git", "history", "analyze", "HEAD"])
+        assert result.exit_code == 0
+
+    def test_complexity_analysis(self):
+        """Test complexity analysis."""
+        result = runner.invoke(app, ["git", "history", "complexity", "HEAD~10", "HEAD"])
+        assert result.exit_code == 0
+```
+
+### Tasks
+1. Create tests/integration/test_git_history.py
+2. Use dot-work repo itself for testing
+3. Mark all tests with `@pytest.mark.integration`
+4. Test each of the 6 subcommands
+
+### Acceptance Criteria
+- [ ] Integration tests created
+- [ ] Tests use real git history
+- [ ] All 6 commands have integration tests
+- [ ] Tests pass with `uv run python scripts/build.py --integration all`
+
+### Notes
+Depends on: MIGRATE-067. Uses dot-work's own git history for testing.
+
+**⚠️ MINIMAL ALTERATION PRINCIPLE:** Integration tests validate that the migrated code behaves identically to the original. If any behavior differs, investigate whether the migration introduced unintended changes.
+
+---
+
+## MIGRATE-069@d7a6b8
+
+---
+id: "MIGRATE-069@d7a6b8"
+title: "Verify git history migration"
+description: "Final verification that git history commands work correctly end-to-end"
+created: 2024-12-21
+section: "src/dot_work/git"
+tags: [migration, git-analysis, verification]
+type: migration
+priority: medium
+status: proposed
+source: "incoming/crampus/git-analysis"
+references:
+  - src/dot_work/git/
+---
+
+### Problem
+
+Final verification that the git history migration is complete and functional.
+
+### Verification Steps
 
 **Build Pipeline:**
 ```bash
 uv run python scripts/build.py
 ```
-- [ ] Formatting passes
-- [ ] Linting passes
-- [ ] Type checking passes
-- [ ] All tests pass
-- [ ] Coverage ≥75%
 
 **CLI Verification:**
 ```bash
-# Initialize versioning
-dot-work version init
-# Should create .work/version/version.json
+# Compare branches/refs
+dot-work git history compare HEAD~10 HEAD
 
-# Show current version
-dot-work version show
-# Should display current version
+# Analyze single commit
+dot-work git history analyze HEAD
 
-# Show version history
-dot-work version history
-# Should show git tags
+# Diff two commits
+dot-work git history diff-commits HEAD~2 HEAD~1
+
+# Show contributors
+dot-work git history contributors HEAD~20 HEAD
+
+# Complexity analysis
+dot-work git history complexity HEAD~15 HEAD --threshold 30
+
+# Recent releases (if tags exist)
+dot-work git history releases --count 5
+
+# JSON output
+dot-work git history compare HEAD~5 HEAD --format json
+
+# With LLM (if configured)
+dot-work git history compare HEAD~5 HEAD --llm --llm-provider openai
 ```
 
-**Functionality Test:**
-- [ ] Version format is YYYY.MM.build
-- [ ] Freeze increments build number
-- [ ] Freeze resets on new month
-- [ ] Changelog generated correctly
-- [ ] Conventional commits parsed
-
 ### Acceptance Criteria
-- [ ] `uv run python scripts/build.py` passes
-- [ ] `dot-work version init` works
-- [ ] `dot-work version show` displays version
-- [ ] No regressions in existing dot-work functionality
+- [ ] Build passes
+- [ ] All 6 subcommands work
+- [ ] Output formats (table, json, yaml) work
+- [ ] Complexity scoring produces valid scores
+- [ ] LLM flag accepted (may fail without API key)
+- [ ] Help text accurate
 
 ### Notes
-Final verification step. Only mark migration complete when all checks pass.
+Final verification. Depends on: MIGRATE-064 through MIGRATE-068.
 
-Depends on: MIGRATE-041 through MIGRATE-045.
+**⚠️ MINIMAL ALTERATION PRINCIPLE:** Verification should confirm:
+1. Output format matches original `git-analysis` tool exactly
+2. Complexity scores calculated identically
+3. All CLI flags and options work as documented in original README
+4. No functionality was lost or changed during migration
+
+If any behavior differs from the original, it's a bug in the migration, not an "improvement."
 
 ---

@@ -1,102 +1,84 @@
-# Baseline Report - VERSION MODULE MIGRATION START
-Generated: 2025-12-22T23:15:00Z
-Commit: 73baa1a (Migrated zip module)
-Branch: migrating-using-opencode
+# Project Baseline
+
+**Captured:** 2025-12-23T06:00:00Z
+**Commit:** 81e235aa1ca3e72bbb3b0d37972aa13a96e8450b
+**Branch:** migrating-using-opencode
+
+---
 
 ## Build Status
-- Status: ✅ **FULLY PASSING** (8/8 checks)
-- Execution time: 16.20 seconds
-- All quality gates cleared
+- Status: Partial (4/8 steps passing)
+- Execution time: ~12s
 
-## Dependencies
-- Total: Synced via uv
-- Outdated: None
-- Vulnerable: 0
-- Core additions needed for VERSION: GitPython, Jinja2, pydantic
+## Pre-existing Issues (Before Git History Migration)
 
-## Linting
+### Linting (Ruff)
+- Status: ✅ PASSING
 - Total errors: 0
-- Total warnings: 0
-- Tool: ruff 0.14.10
 
-## Type Checking
-- Total errors: 0
-- Total warnings: 0
-- Tool: mypy 1.19.1
+### Type Checking (Mypy)
+- Status: ⚠️ 4 errors (pre-existing)
+- Files affected:
+  - `src/dot_work/zip/zipper.py`: unused type: ignore, gitignore_parser untyped
+  - `src/dot_work/container/provision/core.py`: frontmatter untyped
+  - `src/dot_work/container/provision/validation.py`: frontmatter untyped
 
-## Tests
-- Unit tests: 757 passing (includes 45 new zip tests)
-- Integration tests: 5 passing
-- Total: 762 tests
-- Execution time: ~13 seconds
+### Security Checks
+- Status: ⚠️ 1 warning (pre-existing)
+- S603: subprocess call in container/provision/core.py (untrusted input check)
 
-## Coverage
-- Overall: 76%+
-- Meets requirement: ✅ (minimum: 75%)
+### Unit Tests
+- Status: ⚠️ 38 failing, 896 passing, 1 error (pre-existing version module issues)
+- All failing tests are in: `tests/unit/version/`
 
-### Coverage by Component
-| Component | Coverage | Status |
-|-----------|----------|--------|
-| dot_work/zip/config.py | 100% | Perfect |
-| dot_work/zip/uploader.py | 90% | Excellent |
-| dot_work/zip/zipper.py | 89% | Excellent |
-| dot_work/zip/__init__.py | 77% | Good |
-| dot_work/zip/cli.py | 68% | Good |
-| dot_work/cli.py | 80% | Excellent |
-| dot_work/installer.py | 88% | Excellent |
-| dot_work/prompts/canonical.py | 94% | Excellent |
-| dot_work/tools/* | 92-93% | Excellent |
+**Failing test files:**
+- `test_cli.py`: 7 failures (CLI output assertions, exit codes)
+- `test_commit_parser.py`: 6 failures (unexpected keyword argument 'hash')
+- `test_config.py`: 4 failures (VersionConfig missing 'load_config' attribute)
+- `test_manager.py`: 21 failures (git repository errors in tests)
 
-## Security
-- Critical: 0
-- High: 0
-- Medium: 0
+**Note:** These are pre-existing issues from the version module migration (MIGRATE-043 through MIGRATE-057). They should be addressed separately from the git history migration.
 
-## Code Quality
-- Lint errors: 0 ✅
-- Type errors: 0 ✅
-- Security issues: 0 ✅
-- All files compliant ✅
+### Files with Pre-existing Issues
+| File | Issues |
+|------|--------|
+| src/dot_work/zip/zipper.py | mypy: unused type: ignore, untyped import |
+| src/dot_work/container/provision/core.py | mypy: untyped import, security: S603 |
+| src/dot_work/container/provision/validation.py | mypy: untyped import |
+| tests/unit/version/* | 38 failing tests |
 
-## Files Summary
-- Python source files: 19 (includes new zip module: 5 files)
-- Python test files: 26 (includes new zip tests: 5 files)
-- Total tests: 762 (baseline: 721 + zip: 41)
-- Clean files: All (no warnings/errors)
-- Files with pre-existing issues: None
+### Clean Files (No Issues)
+All other files are clean (formatting, linting, type-wise).
 
-## Recent Changes (This Session)
-### Commits
-1. **73baa1a** - "Migrated zip module"
-   - Added src/dot_work/zip/ module (5 files)
-   - Added tests/unit/zip/ tests (5 files)
-   - Modified pyproject.toml (dependencies)
-   - Modified src/dot_work/cli.py (registration)
-   - 20 files changed, 2234 insertions(+)
+---
 
-## Baseline Invariants Verified
-1. ✅ All 762 tests pass
-2. ✅ Coverage ≥ 76% (requirement: 75%)
-3. ✅ Lint errors = 0
-4. ✅ Type errors = 0
-5. ✅ Security issues = 0
-6. ✅ No regressions introduced
-7. ✅ All pre-commit checks passing
-8. ✅ Build fully successful
+## Scope Summary
 
-## Quality Metrics Summary
-| Metric | Value | Target | Status |
-|--------|-------|--------|--------|
-| Tests Passing | 762/762 | 100% | ✅ |
-| Coverage | 76%+ | ≥75% | ✅ |
-| Lint Errors | 0 | 0 | ✅ |
-| Type Errors | 0 | 0 | ✅ |
-| Security Issues | 0 | 0 | ✅ |
-| Build Time | 16.20s | <60s | ✅ |
-| All Checks | 8/8 passing | 8/8 | ✅ |
+### Modules & Structure
+- **Total Python files:** 76
+- **Main modules:**
+  - `dot_work` - Core CLI and scaffolding functionality
+  - `dot_work.container` - Container build/provision
+  - `dot_work.git` - **TO BE CREATED** (this migration)
+  - `dot_work.knowledge_graph` - Knowledge graph management
+  - `dot_work.overview` - Code overview generation (newly added)
+  - `dot_work.prompts` - AI prompt templates and workflows
+  - `dot_work.python` - Python tooling utilities
+  - `dot_work.review` - Code review server and tools
+  - `dot_work.tools` - JSON/YAML validation utilities
+  - `dot_work.version` - Version management system
+  - `dot_work.zip` - Module packaging and distribution
 
-## Ready for VERSION Module Migration
-This baseline is the foundation for MIGRATE-041 through MIGRATE-046 (VERSION module migration).
+### Entry Points
+- **Primary CLI:** `dot-work` - Main project scaffolding and issue tracking
+- **Secondary:** `kg` - Knowledge graph management
 
-**Status: BASELINE ESTABLISHED ✅**
-**Ready to: Begin MIGRATE-041**
+---
+
+## Invariant for Git History Migration
+
+During MIGRATE-064 through MIGRATE-069:
+- Do NOT introduce new issues in clean files
+- Do NOT increase mypy errors beyond 4
+- Do NOT break the 896 passing tests
+- Create new issues only in `src/dot_work/git/` (new module)

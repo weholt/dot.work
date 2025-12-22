@@ -41,9 +41,9 @@ class VersionConfig:
             DOT_WORK_VERSION_INCLUDE_AUTHORS: Include authors (default: true)
             DOT_WORK_VERSION_GROUP_BY_TYPE: Group by type (default: true)
         """
-        version_file = os.getenv("DOT_WORK_VERSION_FILE")
-        if version_file:
-            version_file = Path(version_file)
+        version_file_path = os.getenv("DOT_WORK_VERSION_FILE")
+        if version_file_path:
+            version_file = Path(version_file_path)
         else:
             # Default: .work/version/version.json
             work_dir = Path.home() / ".dot-work"
@@ -53,9 +53,9 @@ class VersionConfig:
                 work_dir = Path.cwd() / ".work"
             version_file = work_dir / "version" / "version.json"
 
-        changelog_file = os.getenv("DOT_WORK_VERSION_CHANGELOG")
-        if changelog_file:
-            changelog_file = Path(changelog_file)
+        changelog_file_path = os.getenv("DOT_WORK_VERSION_CHANGELOG")
+        if changelog_file_path:
+            changelog_file = Path(changelog_file_path)
 
         tag_prefix = os.getenv("DOT_WORK_VERSION_TAG_PREFIX", "version-")
         include_authors = os.getenv("DOT_WORK_VERSION_INCLUDE_AUTHORS", "true").lower() == "true"

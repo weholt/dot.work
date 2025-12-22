@@ -23,12 +23,22 @@ dependencies = [
     "rich>=13.0.0",
     "pyyaml>=6.0.0",
     "jinja2>=3.1.0",
+    "radon>=6.0.0",
+    # version module dependencies
+    "GitPython>=3.1.0",
+    "python-dotenv>=1.0.0",
     # zip module dependencies
     "gitignore-parser>=0.1.0",
     # review module dependencies
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
     "pydantic>=2.6.0",
+    # container provision module dependencies
+    "python-frontmatter>=1.1.0",
+    # overview module dependencies
+    "libcst>=1.1.0",
+    # git module dependencies
+    "tqdm>=4.66.0",
 ]
 
 [project.optional-dependencies]
@@ -41,6 +51,13 @@ kg-all = [
     "httpx>=0.27.0",
     "hnswlib>=0.8.0",
 ]
+# git module optional features (LLM summarization)
+git-llm = [
+    "openai>=1.0.0",
+    "anthropic>=0.3.0",
+]
+# scan optional features (dependency visualization)
+scan-graph = ["networkx>=3.0", "pyvis>=0.3.0"]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
@@ -55,6 +72,7 @@ dev = [
 [project.scripts]
 dot-work = "dot_work.cli:app"
 kg = "dot_work.knowledge_graph.cli:app"
+pybuilder = "dot_work.python.build.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -92,6 +110,16 @@ ignore = ["E501"]
 "src/dot_work/installer.py" = ["S701"]
 # S310: urllib.request calls - intentional HTTP API requests to embedding providers
 "src/dot_work/knowledge_graph/embed/ollama.py" = ["S310"]
+# B008, B904: Typer CLI patterns - function calls in defaults are standard Typer usage
+"src/dot_work/container/provision/cli.py" = ["B008", "B904"]
+"src/dot_work/python/build/cli.py" = ["B008", "B904"]
+"src/dot_work/python/__init__.py" = ["B008", "B904"]
+"src/dot_work/python/scan/cli.py" = ["B008", "B904"]
+"src/dot_work/version/cli.py" = ["B008", "B904"]
+"src/dot_work/overview/cli.py" = ["B008", "B904"]
+# import-untyped: frontmatter library has no type stubs
+"src/dot_work/container/provision/core.py" = ["S603"]
+"src/dot_work/container/provision/validation.py" = []
 "src/dot_work/knowledge_graph/embed/openai.py" = ["S310"]
 # S112: Bare except-continue - intentional best-effort batch embedding storage
 "src/dot_work/knowledge_graph/search_semantic.py" = ["S112"]

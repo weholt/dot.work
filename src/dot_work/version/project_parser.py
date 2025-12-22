@@ -1,18 +1,9 @@
 """Parser for extracting project information from pyproject.toml."""
 
-import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
-# Python 3.11+ has tomllib in stdlib, older versions need tomli
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    try:
-        import tomli as tomllib
-    except ImportError:
-        tomllib = None  # type: ignore
 
 
 @dataclass

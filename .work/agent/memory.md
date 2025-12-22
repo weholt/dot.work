@@ -41,7 +41,10 @@
 - [MIGRATE-018@f2a8b7] 2024-12-21: For optional dependencies, check if they're already in dev deps (httpx was). PyYAML was already a core dep so no need to add to kg-yaml. Embedding modules use stdlib urllib.request, not httpx - optional httpx group is for potential future refactor.
 - [MIGRATE-018@f2a8b7] 2024-12-21: Compare validation against EXACT baseline numbers to detect regressions. Pre-existing issues (lint=3, mypy=3, security=5) are acceptable if unchanged, but any NEW issues are regressions.
 - [MIGRATE-019@a3b9c8] 2025-12-21: Test migration efficiency - use automated search/replace for import updates but verify API compatibility manually. The kgshred tests expect 'backend' field not 'provider' in EmbedderConfig - adjust migrated code accordingly.
-- [MIGRATE-019@a3b9c8] 2025-12-21: Test migration efficiency - use automated search/replace for import updates but verify API compatibility manually. The kgshred tests expect 'backend' field not 'provider' in EmbedderConfig - adjust migrated code accordingly.
+- [MIGRATE-042@f6a7b8] 2024-12-23: Import updates sometimes done in previous steps
+  - Always verify if import/config tasks are already complete before starting
+  - Investigation phase crucial to avoid duplicate work
+  - Version module already had dot-work patterns configured in MIGRATE-041
 - [TEST-001@c4a9f6] 2025-12-22: Installation functions follow consistent patterns per environment - each creates specific directory structure (copilot: .github/prompts, claude: CLAUDE.md, cursor: .cursor/rules, etc.). All generator functions use render_prompt() for template substitution. Mock console needed for testing to avoid output during tests.
 - [TEST-001@c4a9f6] 2025-12-22: Parametrized pytest tests excellent for testing same functionality across multiple variants. Use test_all_environments_create_target_directories pattern: parametrize with (installer_function, expected_path_str, path_type) for clean multi-environment validation.
 - [FEAT-005@d5b2e8] 2025-12-22: Template variables enable true multi-environment support. Hardcoded paths like `[text](filename.prompt.md)` are fragile and fail silently when content moves locations. Use `{{ prompt_path }}` which is provided by `build_template_context()` during rendering.

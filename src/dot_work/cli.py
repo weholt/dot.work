@@ -7,9 +7,14 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from dot_work.container.provision.cli import app as container_provision_app
 from dot_work.environments import ENVIRONMENTS
+from dot_work.git.cli import history_app
 from dot_work.installer import get_prompts_dir, initialize_work_directory, install_prompts
 from dot_work.knowledge_graph.cli import app as kg_app
+from dot_work.overview.pipeline import analyze_project, write_outputs
+from dot_work.python import python_app
+from dot_work.version.cli import app as version_app
 from dot_work.zip.cli import app as zip_app
 
 app = typer.Typer(
@@ -27,6 +32,12 @@ review_app = typer.Typer(help="Interactive code review with AI-friendly export."
 
 # Create subcommand group for canonical prompts
 canonical_app = typer.Typer(help="Validate and install canonical prompt files.")
+
+# Create subcommand group for container operations
+container_app = typer.Typer(help="Container-based operations.")
+
+# Create subcommand group for git operations
+git_app = typer.Typer(help="Git analysis tools.")
 
 
 def detect_environment(target: Path) -> str | None:
@@ -214,6 +225,49 @@ def init_work(
 
     console.print("\n[bold green]✅ Work directory initialized![/bold green]")
     console.print("[dim]Next: Run 'generate-baseline' before making code changes[/dim]")
+
+
+@app.command("overview")
+def overview(
+    input_dir: Annotated[
+        Path,
+        typer.Argument(
+            ...,
+            exists=True,
+            resolve_path=True,
+            help="Folder containing the project to scan.",
+        ),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Argument(
+            ...,
+            exists=False,
+            resolve_path=False,
+            help="Where to store the generated markdown and JSON files.",
+        ),
+    ],
+) -> None:
+    """Generate a bird's-eye overview of a codebase.
+
+    Scans the project for Python files and markdown documentation, then generates:
+    - birdseye_overview.md: Human-readable project guide
+    - features.json: Structured feature data for LLMs
+    - documents.json: Cross-referenceable documentation sections
+    """
+    console.print(f"[cyan]🔍 Scanning project:[/cyan] {input_dir}\n")
+
+    bundle = analyze_project(input_dir)
+    destinations = write_outputs(bundle, output_dir)
+
+    console.print("[green]✓ Scan complete. Deliverables:[/green]")
+    for label, path in destinations.items():
+        console.print(f"  [dim]{label}:[/dim] {path}")
+
+    console.print("\n[bold green]✅ Overview generated![/bold green]")
+    console.print(
+        f"[dim]Found {len(bundle.features)} features, {len(bundle.models)} models, {len(bundle.documents)} document sections[/dim]"
+    )
 
 
 def prompt_for_environment() -> str:
@@ -695,8 +749,26 @@ app.add_typer(review_app, name="review")
 # Register the knowledge graph subcommand group
 app.add_typer(kg_app, name="kg")
 
+# Register the version subcommand group
+app.add_typer(version_app, name="version")
+
 # Register the zip subcommand group
 app.add_typer(zip_app, name="zip")
+
+# Register the container subcommand group
+app.add_typer(container_app, name="container")
+
+# Register the python subcommand group
+app.add_typer(python_app, name="python")
+
+# Register the git subcommand group
+app.add_typer(git_app, name="git")
+
+# Register the history subcommand under git
+git_app.add_typer(history_app, name="history")
+
+# Register the provision subcommand under container
+container_app.add_typer(container_provision_app, name="provision")
 
 
 if __name__ == "__main__":

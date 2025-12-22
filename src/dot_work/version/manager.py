@@ -212,7 +212,7 @@ class VersionManager:
         else:
             commits = list(self.repo.iter_commits())
 
-        authors = set(c.author.name for c in commits)
+        authors = {c.author.name for c in commits}
 
         return {
             "commit_count": len(commits),
