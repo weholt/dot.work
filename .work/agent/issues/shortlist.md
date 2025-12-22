@@ -4,349 +4,324 @@ This file represents **explicit user intent**. Agent may only modify when explic
 
 ---
 
+## VERSION MODULE MIGRATION (Option 2)
+
+Complete migration of version-management utility as dot-work version module.
+
 ---
-id: "MIGRATE-021@c5d6e7"
-title: "Create zip module structure in dot-work"
-description: "Copy zipparu source files to src/dot_work/zip/ and refactor to dot-work patterns"
+id: "MIGRATE-041@e5f6a7"
+title: "Create version module structure in dot-work"
+description: "Create src/dot_work/version/ module from version-management project"
 created: 2024-12-21
-section: "zip"
-tags: [migration, zip, zipparu, module-structure]
+section: "version"
+tags: [migration, version-management, versioning, changelog]
 type: enhancement
 priority: medium
 status: proposed
 references:
-  - incoming/zipparu/zipparu/main.py
-  - src/dot_work/zip/
+   - incoming/crampus/version-management/
+   - src/dot_work/version/
 ---
 
 ### Problem
-The zipparu utility exists as a standalone package in `incoming/zipparu/`. To integrate it as a dot-work command, we need to create the module structure and refactor to follow dot-work patterns.
+The version-management project in `incoming/crampus/version-management/` provides date-based versioning (`YYYY.MM.build`) with automatic changelog generation from conventional commits. To integrate as `dot-work version`, we need to migrate the module.
 
-### Source Analysis
-From `incoming/zipparu/zipparu/main.py` (~60 lines):
-- `load_api_url()` - Load upload URL from `~/.zipparu` config
-- `should_include()` - Check if file matches gitignore patterns
-- `zip_folder()` - Create zip respecting .gitignore
-- `upload_zip()` - POST zip to API endpoint
-- `main()` - CLI entry point
+### Source Files to Migrate
+From `incoming/crampus/version-management/version_management/`:
+- `cli.py` - Typer CLI (init, freeze, show, history, commits, config)
+- `version_manager.py` - Core version management logic
+- `commit_parser.py` - Conventional commit parsing
+- `changelog_generator.py` - Changelog generation with Jinja2
+- `project_parser.py` - pyproject.toml parsing
 
 ### Target Structure
 ```
-src/dot_work/zip/
-├── __init__.py          # Package exports
-├── cli.py               # Typer CLI commands
-├── config.py            # Configuration (env vars, .work/zip.conf)
-├── zipper.py            # Core zip logic (zip_folder, should_include)
-└── uploader.py          # Upload logic (optional feature)
+src/dot_work/version/
+├── __init__.py           # Package exports
+├── cli.py                # Typer CLI commands
+├── manager.py            # Core version management
+├── commit_parser.py      # Conventional commit parsing
+├── changelog.py          # Changelog generation
+└── config.py             # Configuration
 ```
 
 ### Proposed Solution
-1. Create directory `src/dot_work/zip/`
-2. Extract `zip_folder()` and `should_include()` into `zipper.py`
-3. Extract `upload_zip()` into `uploader.py`
-4. Create `config.py` following dot-work patterns (env vars, dataclass)
-5. Create `cli.py` with Typer commands
-6. Add `__init__.py` with exports
+1. Create `src/dot_work/version/` directory
+2. Copy and adapt version_manager.py → manager.py
+3. Copy commit_parser.py (minimal changes)
+4. Copy changelog_generator.py → changelog.py
+5. Create config.py for dot-work patterns
+6. Adapt cli.py for dot-work registration
 
 ### Acceptance Criteria
-- [ ] Directory `src/dot_work/zip/` created
-- [ ] Core zip logic in `zipper.py` with type annotations
-- [ ] Upload logic in `uploader.py` (optional dependency)
-- [ ] Config using `DOT_WORK_ZIP_*` env vars
-- [ ] All functions have Google-style docstrings
-- [ ] No syntax errors in module files
+- [x] Directory `src/dot_work/version/` created
+- [x] All core modules present
+- [x] No syntax errors in module files
+- [x] `__init__.py` exports main classes
 
 ### Notes
-Keep the code simple - this is a ~60 line utility. Don't over-engineer.
+The original uses GitPython, Jinja2, rich, pydantic. These will be added as dependencies.
 
 ---
 
 ---
-id: "MIGRATE-022@d6e7f8"
-title: "Update zip module imports and config to use dot-work patterns"
-description: "Refactor zipparu to use dot-work conventions for imports, config, and error handling"
+id: "MIGRATE-042@f6a7b8"
+title: "Update version module imports and config"
+description: "Refactor imports from version_management.* to dot_work.version.*"
 created: 2024-12-21
-section: "zip"
-tags: [migration, zip, config, refactor]
+section: "version"
+tags: [migration, version, imports, refactor]
 type: refactor
 priority: medium
 status: proposed
 references:
-  - src/dot_work/zip/config.py
-  - src/dot_work/zip/zipper.py
+   - src/dot_work/version/
 ---
 
 ### Problem
-After creating the zip module, we need to ensure it follows dot-work patterns:
-- Config via environment variables and `.work/` files
-- Proper error handling with rich console output
-- Type annotations on all functions
-- pathlib.Path for all file operations
+After copying files, imports reference `version_management.*` which doesn't exist.
 
-### Current Config (zipparu)
-```python
-# Reads from ~/.zipparu file
-config_path = Path.home() / ".zipparu"
-config = dotenv_values(config_path)
-url = config.get("API_URL")
-```
+### Import Changes Required
 
-### New Config (dot-work)
-```python
-@dataclass
-class ZipConfig:
-    upload_url: str | None = None
-    
-    @classmethod
-    def from_env(cls) -> ZipConfig:
-        return cls(
-            upload_url=os.getenv("DOT_WORK_ZIP_UPLOAD_URL"),
-        )
-```
+| Old Import | New Import |
+|------------|------------|
+| `from version_management.version_manager import VersionManager` | `from dot_work.version.manager import VersionManager` |
+| `from version_management.commit_parser import CommitParser` | `from dot_work.version.commit_parser import CommitParser` |
+| `from version_management.changelog_generator import ChangelogGenerator` | `from dot_work.version.changelog import ChangelogGenerator` |
 
-### Changes Required
-
-| Current | New |
-|---------|-----|
-| `~/.zipparu` config file | `DOT_WORK_ZIP_UPLOAD_URL` env var |
-| `print()` for output | `rich.console` for styled output |
-| `sys.argv` parsing | Typer CLI with proper arguments |
-| No type hints | Full type annotations |
-| `os.walk()` | Continue using (pathlib doesn't have walk equivalent) |
+### Config Updates
+- Store version.json in `.work/version/version.json`
+- Config file: `.work/version/config.yaml` or env vars
+- Env var prefix: `DOT_WORK_VERSION_*`
 
 ### Proposed Solution
-1. Create `ZipConfig` dataclass in `config.py`
-2. Use `rich.console` for all output
-3. Replace `print()` with styled console messages
-4. Add type annotations to all functions
-5. Use `pathlib.Path` consistently
+1. Update all internal imports
+2. Create config.py with VersionConfig dataclass
+3. Update storage paths to use `.work/version/`
+4. Verify: `uv run python -c "from dot_work.version import VersionManager"`
 
 ### Acceptance Criteria
-- [ ] Config uses `DOT_WORK_ZIP_UPLOAD_URL` env var
-- [ ] All functions have type annotations
-- [ ] Rich console used for output
-- [ ] No bare `print()` statements
-- [ ] `uv run python -c "from dot_work.zip import zipper"` works
+- [ ] All imports updated to `dot_work.version.*`
+- [ ] Config uses `DOT_WORK_VERSION_*` env vars
+- [ ] Storage in `.work/version/`
+- [ ] Module imports work correctly
 
 ### Notes
-Depends on MIGRATE-021 (files must exist first).
+Depends on MIGRATE-041 (files must exist first).
 
 ---
 
 ---
-id: "MIGRATE-023@e7f8a9"
-title: "Register zip as subcommand in dot-work CLI"
-description: "Add zip commands as 'dot-work zip <folder>' with optional upload flag"
+id: "MIGRATE-043@a7b8c9"
+title: "Register version as subcommand in dot-work CLI"
+description: "Add version commands as 'dot-work version <cmd>' CLI structure"
 created: 2024-12-21
 section: "cli"
-tags: [migration, zip, cli, integration]
+tags: [migration, version, cli, integration]
 type: enhancement
 priority: medium
 status: proposed
 references:
-  - src/dot_work/cli.py
-  - src/dot_work/zip/cli.py
+   - src/dot_work/cli.py
+   - src/dot_work/version/cli.py
 ---
 
 ### Problem
-After the zip module exists in dot-work, it needs to be registered in the main CLI so users can run `dot-work zip <folder>`.
+The version module needs CLI integration as `dot-work version <command>`.
 
 ### CLI Design
-
 ```bash
-# Basic zip (creates <folder>.zip in current directory)
-dot-work zip <folder>
+# Initialize versioning
+dot-work version init
+dot-work version init --version 2025.12.001
 
-# Zip with custom output path
-dot-work zip <folder> --output my-archive.zip
+# Freeze new version with changelog
+dot-work version freeze
+dot-work version freeze --llm       # LLM-enhanced summary
+dot-work version freeze --dry-run   # Preview
+dot-work version freeze --push      # Push tags
 
-# Zip and upload to configured endpoint
-dot-work zip <folder> --upload
+# Show version info
+dot-work version show
 
-# Just upload an existing zip
-dot-work zip upload <file.zip>
+# Show version history
+dot-work version history
+dot-work version history --limit 20
+
+# Show commits since last version
+dot-work version commits
+dot-work version commits --since v1.0.0
+
+# Show/edit config
+dot-work version config --show
 ```
 
 ### CLI Structure
 ```python
-zip_app = typer.Typer(help="Zip folders respecting .gitignore.")
+version_app = typer.Typer(help="Date-based version management with changelog generation.")
 
-@zip_app.command("create")
-def zip_create(
-    folder: Path,
-    output: Path | None = None,
-    upload: bool = False,
-) -> None:
-    """Create a zip archive of a folder, respecting .gitignore."""
-    ...
+@version_app.command("init")
+def version_init(version: str | None = None) -> None:
+    """Initialize version management."""
 
-@zip_app.command("upload")
-def zip_upload(
-    file: Path,
-) -> None:
-    """Upload a zip file to the configured endpoint."""
-    ...
+@version_app.command("freeze")
+def version_freeze(llm: bool = False, dry_run: bool = False, push: bool = False) -> None:
+    """Freeze new version with changelog."""
 
-# Also make create the default command
-@zip_app.callback(invoke_without_command=True)
-def zip_default(ctx: typer.Context, folder: Path | None = None) -> None:
-    if folder and ctx.invoked_subcommand is None:
-        zip_create(folder)
+@version_app.command("show")
+def version_show() -> None:
+    """Show current version."""
+
+@version_app.command("history")
+def version_history(limit: int = 10) -> None:
+    """Show version history."""
+
+@version_app.command("commits")
+def version_commits(since: str | None = None) -> None:
+    """Show commits since last version."""
 ```
 
 ### Proposed Solution
-1. Create `zip_app = typer.Typer()` in `src/dot_work/zip/cli.py`
-2. Add `create` and `upload` subcommands
-3. Import and register: `from dot_work.zip.cli import zip_app`
-4. Register with main app: `app.add_typer(zip_app, name="zip")`
+1. Create `version_app = typer.Typer()` in version/cli.py
+2. Implement commands: init, freeze, show, history, commits, config
+3. Register: `app.add_typer(version_app, name="version")`
 
 ### Acceptance Criteria
-- [ ] `dot-work zip --help` shows zip commands
-- [ ] `dot-work zip <folder>` creates zip file
-- [ ] `dot-work zip <folder> --upload` creates and uploads
-- [ ] `dot-work zip upload <file>` uploads existing zip
-- [ ] `--output` flag allows custom output path
+- [ ] `dot-work version --help` shows commands
+- [ ] `dot-work version init` creates version.json
+- [ ] `dot-work version freeze` creates version + changelog
+- [ ] `dot-work version show` displays current version
+- [ ] `dot-work version history` shows git tag history
 
 ### Notes
-Depends on MIGRATE-022 (module must work first).
+Depends on MIGRATE-042 (imports must work first).
 
 ---
 
 ---
-id: "MIGRATE-024@f8a9b0"
-title: "Add zip dependencies to pyproject.toml"
-description: "Add gitignore_parser as core dependency, requests as optional for upload"
+id: "MIGRATE-044@b8c9d0"
+title: "Add version dependencies to pyproject.toml"
+description: "Add GitPython, Jinja2, pydantic for version management"
 created: 2024-12-21
 section: "dependencies"
-tags: [migration, zip, dependencies, pyproject]
+tags: [migration, version, dependencies, pyproject]
 type: enhancement
 priority: medium
 status: proposed
 references:
-  - pyproject.toml
+   - pyproject.toml
 ---
 
 ### Problem
-The zip module requires `gitignore_parser` for parsing .gitignore files and optionally `requests` for upload functionality.
+The version module requires external dependencies.
 
-### Dependencies to Add
-
+### Dependencies from version-management
 ```toml
-[project]
 dependencies = [
-    # Existing...
-    "gitignore-parser>=0.1.0",  # For zip command
+    "GitPython>=3.1.0",   # Git operations
+    "Jinja2>=3.1.0",      # Changelog templates
+    "pydantic>=2.0.0",    # Data models
+    "tomli>=2.0.0; python_version < '3.11'",  # pyproject.toml parsing
 ]
 
 [project.optional-dependencies]
-# Existing...
-zip-upload = ["requests>=2.28.0"]
+version-llm = ["httpx>=0.24.0"]  # For Ollama integration
 ```
 
-### Installation Options
-- `pip install dot-work` - Basic zip (no upload)
-- `pip install dot-work[zip-upload]` - Adds upload capability
-
 ### Proposed Solution
-1. Add `gitignore-parser>=0.1.0` to core dependencies
-2. Add `zip-upload` optional dependency group with `requests`
-3. Ensure zip module gracefully handles missing `requests`
-4. Run `uv sync` to verify dependency resolution
+1. Add core dependencies to pyproject.toml
+2. Add `version-llm` optional group for LLM features
+3. Run `uv sync` to install
+4. Verify imports work
 
 ### Acceptance Criteria
-- [ ] `gitignore-parser` in core dependencies
-- [ ] `requests` in optional `zip-upload` group
-- [ ] `dot-work zip <folder>` works without requests installed
-- [ ] `dot-work zip <folder> --upload` shows helpful error if requests missing
+- [ ] `GitPython`, `Jinja2`, `pydantic` in core deps
+- [ ] `httpx` in optional `version-llm` group
 - [ ] `uv sync` succeeds
+- [ ] Version module imports work
 
 ### Notes
-Consider: `requests` might already be a transitive dependency. Check before adding.
-Alternative: Could use `httpx` instead of `requests` for consistency with kg module.
+Some deps may already exist (rich, typer). GitPython may conflict with kg module - verify.
+
+Depends on MIGRATE-041 (module must exist).
 
 ---
 
 ---
-id: "MIGRATE-025@a9b0c1"
-title: "Add tests for zip module"
-description: "Create unit tests for zip functionality"
+id: "MIGRATE-045@c9d0e1"
+title: "Add tests for version module"
+description: "Create unit tests for version management functionality"
 created: 2024-12-21
 section: "tests"
-tags: [migration, zip, tests]
+tags: [migration, version, tests]
 type: test
 priority: medium
 status: proposed
 references:
-  - tests/unit/zip/
-  - src/dot_work/zip/
+   - tests/unit/version/
+   - src/dot_work/version/
 ---
 
 ### Problem
-The zip module needs tests to ensure correct behavior, especially for .gitignore handling.
+The version module needs tests to ensure correct behavior.
 
 ### Test Structure
 ```
-tests/unit/zip/
+tests/unit/version/
 ├── __init__.py
-├── conftest.py          # Fixtures (temp folders, mock gitignore)
-├── test_zipper.py       # Core zip logic tests
-├── test_config.py       # Config loading tests
+├── conftest.py          # Fixtures (mock git repo)
+├── test_manager.py      # VersionManager tests
+├── test_commit_parser.py # Commit parsing tests
+├── test_changelog.py    # Changelog generation tests
+├── test_config.py       # Config tests
 └── test_cli.py          # CLI command tests
 ```
 
 ### Key Test Cases
 
-**test_zipper.py:**
-- `test_zip_folder_creates_archive` - Basic zip creation
-- `test_zip_folder_excludes_gitignore_patterns` - .gitignore respected
-- `test_zip_folder_without_gitignore` - Works when no .gitignore
-- `test_zip_folder_empty_directory` - Handles empty folders
-- `test_zip_folder_nested_gitignore` - Nested .gitignore files (if supported)
-- `test_should_include_matches_pattern` - Pattern matching
+**test_manager.py:**
+- `test_init_creates_version_file`
+- `test_freeze_increments_build_number`
+- `test_freeze_resets_on_new_month`
+- `test_read_version_returns_current`
 
-**test_config.py:**
-- `test_config_from_env_with_url` - Loads URL from env
-- `test_config_from_env_without_url` - Handles missing URL gracefully
+**test_commit_parser.py:**
+- `test_parse_conventional_commit`
+- `test_parse_with_scope`
+- `test_parse_breaking_change`
+- `test_parse_non_conventional`
 
-**test_cli.py:**
-- `test_zip_create_command` - CLI creates zip
-- `test_zip_create_with_output` - Custom output path
-- `test_zip_upload_without_config` - Error when no upload URL
-
-### Proposed Solution
-1. Create `tests/unit/zip/` directory
-2. Add conftest.py with temp directory fixtures
-3. Write tests for each module
-4. Mock `requests.post` for upload tests
-5. Run: `uv run pytest tests/unit/zip/ -v`
+**test_changelog.py:**
+- `test_generate_changelog_groups_by_type`
+- `test_changelog_includes_authors`
 
 ### Acceptance Criteria
-- [ ] Tests in `tests/unit/zip/`
-- [ ] Coverage ≥ 80% for zip module
-- [ ] All tests pass: `uv run pytest tests/unit/zip/`
-- [ ] Upload tests use mocked requests
+- [ ] Tests in `tests/unit/version/`
+- [ ] Coverage ≥ 80% for version module
+- [ ] All tests pass
+- [ ] Mock git operations (no real repos)
 
 ### Notes
-Depends on MIGRATE-022 (module must be functional).
+Depends on MIGRATE-042 (module must be functional).
 
 ---
 
 ---
-id: "MIGRATE-026@b0c1d2"
-title: "Verify zip migration with full build"
-description: "Run complete build pipeline and verify all zip functionality"
+id: "MIGRATE-046@d0e1f2"
+title: "Verify version migration with full build"
+description: "Run complete build pipeline and verify version functionality"
 created: 2024-12-21
-section: "zip"
-tags: [migration, zip, verification, qa]
+section: "version"
+tags: [migration, version, verification, qa]
 type: test
 priority: medium
 status: proposed
 references:
-  - scripts/build.py
+   - scripts/build.py
 ---
 
 ### Problem
-After completing all migration steps, verify the zip migration works correctly.
+After completing all migration steps, verify the version migration works correctly.
 
 ### Verification Checklist
 
@@ -362,236 +337,35 @@ uv run python scripts/build.py
 
 **CLI Verification:**
 ```bash
-# Create test folder with files
-mkdir test_folder
-echo "hello" > test_folder/file.txt
-echo "*.log" > test_folder/.gitignore
-echo "ignored" > test_folder/debug.log
+# Initialize versioning
+dot-work version init
+# Should create .work/version/version.json
 
-# Test zip creation
-dot-work zip test_folder
-# Should create test_folder.zip without debug.log
+# Show current version
+dot-work version show
+# Should display current version
 
-# Verify contents
-unzip -l test_folder.zip
-# Should show file.txt, .gitignore but NOT debug.log
-
-# Test custom output
-dot-work zip test_folder --output custom.zip
-
-# Cleanup
-rm -rf test_folder test_folder.zip custom.zip
+# Show version history
+dot-work version history
+# Should show git tags
 ```
 
-**Upload Test (if configured):**
-```bash
-export DOT_WORK_ZIP_UPLOAD_URL="https://httpbin.org/post"
-dot-work zip test_folder --upload
-# Should create zip and POST to endpoint
-```
+**Functionality Test:**
+- [ ] Version format is YYYY.MM.build
+- [ ] Freeze increments build number
+- [ ] Freeze resets on new month
+- [ ] Changelog generated correctly
+- [ ] Conventional commits parsed
 
 ### Acceptance Criteria
 - [ ] `uv run python scripts/build.py` passes
-- [ ] `dot-work zip <folder>` works correctly
-- [ ] .gitignore patterns respected
-- [ ] Upload works with configured endpoint
+- [ ] `dot-work version init` works
+- [ ] `dot-work version show` displays version
 - [ ] No regressions in existing dot-work functionality
 
 ### Notes
 Final verification step. Only mark migration complete when all checks pass.
 
-Depends on: MIGRATE-021 through MIGRATE-025.
+Depends on: MIGRATE-041 through MIGRATE-045.
 
 ---
-
-
-id: "FEAT-009@a1b2c3"
-title: "Enforce canonical prompt file structure with multi-environment frontmatter"
-description: "Require all prompt files to use a single canonical file with meta and environments blocks"
-created: 2025-12-21
-section: "prompts"
-tags: [prompts, frontmatter, environments, specification]
-type: enhancement
-priority: medium
-status: completed
-references:
-	- src/dot_work/installer.py
-	- docs/Unified Multi-Environment Prompt Specification.md
----
-
-### Problem
-Prompt files are currently duplicated or hand-edited for each environment (Copilot, Claude, OpenCode, etc.), leading to drift and maintenance burden. There is no enforced structure for canonical prompt files.
-
-### Affected Files
-- `src/dot_work/installer.py` (prompt parsing logic)
-- `docs/Unified Multi-Environment Prompt Specification.md` (specification)
-
-### Importance
-A single canonical prompt file per agent, with environment-specific frontmatter, will eliminate drift and ensure deterministic prompt installation across all supported tools.
-
-### Proposed Solution
-1. Define and document the canonical prompt file structure:
-	 - YAML frontmatter with `meta` and `environments` blocks
-	 - Immutable prompt body
-2. Update prompt authoring guidelines and validation logic to require this structure
-3. Add validation to the installer to reject non-conforming prompt files
-
-### Acceptance Criteria
-- [ ] All prompt files use the canonical structure
-- [ ] Validation rejects non-conforming files
-- [ ] Documentation updated for prompt authors
-- [ ] No prompt drift across environments
-
-### Notes
-See the Unified Multi-Environment Prompt Specification for details.
-
----
-id: "FEAT-010@b2c3d4"
-title: "Implement multi-environment frontmatter parsing and selection"
-description: "Parse environments block and select correct environment at install time"
-created: 2025-12-21
-section: "installer"
-tags: [prompts, installer, environments, parsing]
-type: enhancement
-priority: medium
-status: completed
-references:
-	- src/dot_work/installer.py
----
-
-### Problem
-The installer currently does not support selecting environment-specific frontmatter from a canonical prompt file. It cannot parse or extract the correct environment block.
-
-### Affected Files
-- `src/dot_work/installer.py` (prompt parsing and install logic)
-
-### Importance
-Correct parsing and selection of the environment block is required for deterministic, environment-specific prompt installation.
-
-### Proposed Solution
-1. Parse the `environments` block from the prompt file frontmatter
-2. Select the correct environment based on the install target
-3. Extract only the selected environment's keys (excluding `target`)
-4. Pass the correct frontmatter and prompt body to the output file
-
-### Acceptance Criteria
-- [ ] Installer parses environments block
-- [ ] Correct environment is selected at install time
-- [ ] Only selected environment's keys are included in output frontmatter
-- [ ] Hard error if environment is missing or ambiguous
-
-### Notes
-See the Minimal Installer Logic in the specification for reference.
-
----
-id: "FEAT-011@c3d4e5"
-title: "Generate deterministic environment-specific prompt files"
-description: "Emit prompt files with only the selected environment's frontmatter and the canonical prompt body"
-created: 2025-12-21
-section: "installer"
-tags: [prompts, installer, deterministic, output]
-type: enhancement
-priority: medium
-status: completed
-references:
-	- src/dot_work/installer.py
----
-
-### Problem
-Generated prompt files must be deterministic: same input + same target = identical output. Current logic may not guarantee this.
-
-### Affected Files
-- `src/dot_work/installer.py` (prompt file generation)
-
-### Importance
-Deterministic output is required for reproducibility, safe cleanup, and reliable prompt installation.
-
-### Proposed Solution
-1. Ensure output file contains only the selected environment's frontmatter (excluding `target`)
-2. Write the prompt body verbatim
-3. Output path and filename must match the selected environment's `target`
-4. Add tests to verify determinism
-
-### Acceptance Criteria
-- [ ] Output is deterministic for same input/target
-- [ ] Output file contains only selected environment's frontmatter and prompt body
-- [ ] Tests verify reproducibility
-
-### Notes
-Generated files are disposable and never edited by hand.
-
----
-id: "FEAT-012@d4e5f6"
-title: "Installer hard errors for invalid or missing environments"
-description: "Installer must fail with a clear error if the target environment is missing or misconfigured"
-created: 2025-12-21
-section: "installer"
-tags: [prompts, installer, error-handling, environments]
-type: enhancement
-priority: medium
-status: completed
-references:
-	- src/dot_work/installer.py
----
-
-### Problem
-If the target environment does not exist, or if `target.path` or `target.filename` is missing, the installer should fail with a clear error. Current behavior may be silent or ambiguous.
-
-### Affected Files
-- `src/dot_work/installer.py` (error handling)
-
-### Importance
-Failing fast and clearly prevents prompt drift and misinstallation.
-
-### Proposed Solution
-1. Add hard error if the selected environment does not exist
-2. Add hard error if `target.path` or `target.filename` is missing
-3. Add error if more than one environment is selected
-
-### Acceptance Criteria
-- [ ] Installer fails with clear error for missing/invalid environment
-- [ ] Error messages are actionable
-- [ ] No silent failures
-
-### Notes
-See the Operational Guarantees section of the specification.
-
----
-id: "DOCS-003@e5f6a7"
-title: "Document unified prompt authoring and migration"
-description: "Provide clear documentation and migration guide for prompt authors"
-created: 2025-12-21
-section: "docs"
-tags: [prompts, documentation, migration, authors]
-type: docs
-priority: medium
-status: completed
-references:
-	- docs/Unified Multi-Environment Prompt Specification.md
-	- docs/prompt-authoring.md
----
-
-### Problem
-Prompt authors need clear guidance on the new canonical prompt file structure, environment blocks, and migration from legacy prompt files.
-
-### Affected Files
-- `docs/Unified Multi-Environment Prompt Specification.md`
-- `docs/prompt-authoring.md`
-
-### Importance
-Documentation is essential for adoption and correct usage of the new prompt system.
-
-### Proposed Solution
-1. Write documentation for the canonical prompt file structure
-2. Provide migration steps for existing prompt files
-3. Include examples for each supported environment
-4. Add FAQ and troubleshooting section
-
-### Acceptance Criteria
-- [ ] Documentation published and accessible
-- [ ] Migration steps are clear and actionable
-- [ ] Examples for all supported environments
-- [ ] FAQ addresses common issues
-
-### Notes
-Coordinate with installer changes to ensure docs match implementation.

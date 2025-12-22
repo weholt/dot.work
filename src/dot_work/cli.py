@@ -10,6 +10,7 @@ from rich.table import Table
 from dot_work.environments import ENVIRONMENTS
 from dot_work.installer import get_prompts_dir, initialize_work_directory, install_prompts
 from dot_work.knowledge_graph.cli import app as kg_app
+from dot_work.zip.cli import app as zip_app
 
 app = typer.Typer(
     name="dot-work",
@@ -693,6 +694,9 @@ app.add_typer(review_app, name="review")
 
 # Register the knowledge graph subcommand group
 app.add_typer(kg_app, name="kg")
+
+# Register the zip subcommand group
+app.add_typer(zip_app, name="zip")
 
 
 if __name__ == "__main__":
