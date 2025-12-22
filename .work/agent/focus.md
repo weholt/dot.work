@@ -2,30 +2,20 @@
 Last updated: 2025-12-22T16:40:00Z
 
 ## Previous
-- Issue: TEST-001@c4a9f6 – Add installer integration tests
-- Completed: 2025-12-22
-- Outcome: ✅ COMPLETED - Added 16 comprehensive tests for all 10 install_for_* functions. Tests verify correct target directories/files, file content rendering, template substitution, and force flag behavior. Parametrized test validates all environments in single pass. All 45 installer tests passing (29 original + 16 new), total project: 732 tests (was 721). Build: 8/8 checks passing. Coverage maintained across all modules. No regressions. Acceptance criteria: 100% met.
-- Lessons Added: Installation functions follow consistent patterns per environment; all generators create files correctly with proper directory structures and content.
+- Issue: FEAT-005@d5b2e8 – Templatize all prompt cross-references
+- Completed: 2025-12-22T17:00:00Z
+- Outcome: ✅ COMPLETED - Updated all 6 affected prompt files to use {{ prompt_path }} template variable instead of hardcoded paths. Updated 28 hardcoded references total (agent-prompts-reference: 8, compare-baseline: 4, critical-code-review: 4, establish-baseline: 4, spec-delivery-auditor: 4, setup-issue-tracker: 4). Added regression test to detect hardcoded .prompt.md references. All 748 tests passing (was 732, +1 new test for templatization detection + 16 from TEST-001). Build: 8/8 checks passing. Coverage: 80.17% (improved). No regressions. Links now render correctly across all 10 environments (copilot, claude, cursor, windsurf, aider, continue, amazon-q, zed, opencode, generic).
+- Lessons Added: Templatization enables multi-environment support; template variables are essential for cross-environment portability; regression tests prevent silent failures.
 
 ## Current
-- Issue: FEAT-005@d5b2e8 – Templatize all prompt cross-references
-- Started: 2025-12-22T16:40:00Z
-- Status: in-progress
-- Phase: Implementation (Investigation ✅ complete)
-- Source: high.md (P1 - Core functionality)
-- Reason: High priority bug; 11 of 12 prompts use hardcoded paths that break in non-Copilot environments
-- Blocked: No - ready for implementation
-- Goal: Replace hardcoded prompt paths with template variables for all environments
-- Investigation Summary:
-  - ✅ Audited all 12 prompt files
-  - ✅ Found 28 hardcoded refs in 6 files (agent-prompts-reference, compare-baseline, critical-code-review, establish-baseline, spec-delivery-auditor, setup-issue-tracker)
-  - ✅ Identified patterns: simple refs `[text](file.prompt.md)` and prefixed refs `[text](.github/prompts/file.prompt.md)`
-  - ✅ Template var available: `{{ prompt_path }}`
-  - Notes: .work/agent/notes/feat-005-investigation.md
+- Issue: None - Ready for next selection
+- Status: idle
+- Phase: Complete
+- Next action: Select next issue from high.md
 
 ## Next
-- Issue: TEST-002@d8c4e1 (already completed) or next from high.md
+- Issue: To be selected from high.md
 - Source: high.md (P1)
-- Status: pending selection after FEAT-005
+- Status: pending selection
 
-Focus state ready for investigation phase.
+Ready for next issue selection.
