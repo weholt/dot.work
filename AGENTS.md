@@ -1,7 +1,7 @@
 # AI Agent Guidelines for dot-work
 
 **MANDATORY: Use `uv run` for ALL Python commands** - NEVER run Python directly.
-
+**MANDATORY: Never use rm command without explicit user confirmation**
 ## Issue Tracker Workflow
 
 This project uses a file-based issue tracker in `.work/`.
