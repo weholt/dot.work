@@ -1,5 +1,5 @@
 # Agent Focus
-Last updated: 2025-12-21T23:15:00Z
+Last updated: 2025-12-22T16:10:00Z
 
 ## Previous
 - Issue: DOCS-003@e5f6a7 – Document unified prompt authoring and migration
@@ -8,17 +8,18 @@ Last updated: 2025-12-21T23:15:00Z
 - Lessons Added: Canonical prompt format is production-ready; documentation covers all error cases from FEAT-012 error handling.
 
 ## Current
-- None - All shortlist items completed and moved to history.md
-- Status: Ready for new work selection
-- Baseline: Current (as of 2025-12-21)
+- Issue: TEST-001@c4a9f6 – Add installer integration tests
+- Started: 2025-12-22T16:10:00Z
+- Status: in-progress
+- Phase: Investigation
+- Source: high.md (P1 - Core functionality)
+- Reason: Selected as first high-priority issue; installer has 41% coverage, install_for_* functions lack tests
+- Goal: Improve installer.py coverage from 41% to ≥80%, test all 10 install_for_* functions
 
 ## Next
-- None yet - Awaiting user prioritization or selection from critical.md/high.md/medium.md
-- Previous shortlist items now in history.md:
-  - FEAT-009@a1b2c3 ✓ Enforce canonical prompt file structure
-  - FEAT-010@b2c3d4 ✓ Multi-environment frontmatter parsing
-  - FEAT-011@c3d4e5 ✓ Deterministic environment-specific files
-  - FEAT-012@d4e5f6 ✓ Hard errors for invalid/missing environments
-  - DOCS-003@e5f6a7 ✓ Unified prompt authoring documentation
+- Issue: FEAT-005@d5b2e8 – Templatize all prompt cross-references
+- Source: high.md (P1)
+- Reason: High priority; 11 of 12 prompts use hardcoded paths that break in non-Copilot environments
+- Status: pending
 
-Session complete. Ready for: (1) code review of changes, (2) merge to main, or (3) new work selection.
+Focus state ready for investigation phase.

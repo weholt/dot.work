@@ -10,7 +10,16 @@ from dot_work.installer import (
     create_jinja_env,
     detect_project_context,
     initialize_work_directory,
+    install_for_aider,
+    install_for_amazon_q,
+    install_for_claude,
+    install_for_continue,
     install_for_copilot,
+    install_for_cursor,
+    install_for_generic,
+    install_for_opencode,
+    install_for_windsurf,
+    install_for_zed,
     install_prompts,
     render_prompt,
     should_write_file,
@@ -89,9 +98,7 @@ class TestInstallPrompts:
         install_prompts("copilot", temp_project_dir, sample_prompts_dir, console)
 
         # Install again with force
-        install_prompts(
-            "copilot", temp_project_dir, sample_prompts_dir, console, force=True
-        )
+        install_prompts("copilot", temp_project_dir, sample_prompts_dir, console, force=True)
 
         # Files should exist and be overwritten
         dest_dir = temp_project_dir / ".github" / "prompts"
@@ -104,9 +111,7 @@ class TestInstallPrompts:
         console = MagicMock()
 
         with pytest.raises(ValueError, match="Unknown environment"):
-            install_prompts(
-                "nonexistent", temp_project_dir, sample_prompts_dir, console
-            )
+            install_prompts("nonexistent", temp_project_dir, sample_prompts_dir, console)
 
 
 class TestInstallForCopilotWithForce:
@@ -130,9 +135,7 @@ class TestInstallForCopilotWithForce:
         # File should remain unchanged
         assert existing_file.read_text(encoding="utf-8") == "original content"
 
-    def test_overwrites_with_force(
-        self, temp_project_dir: Path, sample_prompts_dir: Path
-    ) -> None:
+    def test_overwrites_with_force(self, temp_project_dir: Path, sample_prompts_dir: Path) -> None:
         """Test that force=True overwrites existing files."""
         console = MagicMock()
 
@@ -214,9 +217,7 @@ class TestDetectProjectContext:
     def test_detects_pytest(self, tmp_path: Path) -> None:
         """Test detection of pytest from pyproject.toml."""
         pyproject = tmp_path / "pyproject.toml"
-        pyproject.write_text(
-            '[project]\nname = "test"\n[tool.pytest]\n', encoding="utf-8"
-        )
+        pyproject.write_text('[project]\nname = "test"\n[tool.pytest]\n', encoding="utf-8")
 
         result = detect_project_context(tmp_path)
 
@@ -225,9 +226,7 @@ class TestDetectProjectContext:
     def test_detects_typer_framework(self, tmp_path: Path) -> None:
         """Test detection of Typer framework from pyproject.toml."""
         pyproject = tmp_path / "pyproject.toml"
-        pyproject.write_text(
-            '[project]\ndependencies = ["typer"]\n', encoding="utf-8"
-        )
+        pyproject.write_text('[project]\ndependencies = ["typer"]\n', encoding="utf-8")
 
         result = detect_project_context(tmp_path)
 
@@ -327,9 +326,7 @@ class TestInitializeWorkDirectory:
         initialize_work_directory(tmp_path, console, force=True)
 
         assert (tmp_path / ".work" / "agent" / "notes" / ".gitkeep").exists()
-        assert (
-            tmp_path / ".work" / "agent" / "issues" / "references" / ".gitkeep"
-        ).exists()
+        assert (tmp_path / ".work" / "agent" / "issues" / "references" / ".gitkeep").exists()
 
     def test_skips_existing_files_without_force(self, tmp_path: Path) -> None:
         """Test that existing files are skipped when force=False."""
@@ -377,7 +374,249 @@ class TestInitializeWorkDirectory:
 
         initialize_work_directory(tmp_path, console, force=True)
 
-        memory_content = (tmp_path / ".work" / "agent" / "memory.md").read_text(
+        memory_content = (tmp_path / ".work" / "agent" / "memory.md").read_text(encoding="utf-8")
+        assert "Python" in memory_content
+
+
+class TestInstallForEnvironments:
+    """Tests for install_for_* functions for each environment."""
+
+    def test_install_for_copilot_creates_correct_directory(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that copilot installer creates .github/prompts directory."""
+        console = MagicMock()
+
+        install_for_copilot(temp_project_dir, sample_prompts_dir, console)
+
+        assert (temp_project_dir / ".github" / "prompts").is_dir()
+
+    def test_install_for_copilot_creates_prompt_files(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that copilot installer creates .prompt.md files."""
+        console = MagicMock()
+
+        install_for_copilot(temp_project_dir, sample_prompts_dir, console)
+
+        prompts_dir = temp_project_dir / ".github" / "prompts"
+        prompt_files = list(prompts_dir.glob("*.prompt.md"))
+        assert len(prompt_files) > 0
+        assert (prompts_dir / "test.prompt.md").exists()
+
+    def test_install_for_claude_creates_claude_md(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that claude installer creates CLAUDE.md file."""
+        console = MagicMock()
+
+        install_for_claude(temp_project_dir, sample_prompts_dir, console)
+
+        claude_md = temp_project_dir / "CLAUDE.md"
+        assert claude_md.exists()
+        content = claude_md.read_text(encoding="utf-8")
+        assert "Claude Code Instructions" in content
+        assert "##" in content  # Has sections
+
+    def test_install_for_cursor_creates_rules_directory(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that cursor installer creates .cursor/rules directory."""
+        console = MagicMock()
+
+        install_for_cursor(temp_project_dir, sample_prompts_dir, console)
+
+        assert (temp_project_dir / ".cursor" / "rules").is_dir()
+
+    def test_install_for_cursor_creates_mdc_files(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that cursor installer creates .mdc files."""
+        console = MagicMock()
+
+        install_for_cursor(temp_project_dir, sample_prompts_dir, console)
+
+        rules_dir = temp_project_dir / ".cursor" / "rules"
+        mdc_files = list(rules_dir.glob("*.mdc"))
+        assert len(mdc_files) > 0
+        # Check that at least one .mdc file was created from source prompts
+        assert any(f.name.endswith(".mdc") for f in mdc_files)
+
+    def test_install_for_windsurf_creates_rules_directory(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that windsurf installer creates .windsurf/rules directory."""
+        console = MagicMock()
+
+        install_for_windsurf(temp_project_dir, sample_prompts_dir, console)
+
+        assert (temp_project_dir / ".windsurf" / "rules").is_dir()
+
+    def test_install_for_aider_creates_conventions_file(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that aider installer creates CONVENTIONS.md file."""
+        console = MagicMock()
+
+        install_for_aider(temp_project_dir, sample_prompts_dir, console)
+
+        conventions_file = temp_project_dir / "CONVENTIONS.md"
+        assert conventions_file.exists()
+        content = conventions_file.read_text(encoding="utf-8")
+        assert "Project Conventions" in content
+        assert "##" in content  # Has sections
+
+    def test_install_for_continue_creates_config_directory(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that continue installer creates .continue directory."""
+        console = MagicMock()
+
+        install_for_continue(temp_project_dir, sample_prompts_dir, console)
+
+        assert (temp_project_dir / ".continue").is_dir()
+
+    def test_install_for_amazon_q_creates_rules_directory(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that amazon_q installer creates .amazonq directory."""
+        console = MagicMock()
+
+        install_for_amazon_q(temp_project_dir, sample_prompts_dir, console)
+
+        assert (temp_project_dir / ".amazonq").is_dir()
+
+    def test_install_for_zed_creates_prompts_directory(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that zed installer creates .zed/prompts directory."""
+        console = MagicMock()
+
+        install_for_zed(temp_project_dir, sample_prompts_dir, console)
+
+        zed_prompts = temp_project_dir / ".zed" / "prompts"
+        assert zed_prompts.is_dir()
+        prompt_files = list(zed_prompts.glob("*.md"))
+        assert len(prompt_files) > 0
+
+    def test_install_for_opencode_creates_prompts_directory(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that opencode installer creates .opencode/prompts directory."""
+        console = MagicMock()
+
+        install_for_opencode(temp_project_dir, sample_prompts_dir, console)
+
+        assert (temp_project_dir / ".opencode" / "prompts").is_dir()
+
+    def test_install_for_generic_creates_prompts_directory(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that generic installer creates prompts directory."""
+        console = MagicMock()
+
+        install_for_generic(temp_project_dir, sample_prompts_dir, console)
+
+        prompts_dir = temp_project_dir / "prompts"
+        assert prompts_dir.is_dir()
+        prompt_files = list(prompts_dir.glob("*.md"))
+        assert len(prompt_files) > 0
+
+    def test_install_respects_force_flag_false(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that installer respects force=False when file exists."""
+        console = MagicMock()
+        console.input.return_value = "n"  # User declines
+
+        # Install once
+        install_for_copilot(temp_project_dir, sample_prompts_dir, console, force=False)
+        original_content = (temp_project_dir / ".github" / "prompts" / "test.prompt.md").read_text(
             encoding="utf-8"
         )
-        assert "Python" in memory_content
+
+        # Install again with force=False
+        console.input.reset_mock()
+        console.input.return_value = "n"
+        install_for_copilot(temp_project_dir, sample_prompts_dir, console, force=False)
+
+        # Content should be unchanged
+        current_content = (temp_project_dir / ".github" / "prompts" / "test.prompt.md").read_text(
+            encoding="utf-8"
+        )
+        assert original_content == current_content
+
+    def test_install_respects_force_flag_true(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that installer overwrites with force=True."""
+        console = MagicMock()
+
+        # Install once
+        install_for_copilot(temp_project_dir, sample_prompts_dir, console, force=False)
+        first_content = (temp_project_dir / ".github" / "prompts" / "test.prompt.md").read_text(
+            encoding="utf-8"
+        )
+
+        # Modify the file
+        prompt_file = temp_project_dir / ".github" / "prompts" / "test.prompt.md"
+        prompt_file.write_text("modified content", encoding="utf-8")
+
+        # Install again with force=True
+        console.reset_mock()
+        install_for_copilot(temp_project_dir, sample_prompts_dir, console, force=True)
+
+        # Content should be restored to original
+        current_content = prompt_file.read_text(encoding="utf-8")
+        assert current_content == first_content
+        assert current_content != "modified content"
+
+    def test_all_environments_create_target_directories(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that all environment installers create expected directories."""
+        console = MagicMock()
+
+        # Test all 10 install_for_* functions with corrected paths
+        installers = [
+            (install_for_copilot, ".github/prompts", "dir"),
+            (install_for_claude, "CLAUDE.md", "file"),
+            (install_for_cursor, ".cursor/rules", "dir"),
+            (install_for_windsurf, ".windsurf/rules", "dir"),
+            (install_for_aider, "CONVENTIONS.md", "file"),
+            (install_for_continue, ".continue/prompts", "dir"),
+            (install_for_amazon_q, ".amazonq", "dir"),
+            (install_for_zed, ".zed/prompts", "dir"),
+            (install_for_opencode, ".opencode/prompts", "dir"),
+            (install_for_generic, "prompts", "dir"),
+        ]
+
+        for installer, expected_path_str, path_type in installers:
+            # Create fresh project dir for each test
+            test_dir = temp_project_dir / installer.__name__.replace("install_for_", "")
+            test_dir.mkdir(parents=True, exist_ok=True)
+
+            installer(test_dir, sample_prompts_dir, console)
+
+            expected_path = test_dir / expected_path_str
+            if path_type == "dir":
+                assert expected_path.is_dir(), (
+                    f"{expected_path_str} not created as directory by {installer.__name__}"
+                )
+            elif path_type == "file":
+                assert expected_path.exists(), (
+                    f"{expected_path_str} not created by {installer.__name__}"
+                )
+
+    def test_files_contain_content(self, temp_project_dir: Path, sample_prompts_dir: Path) -> None:
+        """Test that installed files contain rendered content (not empty)."""
+        console = MagicMock()
+
+        install_for_copilot(temp_project_dir, sample_prompts_dir, console)
+
+        prompt_file = temp_project_dir / ".github" / "prompts" / "test.prompt.md"
+        content = prompt_file.read_text(encoding="utf-8")
+
+        assert len(content) > 0
+        assert content != ""  # Not empty
+        assert "test" in prompt_file.name  # Filename matches source
