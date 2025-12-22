@@ -1,10 +1,8 @@
 """Tag generation for git commits based on analysis."""
 
-import re
-from typing import List, Set
 from collections import Counter
 
-from dot_work.git.models import ChangeAnalysis, FileCategory, ChangeType
+from dot_work.git.models import ChangeAnalysis, ChangeType, FileCategory
 
 
 class TagGenerator:
@@ -126,7 +124,7 @@ class TagGenerator:
             'critical': ['breaking', 'security', 'critical', 'emergency']
         }
 
-    def generate_tags(self, analysis: ChangeAnalysis) -> List[str]:
+    def generate_tags(self, analysis: ChangeAnalysis) -> list[str]:
         """
         Generate tags for a commit analysis.
 
@@ -174,7 +172,7 @@ class TagGenerator:
 
         return list(final_tags)
 
-    def _extract_message_tags(self, message: str) -> Set[str]:
+    def _extract_message_tags(self, message: str) -> set[str]:
         """Extract tags from commit message."""
         tags = set()
         message_lower = message.lower()
@@ -187,7 +185,7 @@ class TagGenerator:
 
         return tags
 
-    def _extract_file_tags(self, files_changed) -> Set[str]:
+    def _extract_file_tags(self, files_changed) -> set[str]:
         """Extract tags from changed files."""
         tags = set()
 
@@ -217,7 +215,7 @@ class TagGenerator:
 
         return tags
 
-    def _extract_impact_tags(self, impact_areas: List[str]) -> Set[str]:
+    def _extract_impact_tags(self, impact_areas: list[str]) -> set[str]:
         """Extract tags from impact areas."""
         tags = set()
 
@@ -240,7 +238,7 @@ class TagGenerator:
 
         return tags
 
-    def _extract_complexity_tags(self, complexity_score: float) -> Set[str]:
+    def _extract_complexity_tags(self, complexity_score: float) -> set[str]:
         """Extract tags based on complexity score."""
         tags = set()
 
@@ -257,7 +255,7 @@ class TagGenerator:
 
         return tags
 
-    def _extract_emoji_tags(self, message: str) -> Set[str]:
+    def _extract_emoji_tags(self, message: str) -> set[str]:
         """Extract semantic tags from emoji in commit message."""
         emoji_to_tag = {
             '🚀': 'feature',      # Rocket - new feature
@@ -306,7 +304,7 @@ class TagGenerator:
 
         return tags
 
-    def _filter_tags(self, tags: Set[str]) -> Set[str]:
+    def _filter_tags(self, tags: set[str]) -> set[str]:
         """Filter and prioritize tags."""
         filtered = set()
 
@@ -360,7 +358,7 @@ class TagGenerator:
 
         return filtered
 
-    def generate_tag_suggestions(self, message: str, files_changed=None, complexity_score=0.0) -> List[str]:
+    def generate_tag_suggestions(self, message: str, files_changed=None, complexity_score=0.0) -> list[str]:
         """
         Generate tag suggestions for a commit message.
 
@@ -373,7 +371,8 @@ class TagGenerator:
             List of suggested tags
         """
         from datetime import datetime
-        from dot_work.git.models import FileChange, ChangeType, FileCategory
+
+        from dot_work.git.models import ChangeType, FileChange
 
         # Mock file analysis if not provided
         if files_changed is None:
@@ -432,7 +431,7 @@ class TagGenerator:
         else:
             return FileCategory.UNKNOWN
 
-    def get_tag_statistics(self, commits: List[ChangeAnalysis]) -> dict:
+    def get_tag_statistics(self, commits: list[ChangeAnalysis]) -> dict:
         """
         Generate statistics about tag usage.
 
@@ -461,7 +460,7 @@ class TagGenerator:
 
         return stats
 
-    def suggest_related_tags(self, existing_tags: List[str]) -> List[str]:
+    def suggest_related_tags(self, existing_tags: list[str]) -> list[str]:
         """
         Suggest related tags based on existing tags.
 

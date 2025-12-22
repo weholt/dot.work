@@ -1,14 +1,14 @@
 """Caching system for git analysis results."""
 
-import json
 import hashlib
+import json
+import logging
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Optional, List, TypeVar, Type
-import logging
+from typing import Any, TypeVar
 
-from dot_work.git.models import CacheEntry, AnalysisConfig, ChangeAnalysis
+from dot_work.git.models import AnalysisConfig, CacheEntry, ChangeAnalysis
 
 T = TypeVar('T')
 
@@ -16,7 +16,7 @@ T = TypeVar('T')
 class AnalysisCache:
     """Cache system for storing and retrieving git analysis results."""
 
-    def __init__(self, cache_dir: Optional[Path] = None):
+    def __init__(self, cache_dir: Path | None = None):
         self.cache_dir = cache_dir or Path.cwd() / ".git-analysis" / "cache"
         self.logger = logging.getLogger(__name__)
         self._ensure_cache_dir()
@@ -34,7 +34,7 @@ class AnalysisCache:
         key_hash = hashlib.md5(key.encode()).hexdigest()
         return self.cache_dir / f"{key_hash}.json"
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """
         Retrieve cached data by key.
 
@@ -50,7 +50,7 @@ class AnalysisCache:
             if not cache_path.exists():
                 return None
 
-            with open(cache_path, 'r', encoding='utf-8') as f:
+            with open(cache_path, encoding='utf-8') as f:
                 cache_data = json.load(f)
 
             # Create cache entry
@@ -214,7 +214,7 @@ class AnalysisCache:
 
             for cache_file in self.cache_dir.glob("*.json"):
                 try:
-                    with open(cache_file, 'r', encoding='utf-8') as f:
+                    with open(cache_file, encoding='utf-8') as f:
                         cache_data = json.load(f)
 
                     timestamp = datetime.fromisoformat(cache_data['timestamp'])
@@ -238,7 +238,7 @@ class AnalysisCache:
             self.logger.error(f"Failed to cleanup expired cache: {e}")
             return 0
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """
         Get cache statistics.
 
@@ -262,7 +262,7 @@ class AnalysisCache:
 
             for cache_file in cache_files:
                 try:
-                    with open(cache_file, 'r', encoding='utf-8') as f:
+                    with open(cache_file, encoding='utf-8') as f:
                         cache_data = json.load(f)
 
                     timestamp = datetime.fromisoformat(cache_data['timestamp'])
@@ -338,7 +338,7 @@ class CacheManager:
         """Get cache for file analyses."""
         return self.get_cache('files')
 
-    def cleanup_all(self) -> Dict[str, int]:
+    def cleanup_all(self) -> dict[str, int]:
         """
         Clean up expired entries in all caches.
 
@@ -379,7 +379,7 @@ class CacheManager:
 
         return success
 
-    def get_all_stats(self) -> Dict[str, Any]:
+    def get_all_stats(self) -> dict[str, Any]:
         """
         Get statistics for all caches.
 

@@ -2,34 +2,31 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Set
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import re
 
 import git as gitpython
 from tqdm import tqdm
 
 from dot_work.git.models import (
-    ChangeAnalysis,
-    ComparisonResult,
-    ComparisonDiff,
-    ComparisonMetadata,
-    ContributorStats,
-    FileChange,
-    FileCategory,
-    ChangeType,
-    CommitInfo,
     AnalysisConfig,
     AnalysisProgress,
+    ChangeAnalysis,
+    ChangeType,
+    CommitInfo,
+    ComparisonDiff,
+    ComparisonMetadata,
+    ComparisonResult,
+    ContributorStats,
+    FileCategory,
+    FileChange,
 )
-from .complexity import ComplexityCalculator
-from .llm_summarizer import LLMSummarizer
+
 from .cache import AnalysisCache
+from .complexity import ComplexityCalculator
 from .file_analyzer import FileAnalyzer
+from .llm_summarizer import LLMSummarizer
 from .tag_generator import TagGenerator
 
 
@@ -289,7 +286,7 @@ class GitAnalysisService:
             migration_notes=migration_notes
         )
 
-    def _get_commits_between_refs(self, from_ref: str, to_ref: str) -> List[git.Commit]:
+    def _get_commits_between_refs(self, from_ref: str, to_ref: str) -> list[git.Commit]:
         """Get commits between two git references."""
         try:
             # Resolve references
@@ -308,7 +305,7 @@ class GitAnalysisService:
         except Exception as e:
             raise ValueError(f"Failed to get commits between {from_ref} and {to_ref}: {e}")
 
-    def _analyze_commit_files(self, commit: git.Commit) -> List[FileChange]:
+    def _analyze_commit_files(self, commit: git.Commit) -> list[FileChange]:
         """Analyze file changes in a commit."""
         files_changed = []
 
@@ -379,7 +376,7 @@ class GitAnalysisService:
         )
 
     def _calculate_comparison_metadata(
-        self, from_ref: str, to_ref: str, commits: List[ChangeAnalysis]
+        self, from_ref: str, to_ref: str, commits: list[ChangeAnalysis]
     ) -> ComparisonMetadata:
         """Calculate metadata for the comparison."""
         if not commits:
@@ -422,8 +419,8 @@ class GitAnalysisService:
         )
 
     def _calculate_contributor_stats(
-        self, commits: List[ChangeAnalysis]
-    ) -> Dict[str, ContributorStats]:
+        self, commits: list[ChangeAnalysis]
+    ) -> dict[str, ContributorStats]:
         """Calculate statistics for each contributor."""
         contributors = {}
 
@@ -457,7 +454,7 @@ class GitAnalysisService:
 
         return contributors
 
-    def _generate_aggregate_summary(self, commits: List[ChangeAnalysis]) -> str:
+    def _generate_aggregate_summary(self, commits: list[ChangeAnalysis]) -> str:
         """Generate aggregate summary for all commits."""
         if not commits:
             return "No commits to summarize"
@@ -494,7 +491,7 @@ class GitAnalysisService:
 
         return " ".join(summary_parts)
 
-    def _generate_highlights(self, commits: List[ChangeAnalysis]) -> List[str]:
+    def _generate_highlights(self, commits: list[ChangeAnalysis]) -> list[str]:
         """Generate highlights from commits."""
         highlights = []
 
@@ -523,7 +520,7 @@ class GitAnalysisService:
 
         return highlights[:10]  # Limit to 10 highlights
 
-    def _assess_risk(self, commits: List[ChangeAnalysis]) -> str:
+    def _assess_risk(self, commits: list[ChangeAnalysis]) -> str:
         """Assess overall risk of the changes."""
         if not commits:
             return "No risk assessment available"
@@ -551,7 +548,7 @@ class GitAnalysisService:
         else:
             return f"High risk - {', '.join(risk_factors)}"
 
-    def _generate_recommendations(self, commits: List[ChangeAnalysis]) -> List[str]:
+    def _generate_recommendations(self, commits: list[ChangeAnalysis]) -> list[str]:
         """Generate recommendations based on analysis."""
         recommendations = []
 
@@ -586,8 +583,8 @@ class GitAnalysisService:
         return recommendations
 
     def _calculate_file_categories(
-        self, commits: List[ChangeAnalysis]
-    ) -> Dict[FileCategory, int]:
+        self, commits: list[ChangeAnalysis]
+    ) -> dict[FileCategory, int]:
         """Calculate distribution of file categories."""
         categories = {}
         for commit in commits:
@@ -607,7 +604,7 @@ class GitAnalysisService:
         except:
             return "main"  # Default fallback
 
-    def _get_commit_tags(self, commit: git.Commit) -> List[str]:
+    def _get_commit_tags(self, commit: git.Commit) -> list[str]:
         """Get tags pointing to this commit."""
         try:
             tags = []
@@ -623,7 +620,7 @@ class GitAnalysisService:
         lines = message.strip().split('\n')
         return lines[0] if lines else ""
 
-    def _identify_impact_areas(self, files_changed: List[FileChange]) -> List[str]:
+    def _identify_impact_areas(self, files_changed: list[FileChange]) -> list[str]:
         """Identify areas of impact based on file changes."""
         areas = set()
         for file_change in files_changed:
@@ -652,7 +649,7 @@ class GitAnalysisService:
 
         return list(areas)
 
-    def _is_breaking_change(self, message: str, files_changed: List[FileChange]) -> bool:
+    def _is_breaking_change(self, message: str, files_changed: list[FileChange]) -> bool:
         """Check if commit represents a breaking change."""
         message_lower = message.lower()
         breaking_indicators = [
@@ -672,7 +669,7 @@ class GitAnalysisService:
 
         return False
 
-    def _is_security_relevant(self, message: str, files_changed: List[FileChange]) -> bool:
+    def _is_security_relevant(self, message: str, files_changed: list[FileChange]) -> bool:
         """Check if commit is security-relevant."""
         message_lower = message.lower()
         security_indicators = [
@@ -720,7 +717,7 @@ class GitAnalysisService:
 
         return (tag_similarity + file_similarity) / 2
 
-    def _find_commit_differences(self, a: ChangeAnalysis, b: ChangeAnalysis) -> List[str]:
+    def _find_commit_differences(self, a: ChangeAnalysis, b: ChangeAnalysis) -> list[str]:
         """Find differences between two commits."""
         differences = []
 
@@ -741,7 +738,7 @@ class GitAnalysisService:
 
         return differences
 
-    def _find_common_themes(self, a: ChangeAnalysis, b: ChangeAnalysis) -> List[str]:
+    def _find_common_themes(self, a: ChangeAnalysis, b: ChangeAnalysis) -> list[str]:
         """Find common themes between two commits."""
         common_tags = set(a.tags) & set(b.tags)
         common_areas = set(a.impact_areas) & set(b.impact_areas)
@@ -785,7 +782,7 @@ class GitAnalysisService:
         else:
             return f"High regression risk ({', '.join(risk_factors)})"
 
-    def _generate_migration_notes(self, a: ChangeAnalysis, b: ChangeAnalysis) -> List[str]:
+    def _generate_migration_notes(self, a: ChangeAnalysis, b: ChangeAnalysis) -> list[str]:
         """Generate migration notes for transitioning between commits."""
         notes = []
 

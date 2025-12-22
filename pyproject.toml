@@ -56,6 +56,8 @@ git-llm = [
     "openai>=1.0.0",
     "anthropic>=0.3.0",
 ]
+# version module optional features (LLM-enhanced changelog)
+version-llm = ["httpx>=0.24.0"]
 # scan optional features (dependency visualization)
 scan-graph = ["networkx>=3.0", "pyvis>=0.3.0"]
 dev = [

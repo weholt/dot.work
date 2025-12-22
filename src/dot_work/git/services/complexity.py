@@ -1,10 +1,9 @@
 """Complexity calculation for git commits and changes."""
 
 import re
-from typing import List, Dict, Any, Set
-from pathlib import Path
+from typing import Any
 
-from dot_work.git.models import ChangeAnalysis, FileChange, FileCategory, ChangeType
+from dot_work.git.models import ChangeAnalysis, ChangeType, FileCategory, FileChange
 
 
 class ComplexityCalculator:
@@ -110,7 +109,7 @@ class ComplexityCalculator:
 
         return min(score, 100.0)
 
-    def _calculate_file_type_multiplier(self, files: List[FileChange]) -> float:
+    def _calculate_file_type_multiplier(self, files: list[FileChange]) -> float:
         """Calculate multiplier based on file types and change types."""
         if not files:
             return 1.0
@@ -200,7 +199,7 @@ class ComplexityCalculator:
 
         return adjusted_score
 
-    def calculate_file_complexity(self, file_change: FileChange) -> Dict[str, Any]:
+    def calculate_file_complexity(self, file_change: FileChange) -> dict[str, Any]:
         """
         Calculate detailed complexity for a single file change.
 
@@ -260,8 +259,8 @@ class ComplexityCalculator:
             return "critical"
 
     def analyze_commit_complexity_distribution(
-        self, commits: List[ChangeAnalysis]
-    ) -> Dict[str, int]:
+        self, commits: list[ChangeAnalysis]
+    ) -> dict[str, int]:
         """
         Analyze distribution of complexity scores across commits.
 
@@ -295,8 +294,8 @@ class ComplexityCalculator:
         return ranges
 
     def get_top_complex_files(
-        self, commits: List[ChangeAnalysis], limit: int = 10
-    ) -> List[Dict[str, Any]]:
+        self, commits: list[ChangeAnalysis], limit: int = 10
+    ) -> list[dict[str, Any]]:
         """
         Get the most complex files across all commits.
 
@@ -341,7 +340,7 @@ class ComplexityCalculator:
 
         return sorted_files[:limit]
 
-    def identify_risk_factors(self, commit: ChangeAnalysis) -> List[str]:
+    def identify_risk_factors(self, commit: ChangeAnalysis) -> list[str]:
         """Identify risk factors for a commit based on complexity analysis."""
         risk_factors = []
 

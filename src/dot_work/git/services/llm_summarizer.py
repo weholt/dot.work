@@ -1,11 +1,10 @@
 """LLM integration for generating enhanced summaries and insights."""
 
-import logging
-from typing import Any, Dict, List, Optional
-from datetime import datetime
 import asyncio
+import logging
+from typing import Any
 
-from dot_work.git.models import ChangeAnalysis, ComparisonResult, AnalysisConfig
+from dot_work.git.models import AnalysisConfig, ChangeAnalysis, ComparisonResult
 
 
 class LLMSummarizer:
@@ -66,7 +65,7 @@ class LLMSummarizer:
         except Exception as e:
             raise Exception(f"Failed to initialize Anthropic: {e}")
 
-    def _get_api_key(self, env_var: str) -> Optional[str]:
+    def _get_api_key(self, env_var: str) -> str | None:
         """Get API key from environment variables."""
         import os
         return os.getenv(env_var)
@@ -119,7 +118,7 @@ class LLMSummarizer:
             self.logger.error(f"Failed to generate comparison summary: {e}")
             return result.aggregate_summary
 
-    async def analyze_impact(self, analysis: ChangeAnalysis) -> List[str]:
+    async def analyze_impact(self, analysis: ChangeAnalysis) -> list[str]:
         """
         Analyze impact areas using LLM.
 
@@ -141,7 +140,7 @@ class LLMSummarizer:
             self.logger.error(f"Failed to analyze impact: {e}")
             return analysis.impact_areas
 
-    async def suggest_testing_strategy(self, analysis: ChangeAnalysis) -> List[str]:
+    async def suggest_testing_strategy(self, analysis: ChangeAnalysis) -> list[str]:
         """
         Suggest testing strategy for the changes.
 
@@ -163,7 +162,7 @@ class LLMSummarizer:
             self.logger.error(f"Failed to generate testing suggestions: {e}")
             return self._generate_basic_testing_suggestions(analysis)
 
-    async def assess_migration_complexity(self, analysis: ChangeAnalysis) -> Dict[str, Any]:
+    async def assess_migration_complexity(self, analysis: ChangeAnalysis) -> dict[str, Any]:
         """
         Assess migration complexity and requirements.
 
@@ -396,7 +395,7 @@ Provide specific, actionable assessment.
 
         return cleaned.strip()
 
-    def _parse_impact_areas(self, response: str) -> List[str]:
+    def _parse_impact_areas(self, response: str) -> list[str]:
         """Parse impact areas from LLM response."""
         # Simple parsing - split by common delimiters
         areas = []
@@ -417,7 +416,7 @@ Provide specific, actionable assessment.
 
         return areas[:7]  # Limit to 7 areas
 
-    def _parse_testing_suggestions(self, response: str) -> List[str]:
+    def _parse_testing_suggestions(self, response: str) -> list[str]:
         """Parse testing suggestions from LLM response."""
         suggestions = []
 
@@ -435,7 +434,7 @@ Provide specific, actionable assessment.
 
         return suggestions[:6]  # Limit to 6 suggestions
 
-    def _parse_migration_assessment(self, response: str) -> Dict[str, Any]:
+    def _parse_migration_assessment(self, response: str) -> dict[str, Any]:
         """Parse migration assessment from LLM response."""
         assessment = {
             "complexity_level": "Medium",
@@ -503,7 +502,7 @@ Provide specific, actionable assessment.
 
         return ". ".join(parts) + "."
 
-    def _generate_basic_testing_suggestions(self, analysis: ChangeAnalysis) -> List[str]:
+    def _generate_basic_testing_suggestions(self, analysis: ChangeAnalysis) -> list[str]:
         """Generate basic testing suggestions without LLM."""
         suggestions = []
 
@@ -535,7 +534,7 @@ Provide specific, actionable assessment.
 
         return suggestions[:5]
 
-    def _generate_basic_migration_assessment(self, analysis: ChangeAnalysis) -> Dict[str, Any]:
+    def _generate_basic_migration_assessment(self, analysis: ChangeAnalysis) -> dict[str, Any]:
         """Generate basic migration assessment without LLM."""
         if analysis.breaking_change:
             return {

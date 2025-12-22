@@ -1,21 +1,20 @@
 """File analysis utilities for categorizing and analyzing file changes."""
 
 import re
-from pathlib import Path
-from typing import Dict, List, Set, Optional
 from dataclasses import dataclass
+from pathlib import Path
 
-from dot_work.git.models import FileChange, FileCategory, ChangeType
+from dot_work.git.models import ChangeType, FileCategory, FileChange
 
 
 @dataclass
 class LanguageInfo:
     """Information about a programming language."""
     name: str
-    extensions: List[str]
+    extensions: list[str]
     category: FileCategory
     complexity_multiplier: float = 1.0
-    test_patterns: List[str] = None
+    test_patterns: list[str] = None
 
 
 class FileAnalyzer:
@@ -67,7 +66,7 @@ class FileAnalyzer:
 
         return FileCategory.UNKNOWN
 
-    def analyze_file_content(self, file_path: str, content: Optional[str] = None) -> Dict[str, any]:
+    def analyze_file_content(self, file_path: str, content: str | None = None) -> dict[str, any]:
         """
         Analyze file content to extract additional information.
 
@@ -80,7 +79,7 @@ class FileAnalyzer:
         """
         if content is None:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, encoding='utf-8') as f:
                     content = f.read()
             except (UnicodeDecodeError, FileNotFoundError, PermissionError):
                 return {"binary_file": True, "readable": False}
@@ -101,7 +100,7 @@ class FileAnalyzer:
 
         return analysis
 
-    def detect_file_type(self, file_path: str, content: Optional[str] = None) -> str:
+    def detect_file_type(self, file_path: str, content: str | None = None) -> str:
         """
         Detect file type based on path and content.
 
@@ -213,7 +212,7 @@ class FileAnalyzer:
 
         return 'unknown'
 
-    def get_file_dependencies(self, file_path: str, content: Optional[str] = None) -> List[str]:
+    def get_file_dependencies(self, file_path: str, content: str | None = None) -> list[str]:
         """
         Extract dependencies from a file.
 
@@ -228,7 +227,7 @@ class FileAnalyzer:
 
         if content is None:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, encoding='utf-8') as f:
                     content = f.read()
             except:
                 return dependencies
@@ -315,7 +314,7 @@ class FileAnalyzer:
         importance = base_score + category_score + pattern_bonus + change_type_score + volume_score
         return min(importance, 1.0)
 
-    def _initialize_language_info(self) -> Dict[str, LanguageInfo]:
+    def _initialize_language_info(self) -> dict[str, LanguageInfo]:
         """Initialize programming language information."""
         languages = {
             "python": LanguageInfo(
@@ -378,7 +377,7 @@ class FileAnalyzer:
 
         return languages
 
-    def _initialize_category_patterns(self) -> Dict[FileCategory, List[str]]:
+    def _initialize_category_patterns(self) -> dict[FileCategory, list[str]]:
         """Initialize file category patterns."""
         return {
             FileCategory.CODE: [
@@ -476,7 +475,7 @@ class FileAnalyzer:
             ]
         }
 
-    def _detect_language(self, file_path: str, content: str) -> Optional[str]:
+    def _detect_language(self, file_path: str, content: str) -> str | None:
         """Detect the programming language of a file."""
         path = Path(file_path)
         ext = path.suffix.lower()
@@ -545,7 +544,7 @@ class FileAnalyzer:
 
         return False
 
-    def _extract_imports(self, content: str) -> List[str]:
+    def _extract_imports(self, content: str) -> list[str]:
         """Extract import statements from content."""
         imports = []
 
@@ -575,7 +574,7 @@ class FileAnalyzer:
 
         return list(set(imports))  # Remove duplicates
 
-    def _extract_functions(self, content: str) -> List[str]:
+    def _extract_functions(self, content: str) -> list[str]:
         """Extract function definitions from content."""
         functions = []
 
@@ -599,7 +598,7 @@ class FileAnalyzer:
 
         return list(set(functions))
 
-    def _extract_classes(self, content: str) -> List[str]:
+    def _extract_classes(self, content: str) -> list[str]:
         """Extract class definitions from content."""
         classes = []
 
@@ -624,7 +623,7 @@ class FileAnalyzer:
 
         return list(set(classes))
 
-    def _analyze_complexity_indicators(self, content: str) -> Dict[str, int]:
+    def _analyze_complexity_indicators(self, content: str) -> dict[str, int]:
         """Analyze complexity indicators in file content."""
         indicators = {
             "nested_loops": 0,
@@ -673,7 +672,7 @@ class FileAnalyzer:
 
         return indicators
 
-    def _extract_python_dependencies(self, content: str, path: Path) -> List[str]:
+    def _extract_python_dependencies(self, content: str, path: Path) -> list[str]:
         """Extract Python dependencies."""
         dependencies = []
 
@@ -690,7 +689,7 @@ class FileAnalyzer:
 
         return dependencies
 
-    def _extract_node_dependencies(self, content: str, path: Path) -> List[str]:
+    def _extract_node_dependencies(self, content: str, path: Path) -> list[str]:
         """Extract Node.js dependencies."""
         dependencies = []
 
@@ -706,7 +705,7 @@ class FileAnalyzer:
 
         return dependencies
 
-    def _extract_go_dependencies(self, content: str, path: Path) -> List[str]:
+    def _extract_go_dependencies(self, content: str, path: Path) -> list[str]:
         """Extract Go dependencies."""
         dependencies = []
 
@@ -717,7 +716,7 @@ class FileAnalyzer:
 
         return dependencies
 
-    def _extract_ruby_dependencies(self, content: str, path: Path) -> List[str]:
+    def _extract_ruby_dependencies(self, content: str, path: Path) -> list[str]:
         """Extract Ruby dependencies."""
         dependencies = []
 
@@ -727,7 +726,7 @@ class FileAnalyzer:
 
         return dependencies
 
-    def _extract_java_dependencies(self, content: str, path: Path) -> List[str]:
+    def _extract_java_dependencies(self, content: str, path: Path) -> list[str]:
         """Extract Java dependencies."""
         dependencies = []
 
@@ -743,7 +742,7 @@ class FileAnalyzer:
 
         return dependencies
 
-    def _extract_docker_dependencies(self, content: str, path: Path) -> List[str]:
+    def _extract_docker_dependencies(self, content: str, path: Path) -> list[str]:
         """Extract Docker dependencies."""
         dependencies = []
 

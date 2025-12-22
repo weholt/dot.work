@@ -1,13 +1,13 @@
 """Utility functions for git analysis."""
 
-import logging
-import sys
-import os
-from pathlib import Path
-from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
 import hashlib
 import json
+import logging
+import os
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 
 def setup_logging(verbose: bool = False):
@@ -185,7 +185,7 @@ def calculate_time_ago(timestamp: datetime) -> str:
         return f"{years} year{'s' if years != 1 else ''} ago"
 
 
-def get_git_config_value(key: str, repo_path: Path = None) -> Optional[str]:
+def get_git_config_value(key: str, repo_path: Path = None) -> str | None:
     """Get git configuration value."""
     try:
         import subprocess
@@ -209,7 +209,7 @@ def is_git_repository(path: Path) -> bool:
         return False
 
 
-def get_repository_root(path: Path = None) -> Optional[Path]:
+def get_repository_root(path: Path = None) -> Path | None:
     """Get the root directory of the git repository."""
     try:
         if path is None:
@@ -300,7 +300,7 @@ class Timer:
         return 0.0
 
 
-def merge_dicts(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
+def merge_dicts(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
     """Recursively merge two dictionaries."""
     result = dict1.copy()
 

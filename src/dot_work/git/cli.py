@@ -1,23 +1,19 @@
 """Command-line interface for git history analysis."""
 
-import asyncio
 import json
 import sys
 from pathlib import Path
-from typing import Optional, List
+
 import typer
+import yaml
 from rich.console import Console
+from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
-from rich.panel import Panel
-from rich.tree import Tree
-from rich.syntax import Syntax
-import yaml
 
 from dot_work.git.models import AnalysisConfig
 from dot_work.git.services import GitAnalysisService
-from dot_work.git.utils import setup_logging, format_duration
-
+from dot_work.git.utils import setup_logging
 
 # Create Typer app for history subcommand
 history_app = typer.Typer(
@@ -35,7 +31,7 @@ def compare(
     to_ref: str = typer.Argument(..., help="Target git reference (branch, tag, or commit)"),
     repo_path: str = typer.Option(".", "--repo", "-r", help="Path to git repository"),
     output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, yaml"),
-    output_file: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path"),
+    output_file: str | None = typer.Option(None, "--output", "-o", help="Output file path"),
     use_llm: bool = typer.Option(False, "--llm", help="Use LLM for enhanced summaries"),
     llm_provider: str = typer.Option("openai", "--llm-provider", help="LLM provider: openai, anthropic"),
     max_commits: int = typer.Option(100, "--max-commits", help="Maximum number of commits to analyze"),
@@ -333,12 +329,12 @@ def _display_commit_analysis(analysis):
     console.print(Panel(info_text, title="📋 Commit Information", border_style="blue"))
 
     # Message
-    console.print(f"\n[bold]📝 Message:[/bold]")
+    console.print("\n[bold]📝 Message:[/bold]")
     console.print(analysis.message)
 
     # Summary
     if analysis.summary:
-        console.print(f"\n[bold]📄 Summary:[/bold]")
+        console.print("\n[bold]📄 Summary:[/bold]")
         console.print(analysis.summary)
 
     # Metrics
@@ -369,7 +365,7 @@ def _display_commit_analysis(analysis):
 
     # Files table
     if analysis.files_changed:
-        console.print(f"\n[bold]📁 Files Changed:[/bold]")
+        console.print("\n[bold]📁 Files Changed:[/bold]")
         table = Table()
         table.add_column("Path", style="cyan")
         table.add_column("Type", style="green")
@@ -393,12 +389,12 @@ def _display_commit_comparison(comparison):
     console.print(f"[bold]Similarity Score:[/bold] {comparison.similarity_score:.2f}")
 
     if comparison.differences:
-        console.print(f"\n[bold]🔍 Differences:[/bold]")
+        console.print("\n[bold]🔍 Differences:[/bold]")
         for diff in comparison.differences:
             console.print(f"  • {diff}")
 
     if comparison.common_themes:
-        console.print(f"\n[bold]🎯 Common Themes:[/bold]")
+        console.print("\n[bold]🎯 Common Themes:[/bold]")
         for theme in comparison.common_themes:
             console.print(f"  • {theme}")
 
@@ -406,7 +402,7 @@ def _display_commit_comparison(comparison):
     console.print(f"[bold]⚠️  Regression Risk:[/bold] {comparison.regression_risk}")
 
     if comparison.migration_notes:
-        console.print(f"\n[bold]📋 Migration Notes:[/bold]")
+        console.print("\n[bold]📋 Migration Notes:[/bold]")
         for note in comparison.migration_notes:
             console.print(f"  • {note}")
 
@@ -482,7 +478,7 @@ def _display_complexity_analysis(result, threshold):
 
     # Top complex files
     if result.top_complex_files:
-        console.print(f"\n[bold]📁 Most Complex Files:[/bold]")
+        console.print("\n[bold]📁 Most Complex Files:[/bold]")
         table = Table()
         table.add_column("File", style="cyan")
         table.add_column("Category", style="green")

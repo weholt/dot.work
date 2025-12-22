@@ -1,10 +1,10 @@
 """Data models for git analysis and comparison."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 
 class ChangeType(Enum):
@@ -38,14 +38,14 @@ class CommitInfo:
     timestamp: datetime
     message: str
     branch: str = "main"
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
 
 @dataclass
 class FileChange:
     """Information about a changed file."""
     path: str
-    old_path: Optional[str] = None  # For renames/copies
+    old_path: str | None = None  # For renames/copies
     change_type: ChangeType = ChangeType.MODIFIED
     category: FileCategory = FileCategory.UNKNOWN
     lines_added: int = 0
@@ -63,7 +63,7 @@ class ChangeAnalysis:
     branch: str
     message: str
     short_message: str
-    files_changed: List[FileChange]
+    files_changed: list[FileChange]
     lines_added: int
     lines_deleted: int
     files_added: int
@@ -71,13 +71,13 @@ class ChangeAnalysis:
     files_modified: int
     complexity_score: float
     summary: str
-    tags: List[str]
-    impact_areas: List[str]
+    tags: list[str]
+    impact_areas: list[str]
     breaking_change: bool = False
     test_coverage_change: float = 0.0
-    performance_impact: Optional[str] = None
+    performance_impact: str | None = None
     security_relevant: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -108,22 +108,22 @@ class ComparisonMetadata:
     total_lines_deleted: int
     total_complexity: float
     time_span_days: int
-    branches_involved: List[str]
+    branches_involved: list[str]
 
 
 @dataclass
 class ComparisonResult:
     """Result of comparing two git references."""
     metadata: ComparisonMetadata
-    commits: List[ChangeAnalysis]
-    contributors: Dict[str, ContributorStats]
+    commits: list[ChangeAnalysis]
+    contributors: dict[str, ContributorStats]
     aggregate_summary: str
-    highlights: List[str]
+    highlights: list[str]
     risk_assessment: str
-    recommendations: List[str]
-    file_categories: Dict[FileCategory, int]
-    complexity_distribution: Dict[str, int]  # ranges -> count
-    top_complex_files: List[Dict[str, Any]]
+    recommendations: list[str]
+    file_categories: dict[FileCategory, int]
+    complexity_distribution: dict[str, int]  # ranges -> count
+    top_complex_files: list[dict[str, Any]]
 
 
 @dataclass
@@ -132,18 +132,18 @@ class ComparisonDiff:
     commit_a_hash: str
     commit_b_hash: str
     similarity_score: float
-    differences: List[str]
-    common_themes: List[str]
+    differences: list[str]
+    common_themes: list[str]
     impact_description: str
     regression_risk: str
-    migration_notes: List[str]
+    migration_notes: list[str]
 
 
 @dataclass
 class AnalysisConfig:
     """Configuration for git analysis."""
     repo_path: Path = field(default_factory=lambda: Path.cwd())
-    cache_dir: Optional[Path] = None
+    cache_dir: Path | None = None
     use_llm: bool = False
     llm_provider: str = "openai"  # openai, anthropic, local
     complexity_threshold: float = 50.0
@@ -167,9 +167,9 @@ class AnalysisConfig:
     include_file_contents: bool = False
 
     # Filtering settings
-    file_ignore_patterns: List[str] = field(default_factory=list)
-    author_ignore_patterns: List[str] = field(default_factory=list)
-    commit_message_ignore_patterns: List[str] = field(default_factory=lambda: ["^Merge pull request", "^Auto-matic"])
+    file_ignore_patterns: list[str] = field(default_factory=list)
+    author_ignore_patterns: list[str] = field(default_factory=list)
+    commit_message_ignore_patterns: list[str] = field(default_factory=lambda: ["^Merge pull request", "^Auto-matic"])
 
     # Caching settings
     cache_ttl_hours: int = 24
@@ -180,7 +180,7 @@ class AnalysisConfig:
 class CacheEntry:
     """Entry in the analysis cache."""
     key: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
     timestamp: datetime
     ttl_hours: int = 24
 
@@ -195,10 +195,10 @@ class AnalysisError:
     """Error information for failed analysis."""
     error_type: str
     message: str
-    commit_hash: Optional[str] = None
-    file_path: Optional[str] = None
+    commit_hash: str | None = None
+    file_path: str | None = None
     timestamp: datetime = field(default_factory=datetime.now)
-    stack_trace: Optional[str] = None
+    stack_trace: str | None = None
 
 
 @dataclass
