@@ -214,564 +214,96 @@ Consider interaction with `--force` flag:
 This builds on FEAT-003 (--force implementation). Could be combined with FEAT-007 (--dry-run) for a complete UX.
 
 ---
-
-## MIGRATE-034@d8e9f0
-
----
-id: "MIGRATE-034@d8e9f0"
-title: "Create db-issues module structure in dot-work"
-description: "Create src/dot_work/db_issues/ module with core CRUD from issue-tracker"
-created: 2024-12-21
-section: "db_issues"
-tags: [migration, issue-tracker, db-issues, module-structure]
-type: enhancement
-priority: medium
-status: proposed
-references:
-  - incoming/glorious/src/glorious_agents/skills/issues/src/issue_tracker/
-  - src/dot_work/db_issues/
----
-
-### Problem
-The issue-tracker project provides SQLite-backed issue management. To integrate as `dot-work db-issues`, we need to migrate the core CRUD functionality without the daemon/MCP/RPC features.
-
-### Source Analysis
-From `incoming/glorious/src/glorious_agents/skills/issues/src/issue_tracker/`:
-
-**Include (Core CRUD):**
-- `domain/entities/` - Issue, Comment, Dependency, Epic, Label
-- `domain/value_objects.py` - Value objects
-- `domain/ports/` - Repository interfaces
-- `services/issue_service.py` - Core business logic
-- `services/search_service.py` - Search functionality
-- `adapters/db/` - SQLite/SQLModel implementation
-- `config/settings.py` - Configuration
-- `cli/` - CLI commands (simplified)
-
-**Exclude (Daemon/MCP/RPC):**
-- `daemon/` - Background daemon with IPC/RPC
-- `adapters/mcp/` - MCP server for Claude
-- `factories/` - Complex DI for daemon
-- CLI commands: daemon-*, rpc-*, mcp-*
-
-### Target Structure
-```
-src/dot_work/db_issues/
-├── __init__.py           # Package exports
-├── cli.py                # Typer CLI commands (simplified)
-├── config.py             # Configuration
-├── domain/
-│   ├── __init__.py
-│   ├── entities.py       # Issue, Comment, Dependency, Epic, Label
-│   └── ports.py          # Repository interfaces
-├── services/
-│   ├── __init__.py
-│   ├── issue_service.py  # Core CRUD operations
-│   └── search_service.py # Search functionality
-└── adapters/
-    ├── __init__.py
-    └── sqlite.py         # SQLite implementation
-```
-
-### Proposed Solution
-1. Create `src/dot_work/db_issues/` directory
-2. Create subdirectories: domain/, services/, adapters/
-3. Copy and consolidate domain entities into single `entities.py`
-4. Copy issue_service.py and search_service.py
-5. Simplify adapter to single sqlite.py
-6. Create simplified cli.py without daemon commands
-7. Add config.py for database path configuration
-
-### Acceptance Criteria
-- [ ] Directory `src/dot_work/db_issues/` created
-- [ ] Core entities in `domain/entities.py`
-- [ ] Services in `services/`
-- [ ] SQLite adapter in `adapters/sqlite.py`
-- [ ] No daemon/MCP/RPC files included
-- [ ] No syntax errors in module files
-
-### Notes
-This is a significant simplification from the original ~50+ file structure.
-Focus on CRUD operations: create, list, show, update, close, reopen, delete.
-
-**Important**: Preserve the hash-based ID system from the original:
-- Issue IDs like `bd-a1b2` (prefix + 4-char hash)
-- Child/hierarchical IDs like `bd-a1b2.1`, `bd-a1b2.2`
-- IdentifierService for ID generation
-
----
-
-## MIGRATE-035@e9f0a1
-
----
-id: "MIGRATE-035@e9f0a1"
-title: "Update db-issues imports to use dot-work patterns"
-description: "Refactor imports from issue_tracker.* to dot_work.db_issues.*"
-created: 2024-12-21
-section: "db_issues"
-tags: [migration, db-issues, imports, refactor]
+id: "RECONCILE-001@a1b2c3"
+title: "Reconcile enum schemas between old and new issue-tracker"
+description: "Differences between migrated enums and original issue-tracker spec need resolution"
+created: 2024-12-23
+section: "db-issues"
+tags: [db-issues, enums, reconciliation, migration]
 type: refactor
 priority: medium
 status: proposed
 references:
-  - src/dot_work/db_issues/
+  - src/dot_work/db_issues/domain/entities.py
+  - .work/agent/issues/references/MIGRATE-034-investigation.md
 ---
 
 ### Problem
-After copying/creating files, all imports reference `issue_tracker.*` which doesn't exist.
+MIGRATE-041 updated enum values to match the issue-tracker project specification, but this introduced breaking changes from the original "Beads-compatible" schema that was initially migrated in MIGRATE-034.
 
-### Import Changes Required
+Key differences:
 
-| Old Import | New Import |
-|------------|------------|
-| `from issue_tracker.domain.entities.issue import Issue` | `from dot_work.db_issues.domain.entities import Issue` |
-| `from issue_tracker.services.issue_service import IssueService` | `from dot_work.db_issues.services.issue_service import IssueService` |
-| `from issue_tracker.adapters.db.unit_of_work import UnitOfWork` | `from dot_work.db_issues.adapters.sqlite import UnitOfWork` |
-| `from issue_tracker.config.settings import Settings` | `from dot_work.db_issues.config import DbIssuesConfig` |
+**IssueStatus:**
+- Old: OPEN, IN_PROGRESS, BLOCKED, RESOLVED, CLOSED, ARCHIVED
+- New: PROPOSED, IN_PROGRESS, BLOCKED, COMPLETED, WONT_FIX
+- Missing: RESOLVED, CLOSED, ARCHIVED
+- Added: PROPOSED, WONT_FIX
+- Mapping: OPEN→PROPOSED, RESOLVED→COMPLETED, CLOSED→COMPLETED (merge)
 
-### Simplification Opportunities
-- Consolidate multiple entity files into single `entities.py`
-- Remove complex DI factory patterns
-- Simplify to direct instantiation
-- Remove daemon/MCP-related imports entirely
+**IssueType:**
+- Old: TASK, BUG, FEATURE, EPIC, CHORE
+- New: BUG, FEATURE, TASK, ENHANCEMENT, REFACTOR, DOCS, TEST, SECURITY, PERFORMANCE
+- Missing: EPIC, CHORE
+- Added: ENHANCEMENT, REFACTOR, DOCS, TEST, SECURITY, PERFORMANCE
+- Mapping: TASK→TASK, BUG→BUG, FEATURE→FEATURE, EPIC→removed, CHORE→removed
+
+**DependencyType:**
+- Old: BLOCKS, DEPENDS_ON, RELATED_TO, DISCOVERED_FROM
+- New: BLOCKS, DEPENDS_ON, RELATED_TO, DUPLICATES, PARENT_OF, CHILD_OF
+- Missing: DISCOVERED_FROM
+- Added: DUPLICATES, PARENT_OF, CHILD_OF
+
+**IssuePriority:**
+- Old: CRITICAL, HIGH, MEDIUM, LOW, BACKLOG (5 values)
+- New: CRITICAL, HIGH, MEDIUM, LOW (4 values)
+- Removed: BACKLOG
+
+### Affected Files
+- `src/dot_work/db_issues/domain/entities.py` (enum definitions)
+- `src/dot_work/db_issues/services/issue_service.py` (EPIC type removed, include_children disabled)
+- All test files (updated to new enum values)
+
+### Importance
+The enum changes break backward compatibility with any code using the old schema. However, MIGRATE-041 explicitly chose to use the issue-tracker project's enum values for compatibility with the source.
+
+Key concerns:
+1. **Epic hierarchy** - The `IssueType.EPIC` was removed, breaking the `include_children` functionality in `get_epic_issues()`
+2. **Status transitions** - `RESOLVED` vs `COMPLETED` semantic difference needs clarification
+3. **Missing types** - `EPIC` and `CHORE` types from old schema are gone
+4. **Priority** - `BACKLOG` priority removed
 
 ### Proposed Solution
-1. Update all internal imports to `dot_work.db_issues.*`
-2. Remove references to excluded modules (daemon, mcp, factories)
-3. Simplify dependency injection to direct construction
-4. Verify: `uv run python -c "from dot_work.db_issues import IssueService"`
+**Option A: Support both schemas (recommended)**
+1. Keep new enum values as primary (issue-tracker spec)
+2. Add aliases/compatibility layer for old values
+3. Restore EPIC support as a separate `IssueEntity` concept (not a type)
+
+**Option B: Document breaking changes**
+1. Keep new enum values as-is
+2. Document migration path for users of old schema
+3. Accept that EPIC hierarchy is removed
+
+**Option C: Merge both schemas**
+1. Add missing old values to new enums
+2. Keep all values: both PROPOSED and OPEN, both COMPLETED and RESOLVED
+3. Restore EPIC as a type
 
 ### Acceptance Criteria
-- [ ] All `issue_tracker.*` imports updated to `dot_work.db_issues.*`
-- [ ] No references to daemon/mcp/factories
-- [ ] Import statement works: `from dot_work.db_issues import IssueService`
-- [ ] Type checking passes on db_issues module
+- [ ] Decision made on which approach to take
+- [ ] If Option A: Compatibility layer implemented
+- [ ] If Option B: Migration documentation written
+- [ ] If Option C: Enums expanded with union of both value sets
+- [ ] Epic functionality restored if needed
+- [ ] Tests updated to reflect final decision
+- [ ] Memory.md updated with resolution
 
 ### Notes
-Depends on MIGRATE-034 (files must exist first).
+This should be resolved before MIGRATE-085 (DB-Issues Integration) to avoid further compounding the issue.
+
+The `include_children` functionality in `get_epic_issues()` was disabled in MIGRATE-041 because `IssueType.EPIC` no longer exists. This needs to be resolved either by:
+- Restoring EPIC as a type
+- Implementing epic hierarchy via the `Epic` entity (which still exists)
+- Removing the feature entirely
 
 ---
 
-## MIGRATE-036@f0a1b2
-
----
-id: "MIGRATE-036@f0a1b2"
-title: "Register db-issues as subcommand in dot-work CLI"
-description: "Add db-issues commands as 'dot-work db-issues <cmd>' CLI structure"
-created: 2024-12-21
-section: "cli"
-tags: [migration, db-issues, cli, integration]
-type: enhancement
-priority: medium
-status: proposed
-references:
-  - src/dot_work/cli.py
-  - src/dot_work/db_issues/cli.py
----
-
-### Problem
-The db-issues module needs CLI integration as `dot-work db-issues <command>`.
-
-### CLI Design (Core CRUD Only)
-```bash
-# Initialize database
-dot-work db-issues init
-
-# Create issue
-dot-work db-issues create "Fix bug in parser"
-dot-work db-issues create "Add feature" --priority high --type feature
-
-# List issues
-dot-work db-issues list
-dot-work db-issues list --status open
-dot-work db-issues list --priority high
-
-# Show issue details
-dot-work db-issues show <id>
-
-# Update issue
-dot-work db-issues update <id> --title "New title"
-dot-work db-issues update <id> --priority critical
-
-# Status changes
-dot-work db-issues close <id>
-dot-work db-issues reopen <id>
-
-# Delete
-dot-work db-issues delete <id>
-
-# Search
-dot-work db-issues search "parser bug"
-
-# Dependencies (subgroup)
-dot-work db-issues deps add <from_id> <to_id> --type blocks
-dot-work db-issues deps list <id>
-dot-work db-issues deps remove <from_id> <to_id>
-
-# Labels (subgroup)
-dot-work db-issues labels add <id> "bug"
-dot-work db-issues labels remove <id> "bug"
-dot-work db-issues labels list
-
-# Comments (subgroup)
-dot-work db-issues comments add <id> "This is a comment"
-dot-work db-issues comments list <id>
-```
-
-### CLI Structure
-```python
-db_issues_app = typer.Typer(help="SQLite-backed issue tracking.")
-
-@db_issues_app.command("init")
-def init() -> None:
-    """Initialize issue database."""
-
-@db_issues_app.command("create")
-def create(title: str, priority: str = "medium", issue_type: str = "task") -> None:
-    """Create a new issue."""
-
-@db_issues_app.command("list")
-def list_issues(status: str | None = None, priority: str | None = None) -> None:
-    """List issues with optional filters."""
-
-# ... etc for show, update, close, reopen, delete, search
-
-# Subgroups
-deps_app = typer.Typer(help="Manage issue dependencies.")
-labels_app = typer.Typer(help="Manage issue labels.")
-comments_app = typer.Typer(help="Manage issue comments.")
-
-db_issues_app.add_typer(deps_app, name="deps")
-db_issues_app.add_typer(labels_app, name="labels")
-db_issues_app.add_typer(comments_app, name="comments")
-```
-
-### Commands NOT Included
-- daemon-* commands (no daemon)
-- rpc-* commands (no RPC)
-- mcp-* commands (no MCP server)
-- sync, export, import (future enhancement)
-
-### Proposed Solution
-1. Create `db_issues_app = typer.Typer()` in cli.py
-2. Implement core CRUD commands
-3. Add deps, labels, comments subgroups
-4. Register: `app.add_typer(db_issues_app, name="db-issues")`
-
-### Acceptance Criteria
-- [ ] `dot-work db-issues --help` shows commands
-- [ ] CRUD commands work: create, list, show, update, close, reopen, delete
-- [ ] Dependencies subgroup works
-- [ ] Labels subgroup works
-- [ ] Comments subgroup works
-- [ ] Search command works
-
-### Notes
-Depends on MIGRATE-035 (imports must work first).
-
----
-
-## MIGRATE-037@a1b2c3
-
----
-id: "MIGRATE-037@a1b2c3"
-title: "Add db-issues dependencies to pyproject.toml"
-description: "Add sqlmodel and gitpython as dependencies for db-issues"
-created: 2024-12-21
-section: "dependencies"
-tags: [migration, db-issues, dependencies, pyproject]
-type: enhancement
-priority: medium
-status: proposed
-references:
-  - pyproject.toml
----
-
-### Problem
-The db-issues module requires external dependencies for SQLite ORM.
-
-### Dependencies Required (Simplified)
-
-Original issue-tracker had heavy deps for daemon/MCP. Simplified list:
-```toml
-dependencies = [
-    # Existing...
-    "sqlmodel>=0.0.16",    # SQLite ORM (SQLAlchemy + Pydantic)
-    "gitpython>=3.1.0",    # Git integration for JSONL storage (optional)
-]
-```
-
-### Dependencies NOT Needed (Excluded)
-- `fastapi` - Only for MCP server
-- `uvicorn` - Only for MCP server
-- `aiohttp` - Only for daemon RPC
-- `psutil` - Only for daemon management
-- `redis` - Only for agentmail
-- `pywin32` - Only for Windows daemon
-
-### Proposed Solution
-1. Add `sqlmodel>=0.0.16` to core dependencies
-2. Consider `gitpython` as optional for git-backed storage
-3. Run `uv sync` to install
-4. Verify: `uv run python -c "from sqlmodel import SQLModel"`
-
-### Acceptance Criteria
-- [ ] `sqlmodel` in core dependencies
-- [ ] `gitpython` in optional group or core (decide)
-- [ ] `uv sync` succeeds
-- [ ] No daemon-related dependencies added
-- [ ] db_issues module imports work
-
-### Notes
-SQLModel brings SQLAlchemy + Pydantic as transitive deps.
-Consider making gitpython optional if JSONL sync not needed initially.
-
-Depends on MIGRATE-034 (module must exist).
-
----
-
-## MIGRATE-038@b2c3d4
-
----
-id: "MIGRATE-038@b2c3d4"
-title: "Configure db-issues storage in .work/db-issues/"
-description: "Update db-issues to store database in .work/db-issues/ directory"
-created: 2024-12-21
-section: "db_issues"
-tags: [migration, db-issues, config, storage]
-type: enhancement
-priority: medium
-status: proposed
-references:
-  - src/dot_work/db_issues/config.py
-  - src/dot_work/db_issues/adapters/sqlite.py
----
-
-### Problem
-The db-issues module needs configuration for database storage location.
-
-### Storage Design
-```
-.work/db-issues/
-├── issues.db       # SQLite database
-└── issues.jsonl    # Optional JSONL export for git
-```
-
-### Environment Variable Support
-```python
-# Default: .work/db-issues/
-# Override: DOT_WORK_DB_ISSUES_PATH=/custom/path
-```
-
-### Config Dataclass
-```python
-@dataclass
-class DbIssuesConfig:
-    base_path: Path = field(default_factory=lambda: Path(".work/db-issues"))
-    db_file: str = "issues.db"
-
-    @classmethod
-    def from_env(cls) -> DbIssuesConfig:
-        base = os.getenv("DOT_WORK_DB_ISSUES_PATH")
-        return cls(base_path=Path(base) if base else Path(".work/db-issues"))
-
-    @property
-    def db_path(self) -> Path:
-        return self.base_path / self.db_file
-
-    @property
-    def db_url(self) -> str:
-        return f"sqlite:///{self.db_path}"
-```
-
-### Proposed Solution
-1. Create `src/dot_work/db_issues/config.py` with DbIssuesConfig
-2. Update sqlite adapter to use config.db_url
-3. Ensure .work/db-issues/ created on init
-4. Add .work/db-issues/ to .gitignore template
-
-### Acceptance Criteria
-- [ ] Database at `.work/db-issues/issues.db`
-- [ ] `DOT_WORK_DB_ISSUES_PATH` env var override works
-- [ ] Directory created on `dot-work db-issues init`
-- [ ] `.gitignore` updated to ignore `.work/db-issues/`
-
-### Notes
-Depends on MIGRATE-035 (imports must work).
-
----
-
-## MIGRATE-039@c3d4e5
-
----
-id: "MIGRATE-039@c3d4e5"
-title: "Add tests for db-issues module"
-description: "Create unit tests for db-issues functionality"
-created: 2024-12-21
-section: "tests"
-tags: [migration, db-issues, tests]
-type: test
-priority: medium
-status: proposed
-references:
-  - tests/unit/db_issues/
-  - src/dot_work/db_issues/
----
-
-### Problem
-The db-issues module needs tests to ensure correct CRUD behavior.
-
-### Test Structure
-```
-tests/unit/db_issues/
-├── __init__.py
-├── conftest.py          # Fixtures (in-memory SQLite)
-├── test_entities.py     # Domain entity tests
-├── test_issue_service.py # Service layer tests
-├── test_sqlite.py       # Adapter tests
-├── test_config.py       # Config tests
-└── test_cli.py          # CLI command tests
-```
-
-### Key Test Cases
-
-**test_entities.py:**
-- `test_issue_creation` - Issue entity created
-- `test_issue_status_transitions` - Status changes valid
-- `test_comment_attached_to_issue` - Comment linking
-- `test_dependency_types` - All dependency types work
-
-**test_issue_service.py:**
-- `test_create_issue_returns_issue` - CRUD create
-- `test_list_issues_returns_all` - CRUD list
-- `test_update_issue_modifies_fields` - CRUD update
-- `test_close_issue_sets_status` - Status change
-- `test_search_finds_matching` - Search works
-- `test_add_dependency_links_issues` - Dependencies
-
-**test_sqlite.py:**
-- `test_init_creates_tables` - Database initialization
-- `test_repository_persists_issue` - Persistence
-- `test_in_memory_database` - Test mode
-
-**test_cli.py:**
-- `test_create_command` - CLI create
-- `test_list_command` - CLI list
-- `test_show_command` - CLI show
-
-### Fixtures
-```python
-@pytest.fixture
-def in_memory_db():
-    """Create in-memory SQLite for testing."""
-    config = DbIssuesConfig(db_url="sqlite:///:memory:")
-    # Setup and return session
-```
-
-### Proposed Solution
-1. Create `tests/unit/db_issues/` directory
-2. Add conftest.py with in-memory database fixture
-3. Write tests for entities, services, adapters
-4. Run: `uv run pytest tests/unit/db_issues/ -v`
-
-### Acceptance Criteria
-- [ ] Tests in `tests/unit/db_issues/`
-- [ ] Coverage ≥ 80% for db_issues module
-- [ ] All tests pass
-- [ ] Uses in-memory SQLite for fast tests
-
-### Notes
-Depends on MIGRATE-035 (module must be functional).
-
----
-
-## MIGRATE-040@d4e5f6
-
----
-id: "MIGRATE-040@d4e5f6"
-title: "Verify db-issues migration with full build"
-description: "Run complete build pipeline and verify all db-issues functionality"
-created: 2024-12-21
-section: "db_issues"
-tags: [migration, db-issues, verification, qa]
-type: test
-priority: medium
-status: proposed
-references:
-  - scripts/build.py
----
-
-### Problem
-After completing all migration steps, verify the db-issues migration works correctly.
-
-### Verification Checklist
-
-**Build Pipeline:**
-```bash
-uv run python scripts/build.py
-```
-- [ ] Formatting passes
-- [ ] Linting passes
-- [ ] Type checking passes
-- [ ] All tests pass
-- [ ] Coverage ≥75%
-
-**CLI Verification:**
-```bash
-# Initialize database
-dot-work db-issues init
-
-# Create issues (returns hash-based ID like bd-a1b2)
-dot-work db-issues create "First issue"
-dot-work db-issues create "Second issue" --priority high --type bug
-
-# List and show (using hash IDs)
-dot-work db-issues list
-dot-work db-issues show bd-a1b2
-
-# Update and status
-dot-work db-issues update bd-a1b2 --title "Updated title"
-dot-work db-issues close bd-a1b2
-dot-work db-issues reopen bd-a1b2
-
-# Dependencies
-dot-work db-issues deps add bd-a1b2 bd-c3d4 --type blocks
-dot-work db-issues deps list bd-a1b2
-
-# Labels
-dot-work db-issues labels add bd-a1b2 "bug"
-dot-work db-issues labels list
-
-# Comments
-dot-work db-issues comments add bd-a1b2 "Test comment"
-dot-work db-issues comments list bd-a1b2
-
-# Search
-dot-work db-issues search "first"
-
-# Delete
-dot-work db-issues delete bd-a1b2
-
-# Cleanup
-rm -rf .work/db-issues/
-```
-
-**Database Verification:**
-- [ ] Database created at `.work/db-issues/issues.db`
-- [ ] Tables created correctly
-- [ ] Data persists between commands
-- [ ] Hash-based IDs generated correctly (e.g., `bd-a1b2`)
-- [ ] Child IDs work (e.g., `bd-a1b2.1`)
-
-### Acceptance Criteria
-- [ ] `uv run python scripts/build.py` passes
-- [ ] All db-issues commands work correctly
-- [ ] Database stored in `.work/db-issues/`
-- [ ] CRUD operations persist data
-- [ ] Hash-based ID system works correctly
-- [ ] No regressions in existing dot-work functionality
-
-### Notes
-Final verification step. Only mark migration complete when all checks pass.
-
-Depends on: MIGRATE-034 through MIGRATE-039.

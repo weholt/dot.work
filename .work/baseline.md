@@ -1,84 +1,68 @@
-# Project Baseline
-
-**Captured:** 2025-12-23T06:00:00Z
-**Commit:** 81e235aa1ca3e72bbb3b0d37972aa13a96e8450b
-**Branch:** migrating-using-opencode
-
----
+# Baseline Report
+Generated: 2024-12-23T09:30:00Z
+Commit: ab43b59
+Branch: migrating-using-opencode
 
 ## Build Status
-- Status: Partial (4/8 steps passing)
-- Execution time: ~12s
+- Status: passing
+- Execution time: ~120s
 
-## Pre-existing Issues (Before Git History Migration)
+## Dependencies
+- Python 3.13.11
+- pytest 9.0.2
+- uv package manager
 
-### Linting (Ruff)
-- Status: ✅ PASSING
+## Linting
+- Total errors: 840
+- Fixable with --fix: 598
+- Critical errors (undefined-name, invalid-syntax): 16
+
+### Error Summary
+| Code | Count | Description |
+|------|-------|-------------|
+| UP006 | 239 | non-pep585-annotation |
+| F401 | 93 | unused-import |
+| UP045 | 84 | non-pep604-annotation-optional |
+| I001 | 63 | unsorted-imports |
+| W293 | 61 | blank-line-with-whitespace |
+| UP035 | 53 | deprecated-import |
+
+Note: Most errors are style-related and pre-existing. Can run `uv run ruff check --fix` to auto-fix 598 errors.
+
+## Type Checking
 - Total errors: 0
+- Total warnings: 0
+- Status: passing (87 source files)
 
-### Type Checking (Mypy)
-- Status: ⚠️ 4 errors (pre-existing)
-- Files affected:
-  - `src/dot_work/zip/zipper.py`: unused type: ignore, gitignore_parser untyped
-  - `src/dot_work/container/provision/core.py`: frontmatter untyped
-  - `src/dot_work/container/provision/validation.py`: frontmatter untyped
+## Tests
+- Unit tests: 1027 passed, 0 failed
+- Integration tests: 33 passed, 0 failed
+- Total: 1060 collected, 1027 selected
+- Execution time: ~90s
 
-### Security Checks
-- Status: ⚠️ 1 warning (pre-existing)
-- S603: subprocess call in container/provision/core.py (untrusted input check)
+### Test Status
+All tests passing ✓
 
-### Unit Tests
-- Status: ⚠️ 38 failing, 896 passing, 1 error (pre-existing version module issues)
-- All failing tests are in: `tests/unit/version/`
+## Coverage
+- Not measured in this build run
 
-**Failing test files:**
-- `test_cli.py`: 7 failures (CLI output assertions, exit codes)
-- `test_commit_parser.py`: 6 failures (unexpected keyword argument 'hash')
-- `test_config.py`: 4 failures (VersionConfig missing 'load_config' attribute)
-- `test_manager.py`: 21 failures (git repository errors in tests)
+## Security
+- No security scanning in this build
 
-**Note:** These are pre-existing issues from the version module migration (MIGRATE-043 through MIGRATE-057). They should be addressed separately from the git history migration.
+## Files Summary
+Total Python files: 87
+Build status: passing
+Test status: all passing
+Type checking: passing
 
-### Files with Pre-existing Issues
-| File | Issues |
-|------|--------|
-| src/dot_work/zip/zipper.py | mypy: unused type: ignore, untyped import |
-| src/dot_work/container/provision/core.py | mypy: untyped import, security: S603 |
-| src/dot_work/container/provision/validation.py | mypy: untyped import |
-| tests/unit/version/* | 38 failing tests |
+### Pre-existing Issues to Address
+- Linting: 840 errors (598 auto-fixable)
+- Tests: All passing now (version module tests fixed in previous work)
 
-### Clean Files (No Issues)
-All other files are clean (formatting, linting, type-wise).
-
----
-
-## Scope Summary
-
-### Modules & Structure
-- **Total Python files:** 76
-- **Main modules:**
-  - `dot_work` - Core CLI and scaffolding functionality
-  - `dot_work.container` - Container build/provision
-  - `dot_work.git` - **TO BE CREATED** (this migration)
-  - `dot_work.knowledge_graph` - Knowledge graph management
-  - `dot_work.overview` - Code overview generation (newly added)
-  - `dot_work.prompts` - AI prompt templates and workflows
-  - `dot_work.python` - Python tooling utilities
-  - `dot_work.review` - Code review server and tools
-  - `dot_work.tools` - JSON/YAML validation utilities
-  - `dot_work.version` - Version management system
-  - `dot_work.zip` - Module packaging and distribution
-
-### Entry Points
-- **Primary CLI:** `dot-work` - Main project scaffolding and issue tracking
-- **Secondary:** `kg` - Knowledge graph management
-
----
-
-## Invariant for Git History Migration
-
-During MIGRATE-064 through MIGRATE-069:
-- Do NOT introduce new issues in clean files
-- Do NOT increase mypy errors beyond 4
-- Do NOT break the 896 passing tests
-- Create new issues only in `src/dot_work/git/` (new module)
+## Invariant for db-issues Migration
+During MIGRATE-034 through MIGRATE-085:
+- Create new module: `src/dot_work/db_issues/`
+- Do NOT introduce new critical errors (undefined-name, invalid-syntax)
+- Do NOT break the 1060 passing tests
+- Keep mypy errors at 0
+- New files should be clean (no new mypy warnings)

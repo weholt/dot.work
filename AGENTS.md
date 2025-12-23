@@ -33,7 +33,6 @@ This project uses a file-based issue tracker in `.work/`.
 ```
 
 **Key commands:**
-- `init work` – Initialize the issue tracker
 - `generate-baseline` – Generate `.work/baseline.md` before any code changes
 - `continue` – Resume work on the current issue
 - `focus on <topic>` – Create prioritized issues for a topic
@@ -69,3 +68,4 @@ uv run mypy src/ && uv run ruff check .     # Type check + lint
 
 ## Forbidden
 - Running Python directly, hardcoded secrets, mutable defaults, global state
+- Using rm bash command without explicit user permission.

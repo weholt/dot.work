@@ -38,7 +38,7 @@ class VersionManager:
         self.repo: Repo | None = None
         try:
             self.repo = Repo(self.project_root)
-        except Exception:
+        except Exception:  # noqa: S110 (non-git directories are allowed)
             pass
 
         # Load project information from pyproject.toml

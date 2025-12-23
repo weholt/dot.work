@@ -22,6 +22,8 @@ dependencies = [
     "typer>=0.12.0",
     "rich>=13.0.0",
     "pyyaml>=6.0.0",
+    # db-issues module dependencies
+    "sqlmodel>=0.0.22",
     "jinja2>=3.1.0",
     "radon>=6.0.0",
     # version module dependencies
