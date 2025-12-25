@@ -56,6 +56,7 @@ class IssueService:
         priority: IssuePriority = IssuePriority.MEDIUM,
         issue_type: IssueType = IssueType.TASK,
         assignee: str | None = None,
+        assignees: list[str] | None = None,
         epic_id: str | None = None,
         labels: list[str] | None = None,
         project_id: str = "default",
@@ -68,7 +69,8 @@ class IssueService:
             description: Issue description (default: empty)
             priority: Issue priority (default: MEDIUM)
             issue_type: Issue type (default: TASK)
-            assignee: Optional assignee username
+            assignee: Optional single assignee username (deprecated, use assignees)
+            assignees: Optional list of assignee usernames
             epic_id: Optional parent epic ID
             labels: Optional list of labels
             project_id: Project identifier (default: "default")
@@ -81,15 +83,25 @@ class IssueService:
             >>> service.create_issue("Fix bug", priority=IssuePriority.HIGH)
             Issue(id='issue-abc123', title='Fix bug', ...)
 
+            >>> service.create_issue("Multi-assign", assignees=["alice", "bob"])
+            Issue(id='issue-def456', title='Multi-assign', ...)
+
             >>> service.create_issue("Custom", custom_id="PROJECT-123")
             Issue(id='PROJECT-123', title='Custom', ...)
         """
+        # Handle both assignee (single) and assignees (list) for backward compatibility
+        final_assignees: list[str] = []
+        if assignee:
+            final_assignees.append(assignee)
+        if assignees:
+            final_assignees.extend(assignees)
+
         logger.debug(
-            "Creating issue: title=%s, type=%s, priority=%s, assignee=%s",
+            "Creating issue: title=%s, type=%s, priority=%s, assignees=%s",
             title,
             issue_type.value,
             priority.value,
-            assignee,
+            final_assignees,
         )
 
         # Use custom ID if provided, otherwise generate one
@@ -114,7 +126,7 @@ class IssueService:
             status=IssueStatus.PROPOSED,
             priority=priority,
             type=issue_type,
-            assignee=assignee,
+            assignees=final_assignees,
             epic_id=epic_id,
             labels=labels or [],
             created_at=now,
@@ -156,6 +168,7 @@ class IssueService:
         description: str | None = None,
         priority: IssuePriority | None = None,
         assignee: str | None = None,
+        assignees: list[str] | None = None,
         epic_id: str | None = None,
         status: IssueStatus | None = None,
         type: IssueType | None = None,
@@ -167,7 +180,8 @@ class IssueService:
             title: New title (if provided)
             description: New description (if provided)
             priority: New priority (if provided)
-            assignee: New assignee (if provided)
+            assignee: New single assignee, replaces all assignees (if provided)
+            assignees: New list of assignees, replaces all assignees (if provided)
             epic_id: New epic ID (if provided)
             status: New status (if provided, uses transition validation)
             type: New issue type (if provided)
@@ -179,11 +193,12 @@ class IssueService:
             InvalidTransitionError: If status transition is not allowed
         """
         logger.debug(
-            "Updating issue: id=%s, title=%s, priority=%s, assignee=%s, epic_id=%s, status=%s, type=%s",
+            "Updating issue: id=%s, title=%s, priority=%s, assignee=%s, assignees=%s, epic_id=%s, status=%s, type=%s",
             issue_id,
             title,
             priority,
             assignee,
+            assignees,
             epic_id,
             status.value if status else None,
             type.value if type else None,
@@ -199,8 +214,15 @@ class IssueService:
             issue.description = description
         if priority is not None:
             issue.priority = priority
-        if assignee is not None:
-            issue.assignee = assignee
+
+        # Handle assignee/assignees - set the full assignees list
+        if assignees is not None:
+            # Replace entire assignees list
+            issue.assignees = assignees.copy()
+        elif assignee is not None:
+            # Single assignee replaces all
+            issue.assignees = [assignee]
+
         if epic_id is not None:
             issue.epic_id = epic_id
         if status is not None:
@@ -324,8 +346,10 @@ class IssueService:
         assignee: str | None = None,
         epic_id: str | None = None,
         issue_type: IssueType | None = None,
+        project_id: str | None = None,
         limit: int = 100,
         offset: int = 0,
+        exclude_backlog: bool = True,
     ) -> list[Issue]:
         """List issues with optional filtering.
 
@@ -335,24 +359,34 @@ class IssueService:
             assignee: Filter by assignee
             epic_id: Filter by epic
             issue_type: Filter by type
+            project_id: Filter by project
             limit: Maximum results (default: 100)
             offset: Offset for pagination (default: 0)
+            exclude_backlog: Exclude backlog priority issues (default: True)
 
         Returns:
             List of matching issues
         """
-        if status:
-            return self.uow.issues.list_by_status(status, limit, offset)
+        if project_id:
+            issues = self.uow.issues.list_by_project(project_id, limit, offset)
+        elif status:
+            issues = self.uow.issues.list_by_status(status, limit, offset)
         elif priority is not None:
-            return self.uow.issues.list_by_priority(priority, limit, offset)
+            issues = self.uow.issues.list_by_priority(priority, limit, offset)
         elif assignee:
-            return self.uow.issues.list_by_assignee(assignee, limit, offset)
+            issues = self.uow.issues.list_by_assignee(assignee, limit, offset)
         elif epic_id:
-            return self.uow.issues.list_by_epic(epic_id, limit, offset)
+            issues = self.uow.issues.list_by_epic(epic_id, limit, offset)
         elif issue_type:
-            return self.uow.issues.list_by_type(issue_type, limit, offset)
+            issues = self.uow.issues.list_by_type(issue_type, limit, offset)
         else:
-            return self.uow.issues.list_all(limit, offset)
+            issues = self.uow.issues.list_all(limit, offset)
+
+        # Filter out backlog items if exclude_backlog is True
+        if exclude_backlog:
+            issues = [i for i in issues if i.priority != IssuePriority.BACKLOG]
+
+        return issues
 
     def add_comment(self, issue_id: str, author: str, text: str) -> Comment | None:
         """Add comment to issue.
@@ -637,6 +671,279 @@ class IssueService:
             # Hierarchical epic handling to be addressed in reconciliation.
 
             return epic_issues
+
+    def set_labels(self, issue_id: str, labels: list[str]) -> Issue | None:
+        """Replace all labels on an issue.
+
+        Args:
+            issue_id: Issue identifier
+            labels: New list of labels (replaces all existing labels)
+
+        Returns:
+            Updated issue if found, None otherwise
+
+        Examples:
+            >>> service.set_labels("issue-123", ["bug", "urgent"])
+            Issue(id='issue-123', labels=["bug", "urgent"], ...)
+        """
+        logger.debug("Setting labels for issue: id=%s, labels=%s", issue_id, labels)
+
+        issue = self.uow.issues.get(issue_id)
+        if not issue:
+            logger.warning("Cannot set labels: issue not found: id=%s", issue_id)
+            return None
+
+        # Replace all labels
+        issue.labels = labels
+        issue.updated_at = self.clock.now()
+
+        updated_issue = self.uow.issues.save(issue)
+        logger.info("Set labels for issue: id=%s, labels=%s", issue_id, labels)
+        return updated_issue
+
+    def block_issue(self, issue_id: str, reason: str | None = None) -> Issue | None:
+        """Block an issue with an optional reason.
+
+        Transitions the issue to BLOCKED status and stores the reason.
+
+        Args:
+            issue_id: Issue identifier
+            reason: Optional reason for blocking
+
+        Returns:
+            Blocked issue if found, None otherwise
+        """
+        logger.debug("Blocking issue: id=%s, reason=%s", issue_id, reason)
+
+        issue = self.uow.issues.get(issue_id)
+        if not issue:
+            logger.warning("Cannot block: issue not found: id=%s", issue_id)
+            return None
+
+        # Transition to blocked
+        blocked = issue.transition(IssueStatus.BLOCKED)
+        blocked.blocked_reason = reason
+        blocked.updated_at = self.clock.now()
+
+        saved = self.uow.issues.save(blocked)
+        logger.info("Issue blocked: id=%s, reason=%s", saved.id, reason)
+        return saved
+
+    def get_stale_issues(self, days: int = 30) -> list[Issue]:
+        """Get issues that haven't been updated in a specified number of days.
+
+        Args:
+            days: Number of days of inactivity to consider stale (default: 30)
+
+        Returns:
+            List of stale issues, sorted by updated_at ascending (oldest first)
+        """
+        logger.debug("Getting stale issues: days=%d", days)
+
+        # Get all issues (limit high to get all)
+        all_issues = self.list_issues(limit=100000)
+
+        # Calculate cutoff time
+        from datetime import timedelta
+
+        cutoff = self.clock.now() - timedelta(days=days)
+
+        # Filter stale issues
+        stale_issues = [issue for issue in all_issues if issue.updated_at < cutoff]
+
+        # Sort by updated_at ascending (oldest first)
+        stale_issues.sort(key=lambda x: x.updated_at)
+
+        logger.info("Found %d stale issues (older than %d days)", len(stale_issues), days)
+        return stale_issues
+
+    def merge_issues(
+        self,
+        source_id: str,
+        target_id: str,
+        keep_comments: bool = False,
+        close_source: bool = False,
+    ) -> Issue | None:
+        """Merge source issue into target issue.
+
+        Combines data from source into target:
+        - Labels: union of both sets
+        - Dependencies: all dependencies remapped to target
+        - Comments: optionally copied from source
+
+        Args:
+            source_id: Source issue ID (to be merged from)
+            target_id: Target issue ID (to be merged into)
+            keep_comments: If True, copy comments from source to target
+            close_source: If True, close source instead of deleting
+
+        Returns:
+            Updated target issue if successful, None otherwise
+
+        Raises:
+            ValueError: If source and target are the same
+            ValueError: If either issue not found
+        """
+        logger.debug(
+            "Merging issues: source=%s, target=%s, keep_comments=%s, close_source=%s",
+            source_id,
+            target_id,
+            keep_comments,
+            close_source,
+        )
+
+        # Validate source != target
+        if source_id == target_id:
+            raise ValueError("Cannot merge issue into itself")
+
+        with self.uow:
+            # Get both issues
+            source = self.uow.issues.get(source_id)
+            target = self.uow.issues.get(target_id)
+
+            if not source:
+                raise ValueError(f"Source issue not found: {source_id}")
+            if not target:
+                raise ValueError(f"Target issue not found: {target_id}")
+
+            # Merge labels (union, preserving order from target then new from source)
+            target_label_set = set(target.labels)
+            new_labels = [label for label in source.labels if label not in target_label_set]
+            merged_labels = target.labels + new_labels
+            target.labels = merged_labels
+
+            # Combine descriptions
+            if source.description:
+                if target.description:
+                    # Add source description to target
+                    separator = "\n\n---\n\n"
+                    target.description = target.description + separator + source.description
+                else:
+                    target.description = source.description
+
+            # Merge dependencies
+            # 1. Get all dependencies for both issues
+            source_deps = self.uow.issues.get_dependencies(source_id)
+            target_deps = self.uow.issues.get_dependencies(target_id)
+            source_dependents = self.uow.issues.get_dependents(source_id)
+
+            # Build sets of existing relationships for target
+            target_from_to = {(d.from_issue_id, d.to_issue_id) for d in target_deps}
+
+            # Add unique source dependencies to target
+            for dep in source_deps:
+                # Skip self-references after remapping
+                if dep.to_issue_id == source_id:
+                    continue  # Source pointing to itself, skip
+                if dep.to_issue_id == target_id:
+                    continue  # Would create self-reference, skip
+
+                # Remap to target
+                key = (target_id, dep.to_issue_id)
+                if key not in target_from_to:
+                    new_dep = Dependency(
+                        from_issue_id=target_id,
+                        to_issue_id=dep.to_issue_id,
+                        dependency_type=dep.dependency_type,
+                        description=dep.description,
+                        created_at=self.clock.now(),
+                    )
+                    self.uow.issues.add_dependency(new_dep)
+                    target_from_to.add(key)
+
+            # Remap dependents (issues that depend on source) to depend on target
+            for dep in source_dependents:
+                # Skip self-references after remapping
+                if dep.from_issue_id == target_id:
+                    continue  # Would create self-reference, skip
+
+                # Remap to target
+                key = (dep.from_issue_id, target_id)
+                if key not in target_from_to:
+                    new_dep = Dependency(
+                        from_issue_id=dep.from_issue_id,
+                        to_issue_id=target_id,
+                        dependency_type=dep.dependency_type,
+                        description=dep.description,
+                        created_at=self.clock.now(),
+                    )
+                    self.uow.issues.add_dependency(new_dep)
+                    target_from_to.add(key)
+
+            # Copy comments if requested
+            if keep_comments:
+                source_comments = self.uow.issues.get_comments(source_id)
+                for comment in source_comments:
+                    # Create new comment with same content but different ID
+                    new_comment = Comment(
+                        id=self.id_service.generate_id(),
+                        issue_id=target_id,
+                        author=comment.author,
+                        text=f"[Merged from {source_id}]\n{comment.text}",
+                        created_at=comment.created_at,
+                        updated_at=comment.updated_at,
+                    )
+                    self.uow.issues.add_comment(new_comment)
+
+            # Update target timestamp
+            target.updated_at = self.clock.now()
+            self.uow.issues.save(target)
+
+            # Handle source issue
+            if close_source:
+                # Close source issue
+                source = source.transition(IssueStatus.COMPLETED)
+                source.updated_at = self.clock.now()
+                source.closed_at = self.clock.now()
+                self.uow.issues.save(source)
+                logger.info("Source issue closed: %s", source_id)
+            else:
+                # Delete source issue
+                self.uow.issues.delete(source_id)
+                logger.info("Source issue deleted: %s", source_id)
+
+            self.uow.commit()
+
+            logger.info("Merged %s into %s", source_id, target_id)
+            return target
+
+    def restore_issue(self, issue_id: str) -> Issue | None:
+        """Restore a soft-deleted issue.
+
+        Args:
+            issue_id: Issue identifier to restore
+
+        Returns:
+            Restored issue if successful, None otherwise
+        """
+        logger.debug("Restoring issue: id=%s", issue_id)
+
+        with self.uow:
+            restored = self.uow.issues.restore(issue_id)
+            if restored:
+                # Get the restored issue to return it
+                # Need to query without the deleted filter
+                from dot_work.db_issues.adapters.sqlite import IssueModel
+
+                model = self.uow.session.get(IssueModel, issue_id)
+                if model:
+                    issue = self.uow.issues._model_to_entity(model)
+                    self.uow.commit()
+                    logger.info("Issue restored: id=%s", issue_id)
+                    return issue
+            return None
+
+    def list_deleted_issues(self, limit: int = 100) -> list[Issue]:
+        """List soft-deleted issues.
+
+        Args:
+            limit: Maximum number of issues to return
+
+        Returns:
+            List of soft-deleted issues
+        """
+        logger.debug("Listing deleted issues: limit=%d", limit)
+        return self.uow.issues.list_deleted(limit=limit)
 
 
 __all__ = ["IssueService"]

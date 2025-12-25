@@ -50,6 +50,32 @@ class CycleResult:
     message: str
 
 
+@dataclass(frozen=True)
+class BlockedIssue:
+    """An issue that is blocked by dependencies.
+
+    Attributes:
+        issue_id: The blocked issue ID
+        blockers: List of issue IDs that are blocking this issue
+    """
+
+    issue_id: str
+    blockers: list[str]
+
+
+@dataclass(frozen=True)
+class ReadyResult:
+    """Result of ready queue calculation.
+
+    Attributes:
+        ready_issues: List of issue IDs ready to work on
+        blocked_issues: List of BlockedIssue with their blockers
+    """
+
+    ready_issues: list[str]
+    blocked_issues: list[BlockedIssue]
+
+
 class DependencyService:
     """Service for dependency analysis and cycle detection.
 
@@ -332,6 +358,209 @@ class DependencyService:
 
         return tree
 
+    def get_all_dependencies(
+        self, dependency_type: DependencyType | None = None
+    ) -> list[Dependency]:
+        """Get all dependencies in the system, optionally filtered by type.
+
+        Args:
+            dependency_type: Optional filter by dependency type
+
+        Returns:
+            List of all dependency relationships
+
+        Examples:
+            >>> all_deps = service.get_all_dependencies()
+            >>> blocks_only = service.get_all_dependencies(DependencyType.BLOCKS)
+        """
+        all_deps = self.uow.graph.get_all_dependencies()
+
+        if dependency_type:
+            return [d for d in all_deps if d.dependency_type == dependency_type]
+
+        return all_deps
+
+    def generate_mermaid(
+        self, issue_id: str, max_depth: int = 5
+    ) -> str:
+        """Generate Mermaid diagram for dependency tree.
+
+        Args:
+            issue_id: Root issue to generate diagram from
+            max_depth: Maximum depth to traverse (default: 5)
+
+        Returns:
+            Mermaid diagram as string
+
+        Examples:
+            >>> mermaid = service.generate_mermaid("bd-a1b2")
+            >>> print(mermaid)
+            graph TD
+                bd-a1b2[bd-a1b2: Feature]
+                bd-c3d4[bd-c3d4: Test]
+                bd-a1b2 -->|blocks| bd-c3d4
+        """
+        tree = self.get_dependency_tree(issue_id, max_depth)
+
+        if not tree:
+            return f"graph TD\n    {issue_id}[{issue_id}: No dependencies]"
+
+        lines = ["graph TD"]
+        edges: set[tuple[str, str, str]] = set()
+        nodes: set[str] = set()
+
+        def build_mermaid(current: str) -> None:
+            """Recursively build Mermaid diagram."""
+            if current not in tree:
+                return
+
+            # Add node
+            issue = self.uow.issues.get(current)
+            title = issue.title[:30] if issue else "Unknown"
+            label = f"{current}: {title}"
+            node_id = current.replace("-", "_")
+            nodes.add(f"    {node_id}[{current}: {title}]")
+
+            # Add edges to children
+            for _from_id, to_id, dep_type in tree[current]:
+                child_id = to_id.replace("-", "_")
+                edge_label = dep_type.value
+                edge = (node_id, child_id, edge_label)
+                if edge not in edges:
+                    edges.add(edge)
+                    lines.append(f"    {node_id} -->|{edge_label}| {child_id}")
+
+                build_mermaid(to_id)
+
+        build_mermaid(issue_id)
+
+        # Add all nodes first, then edges (skip the initial "graph TD" from lines)
+        result_lines = ["graph TD"] + list(nodes) + lines[1:]
+        return "\n".join(result_lines)
+
+    def suggest_cycle_fixes(self, cycles: list[CycleResult]) -> list[str]:
+        """Suggest fixes for circular dependencies.
+
+        Analyzes cycles and generates suggestions for which dependencies
+        to remove to break each cycle.
+
+        Args:
+            cycles: List of cycle results to analyze
+
+        Returns:
+            List of fix suggestions
+
+        Examples:
+            >>> cycles = service.check_circular_all()
+            >>> fixes = service.suggest_cycle_fixes(cycles)
+            >>> for fix in fixes:
+            ...     print(fix)
+        """
+        suggestions: list[str] = []
+
+        for cycle in cycles:
+            if not cycle.has_cycle or len(cycle.cycle_path) < 2:
+                continue
+
+            # For a cycle A -> B -> C -> A, suggest removing the last link
+            # This is a heuristic - suggest removing the dependency that
+            # would create the least disruption
+            path = cycle.cycle_path
+
+            if len(path) >= 2:
+                # Suggest removing the last dependency in the cycle
+                from_issue = path[-2]
+                to_issue = path[-1]
+
+                suggestion = (
+                    f"Remove dependency: {from_issue} -> {to_issue} "
+                    f"(this would break the cycle: {' -> '.join(path)})"
+                )
+                suggestions.append(suggestion)
+
+        return suggestions
+
+    def get_ready_queue(self) -> ReadyResult:
+        """Get ready queue of issues with no blocking dependencies.
+
+        An issue is "ready" if:
+        1. Status is "proposed" or "in_progress"
+        2. Not in "blocked" status
+        3. No open "blocks" dependencies pointing to it
+
+        Returns:
+            ReadyResult with ready issue IDs and blocked issues with their blockers
+
+        Examples:
+            >>> result = service.get_ready_queue()
+            >>> print(f"Ready: {len(result.ready_issues)}")
+            >>> for blocked in result.blocked_issues:
+            ...     print(f"{blocked.issue_id} blocked by {blocked.blockers}")
+        """
+        logger.debug("Calculating ready queue")
+
+        from dot_work.db_issues.domain.entities import IssueStatus
+
+        # Get all issues from the repository
+        all_issues = self.uow.issues.list_all()
+
+        # Get all BLOCKS dependencies
+        all_deps = self.uow.graph.get_all_dependencies()
+        blocks_deps = [
+            d for d in all_deps if d.dependency_type == DependencyType.BLOCKS
+        ]
+
+        # Build a map: issue_id -> list of issues that block it
+        # For a blocks relationship (from -> to), "from" blocks "to"
+        # So "to" is blocked by "from"
+        blocked_by: dict[str, set[str]] = {}
+        for dep in blocks_deps:
+            if dep.to_issue_id not in blocked_by:
+                blocked_by[dep.to_issue_id] = set()
+            blocked_by[dep.to_issue_id].add(dep.from_issue_id)
+
+        # Also need to check if the blocking issues are open (not completed)
+        # If a blocking issue is completed, it doesn't block anymore
+        completed_issues: set[str] = {
+            issue.id for issue in all_issues if issue.status == IssueStatus.COMPLETED
+        }
+
+        # Filter out completed blocking issues
+        for issue_id in list(blocked_by.keys()):
+            blockers = blocked_by[issue_id]
+            active_blockers = {b for b in blockers if b not in completed_issues}
+            if active_blockers:
+                blocked_by[issue_id] = active_blockers
+            else:
+                del blocked_by[issue_id]
+
+        ready_ids: list[str] = []
+        blocked_issues: list[BlockedIssue] = []
+
+        for issue in all_issues:
+            # Skip completed and wont-fix issues
+            if issue.status in (IssueStatus.COMPLETED, IssueStatus.WONT_FIX):
+                continue
+
+            # Check if issue is blocked by status
+            if issue.status == IssueStatus.BLOCKED:
+                # Get blockers from dependencies
+                blockers = list(blocked_by.get(issue.id, []))
+                blocked_issues.append(BlockedIssue(issue_id=issue.id, blockers=blockers))
+                continue
+
+            # Check if issue has active blockers via dependencies
+            if issue.id in blocked_by:
+                blockers = list(blocked_by[issue.id])
+                blocked_issues.append(BlockedIssue(issue_id=issue.id, blockers=blockers))
+                continue
+
+            # Check status is proposed or in-progress
+            if issue.status in (IssueStatus.PROPOSED, IssueStatus.IN_PROGRESS):
+                ready_ids.append(issue.id)
+
+        return ReadyResult(ready_issues=ready_ids, blocked_issues=blocked_issues)
+
     def _has_path_to(self, from_id: str, to_id: str, visited: set[str]) -> bool:
         """Check if there's a path from from_id to to_id.
 
@@ -367,4 +596,6 @@ __all__ = [
     "DependencyService",
     "ImpactResult",
     "CycleResult",
+    "BlockedIssue",
+    "ReadyResult",
 ]

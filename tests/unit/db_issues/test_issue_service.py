@@ -48,7 +48,21 @@ class TestCreateIssue:
             assignee="testuser",
             labels=["bug"],
         )
-        assert issue.assignee == "testuser"
+        assert "testuser" in issue.assignees
+        assert "bug" in issue.labels
+
+    def test_create_issue_with_multiple_assignees(self, issue_service: IssueService) -> None:
+        """Test creating an issue with multiple assignees."""
+        issue = issue_service.create_issue(
+            title="Multi-Assigned Issue",
+            description="Test",
+            priority=IssuePriority.HIGH,
+            issue_type=IssueType.BUG,
+            assignees=["user1", "user2"],
+            labels=["bug"],
+        )
+        assert "user1" in issue.assignees
+        assert "user2" in issue.assignees
         assert "bug" in issue.labels
 
     def test_create_issue_with_labels(self, issue_service: IssueService) -> None:
@@ -172,8 +186,8 @@ class TestUpdateIssue:
             title="Test", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
         )
 
-        updated = issue_service.update_issue(issue.id, assignee="newuser")
-        assert updated.assignee == "newuser"
+        updated = issue_service.update_issue(issue.id, assignees=["newuser"])
+        assert "newuser" in updated.assignees
 
     def test_update_issue_not_found_returns_none(self, issue_service: IssueService) -> None:
         """Test updating a non-existent issue returns None."""
@@ -328,3 +342,181 @@ class TestAddDependency:
             from_issue_id=issue.id, to_issue_id=issue.id, dependency_type=DependencyType.BLOCKS
         )
         assert result is None  # Self-referencing dependency returns None
+
+
+class TestSetLabels:
+    """Tests for IssueService.set_labels method."""
+
+    def test_set_labels_replaces_all_labels(self, issue_service: IssueService) -> None:
+        """Test that set_labels replaces all existing labels."""
+        issue = issue_service.create_issue("Test Issue", labels=["old-label", "another-old"])
+
+        updated = issue_service.set_labels(issue.id, ["bug", "urgent", "critical"])
+
+        assert updated is not None
+        # Labels are stored in sorted order
+        assert set(updated.labels) == {"bug", "urgent", "critical"}
+
+    def test_set_labels_clears_all_labels(self, issue_service: IssueService) -> None:
+        """Test that set_labels with empty list clears all labels."""
+        issue = issue_service.create_issue("Test Issue", labels=["old-label", "another-old"])
+
+        updated = issue_service.set_labels(issue.id, [])
+
+        assert updated is not None
+        assert updated.labels == []
+
+    def test_set_labels_on_nonexistent_issue_returns_none(
+        self, issue_service: IssueService
+    ) -> None:
+        """Test that set_labels on nonexistent issue returns None."""
+        result = issue_service.set_labels("nonexistent", ["bug"])
+        assert result is None
+
+    def test_set_labels_updates_timestamp(self, issue_service: IssueService) -> None:
+        """Test that set_labels updates the updated_at timestamp."""
+        # Note: With fixed_clock, timestamps don't actually advance
+        # We just verify that updated_at is set
+        issue = issue_service.create_issue("Test Issue", labels=["old"])
+
+        updated = issue_service.set_labels(issue.id, ["new-label"])
+
+        assert updated is not None
+        assert updated.updated_at is not None
+
+
+class TestBlockIssue:
+    """Tests for IssueService.block_issue method."""
+
+    def test_block_issue_sets_blocked_status(self, issue_service: IssueService) -> None:
+        """Test blocking an issue sets status to BLOCKED."""
+        issue = issue_service.create_issue("Test Issue")
+
+        blocked = issue_service.block_issue(issue.id)
+
+        assert blocked is not None
+        assert blocked.status == IssueStatus.BLOCKED
+
+    def test_block_issue_with_reason(self, issue_service: IssueService) -> None:
+        """Test blocking an issue stores the reason."""
+        issue = issue_service.create_issue("Test Issue")
+
+        blocked = issue_service.block_issue(issue.id, "Waiting for dependency")
+
+        assert blocked is not None
+        assert blocked.blocked_reason == "Waiting for dependency"
+
+    def test_block_issue_without_reason(self, issue_service: IssueService) -> None:
+        """Test blocking an issue without reason stores None."""
+        issue = issue_service.create_issue("Test Issue")
+
+        blocked = issue_service.block_issue(issue.id)
+
+        assert blocked is not None
+        assert blocked.blocked_reason is None
+
+    def test_block_nonexistent_issue_returns_none(self, issue_service: IssueService) -> None:
+        """Test blocking a nonexistent issue returns None."""
+        result = issue_service.block_issue("nonexistent", "reason")
+        assert result is None
+
+
+class TestResolveIssue:
+    """Tests for resolving issues via transition_issue."""
+
+    def test_transition_to_resolved(self, issue_service: IssueService) -> None:
+        """Test transitioning an issue to RESOLVED status."""
+        issue = issue_service.create_issue("Test Issue")
+
+        # Start the issue first (proposed -> in_progress)
+        issue_service.transition_issue(issue.id, IssueStatus.IN_PROGRESS)
+
+        # Then resolve it
+        resolved = issue_service.transition_issue(issue.id, IssueStatus.RESOLVED)
+
+        assert resolved is not None
+        assert resolved.status == IssueStatus.RESOLVED
+
+    def test_transition_to_stale(self, issue_service: IssueService) -> None:
+        """Test transitioning an issue to STALE status."""
+        issue = issue_service.create_issue("Test Issue")
+
+        stale = issue_service.transition_issue(issue.id, IssueStatus.STALE)
+
+        assert stale is not None
+        assert stale.status == IssueStatus.STALE
+
+
+class TestGetStaleIssues:
+    """Tests for IssueService.get_stale_issues method."""
+
+    def test_get_stale_issues_empty(self, issue_service: IssueService) -> None:
+        """Test get_stale_issues returns empty list when no issues."""
+        from datetime import timedelta
+
+        stale = issue_service.get_stale_issues(days=30)
+        assert stale == []
+
+    def test_get_stale_issues_with_old_issue(self, issue_service: IssueService) -> None:
+        """Test get_stale_issues finds issues older than specified days."""
+        from datetime import timedelta
+
+        # Create an issue
+        issue = issue_service.create_issue("Old Issue")
+
+        # Manually set updated_at to be older than 30 days
+        # We need to directly modify in the repository
+        old_time = issue.updated_at - timedelta(days=35)
+        issue.updated_at = old_time
+        issue_service.uow.issues.save(issue)
+
+        # Get stale issues
+        stale = issue_service.get_stale_issues(days=30)
+
+        assert len(stale) == 1
+        assert stale[0].id == issue.id
+
+    def test_get_stale_issues_with_recent_issue(self, issue_service: IssueService) -> None:
+        """Test get_stale_issues excludes recent issues."""
+        from datetime import timedelta
+
+        # Create an issue
+        issue = issue_service.create_issue("Recent Issue")
+
+        # Set updated_at to be recent (10 days ago)
+        recent_time = issue.updated_at - timedelta(days=10)
+        issue.updated_at = recent_time
+        issue_service.uow.issues.save(issue)
+
+        # Get stale issues (30 day threshold)
+        stale = issue_service.get_stale_issues(days=30)
+
+        assert len(stale) == 0
+
+    def test_get_stale_issues_sorts_by_updated_at(self, issue_service: IssueService) -> None:
+        """Test get_stale_issues sorts by updated_at ascending (oldest first)."""
+        from datetime import timedelta
+
+        # Create multiple issues with different ages
+        issue1 = issue_service.create_issue("Issue 1")
+        issue2 = issue_service.create_issue("Issue 2")
+        issue3 = issue_service.create_issue("Issue 3")
+
+        # Set different ages
+        base_time = issue_service.clock.now()
+        issue1.updated_at = base_time - timedelta(days=40)
+        issue2.updated_at = base_time - timedelta(days=50)
+        issue3.updated_at = base_time - timedelta(days=35)
+
+        issue_service.uow.issues.save(issue1)
+        issue_service.uow.issues.save(issue2)
+        issue_service.uow.issues.save(issue3)
+
+        # Get stale issues
+        stale = issue_service.get_stale_issues(days=30)
+
+        # Should be sorted by updated_at ascending (oldest first)
+        assert len(stale) == 3
+        assert stale[0].id == issue2.id  # 50 days - oldest
+        assert stale[1].id == issue1.id  # 40 days
+        assert stale[2].id == issue3.id  # 35 days - newest

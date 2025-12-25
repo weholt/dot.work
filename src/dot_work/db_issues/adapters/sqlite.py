@@ -28,6 +28,8 @@ from dot_work.db_issues.domain.entities import (
     IssueStatus,
     IssueType,
     Label,
+    Project,
+    ProjectStatus,
     utcnow_naive,
 )
 
@@ -50,7 +52,6 @@ class IssueModel(SQLModel, table=True):
         # Composite index for common queries
         Index("ix_issues_status_priority", "status", "priority"),
         Index("ix_issues_project_status", "project_id", "status"),
-        Index("ix_issues_assignee_status", "assignee", "status"),
         Index("ix_issues_created_status", "created_at", "status"),
     )
 
@@ -61,11 +62,13 @@ class IssueModel(SQLModel, table=True):
     status: str = Field(max_length=20, index=True)
     priority: int = Field(default=2, index=True)
     type: str = Field(max_length=20, index=True)
-    assignee: str | None = Field(default=None, max_length=100, index=True)
     epic_id: str | None = Field(default=None, max_length=50, index=True)
+    blocked_reason: str | None = Field(default=None, max_length=1000)
+    source_url: str | None = Field(default=None, max_length=2048)
     created_at: str = Field(index=True)  # Using str for datetime to avoid import issues
     updated_at: str = Field(index=True)
     closed_at: str | None = Field(default=None, index=True)
+    deleted_at: str | None = Field(default=None, index=True)
 
 
 class LabelModel(SQLModel, table=True):
@@ -90,6 +93,26 @@ class IssueLabelModel(SQLModel, table=True):
 
     issue_id: str = Field(foreign_key="issues.id", primary_key=True, max_length=50)
     label_name: str = Field(primary_key=True, max_length=100)
+    created_at: str
+
+
+class IssueAssigneeModel(SQLModel, table=True):
+    """Junction table for issue-assignee many-to-many relationship."""
+
+    __tablename__ = "issue_assignees"
+
+    issue_id: str = Field(foreign_key="issues.id", primary_key=True, max_length=50)
+    assignee: str = Field(primary_key=True, max_length=100)
+    created_at: str
+
+
+class IssueReferenceModel(SQLModel, table=True):
+    """Junction table for issue-reference many-to-many relationship."""
+
+    __tablename__ = "issue_references"
+
+    issue_id: str = Field(foreign_key="issues.id", primary_key=True, max_length=50)
+    reference: str = Field(primary_key=True, max_length=2048)
     created_at: str
 
 
@@ -147,6 +170,23 @@ class EpicModel(SQLModel, table=True):
     start_date: str | None = None
     target_date: str | None = None
     completed_date: str | None = None
+
+
+class ProjectModel(SQLModel, table=True):
+    """Project table model.
+
+    Maps to Project domain entity.
+    """
+
+    __tablename__ = "projects"
+
+    id: str = Field(primary_key=True, max_length=50)
+    name: str = Field(max_length=200)
+    description: str | None = None
+    status: str = Field(default="active", max_length=20, index=True)
+    is_default: bool = Field(default=False)
+    created_at: str
+    updated_at: str
 
 
 # =============================================================================
@@ -256,15 +296,19 @@ class IssueRepository:
             issue_id: Unique issue identifier
 
         Returns:
-            Issue entity if found, None otherwise
+            Issue entity if found and not deleted, None otherwise
         """
         logger.debug("Repository: fetching issue: id=%s", issue_id)
         model = self.session.get(IssueModel, issue_id)
-        if model:
+        if model and model.deleted_at is None:
             logger.debug("Repository: issue found: id=%s, title=%s", model.id, model.title)
+            return self._model_to_entity(model)
+        elif model and model.deleted_at is not None:
+            logger.debug("Repository: issue is deleted: id=%s", issue_id)
+            return None
         else:
             logger.debug("Repository: issue not found: id=%s", issue_id)
-        return self._model_to_entity(model) if model else None
+            return None
 
     def save(self, issue: Issue) -> Issue:
         """Save or update issue.
@@ -276,10 +320,11 @@ class IssueRepository:
             Saved issue with updated timestamps
         """
         logger.debug(
-            "Repository: saving issue: id=%s, title=%s, labels=%d",
+            "Repository: saving issue: id=%s, title=%s, labels=%d, assignees=%d",
             issue.id,
             issue.title,
             len(issue.labels),
+            len(issue.assignees),
         )
         model = self._entity_to_model(issue)
         merged = self.session.merge(model)
@@ -304,29 +349,89 @@ class IssueRepository:
             self.session.add(label_model)
         self.session.flush()
 
+        # Handle assignees via junction table
+        # First delete existing assignees for this issue
+        assignee_statement = select(IssueAssigneeModel).where(IssueAssigneeModel.issue_id == issue.id)
+        existing_assignees = self.session.exec(assignee_statement).all()
+        for assignee_model in existing_assignees:
+            self.session.delete(assignee_model)
+        self.session.flush()
+
+        # Then add new assignees
+        for assignee in issue.assignees:
+            assignee_model = IssueAssigneeModel(
+                issue_id=issue.id,
+                assignee=assignee,
+                created_at=str(now),
+            )
+            self.session.add(assignee_model)
+        self.session.flush()
+
+        # Handle references via junction table
+        refs = getattr(issue, "references", [])
+        # First delete existing references for this issue
+        ref_statement = select(IssueReferenceModel).where(IssueReferenceModel.issue_id == issue.id)
+        existing_refs = self.session.exec(ref_statement).all()
+        for ref_model in existing_refs:
+            self.session.delete(ref_model)
+        self.session.flush()
+
+        # Then add new references
+        for reference in refs:
+            ref_model = IssueReferenceModel(
+                issue_id=issue.id,
+                reference=reference,
+                created_at=str(now),
+            )
+            self.session.add(ref_model)
+        self.session.flush()
+
         self.session.refresh(merged)
         saved_issue = self._model_to_entity(merged)
         logger.debug("Repository: issue saved: id=%s", saved_issue.id)
         return saved_issue
 
     def delete(self, issue_id: str) -> bool:
-        """Delete issue by ID.
+        """Soft-delete issue by ID (sets deleted_at timestamp).
 
         Args:
             issue_id: Unique issue identifier
 
         Returns:
-            True if issue was deleted, False if not found
+            True if issue was soft-deleted, False if not found
         """
-        logger.debug("Repository: deleting issue: id=%s", issue_id)
+        logger.debug("Repository: soft-deleting issue: id=%s", issue_id)
         model = self.session.get(IssueModel, issue_id)
         if model:
-            self.session.delete(model)
+            model.deleted_at = str(utcnow_naive())
             self.session.flush()
-            logger.info("Repository: issue deleted: id=%s", issue_id)
+            logger.info("Repository: issue soft-deleted: id=%s", issue_id)
             return True
         logger.warning("Repository: issue not found for deletion: id=%s", issue_id)
         return False
+
+    def restore(self, issue_id: str) -> bool:
+        """Restore soft-deleted issue by clearing deleted_at timestamp.
+
+        Args:
+            issue_id: Unique issue identifier
+
+        Returns:
+            True if issue was restored, False if not found or not deleted
+        """
+        logger.debug("Repository: restoring issue: id=%s", issue_id)
+        model = self.session.get(IssueModel, issue_id)
+        if model and model.deleted_at is not None:
+            model.deleted_at = None
+            self.session.flush()
+            logger.info("Repository: issue restored: id=%s", issue_id)
+            return True
+        elif model and model.deleted_at is None:
+            logger.debug("Repository: issue not deleted, cannot restore: id=%s", issue_id)
+            return False
+        else:
+            logger.warning("Repository: issue not found for restore: id=%s", issue_id)
+            return False
 
     def list_all(self, limit: int = 100, offset: int = 0) -> list[Issue]:
         """List all issues with pagination.
@@ -336,9 +441,33 @@ class IssueRepository:
             offset: Number of issues to skip
 
         Returns:
-            List of issue entities
+            List of issue entities (excluding soft-deleted)
         """
-        statement = select(IssueModel).limit(limit).offset(offset)
+        statement = (
+            select(IssueModel)
+            .where(IssueModel.deleted_at.is_(None))  # type: ignore[attr-defined]
+            .limit(limit)
+            .offset(offset)
+        )
+        models = self.session.exec(statement).all()
+        return self._models_to_entities(models)
+
+    def list_deleted(self, limit: int = 100, offset: int = 0) -> list[Issue]:
+        """List soft-deleted issues with pagination.
+
+        Args:
+            limit: Maximum number of issues to return
+            offset: Number of issues to skip
+
+        Returns:
+            List of soft-deleted issue entities
+        """
+        statement = (
+            select(IssueModel)
+            .where(IssueModel.deleted_at.is_not(None))  # type: ignore[attr-defined]
+            .limit(limit)
+            .offset(offset)
+        )
         models = self.session.exec(statement).all()
         return self._models_to_entities(models)
 
@@ -351,10 +480,14 @@ class IssueRepository:
             offset: Number of issues to skip
 
         Returns:
-            List of issues matching status
+            List of issues matching status (excluding soft-deleted)
         """
         statement = (
-            select(IssueModel).where(IssueModel.status == status.value).limit(limit).offset(offset)
+            select(IssueModel)
+            .where(IssueModel.status == status.value)
+            .where(IssueModel.deleted_at.is_(None))  # type: ignore[attr-defined]
+            .limit(limit)
+            .offset(offset)
         )
         models = self.session.exec(statement).all()
         return self._models_to_entities(models)
@@ -435,6 +568,29 @@ class IssueRepository:
         models = self.session.exec(statement).all()
         return self._models_to_entities(models)
 
+    def list_by_project(
+        self, project_id: str, limit: int = 100, offset: int = 0
+    ) -> list[Issue]:
+        """List issues filtered by project.
+
+        Args:
+            project_id: Project identifier to filter by
+            limit: Maximum number of issues to return
+            offset: Number of issues to skip
+
+        Returns:
+            List of issues in the project
+        """
+        statement = (
+            select(IssueModel)
+            .where(IssueModel.project_id == project_id)
+            .where(IssueModel.deleted_at.is_(None))  # type: ignore[attr-defined]
+            .limit(limit)
+            .offset(offset)
+        )
+        models = self.session.exec(statement).all()
+        return self._models_to_entities(models)
+
     def _entity_to_model(self, issue: Issue) -> IssueModel:
         """Convert Issue entity to database model.
 
@@ -452,11 +608,13 @@ class IssueRepository:
             status=issue.status.value,
             priority=issue.priority.value,
             type=issue.type.value,
-            assignee=issue.assignee,
             epic_id=issue.epic_id,
+            blocked_reason=issue.blocked_reason,
+            source_url=getattr(issue, "source_url", None),
             created_at=str(issue.created_at),
             updated_at=str(issue.updated_at),
             closed_at=str(issue.closed_at) if issue.closed_at else None,
+            deleted_at=str(issue.deleted_at) if issue.deleted_at else None,
         )
 
     def _model_to_entity(self, model: IssueModel) -> Issue:
@@ -473,6 +631,16 @@ class IssueRepository:
         label_models = self.session.exec(statement).all()
         labels = [label_model.label_name for label_model in label_models]
 
+        # Load assignees from junction table
+        assignee_statement = select(IssueAssigneeModel).where(IssueAssigneeModel.issue_id == model.id)
+        assignee_models = self.session.exec(assignee_statement).all()
+        assignees = [assignee_model.assignee for assignee_model in assignee_models]
+
+        # Load references from junction table
+        ref_statement = select(IssueReferenceModel).where(IssueReferenceModel.issue_id == model.id)
+        ref_models = self.session.exec(ref_statement).all()
+        references = [ref_model.reference for ref_model in ref_models]
+
         # Parse datetime strings back to datetime objects
         created_at = (
             datetime.fromisoformat(model.created_at) if model.created_at else utcnow_naive()
@@ -481,6 +649,7 @@ class IssueRepository:
             datetime.fromisoformat(model.updated_at) if model.updated_at else utcnow_naive()
         )
         closed_at = datetime.fromisoformat(model.closed_at) if model.closed_at else None
+        deleted_at = datetime.fromisoformat(model.deleted_at) if model.deleted_at else None
 
         return Issue(
             id=model.id,
@@ -490,18 +659,22 @@ class IssueRepository:
             status=IssueStatus(model.status),
             priority=IssuePriority(model.priority),
             type=IssueType(model.type),
-            assignee=model.assignee,
+            assignees=assignees,
             epic_id=model.epic_id,
             labels=labels,
+            blocked_reason=model.blocked_reason,
+            source_url=model.source_url,
+            references=references,
             created_at=created_at,
             updated_at=updated_at,
             closed_at=closed_at,
+            deleted_at=deleted_at,
         )
 
     def _models_to_entities(self, models: Sequence[IssueModel]) -> list[Issue]:
         """Convert multiple database models to Issue entities efficiently.
 
-        Batch-loads labels to avoid N+1 queries.
+        Batch-loads labels and assignees to avoid N+1 queries.
 
         Args:
             models: Sequence of IssueModels from database
@@ -512,8 +685,9 @@ class IssueRepository:
         if not models:
             return []
 
-        # Batch-load all labels for these issues
         issue_ids: list[str] = [model.id for model in models]
+
+        # Batch-load all labels for these issues
         issue_id_col = IssueLabelModel.issue_id
         statement = select(IssueLabelModel).where(issue_id_col.in_(issue_ids))  # type: ignore[attr-defined]
         label_models = self.session.exec(statement).all()
@@ -525,10 +699,47 @@ class IssueRepository:
                 labels_by_issue[label_model.issue_id] = []
             labels_by_issue[label_model.issue_id].append(label_model.label_name)
 
-        # Convert models to entities with batched labels
+        # Batch-load all assignees for these issues
+        issue_id_col = IssueAssigneeModel.issue_id
+        assignee_statement = select(IssueAssigneeModel).where(issue_id_col.in_(issue_ids))  # type: ignore[attr-defined]
+        assignee_models = self.session.exec(assignee_statement).all()
+
+        # Group assignees by issue_id
+        assignees_by_issue: dict[str, list[str]] = {}
+        for assignee_model in assignee_models:
+            if assignee_model.issue_id not in assignees_by_issue:
+                assignees_by_issue[assignee_model.issue_id] = []
+            assignees_by_issue[assignee_model.issue_id].append(assignee_model.assignee)
+
+        # Batch-load all references for these issues
+        issue_id_col = IssueReferenceModel.issue_id
+        ref_statement = select(IssueReferenceModel).where(issue_id_col.in_(issue_ids))  # type: ignore[attr-defined]
+        ref_models = self.session.exec(ref_statement).all()
+
+        # Group references by issue_id
+        refs_by_issue: dict[str, list[str]] = {}
+        for ref_model in ref_models:
+            if ref_model.issue_id not in refs_by_issue:
+                refs_by_issue[ref_model.issue_id] = []
+            refs_by_issue[ref_model.issue_id].append(ref_model.reference)
+
+        # Convert models to entities with batched labels, assignees, and references
         entities = []
         for model in models:
             labels = labels_by_issue.get(model.id, [])
+            assignees = assignees_by_issue.get(model.id, [])
+            references = refs_by_issue.get(model.id, [])
+
+            # Parse datetime strings back to datetime objects
+            created_at = (
+                datetime.fromisoformat(model.created_at) if model.created_at else utcnow_naive()
+            )
+            updated_at = (
+                datetime.fromisoformat(model.updated_at) if model.updated_at else utcnow_naive()
+            )
+            closed_at = datetime.fromisoformat(model.closed_at) if model.closed_at else None
+            deleted_at = datetime.fromisoformat(model.deleted_at) if model.deleted_at else None
+
             entity = Issue(
                 id=model.id,
                 project_id=model.project_id,
@@ -537,12 +748,16 @@ class IssueRepository:
                 status=IssueStatus(model.status),
                 priority=IssuePriority(model.priority),
                 type=IssueType(model.type),
-                assignee=model.assignee,
+                assignees=assignees,
                 epic_id=model.epic_id,
                 labels=labels,
-                created_at=utcnow_naive(),
-                updated_at=utcnow_naive(),
-                closed_at=None,
+                blocked_reason=model.blocked_reason,
+                source_url=model.source_url,
+                references=references,
+                created_at=created_at,
+                updated_at=updated_at,
+                closed_at=closed_at,
+                deleted_at=deleted_at,
             )
             entities.append(entity)
 
@@ -1285,6 +1500,163 @@ class LabelRepository:
         )
 
 
+class ProjectRepository:
+    """Repository for Project entity operations.
+
+    Manages projects for organizing issues.
+    """
+
+    def __init__(self, session: Session) -> None:
+        """Initialize repository with database session.
+
+        Args:
+            session: SQLModel database session for queries
+        """
+        self.session = session
+
+    def get(self, project_id: str) -> Project | None:
+        """Get project by ID.
+
+        Args:
+            project_id: Project identifier
+
+        Returns:
+            Project entity if found, None otherwise
+        """
+        model = self.session.get(ProjectModel, project_id)
+        return self._model_to_entity(model) if model else None
+
+    def get_default(self) -> Project | None:
+        """Get the default project.
+
+        Returns:
+            Default project entity if found, None otherwise
+        """
+        statement = select(ProjectModel).where(ProjectModel.is_default == True)
+        model = self.session.exec(statement).first()
+        return self._model_to_entity(model) if model else None
+
+    def list_all(self) -> list[Project]:
+        """List all projects.
+
+        Returns:
+            List of all project entities
+        """
+        statement = select(ProjectModel).order_by(ProjectModel.name)
+        models = self.session.exec(statement).all()
+        return [self._model_to_entity(m) for m in models]
+
+    def list_by_status(self, status: ProjectStatus) -> list[Project]:
+        """List projects by status.
+
+        Args:
+            status: Project status to filter by
+
+        Returns:
+            List of project entities with specified status
+        """
+        statement = select(ProjectModel).where(
+            ProjectModel.status == status.value
+        ).order_by(ProjectModel.name)
+        models = self.session.exec(statement).all()
+        return [self._model_to_entity(m) for m in models]
+
+    def save(self, project: Project) -> Project:
+        """Save project to database.
+
+        Args:
+            project: Project entity to persist
+
+        Returns:
+            Saved project entity
+        """
+        model = self.session.get(ProjectModel, project.id)
+
+        if model:
+            # Update existing
+            model.name = project.name
+            model.description = project.description
+            model.status = project.status.value
+            model.is_default = project.is_default
+            model.updated_at = str(project.updated_at)
+        else:
+            # Create new
+            model = ProjectModel(
+                id=project.id,
+                name=project.name,
+                description=project.description,
+                status=project.status.value,
+                is_default=project.is_default,
+                created_at=str(project.created_at),
+                updated_at=str(project.updated_at),
+            )
+            self.session.add(model)
+
+        self.session.flush()
+        self.session.refresh(model)
+        return self._model_to_entity(model)
+
+    def delete(self, project_id: str) -> bool:
+        """Delete project from database.
+
+        Args:
+            project_id: Project identifier
+
+        Returns:
+            True if deleted, False if not found
+        """
+        model = self.session.get(ProjectModel, project_id)
+        if model:
+            self.session.delete(model)
+            return True
+        return False
+
+    def set_default(self, project_id: str) -> Project | None:
+        """Set a project as the default.
+
+        Unsets is_default on all other projects.
+
+        Args:
+            project_id: Project identifier to set as default
+
+        Returns:
+            Updated project entity, or None if not found
+        """
+        # Clear default flag from all projects
+        statement = select(ProjectModel).where(ProjectModel.is_default == True)
+        default_models = self.session.exec(statement).all()
+        for model in default_models:
+            model.is_default = False
+
+        # Set new default
+        model = self.session.get(ProjectModel, project_id)
+        if model:
+            model.is_default = True
+            self.session.flush()
+            self.session.refresh(model)
+            return self._model_to_entity(model)
+        return None
+
+    def _model_to_entity(self, model: ProjectModel) -> Project:
+        """Convert database model to Project entity.
+
+        Args:
+            model: ProjectModel from database
+
+        Returns:
+            Project domain entity
+        """
+        return Project(
+            id=model.id,
+            name=model.name,
+            description=model.description,
+            status=ProjectStatus(model.status),
+            is_default=model.is_default,
+            created_at=datetime.fromisoformat(model.created_at),
+            updated_at=datetime.fromisoformat(model.updated_at),
+        )
+
+
 # =============================================================================
 # Unit of Work
 # =============================================================================
@@ -1330,6 +1702,7 @@ class UnitOfWork:
         self._graph: IssueGraphRepository | None = None
         self._epics: EpicRepository | None = None
         self._labels: LabelRepository | None = None
+        self._projects: ProjectRepository | None = None
 
     def __enter__(self) -> "UnitOfWork":
         """Begin transaction.
@@ -1437,6 +1810,17 @@ class UnitOfWork:
             self._labels = LabelRepository(self.session)
         return self._labels
 
+    @property
+    def projects(self) -> ProjectRepository:
+        """Lazy-load project repository.
+
+        Returns:
+            Project repository instance for project management
+        """
+        if self._projects is None:
+            self._projects = ProjectRepository(self.session)
+        return self._projects
+
     def close(self) -> None:
         """Close the underlying session.
 
@@ -1465,6 +1849,7 @@ __all__ = [
     "CommentModel",
     "DependencyModel",
     "EpicModel",
+    "ProjectModel",
     # Engine
     "create_db_engine",
     "get_database_path",
@@ -1474,6 +1859,7 @@ __all__ = [
     "IssueGraphRepository",
     "EpicRepository",
     "LabelRepository",
+    "ProjectRepository",
     # Unit of Work
     "UnitOfWork",
 ]

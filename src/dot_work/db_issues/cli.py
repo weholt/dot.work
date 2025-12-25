@@ -32,6 +32,7 @@ from dot_work.db_issues.domain.entities import (
     IssuePriority,
     IssueStatus,
     IssueType,
+    ProjectStatus,
 )
 from dot_work.db_issues.services import (
     BulkResult,
@@ -39,13 +40,17 @@ from dot_work.db_issues.services import (
     CommentService,
     CycleResult,
     DependencyService,
+    DuplicateService,
     EpicService,
     ImpactResult,
     IssueService,
     JsonlService,
     JsonTemplateService,
     LabelService,
+    ProjectService,
     SearchService,
+    Statistics,
+    StatsService,
     TemplateService,
 )
 from dot_work.db_issues.templates import TemplateManager
@@ -64,6 +69,14 @@ epic_app = typer.Typer(
     add_completion=False,
 )
 app.add_typer(epic_app, name="epic")
+
+# Project management commands subgroup
+project_app = typer.Typer(
+    name="project",
+    help="Project management commands",
+    add_completion=False,
+)
+app.add_typer(project_app, name="project")
 
 # Child relationship commands subgroup
 child_app = typer.Typer(
@@ -129,6 +142,14 @@ bulk_app = typer.Typer(
 )
 app.add_typer(bulk_app, name="bulk")
 
+# Search index management commands subgroup
+search_index_app = typer.Typer(
+    name="search-index",
+    help="Full-text search index management commands",
+    add_completion=False,
+)
+app.add_typer(search_index_app, name="search-index")
+
 
 # =============================================================================
 # Service Implementations (for Dependency Injection)
@@ -178,6 +199,7 @@ def create(
     ),
     assignee: str | None = typer.Option(None, "--assignee", "-a", help="Assignee username"),
     labels: list[str] | None = typer.Option(None, "--label", "-l", help="Labels to add"),  # noqa: B008
+    project: str = typer.Option("default", "--project", "-P", help="Project ID"),
 ) -> None:
     """Create a new issue."""
     # Parse priority
@@ -214,6 +236,7 @@ def create(
                 issue_type=issue_type,
                 assignee=assignee,
                 labels=labels or [],
+                project_id=project,
             )
             console.print(f"[green]✓[/green] Issue created: [bold]{issue.id}[/bold]")
             console.print(f"  Title: {issue.title}")
@@ -229,6 +252,8 @@ def list_cmd(  # noqa: B008
     status: str | None = typer.Option(None, "--status", "-s", help="Filter by status"),
     priority: str | None = typer.Option(None, "--priority", "-p", help="Filter by priority"),
     assignee: str | None = typer.Option(None, "--assignee", "-a", help="Filter by assignee"),
+    project: str | None = typer.Option(None, "--project", "-P", help="Filter by project ID"),
+    include_backlog: bool = typer.Option(False, "--include-backlog", help="Include backlog priority issues"),
     limit: int = typer.Option(20, "--limit", "-n", help="Maximum number of issues"),
     format: str = typer.Option(
         "table", "--format", "-f", help="Output format: table, json, jsonl, csv, markdown"
@@ -259,7 +284,9 @@ def list_cmd(  # noqa: B008
             status=status_filter,
             priority=priority_filter,
             assignee=assignee,
+            project_id=project,
             limit=limit,
+            exclude_backlog=not include_backlog,
         )
 
         if not issues:
@@ -408,6 +435,83 @@ def search_cmd(  # noqa: B008
             _output_search_table(issues, console)
 
 
+@app.command()
+def ready(
+    priority: str | None = typer.Option(None, "--priority", "-p", help="Filter by priority"),
+    sort: str | None = typer.Option(None, "--sort", help="Sort by field: id, title, priority, status"),
+    format: str = typer.Option("table", "--format", "-f", help="Output format: table, json"),
+) -> None:
+    """Show issues ready to work on (no blocking dependencies).
+
+    Ready issues are those that:
+    - Have status "proposed" or "in-progress"
+    - Are not in "blocked" status
+    - Have no open "blocks" dependencies pointing to them
+
+    Also shows blocked issues separately with their blocking reasons.
+    """
+    # Parse priority filter (comma-separated)
+    priority_filter: list[IssuePriority] | None = None
+    if priority:
+        priority_filter = []
+        for p in priority.split(","):
+            p = p.strip().upper()
+            try:
+                priority_filter.append(IssuePriority[p])
+            except KeyError:
+                console.print(f"[red]Invalid priority: {p}[/red]")
+                console.print("Valid priorities: critical, high, medium, low")
+                raise typer.Exit(1)
+
+    # Create database session and service
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        issue_service = IssueService(uow, id_service, clock)
+        dep_service = DependencyService(uow)
+
+        # Get ready queue
+        ready_result = dep_service.get_ready_queue()
+
+        # Get full issue objects for ready issues
+        ready_issues = []
+        for issue_id in ready_result.ready_issues:
+            issue = issue_service.get_issue(issue_id)
+            if issue:
+                # Apply priority filter
+                if priority_filter and issue.priority not in priority_filter:
+                    continue
+                ready_issues.append(issue)
+
+        # Get full issue objects for blocked issues
+        blocked_with_info: list[tuple[Issue, list[str]]] = []
+        for blocked in ready_result.blocked_issues:
+            issue = issue_service.get_issue(blocked.issue_id)
+            if issue:
+                # Apply priority filter to blocked issues too
+                if priority_filter and issue.priority not in priority_filter:
+                    continue
+                blocked_with_info.append((issue, blocked.blockers))
+
+        # Apply sorting
+        reverse_order = False
+        if sort:
+            # For priority, we want ascending (critical first)
+            # For other fields, ascending is default
+            reverse_order = sort.lower() not in ("priority", "created", "updated")
+            ready_issues = _sort_issues(ready_issues, sort, reverse_order)
+
+        # Format output
+        if format == "json":
+            _output_ready_json(ready_issues, blocked_with_info, console)
+        else:  # table (default)
+            _output_ready_table(ready_issues, blocked_with_info, console)
+
+
 # =============================================================================
 # Output Formatters
 # =============================================================================
@@ -523,7 +627,7 @@ def _output_table(issues: list[Issue], fields: str | None, console: Console) -> 
 
 
 def _output_json(issues: list[Issue], fields: str | None, console: Console) -> None:
-    """Output issues as JSON array.
+    """Output issues as JSON array with wrapper metadata.
 
     Args:
         issues: List of issues to output
@@ -531,7 +635,7 @@ def _output_json(issues: list[Issue], fields: str | None, console: Console) -> N
         console: Rich console for output
     """
     field_list = _parse_fields(fields)
-    output: list[dict[str, object]] = []
+    issue_list: list[dict[str, object]] = []
 
     for issue in issues:
         if field_list:
@@ -541,21 +645,30 @@ def _output_json(issues: list[Issue], fields: str | None, console: Console) -> N
             # All fields - use proper types
             data_dict = {
                 "id": issue.id,
+                "project_id": issue.project_id,
                 "title": issue.title,
                 "description": issue.description or "",
                 "status": issue.status.value,
                 "priority": issue.priority.value,
                 "type": issue.type.value,
-                "assignee": issue.assignee,
+                "assignees": issue.assignees,
                 "epic_id": issue.epic_id,
                 "labels": issue.labels,
+                "blocked_reason": issue.blocked_reason,
                 "created_at": issue.created_at.isoformat() if issue.created_at else None,
                 "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
                 "closed_at": issue.closed_at.isoformat() if issue.closed_at else None,
             }
-        output.append(data_dict)
+        issue_list.append(data_dict)
 
-    console.print(json.dumps(output, indent=2))
+    # Wrap with metadata
+    wrapper: dict[str, object] = {
+        "command": "list",
+        "issues": issue_list,
+        "total": len(issue_list),
+        "filtered": len(issue_list),
+    }
+    console.print(json.dumps(wrapper, indent=2))
 
 
 def _output_jsonl(issues: list[Issue], fields: str | None, console: Console) -> None:
@@ -649,6 +762,35 @@ def _output_markdown(issues: list[Issue], fields: str | None, console: Console) 
         console.print(row)
 
 
+def _output_show_json(issue: Issue, console: Console) -> None:
+    """Output a single issue as JSON with wrapper metadata.
+
+    Args:
+        issue: Issue to output
+        console: Rich console for output
+    """
+    data_dict: dict[str, object] = {
+        "command": "show",
+        "issue": {
+            "id": issue.id,
+            "project_id": issue.project_id,
+            "title": issue.title,
+            "description": issue.description or "",
+            "status": issue.status.value,
+            "priority": issue.priority.value,
+            "type": issue.type.value,
+            "assignees": issue.assignees,
+            "epic_id": issue.epic_id,
+            "labels": issue.labels,
+            "blocked_reason": issue.blocked_reason,
+            "created_at": issue.created_at.isoformat() if issue.created_at else None,
+            "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
+            "closed_at": issue.closed_at.isoformat() if issue.closed_at else None,
+        },
+    }
+    console.print(json.dumps(data_dict, indent=2))
+
+
 # =============================================================================
 # Search Output Formatters
 # =============================================================================
@@ -683,33 +825,42 @@ def _output_search_table(issues: list[tuple[Issue, float, str]], console: Consol
 
 
 def _output_search_json(issues: list[tuple[Issue, float, str]], console: Console) -> None:
-    """Output search results as JSON.
+    """Output search results as JSON with wrapper metadata.
 
     Args:
         issues: List of (issue, rank, snippet) tuples
         console: Rich console for output
     """
-    output = []
+    results = []
     for issue, rank, snippet in issues:
         data_dict: dict[str, object] = {
             "id": issue.id,
+            "project_id": issue.project_id,
             "title": issue.title,
             "description": issue.description or "",
             "status": issue.status.value,
             "priority": issue.priority.value,
             "type": issue.type.value,
-            "assignee": issue.assignee,
+            "assignees": issue.assignees,
             "epic_id": issue.epic_id,
             "labels": issue.labels,
+            "blocked_reason": issue.blocked_reason,
             "created_at": issue.created_at.isoformat() if issue.created_at else None,
             "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
             "closed_at": issue.closed_at.isoformat() if issue.closed_at else None,
             "search_rank": rank,
             "snippet": snippet.replace("<mark>", "").replace("</mark>", ""),
         }
-        output.append(data_dict)
+        results.append(data_dict)
 
-    console.print(json.dumps(output, indent=2))
+    # Wrap with metadata
+    wrapper: dict[str, object] = {
+        "command": "search",
+        "results": results,
+        "total": len(results),
+        "filtered": len(results),
+    }
+    console.print(json.dumps(wrapper, indent=2))
 
 
 def _output_search_jsonl(issues: list[tuple[Issue, float, str]], console: Console) -> None:
@@ -739,9 +890,104 @@ def _output_search_jsonl(issues: list[tuple[Issue, float, str]], console: Consol
         console.print(json.dumps(data_dict, separators=(",", ":")))
 
 
+def _output_ready_table(
+    ready_issues: list[Issue],
+    blocked_with_info: list[tuple[Issue, list[str]]],
+    console: Console,
+) -> None:
+    """Output ready queue as a table.
+
+    Args:
+        ready_issues: List of ready issues
+        blocked_with_info: List of (issue, blockers) tuples
+        console: Rich console for output
+    """
+    # Print ready issues
+    if ready_issues:
+        console.print(f"[bold green]Ready to work on ({len(ready_issues)} issues):[/bold green]")
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("ID", style="cyan", width=12)
+        table.add_column("Title", style="white", width=40)
+        table.add_column("Priority", style="yellow", width=10)
+        table.add_column("Status", style="green", width=12)
+
+        for issue in ready_issues:
+            table.add_row(
+                issue.id,
+                issue.title[:37] + "..." if len(issue.title) > 37 else issue.title,
+                issue.priority.value,
+                issue.status.value,
+            )
+        console.print(table)
+    else:
+        console.print("[yellow]No ready issues found[/yellow]")
+
+    # Print blocked issues
+    if blocked_with_info:
+        console.print(f"\n[bold red]Blocked issues ({len(blocked_with_info)}):[/bold red]")
+        for issue, blockers in blocked_with_info:
+            blockers_str = ", ".join(blockers)
+            console.print(
+                f"  {issue.id} [red]{issue.title[:40]}[/red] "
+                f"- [yellow]blocked by {blockers_str}[/yellow]"
+            )
+
+
+def _output_ready_json(
+    ready_issues: list[Issue],
+    blocked_with_info: list[tuple[Issue, list[str]]],
+    console: Console,
+) -> None:
+    """Output ready queue as JSON.
+
+    Args:
+        ready_issues: List of ready issues
+        blocked_with_info: List of (issue, blockers) tuples
+        console: Rich console for output
+    """
+    ready_data = [
+        {
+            "id": issue.id,
+            "title": issue.title,
+            "description": issue.description or "",
+            "status": issue.status.value,
+            "priority": issue.priority.value,
+            "type": issue.type.value,
+            "assignee": issue.assignee,
+            "epic_id": issue.epic_id,
+            "labels": issue.labels,
+            "created_at": issue.created_at.isoformat() if issue.created_at else None,
+            "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
+            "closed_at": issue.closed_at.isoformat() if issue.closed_at else None,
+        }
+        for issue in ready_issues
+    ]
+
+    blocked_data = [
+        {
+            "id": issue.id,
+            "title": issue.title,
+            "status": issue.status.value,
+            "priority": issue.priority.value,
+            "blockers": blockers,
+        }
+        for issue, blockers in blocked_with_info
+    ]
+
+    output = {
+        "ready_issues": ready_data,
+        "ready_count": len(ready_data),
+        "blocked_issues": blocked_data,
+        "blocked_count": len(blocked_data),
+    }
+
+    console.print(json.dumps(output, indent=2))
+
+
 @app.command()
 def show(
     issue_id: str = typer.Argument(..., help="Issue ID"),
+    format: str = typer.Option("table", "--format", "-f", help="Output format: table, json"),
 ) -> None:
     """Show issue details."""
     # Create database session and service
@@ -759,19 +1005,22 @@ def show(
             console.print(f"[red]Issue not found: {issue_id}[/red]")
             raise typer.Exit(1)
 
-        # Display issue details
-        console.print(f"[bold cyan]Issue:[/bold cyan] {issue.id}")
-        console.print(f"[bold]Title:[/bold] {issue.title}")
-        console.print(f"[bold]Status:[/bold] {issue.status.value}")
-        console.print(f"[bold]Priority:[/bold] {issue.priority.value}")
-        console.print(f"[bold]Type:[/bold] {issue.type.value}")
-        console.print(f"[bold]Assignee:[/bold] {issue.assignee or 'Unassigned'}")
-        if issue.labels:
-            console.print(f"[bold]Labels:[/bold] {', '.join(issue.labels)}")
-        console.print("[bold]Description:[/bold]")
-        console.print(issue.description or "No description")
-        console.print(f"\n[bold]Created:[/bold] {issue.created_at}")
-        console.print(f"[bold]Updated:[/bold] {issue.updated_at}")
+        if format == "json":
+            _output_show_json(issue, console)
+        else:
+            # Display issue details
+            console.print(f"[bold cyan]Issue:[/bold cyan] {issue.id}")
+            console.print(f"[bold]Title:[/bold] {issue.title}")
+            console.print(f"[bold]Status:[/bold] {issue.status.value}")
+            console.print(f"[bold]Priority:[/bold] {issue.priority.value}")
+            console.print(f"[bold]Type:[/bold] {issue.type.value}")
+            console.print(f"[bold]Assignee:[/bold] {issue.assignee or 'Unassigned'}")
+            if issue.labels:
+                console.print(f"[bold]Labels:[/bold] {', '.join(issue.labels)}")
+            console.print("[bold]Description:[/bold]")
+            console.print(issue.description or "No description")
+            console.print(f"\n[bold]Created:[/bold] {issue.created_at}")
+            console.print(f"[bold]Updated:[/bold] {issue.updated_at}")
 
 
 @app.command()
@@ -1165,13 +1414,120 @@ def reopen(
 
 
 @app.command()
-def delete(
+def resolve(
     issue_id: str = typer.Argument(..., help="Issue ID"),
+) -> None:
+    """Mark an issue as resolved."""
+    # Create database session and service
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = IssueService(uow, id_service, clock)
+
+        issue = service.transition_issue(issue_id, IssueStatus.RESOLVED)
+        if not issue:
+            console.print(f"[red]Issue not found or cannot be resolved: {issue_id}[/red]")
+            raise typer.Exit(1)
+
+        console.print(f"[green]✓[/green] Issue resolved: [bold]{issue.id}[/bold]")
+
+
+@app.command()
+def blocked(
+    issue_id: str = typer.Argument(..., help="Issue ID"),
+    reason: str | None = typer.Option(None, "--reason", "-r", help="Reason for blocking"),
+) -> None:
+    """Mark an issue as blocked with an optional reason."""
+    # Create database session and service
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = IssueService(uow, id_service, clock)
+
+        issue = service.block_issue(issue_id, reason)
+        if not issue:
+            console.print(f"[red]Issue not found or cannot be blocked: {issue_id}[/red]")
+            raise typer.Exit(1)
+
+        if reason:
+            console.print(f"[green]✓[/green] Issue blocked: [bold]{issue.id}[/bold] - {reason}")
+        else:
+            console.print(f"[green]✓[/green] Issue blocked: [bold]{issue.id}[/bold]")
+
+
+@app.command()
+def stale(
+    issue_id: str | None = typer.Argument(None, help="Issue ID to mark as stale"),
+    auto: bool = typer.Option(False, "--auto", "-a", help="Auto-detect stale issues"),
+    days: int = typer.Option(30, "--days", "-d", help="Days of inactivity for auto-detection"),
+    format: str = typer.Option("table", "--format", "-f", help="Output format: table, json"),
+) -> None:
+    """Mark an issue as stale, or list stale issues with --auto."""
+    # Create database session and service
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = IssueService(uow, id_service, clock)
+
+        if auto:
+            # Auto-detect stale issues
+            stale_issues = service.get_stale_issues(days=days)
+
+            if format == "json":
+                from dot_work.db_issues.cli_utils import format_issues_json
+
+                json_output = format_issues_json(stale_issues)
+                console.print(json_output)
+            else:
+                from dot_work.db_issues.cli_utils import format_issues_table
+
+                if not stale_issues:
+                    console.print("[dim]No stale issues found[/dim]")
+                else:
+                    console.print(f"\n[bold]Stale Issues[/bold] (not updated in {days}+ days):")
+                    format_issues_table(stale_issues, console)
+        else:
+            # Mark specific issue as stale
+            if not issue_id:
+                console.print("[red]Error: issue_id required when not using --auto[/red]")
+                raise typer.Exit(1)
+
+            issue = service.transition_issue(issue_id, IssueStatus.STALE)
+            if not issue:
+                console.print(f"[red]Issue not found or cannot be marked stale: {issue_id}[/red]")
+                raise typer.Exit(1)
+
+            console.print(f"[green]✓[/green] Issue marked as stale: [bold]{issue.id}[/bold]")
+
+
+@app.command()
+def delete(
+    issue_ids: list[str] = typer.Argument(..., help="Issue ID(s) to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
 ) -> None:
-    """Delete an issue."""
+    """Delete one or more issues.
+
+    Multiple issue IDs can be provided. With --force, all are deleted without
+    confirmation. Without --force, a single confirmation is requested for
+    all issues.
+    """
     if not force:
-        confirm = typer.confirm(f"Are you sure you want to delete issue {issue_id}?")
+        if len(issue_ids) == 1:
+            confirm = typer.confirm(f"Are you sure you want to delete issue {issue_ids[0]}?")
+        else:
+            confirm = typer.confirm(f"Are you sure you want to delete {len(issue_ids)} issues?")
         if not confirm:
             console.print("[yellow]Cancelled[/yellow]")
             raise typer.Exit()
@@ -1186,12 +1542,27 @@ def delete(
         clock = DefaultClock()
         service = IssueService(uow, id_service, clock)
 
-        deleted = service.delete_issue(issue_id)
-        if not deleted:
-            console.print(f"[red]Issue not found: {issue_id}[/red]")
-            raise typer.Exit(1)
+        deleted_count = 0
+        not_found: list[str] = []
 
-        console.print(f"[green]✓[/green] Issue deleted: [bold]{issue_id}[/bold]")
+        for issue_id in issue_ids:
+            deleted = service.delete_issue(issue_id)
+            if deleted:
+                deleted_count += 1
+            else:
+                not_found.append(issue_id)
+
+        # Report results
+        if deleted_count > 0:
+            if deleted_count == 1:
+                console.print(f"[green]✓[/green] Deleted [bold]{deleted_count}[/bold] issue")
+            else:
+                console.print(f"[green]✓[/green] Deleted [bold]{deleted_count}[/bold] issues")
+
+        if not_found:
+            for issue_id in not_found:
+                console.print(f"[red]Issue not found: {issue_id}[/red]")
+            raise typer.Exit(1)
 
 
 # =============================================================================
@@ -1339,6 +1710,548 @@ def epic_delete(
             raise typer.Exit(1)
 
         console.print(f"[green]✓[/green] Epic deleted: [bold]{epic_id}[/bold]")
+
+
+@epic_app.command("set")
+def epic_set(
+    issue_id: str = typer.Argument(..., help="Issue ID"),
+    epic_id: str = typer.Argument(..., help="Epic ID to assign"),
+) -> None:
+    """Assign an issue to an epic (overwrites existing epic assignment)."""
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        from dot_work.db_issues.services import IssueService
+
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        issue_service = IssueService(uow, id_service, clock)
+
+        # First verify epic exists
+        epic_service = EpicService(uow, id_service, clock)
+        epic = epic_service.get_epic(epic_id)
+        if not epic:
+            console.print(f"[red]Epic not found: {epic_id}[/red]")
+            raise typer.Exit(1)
+
+        # Set epic for issue
+        updated = issue_service.set_epic(issue_id, epic_id)
+        if not updated:
+            console.print(f"[red]Issue not found: {issue_id}[/red]")
+            raise typer.Exit(1)
+
+        console.print(f"[green]✓[/green] Assigned issue [bold]{issue_id}[/bold] to epic [bold]{epic_id}[/bold]")
+
+
+@epic_app.command("clear")
+def epic_clear(
+    issue_id: str = typer.Argument(..., help="Issue ID"),
+) -> None:
+    """Remove epic assignment from an issue."""
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        from dot_work.db_issues.services import IssueService
+
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        issue_service = IssueService(uow, id_service, clock)
+
+        updated = issue_service.clear_epic(issue_id)
+        if not updated:
+            console.print(f"[red]Issue not found: {issue_id}[/red]")
+            raise typer.Exit(1)
+
+        console.print(f"[green]✓[/green] Cleared epic assignment from issue [bold]{issue_id}[/bold]")
+
+
+@epic_app.command("all")
+def epic_all() -> None:
+    """List all epics with issue counts by status."""
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = EpicService(uow, id_service, clock)
+
+        epic_infos = service.get_all_epics_with_counts()
+
+        if not epic_infos:
+            console.print("[yellow]No epics found[/yellow]")
+            return
+
+        # Create rich table
+        table = Table(title=f"Epics ({len(epic_infos)} found)")
+        table.add_column("ID", style="cyan", no_wrap=True)
+        table.add_column("Title", style="white")
+        table.add_column("Total", style="bold", justify="right")
+        table.add_column("Open", style="yellow", justify="right")
+        table.add_column("In-Progress", style="blue", justify="right")
+        table.add_column("Completed", style="green", justify="right")
+
+        for info in epic_infos:
+            table.add_row(
+                info.epic_id,
+                info.title[:50] + "..." if len(info.title) > 50 else info.title,
+                str(info.total_count),
+                str(info.proposed_count),
+                str(info.in_progress_count),
+                str(info.completed_count),
+            )
+
+        console.print(table)
+
+
+@epic_app.command("tree")
+def epic_tree(
+    epic_id: str | None = typer.Argument(None, help="Epic ID (omit for --all)"),
+    all_epics: bool = typer.Option(False, "--all", help="Show all epic trees"),
+    format_output: str = typer.Option(
+        "ascii",
+        "--format",
+        "-f",
+        help="Output format (ascii, mermaid)",
+    ),
+) -> None:
+    """Show hierarchical epic structure.
+
+    If epic_id is provided, shows tree for that epic.
+    With --all, shows trees for all epics.
+    With --format mermaid, generates Mermaid diagram.
+    """
+    if format_output == "mermaid" and all_epics:
+        console.print("[red]Error: --format mermaid cannot be used with --all[/red]")
+        raise typer.Exit(1)
+
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = EpicService(uow, id_service, clock)
+
+        if all_epics:
+            all_trees = service.get_all_epic_trees()
+            if not all_trees:
+                console.print("[yellow]No epics found[/yellow]")
+                return
+
+            for epic_id_key, items in all_trees.items():
+                epic = service.get_epic(epic_id_key)
+                if epic:
+                    console.print(f"\n[bold cyan]{epic_id_key}:[/bold cyan] {epic.title}")
+                    if items:
+                        _print_epic_tree_items(items)
+                    else:
+                        console.print("  [dim](no issues)[/dim]")
+        else:
+            if not epic_id:
+                console.print("[red]Error: Either provide epic_id or use --all[/red]")
+                raise typer.Exit(1)
+
+            epic = service.get_epic(epic_id)
+            if not epic:
+                console.print(f"[red]Epic not found: {epic_id}[/red]")
+                raise typer.Exit(1)
+
+            if format_output == "mermaid":
+                # Generate Mermaid diagram for epic
+                mermaid = _generate_epic_mermaid(epic_id, epic.title, service, uow)
+                console.print(f"\n[cyan]Mermaid diagram for {epic_id}:[/cyan]\n")
+                console.print(mermaid)
+                console.print("\n[dim]Copy this to https://mermaid.live/ to render[/dim]")
+            else:
+                # ASCII tree format
+                console.print(f"[bold cyan]{epic_id}:[/bold cyan] {epic.title}")
+
+                items = service.get_epic_tree(epic_id)
+                if items:
+                    _print_epic_tree_items(items)
+                else:
+                    console.print("  [dim](no issues)[/dim]")
+
+
+def _print_epic_tree_items(items: list) -> None:
+    """Print epic tree items with indentation."""
+    from dot_work.db_issues.domain.entities import IssueStatus
+
+    for item in items:
+        indent = "  " * item.indent_level
+        # Status color
+        status_color = {
+            IssueStatus.PROPOSED.value: "yellow",
+            IssueStatus.IN_PROGRESS.value: "blue",
+            IssueStatus.BLOCKED.value: "red",
+            IssueStatus.COMPLETED.value: "green",
+            IssueStatus.WONT_FIX.value: "dim",
+        }.get(item.status, "white")
+
+        # Tree connector
+        if item.indent_level > 0:
+            connector = "└── "
+        else:
+            connector = ""
+
+        console.print(f"{indent}{connector}[{status_color}]{item.issue_id}[/{status_color}] [dim]{item.title}[/dim] ([{status_color}]{item.status}[/{status_color}])")
+
+
+def _generate_epic_mermaid(
+    epic_id: str, epic_title: str, service: EpicService, uow: UnitOfWork
+) -> str:
+    """Generate Mermaid diagram for epic hierarchy.
+
+    Args:
+        epic_id: Root epic ID
+        epic_title: Root epic title
+        service: EpicService instance
+        uow: UnitOfWork instance
+
+    Returns:
+        Mermaid diagram as string
+    """
+    items = service.get_epic_tree(epic_id)
+
+    if not items:
+        return f"graph TD\n    {epic_id}[{epic_id}: {epic_title}]"
+
+    lines = ["graph TD"]
+
+    # Add root node
+    safe_id = epic_id.replace("-", "_")
+    lines.append(f"    {safe_id}[{epic_id}: {epic_title}]")
+
+    # Track nodes to avoid duplicates
+    nodes: set[str] = {epic_id}
+
+    # Helper to recursively build the Mermaid diagram
+    def build_mermaid(current_items: list, parent_id: str, indent: int = 0) -> None:
+        """Recursively build Mermaid diagram for epic items."""
+        grouped_by_level: dict[int, list] = {}
+        for item in current_items:
+            if item.indent_level not in grouped_by_level:
+                grouped_by_level[item.indent_level] = []
+            grouped_by_level[item.indent_level].append(item)
+
+        for level in sorted(grouped_by_level.keys()):
+            if level <= indent:
+                continue
+            for item in grouped_by_level[level]:
+                safe_child_id = item.issue_id.replace("-", "_")
+                if item.issue_id not in nodes:
+                    # Get issue for title
+                    issue = uow.issues.get(item.issue_id)
+                    title = issue.title[:30] if issue else "Unknown"
+                    lines.append(f"    {safe_child_id}[{item.issue_id}: {title}]")
+                    nodes.add(item.issue_id)
+
+                # Add edge from parent to child
+                lines.append(f"    {parent_id} --> {safe_child_id}")
+
+                # Recursively process children
+                # For epic hierarchies, we don't have child relationships
+                # in the same way as dependencies, so we just show the flat hierarchy
+
+    # Build the diagram
+    build_mermaid(items, safe_id)
+
+    return "\n".join(lines)
+
+
+# =============================================================================
+# Project Commands
+# =============================================================================
+
+
+@project_app.command("create")
+def project_create(
+    name: str = typer.Argument(..., help="Project name"),
+    description: str = typer.Option(None, "--description", "-d", help="Project description"),
+    set_as_default: bool = typer.Option(
+        False, "--default", help="Set as the default project"
+    ),
+) -> None:
+    """Create a new project."""
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = ProjectService(uow, id_service, clock)
+
+        try:
+            project = service.create_project(
+                name=name,
+                description=description,
+                set_as_default=set_as_default,
+            )
+
+            default_marker = " [bold][default][/bold]" if project.is_default else ""
+            console.print(
+                f"[green]✓[/green] Created project: [bold]{project.name}[/bold] ({project.id}){default_marker}"
+            )
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1) from None
+
+
+@project_app.command("list")
+def project_list(
+    status: str = typer.Option(None, "--status", "-s", help="Filter by status"),
+) -> None:
+    """List all projects."""
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = ProjectService(uow, id_service, clock)
+
+        # Parse status if provided
+        project_status = None
+        if status:
+            try:
+                project_status = ProjectStatus(status)
+            except ValueError:
+                console.print(f"[red]Invalid status: {status}[/red]")
+                console.print(
+                    "Valid statuses: [cyan]active[/cyan], [cyan]archived[/cyan], [cyan]on_hold[/cyan]"
+                )
+                raise typer.Exit(1)
+
+        projects = service.list_projects(status=project_status)
+
+        if not projects:
+            console.print("[yellow]No projects found[/yellow]")
+            return
+
+        table = Table(title="Projects")
+        table.add_column("ID", style="cyan")
+        table.add_column("Name", style="green")
+        table.add_column("Description", style="blue")
+        table.add_column("Status", style="yellow")
+        table.add_column("Default")
+
+        for project in projects:
+            default_marker = "[green]✓[/green]" if project.is_default else ""
+            desc = project.description or "-"
+            table.add_row(
+                project.id,
+                project.name,
+                desc[:40] + "..." if desc and len(desc) > 40 else desc,
+                project.status.value,
+                default_marker,
+            )
+
+        console.print(table)
+        console.print(f"\nTotal: {len(projects)} project(s)")
+
+
+@project_app.command("show")
+def project_show(
+    project_id: str = typer.Argument(..., help="Project ID"),
+) -> None:
+    """Show project details."""
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = ProjectService(uow, id_service, clock)
+
+        project = service.get_project(project_id)
+        if not project:
+            console.print(f"[red]Project not found: {project_id}[/red]")
+            raise typer.Exit(1)
+
+        console.print(f"[bold cyan]Project:[/bold cyan] {project.name} ({project.id})")
+        console.print(f"[bold]Status:[/bold] {project.status.value}")
+        default_display = "[green]Yes[/green]" if project.is_default else "[bold]No[/bold]"
+        console.print(f"[bold]Default:[/bold] {default_display}")
+
+        if project.description:
+            console.print(f"[bold]Description:[/bold] {project.description}")
+
+        console.print(f"\n[bold]Created:[/bold] {project.created_at}")
+        console.print(f"[bold]Updated:[/bold] {project.updated_at}")
+
+
+@project_app.command("update")
+def project_update(
+    project_id: str = typer.Argument(..., help="Project ID"),
+    name: str = typer.Option(None, "--name", "-n", help="New project name"),
+    description: str = typer.Option(None, "--description", "-d", help="New description"),
+    status: str = typer.Option(None, "--status", "-s", help="New status"),
+) -> None:
+    """Update a project."""
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = ProjectService(uow, id_service, clock)
+
+        # Parse status if provided
+        project_status = None
+        if status:
+            try:
+                project_status = ProjectStatus(status)
+            except ValueError:
+                console.print(f"[red]Invalid status: {status}[/red]")
+                raise typer.Exit(1)
+
+        try:
+            project = service.update_project(
+                project_id,
+                name=name,
+                description=description,
+                status=project_status,
+            )
+
+            if not project:
+                console.print(f"[red]Project not found: {project_id}[/red]")
+                raise typer.Exit(1)
+
+            console.print(
+                f"[green]✓[/green] Updated project: [bold]{project.name}[/bold] ({project.id})"
+            )
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1) from None
+
+
+@project_app.command("delete")
+def project_delete(
+    project_id: str = typer.Argument(..., help="Project ID"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+) -> None:
+    """Delete a project."""
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = ProjectService(uow, id_service, clock)
+
+        # Check if project exists
+        project = service.get_project(project_id)
+        if not project:
+            console.print(f"[red]Project not found: {project_id}[/red]")
+            raise typer.Exit(1)
+
+        # Confirm deletion
+        if not yes:
+            console.print(
+                f"Delete project '[bold]{project.name}[/bold]' ({project_id})? [y/N]: ",
+                end="",
+            )
+            response = input().strip().lower()
+            if response != "y":
+                console.print("[yellow]Cancelled[/yellow]")
+                raise typer.Exit(0)
+
+        try:
+            success = service.delete_project(project_id)
+            if success:
+                console.print(
+                    f"[green]✓[/green] Deleted project: [bold]{project.name}[/bold] ({project_id})"
+                )
+            else:
+                console.print(f"[red]Failed to delete project: {project_id}[/red]")
+                raise typer.Exit(1)
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1) from None
+
+
+@project_app.command("set-default")
+def project_set_default(
+    project_id: str = typer.Argument(..., help="Project ID"),
+) -> None:
+    """Set a project as the default."""
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = ProjectService(uow, id_service, clock)
+
+        project = service.set_default_project(project_id)
+        if not project:
+            console.print(f"[red]Project not found: {project_id}[/red]")
+            raise typer.Exit(1)
+
+        console.print(
+            f"[green]✓[/green] Set default project: [bold]{project.name}[/bold] ({project.id})"
+        )
+
+
+@project_app.command("archive")
+def project_archive(
+    project_id: str = typer.Argument(..., help="Project ID"),
+) -> None:
+    """Archive a project."""
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = ProjectService(uow, id_service, clock)
+
+        project = service.archive_project(project_id)
+        if not project:
+            console.print(f"[red]Project not found: {project_id}[/red]")
+            raise typer.Exit(1)
+
+        console.print(
+            f"[green]✓[/green] Archived project: [bold]{project.name}[/bold] ({project.id})"
+        )
+
+
+@project_app.command("activate")
+def project_activate(
+    project_id: str = typer.Argument(..., help="Project ID"),
+) -> None:
+    """Activate an archived project."""
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = ProjectService(uow, id_service, clock)
+
+        project = service.activate_project(project_id)
+        if not project:
+            console.print(f"[red]Project not found: {project_id}[/red]")
+            raise typer.Exit(1)
+
+        console.print(
+            f"[green]✓[/green] Activated project: [bold]{project.name}[/bold] ({project.id})"
+        )
 
 
 # =============================================================================
@@ -1526,6 +2439,7 @@ def io_sync(
     repo: str = typer.Option(".", "--repo", "-r", help="Path to git repository"),
     message: str | None = typer.Option(None, "--message", "-m", help="Commit message"),  # noqa: B008
     push: bool = typer.Option(False, "--push", "-p", help="Push to remote after commit"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without making changes"),
 ) -> None:
     """Export issues to JSONL and commit to git.
 
@@ -1538,6 +2452,39 @@ def io_sync(
         uow = UnitOfWork(session)
         id_service = DefaultIdentifierService()
         clock = DefaultClock()
+        issue_service = IssueService(uow, id_service, clock)
+
+        # Get issue count for dry run
+        all_issues = issue_service.list_issues(limit=100000)
+        count = len(all_issues)
+
+        if dry_run:
+            from pathlib import Path
+
+            console.print("[bold]Dry run mode - preview:[/bold]")
+            console.print(f"\n[cyan]Would export:[/cyan] {count} issues")
+
+            # Get JSONL path
+            repo_path = Path(repo) if repo else Path.cwd()
+            jsonl_path = repo_path / ".work" / "db-issues" / "issues.jsonl"
+
+            console.print(f"[cyan]Would write to:[/cyan] {jsonl_path}")
+
+            # Generate commit message
+            if message is None:
+                from datetime import UTC, datetime
+
+                timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+                message = f"Update issues ({count} issues) - {timestamp}"
+
+            console.print(f"[cyan]Would commit:[/cyan] {message}")
+
+            if push:
+                console.print("[cyan]Would push to:[/cyan] origin")
+
+            console.print("\n[yellow]Run without --dry-run to perform these actions.[/yellow]")
+            return
+
         service = JsonlService(uow, id_service, clock)
 
         try:
@@ -1744,6 +2691,12 @@ def deps_blocked_by(
 def deps_tree(
     issue_id: str = typer.Argument(..., help="Root issue ID"),
     max_depth: int = typer.Option(5, "--max-depth", "-d", help="Maximum depth to traverse"),
+    format_output: str = typer.Option(
+        "ascii",
+        "--format",
+        "-f",
+        help="Output format (ascii, mermaid)",
+    ),
 ) -> None:
     """Show dependency tree for an issue."""
     engine = create_db_engine(get_db_url(), echo=is_debug_mode())
@@ -1754,16 +2707,24 @@ def deps_tree(
         service = DependencyService(uow)
 
         try:
-            tree: dict[str, list[tuple[str, str, DependencyType]]] = service.get_dependency_tree(
-                issue_id, max_depth=max_depth
-            )
+            if format_output == "mermaid":
+                # Generate Mermaid diagram
+                mermaid = service.generate_mermaid(issue_id, max_depth=max_depth)
+                console.print(f"\n[cyan]Mermaid diagram for {issue_id}:[/cyan]\n")
+                console.print(mermaid)
+                console.print("\n[dim]Copy this to https://mermaid.live/ to render[/dim]")
+            else:
+                # ASCII tree format
+                tree: dict[str, list[tuple[str, str, DependencyType]]] = service.get_dependency_tree(
+                    issue_id, max_depth=max_depth
+                )
 
-            if not tree:
-                console.print(f"[green]✓[/green] Issue [cyan]{issue_id}[/cyan] has no dependencies")
-                return
+                if not tree:
+                    console.print(f"[green]✓[/green] Issue [cyan]{issue_id}[/cyan] has no dependencies")
+                    return
 
-            console.print(f"\nDependency tree for [cyan]{issue_id}[/cyan]:\n")
-            _print_tree(tree, issue_id, "", uow)
+                console.print(f"\nDependency tree for [cyan]{issue_id}[/cyan]:\n")
+                _print_tree(tree, issue_id, "", uow)
 
         except Exception as e:
             console.print(f"[red]Error building tree:[/red] {e}")
@@ -1791,6 +2752,117 @@ def _print_tree(
 
         console.print(f"{prefix}[cyan]{connector} {to_id}[/cyan] ({dep_type.value}): {title[:50]}")
         _print_tree(tree, to_id, prefix + child_prefix, uow)
+
+
+@deps_app.command("list-all")
+def deps_list_all(
+    dependency_type: str | None = typer.Option(
+        None,
+        "--type",
+        "-t",
+        help="Filter by dependency type (blocks, depends-on, related-to, discovered-from)",
+    ),
+    format_output: str = typer.Option(
+        "table",
+        "--format",
+        "-f",
+        help="Output format (table, json)",
+    ),
+) -> None:
+    """List all dependencies in the system."""
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        service = DependencyService(uow)
+
+        try:
+            # Parse dependency type filter
+            dep_type_filter = None
+            if dependency_type:
+                try:
+                    dep_type_filter = DependencyType(dependency_type.replace("-", "_"))
+                except ValueError:
+                    console.print(f"[red]Invalid dependency type: {dependency_type}[/red]")
+                    console.print(
+                        "Valid types: [cyan]blocks, depends-on, related-to, discovered-from[/cyan]"
+                    )
+                    raise typer.Exit(1) from None
+
+            deps = service.get_all_dependencies(dep_type_filter)
+
+            if not deps:
+                console.print("[green]✓[/green] No dependencies found")
+                return
+
+            if format_output == "json":
+                import json
+
+                output = [
+                    {
+                        "from": d.from_issue_id,
+                        "to": d.to_issue_id,
+                        "type": d.dependency_type.value,
+                    }
+                    for d in deps
+                ]
+                console.print(json.dumps(output, indent=2))
+            else:
+                # Table format
+                from rich.table import Table
+
+                table = Table(title=f"All Dependencies ({len(deps)} total)")
+                table.add_column("From Issue", style="cyan")
+                table.add_column("Type", style="yellow")
+                table.add_column("To Issue", style="cyan")
+
+                for dep in deps:
+                    table.add_row(dep.from_issue_id, dep.dependency_type.value, dep.to_issue_id)
+
+                console.print(table)
+
+        except Exception as e:
+            console.print(f"[red]Error listing dependencies:[/red] {e}")
+            raise typer.Exit(1) from None
+
+
+@deps_app.command("cycles")
+def deps_cycles(
+    fix: bool = typer.Option(False, "--fix", help="Suggest fixes for detected cycles"),
+) -> None:
+    """Check all issues for circular dependencies and optionally suggest fixes."""
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        service = DependencyService(uow)
+
+        try:
+            cycles = service.check_circular_all()
+
+            if not cycles or all(not c.has_cycle for c in cycles):
+                console.print("[green]✓[/green] No circular dependencies found")
+                return
+
+            console.print(f"[red]Found {len(cycles)} circular dependencies:[/red]\n")
+
+            for i, cycle in enumerate(cycles, 1):
+                if not cycle.has_cycle:
+                    continue
+
+                console.print(f"[red]{i}.[/red] {cycle.message}")
+
+                if fix:
+                    fixes = service.suggest_cycle_fixes([cycle])
+                    for suggestion in fixes:
+                        console.print(f"   [yellow]Suggestion:[/yellow] {suggestion}")
+                console.print()
+
+        except Exception as e:
+            console.print(f"[red]Error checking cycles:[/red] {e}")
+            raise typer.Exit(1) from None
 
 
 # =============================================================================
@@ -1970,6 +3042,337 @@ def labels_delete(
             raise typer.Exit(1) from None
 
 
+@labels_app.command("bulk-add")
+def labels_bulk_add(
+    labels: str = typer.Argument(..., help="Labels to add (comma-separated)"),
+    status: str | None = typer.Option(None, "--status", "-s", help="Filter by status"),
+    priority: str | None = typer.Option(None, "--priority", "-p", help="Filter by priority"),
+    type_filter: str | None = typer.Option(None, "--type", "-t", help="Filter by issue type"),
+    assignee: str | None = typer.Option(None, "--assignee", "-a", help="Filter by assignee"),
+    existing_label: str | None = typer.Option(
+        None, "--label", "-l", help="Filter by existing label"
+    ),
+    all_issues: bool = typer.Option(False, "--all", help="Apply to all issues"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be done without making changes"
+    ),
+) -> None:
+    """Add labels to multiple issues by filter criteria.
+
+    Examples:
+        # Add 'urgent' label to all open issues
+        labels bulk-add urgent --status open
+
+        # Add 'review' and 'test' to high priority issues
+        labels bulk-add "review,test" --priority high
+
+        # Add 'backlog' to all task issues
+        labels bulk-add backlog --type task
+    """
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        issue_service = IssueService(uow, id_service, clock)
+        bulk_service = BulkService(issue_service, id_service, clock)
+
+        try:
+            # Parse labels (comma-separated)
+            label_list = [label.strip() for label in labels.split(",") if label.strip()]
+
+            if not label_list:
+                console.print("[red]Error:[/red] At least one label must be specified")
+                raise typer.Exit(1) from None
+
+            # Parse filters
+            status_filter = IssueStatus(status) if status else None
+            priority_filter = IssuePriority[priority.upper()] if priority else None
+            type_filter_enum = IssueType[type_filter.upper()] if type_filter else None
+
+            if dry_run:
+                # Show what would be updated
+                issues = issue_service.list_issues(
+                    status=status_filter,
+                    priority=priority_filter,
+                    issue_type=type_filter_enum,
+                    assignee=assignee,
+                    limit=1000,
+                )
+                if existing_label:
+                    issues = [i for i in issues if existing_label in i.labels]
+
+                console.print(
+                    f"[bold]Dry run mode - {len(issues)} issues would be updated:[/bold]"
+                )
+                for idx, issue in enumerate(issues[:10], start=1):
+                    console.print(f"  {idx}. {issue.id}: {issue.title[:50]}")
+                    console.print(f"     Adding: {', '.join(label_list)}")
+                if len(issues) > 10:
+                    console.print(f"  ... and {len(issues) - 10} more")
+                return
+
+            # Perform bulk label add
+            result = bulk_service.bulk_label_add(
+                labels=label_list,
+                status=status_filter,
+                priority=priority_filter,
+                issue_type=type_filter_enum,
+                assignee=assignee,
+                existing_label=existing_label,
+            )
+
+            # Show results
+            console.print(f"\n[bold]Result:[/bold] {result.succeeded}/{result.total} issues updated")
+            console.print(f"[green]✓[/green] Added: {', '.join(label_list)}")
+
+            if result.succeeded > 0:
+                console.print(f"[green]✓[/green] {result.succeeded} issue(s) updated")
+
+            if result.failed > 0:
+                console.print(f"[red]✗[/red] {result.failed} issue(s) failed")
+
+            if result.issue_ids:
+                console.print(f"\n[cyan]Affected issues ({len(result.issue_ids)}):[/cyan]")
+                for idx, issue_id in enumerate(result.issue_ids[:20], start=1):
+                    console.print(f"  {idx}. {issue_id}")
+
+        except KeyError as e:
+            console.print(f"[red]Error:[/red] Invalid filter value: {e}")
+            console.print("Valid statuses: proposed, in_progress, blocked, completed, wont_fix")
+            console.print("Valid priorities: critical, high, medium, low")
+            console.print(
+                "Valid types: bug, feature, task, enhancement, refactor, docs, test, security, performance"
+            )
+            raise typer.Exit(1) from None
+        except Exception as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1) from None
+
+
+@labels_app.command("bulk-remove")
+def labels_bulk_remove(
+    labels: str = typer.Argument(..., help="Labels to remove (comma-separated)"),
+    status: str | None = typer.Option(None, "--status", "-s", help="Filter by status"),
+    priority: str | None = typer.Option(None, "--priority", "-p", help="Filter by priority"),
+    type_filter: str | None = typer.Option(None, "--type", "-t", help="Filter by issue type"),
+    assignee: str | None = typer.Option(None, "--assignee", "-a", help="Filter by assignee"),
+    must_have: bool = typer.Option(False, "--must-have", help="Only remove from issues that have the labels"),
+    all_issues: bool = typer.Option(False, "--all", help="Apply to all issues"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be done without making changes"
+    ),
+) -> None:
+    """Remove labels from multiple issues by filter criteria.
+
+    Examples:
+        # Remove 'wontfix' label from all issues
+        labels bulk-remove wontfix --all
+
+        # Remove 'old-label' from completed issues
+        labels bulk-remove old-label --status completed
+
+        # Remove multiple labels from issues that have them
+        labels bulk-remove "deprecated,legacy" --must-have
+    """
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        issue_service = IssueService(uow, id_service, clock)
+        bulk_service = BulkService(issue_service, id_service, clock)
+
+        try:
+            # Parse labels (comma-separated)
+            label_list = [label.strip() for label in labels.split(",") if label.strip()]
+
+            if not label_list:
+                console.print("[red]Error:[/red] At least one label must be specified")
+                raise typer.Exit(1) from None
+
+            # Parse filters
+            status_filter = IssueStatus(status) if status else None
+            priority_filter = IssuePriority[priority.upper()] if priority else None
+            type_filter_enum = IssueType[type_filter.upper()] if type_filter else None
+
+            if dry_run:
+                # Show what would be updated
+                issues = issue_service.list_issues(
+                    status=status_filter,
+                    priority=priority_filter,
+                    issue_type=type_filter_enum,
+                    assignee=assignee,
+                    limit=1000,
+                )
+                if must_have:
+                    issues = [
+                        i for i in issues if any(label in i.labels for label in label_list)
+                    ]
+
+                console.print(
+                    f"[bold]Dry run mode - {len(issues)} issues would be updated:[/bold]"
+                )
+                for idx, issue in enumerate(issues[:10], start=1):
+                    console.print(f"  {idx}. {issue.id}: {issue.title[:50]}")
+                    console.print(f"     Removing: {', '.join(label_list)}")
+                if len(issues) > 10:
+                    console.print(f"  ... and {len(issues) - 10} more")
+                return
+
+            # Perform bulk label remove
+            result = bulk_service.bulk_label_remove(
+                labels=label_list,
+                status=status_filter,
+                priority=priority_filter,
+                issue_type=type_filter_enum,
+                assignee=assignee,
+                must_have_label=must_have,
+            )
+
+            # Show results
+            console.print(f"\n[bold]Result:[/bold] {result.succeeded}/{result.total} issues updated")
+            console.print(f"[green]✓[/green] Removed: {', '.join(label_list)}")
+
+            if result.succeeded > 0:
+                console.print(f"[green]✓[/green] {result.succeeded} issue(s) updated")
+
+            if result.failed > 0:
+                console.print(f"[red]✗[/red] {result.failed} issue(s) failed")
+
+            if result.issue_ids:
+                console.print(f"\n[cyan]Affected issues ({len(result.issue_ids)}):[/cyan]")
+                for idx, issue_id in enumerate(result.issue_ids[:20], start=1):
+                    console.print(f"  {idx}. {issue_id}")
+
+        except KeyError as e:
+            console.print(f"[red]Error:[/red] Invalid filter value: {e}")
+            console.print("Valid statuses: proposed, in_progress, blocked, completed, wont_fix")
+            console.print("Valid priorities: critical, high, medium, low")
+            console.print(
+                "Valid types: bug, feature, task, enhancement, refactor, docs, test, security, performance"
+            )
+            raise typer.Exit(1) from None
+        except Exception as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1) from None
+
+
+@labels_app.command("set")
+def labels_set(
+    issue_id: str = typer.Argument(..., help="Issue ID"),
+    labels: str = typer.Argument(..., help="Labels to set (comma-separated)"),
+) -> None:
+    """Replace all labels on an issue.
+
+    Examples:
+        # Set labels to bug, critical, security
+        dot-work db-issues labels set bd-a1b2 bug,critical,security
+
+        # Clear all labels
+        dot-work db-issues labels set bd-a1b2 ""
+    """
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        issue_service = IssueService(uow, id_service, clock)
+
+        # Parse labels (comma-separated, empty string clears all labels)
+        label_list = [label.strip() for label in labels.split(",") if label.strip()]
+
+        # Get issue for display
+        issue = issue_service.get_issue(issue_id)
+        if not issue:
+            console.print(f"[red]Error:[/red] Issue not found: {issue_id}")
+            raise typer.Exit(1)
+
+        # Show previous labels
+        old_labels = ", ".join(issue.labels) if issue.labels else "None"
+
+        # Set new labels
+        updated = issue_service.set_labels(issue_id, label_list)
+        if not updated:
+            console.print("[red]Error:[/red] Failed to update labels")
+            raise typer.Exit(1)
+
+        # Show result
+        console.print(f"[green]✓[/green] Labels updated: [bold]{issue_id}[/bold]")
+        console.print(f"  Old labels: {old_labels}")
+        new_labels = ", ".join(label_list) if label_list else "None"
+        console.print(f"  New labels: {new_labels}")
+
+
+@labels_app.command("all")
+def labels_all(
+    with_counts: bool = typer.Option(False, "--with-counts", "-c", help="Show usage counts"),
+    unused: bool = typer.Option(False, "--unused", "-u", help="Show only unused labels"),
+) -> None:
+    """List all unique labels globally.
+
+    Shows all unique labels across all issues, with optional usage counts.
+
+    Examples:
+        # List all unique labels
+        dot-work db-issues labels all
+
+        # List with usage counts
+        dot-work db-issues labels all --with-counts
+
+        # Show only unused labels
+        dot-work db-issues labels all --unused
+    """
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = LabelService(uow, id_service, clock)
+
+        label_infos = service.get_all_labels_with_counts(include_unused=unused)
+
+        if not label_infos:
+            if unused:
+                console.print("[yellow]No unused labels found[/yellow]")
+            else:
+                console.print("[yellow]No labels found[/yellow]")
+            return
+
+        if unused:
+            console.print(f"[bold]Unused labels ({len(label_infos)} found):[/bold]")
+        else:
+            console.print(f"[bold]All labels ({len(label_infos)} unique):[/bold]")
+
+        # Create table for display
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Name", style="cyan")
+        if with_counts:
+            table.add_column("Count", style="green", justify="right")
+        table.add_column("Color")
+
+        for info in label_infos:
+            color_display = info.color or "N/A"
+            if with_counts:
+                if info.count == 0:
+                    count_display = "[dim]0[/dim]"
+                else:
+                    count_display = str(info.count)
+                table.add_row(info.name, count_display, color_display)
+            else:
+                table.add_row(info.name, color_display)
+
+        console.print(table)
+
+
 if __name__ == "__main__":
     app()
 
@@ -2080,10 +3483,14 @@ def comment_list(
 @comments_app.command("delete")
 def comment_delete(
     issue_id: str = typer.Argument(..., help="Issue ID"),
-    comment_id: str = typer.Argument(..., help="Comment ID"),
+    comment_ids: list[str] = typer.Argument(..., help="Comment ID(s) to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
 ) -> None:
-    """Delete a comment."""
+    """Delete one or more comments from an issue.
+
+    Multiple comment IDs can be provided. All comments must belong to the
+    specified issue. With --force, all are deleted without confirmation.
+    """
     # Create database session and service
     engine = create_db_engine(get_db_url(), echo=is_debug_mode())
     from sqlmodel import Session
@@ -2094,31 +3501,67 @@ def comment_delete(
         clock = DefaultClock()
         service = CommentService(uow, id_service, clock)
 
-        # Get comment to show details
-        comment = service.get_comment(comment_id)
-        if not comment:
-            console.print(f"[red]Error:[/red] Comment not found: {comment_id}")
+        # Verify all comments belong to the issue
+        not_found: list[str] = []
+        wrong_issue: list[tuple[str, str]] = []  # (comment_id, actual_issue_id)
+        valid_comments: list[tuple[str, str]] = []  # (comment_id, author)
+
+        for comment_id in comment_ids:
+            comment = service.get_comment(comment_id)
+            if not comment:
+                not_found.append(comment_id)
+            elif comment.issue_id != issue_id:
+                wrong_issue.append((comment_id, comment.issue_id))
+            else:
+                valid_comments.append((comment_id, comment.author))
+
+        # Report errors first
+        if not_found:
+            for comment_id in not_found:
+                console.print(f"[red]Error:[/red] Comment not found: {comment_id}")
+
+        if wrong_issue:
+            for comment_id, actual_issue in wrong_issue:
+                console.print(
+                    f"[red]Error:[/red] Comment {comment_id} belongs to issue {actual_issue}, not {issue_id}"
+                )
+
+        if not_found or wrong_issue:
             raise typer.Exit(1)
 
-        # Verify comment belongs to issue
-        if comment.issue_id != issue_id:
-            console.print(
-                f"[red]Error:[/red] Comment {comment_id} does not belong to issue {issue_id}"
-            )
+        if not valid_comments:
+            console.print("[yellow]No valid comments to delete[/yellow]")
             raise typer.Exit(1)
 
         # Confirm unless force
         if not force:
-            typer.confirm(
-                f"Delete comment from {comment.author}?",
-                abort=True,
-            )
+            if len(valid_comments) == 1:
+                _, author = valid_comments[0]
+                typer.confirm(f"Delete comment from {author}?", abort=True)
+            else:
+                typer.confirm(f"Delete {len(valid_comments)} comments?", abort=True)
 
-        result = service.delete_comment(comment_id)
-        if result:
-            console.print(f"[green]✓[/green] Comment deleted: [cyan]{comment_id}[/cyan]")
-        else:
-            console.print(f"[red]Error:[/red] Failed to delete comment: {comment_id}")
+        # Delete valid comments
+        deleted_count = 0
+        failed: list[str] = []
+
+        for comment_id, _author in valid_comments:
+            result = service.delete_comment(comment_id)
+            if result:
+                deleted_count += 1
+            else:
+                failed.append(comment_id)
+
+        # Report results
+        if deleted_count > 0:
+            if deleted_count == 1:
+                console.print(f"[green]✓[/green] Deleted [bold]{deleted_count}[/bold] comment")
+            else:
+                console.print(f"[green]✓[/green] Deleted [bold]{deleted_count}[/bold] comments")
+
+        if failed:
+            for comment_id in failed:
+                console.print(f"[red]Error:[/red] Failed to delete comment: {comment_id}")
             raise typer.Exit(1)
 
 
@@ -2804,3 +4247,1401 @@ def _show_bulk_result(result: BulkResult) -> None:
             console.print(f"  {idx}. {issue_id}")
         if len(result.issue_ids) > 20:
             console.print(f"  ... and {len(result.issue_ids) - 20} more")
+
+
+
+# =============================================================================
+# Search Index Commands
+# =============================================================================
+
+
+@search_index_app.command("create")
+def search_index_create() -> None:
+    """Create full-text search index for existing databases.
+
+    Creates the FTS5 virtual table and triggers if they don't exist.
+    Populates the index with existing issues.
+
+    Examples:
+        db-issues search-index create
+    """
+    from dot_work.db_issues.config import DbIssuesConfig
+
+    config = DbIssuesConfig.from_env()
+
+    if not config.db_path.exists():
+        console.print(f"[red]Error:[/red] Database not found at {config.db_path}")
+        console.print("Run 'db-issues init' to create the database first")
+        raise typer.Exit(1)
+
+    console.print("[cyan]Creating full-text search index...[/cyan]")
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session, text
+
+    with Session(engine) as session:
+        # Check if FTS5 table already exists
+        result = session.exec(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='issues_fts';")
+        )  # type: ignore[call-overload]
+        exists = result.first() is not None
+
+        if exists:
+            console.print("[yellow]FTS5 index already exists[/yellow]")
+            console.print("Use 'db-issues search-index rebuild' to rebuild the index")
+            return
+
+        # Create FTS5 virtual table
+        session.exec(text("""
+            CREATE VIRTUAL TABLE issues_fts USING fts5(
+                rowid,
+                id UNINDEXED,
+                title,
+                description,
+                content='issues',
+                content_rowid='rowid'
+            );
+        """))  # type: ignore[call-overload]
+
+        # Populate FTS5 table with existing data
+        insert_result = session.exec(text("""
+            INSERT INTO issues_fts(rowid, id, title, description)
+            SELECT rowid, id, title, COALESCE(description, '')
+            FROM issues;
+        """))  # type: ignore[call-overload]
+
+        # Create triggers to keep FTS table in sync
+        session.exec(text("""
+            CREATE TRIGGER issues_fts_insert AFTER INSERT ON issues BEGIN
+                INSERT INTO issues_fts(rowid, id, title, description)
+                VALUES (NEW.rowid, NEW.id, NEW.title, COALESCE(NEW.description, ''));
+            END;
+        """))  # type: ignore[call-overload]
+
+        session.exec(text("""
+            CREATE TRIGGER issues_fts_update AFTER UPDATE ON issues BEGIN
+                UPDATE issues_fts
+                SET title = NEW.title,
+                    description = COALESCE(NEW.description, '')
+                WHERE rowid = NEW.rowid;
+            END;
+        """))  # type: ignore[call-overload]
+
+        session.exec(text("""
+            CREATE TRIGGER issues_fts_delete AFTER DELETE ON issues BEGIN
+                DELETE FROM issues_fts WHERE rowid = OLD.rowid;
+            END;
+        """))  # type: ignore[call-overload]
+
+        session.commit()
+
+        # Count indexed issues
+        count_result = session.exec(text("SELECT COUNT(*) as cnt FROM issues_fts;"))  # type: ignore[call-overload]
+        indexed_count = count_result.first().cnt if count_result else 0
+
+    console.print(f"[green]✓[/green] FTS5 index created with [bold]{indexed_count}[/bold] issues")
+
+
+@search_index_app.command("rebuild")
+def search_index_rebuild() -> None:
+    """Rebuild the full-text search index from scratch.
+
+    Clears and repopulates the FTS5 index with all current issues.
+
+    Examples:
+        db-issues search-index rebuild
+    """
+    from dot_work.db_issues.config import DbIssuesConfig
+
+    config = DbIssuesConfig.from_env()
+
+    if not config.db_path.exists():
+        console.print(f"[red]Error:[/red] Database not found at {config.db_path}")
+        raise typer.Exit(1)
+
+    console.print("[cyan]Rebuilding full-text search index...[/cyan]")
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session, text
+
+    with Session(engine) as session:
+        # Check if FTS5 table exists
+        result = session.exec(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='issues_fts';")
+        )  # type: ignore[call-overload]
+        exists = result.first() is not None
+
+        if not exists:
+            console.print("[yellow]FTS5 index does not exist[/yellow]")
+            console.print("Use 'db-issues search-index create' to create the index")
+            raise typer.Exit(1)
+
+        # Clear existing FTS data
+        session.exec(text("DELETE FROM issues_fts;"))  # type: ignore[call-overload]
+
+        # Rebuild from issues table
+        insert_result = session.exec(text("""
+            INSERT INTO issues_fts(rowid, id, title, description)
+            SELECT rowid, id, title, COALESCE(description, '')
+            FROM issues;
+        """))  # type: ignore[call-overload]
+
+        session.commit()
+
+        # Count indexed issues
+        count_result = session.exec(text("SELECT COUNT(*) as cnt FROM issues_fts;"))  # type: ignore[call-overload]
+        indexed_count = count_result.first().cnt if count_result else 0
+
+    console.print(f"[green]✓[/green] FTS5 index rebuilt with [bold]{indexed_count}[/bold] issues")
+
+
+@search_index_app.command("status")
+def search_index_status() -> None:
+    """Show full-text search index status.
+
+    Displays information about the FTS5 index including
+    the number of indexed issues and index health.
+
+    Examples:
+        db-issues search-index status
+    """
+    from dot_work.db_issues.config import DbIssuesConfig
+
+    config = DbIssuesConfig.from_env()
+
+    if not config.db_path.exists():
+        console.print(f"[red]Error:[/red] Database not found at {config.db_path}")
+        raise typer.Exit(1)
+
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session, text
+
+    with Session(engine) as session:
+        # Check if FTS5 table exists
+        result = session.exec(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='issues_fts';")
+        )  # type: ignore[call-overload]
+        exists = result.first() is not None
+
+        if not exists:
+            console.print("[yellow]FTS5 index not created[/yellow]")
+            console.print("Run 'db-issues search-index create' to create the index")
+            return
+
+        # Count indexed issues
+        fts_count_result = session.exec(text("SELECT COUNT(*) as cnt FROM issues_fts;"))  # type: ignore[call-overload]
+        fts_count = fts_count_result.first().cnt if fts_count_result else 0
+
+        # Count total issues
+        issues_count_result = session.exec(text("SELECT COUNT(*) as cnt FROM issues;"))  # type: ignore[call-overload]
+        issues_count = issues_count_result.first().cnt if issues_count_result else 0
+
+        # Check triggers
+        triggers_result = session.exec(text("""
+            SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'issues_fts%';
+        """))  # type: ignore[call-overload]
+        triggers = [row.name for row in triggers_result]
+
+    console.print("[bold]Full-Text Search Index Status[/bold]\n")
+    console.print(f"[cyan]Index Status:[/cyan] {'Created' if exists else 'Not created'}")
+    console.print(f"[cyan]Indexed Issues:[/cyan] {fts_count}")
+    console.print(f"[cyan]Total Issues:[/cyan] {issues_count}")
+
+    if fts_count < issues_count:
+        console.print(f"[yellow]Warning:[/yellow] {issues_count - fts_count} issues not indexed")
+        console.print("Run 'db-issues search-index rebuild' to fix")
+    elif fts_count == issues_count:
+        console.print("[green]✓[/green] All issues indexed")
+
+    console.print(f"\n[cyan]Sync Triggers ({len(triggers)}):[/cyan]")
+    for trigger in triggers:
+        console.print(f"  - {trigger}")
+
+
+# =============================================================================
+# System Commands
+# =============================================================================
+
+
+@app.command()
+def init(
+    force: bool = typer.Option(False, "--force", "-f", help="Reinitialize database (overwrite)"),
+) -> None:
+    """Initialize the issue tracker database.
+
+    Creates the database directory and initializes all tables.
+
+    Examples:
+        # Initialize database
+        db-issues init
+
+        # Reinitialize (overwrite existing database)
+        db-issues init --force
+    """
+    from dot_work.db_issues.config import DbIssuesConfig
+
+    config = DbIssuesConfig.from_env()
+
+    # Check if database already exists
+    if config.db_path.exists():
+        if not force:
+            console.print(f"[yellow]Database already exists at:[/yellow] {config.db_path}")
+            console.print("\nTo reinitialize and overwrite, use:")
+            console.print("  db-issues init --force")
+            raise typer.Exit(1)
+
+        console.print(f"[yellow]Removing existing database:[/yellow] {config.db_path}")
+        config.db_path.unlink()
+        console.print("[green]✓[/green] Existing database removed")
+
+    # Create directory
+    console.print(f"[cyan]Creating database directory:[/cyan] {config.base_path}")
+    config.ensure_directory()
+    console.print("[green]✓[/green] Directory created")
+
+    # Create database schema
+    console.print("[cyan]Creating database schema...[/cyan]")
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+
+    # Import all models to ensure they're registered with SQLModel metadata
+    from sqlmodel import SQLModel
+
+
+    # Create all tables
+    SQLModel.metadata.create_all(engine)
+    console.print("[green]✓[/green] Database schema created")
+
+    # Create FTS5 virtual table for full-text search
+    console.print("[cyan]Creating full-text search index...[/cyan]")
+    from sqlmodel import Session, text
+
+    with Session(engine) as session:
+        # Create FTS5 virtual table
+        session.exec(text("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS issues_fts USING fts5(
+                rowid,
+                id UNINDEXED,
+                title,
+                description,
+                content='issues',
+                content_rowid='rowid'
+            );
+        """))  # type: ignore[call-overload]
+
+        # Populate FTS5 table with existing data
+        session.exec(text("""
+            INSERT INTO issues_fts(rowid, id, title, description)
+            SELECT rowid, id, title, COALESCE(description, '')
+            FROM issues;
+        """))  # type: ignore[call-overload]
+
+        # Create triggers to keep FTS table in sync
+        # Trigger for INSERT
+        session.exec(text("""
+            CREATE TRIGGER IF NOT EXISTS issues_fts_insert AFTER INSERT ON issues BEGIN
+                INSERT INTO issues_fts(rowid, id, title, description)
+                VALUES (NEW.rowid, NEW.id, NEW.title, COALESCE(NEW.description, ''));
+            END;
+        """))  # type: ignore[call-overload]
+
+        # Trigger for UPDATE
+        session.exec(text("""
+            CREATE TRIGGER IF NOT EXISTS issues_fts_update AFTER UPDATE ON issues BEGIN
+                UPDATE issues_fts
+                SET title = NEW.title,
+                    description = COALESCE(NEW.description, '')
+                WHERE rowid = NEW.rowid;
+            END;
+        """))  # type: ignore[call-overload]
+
+        # Trigger for DELETE
+        session.exec(text("""
+            CREATE TRIGGER IF NOT EXISTS issues_fts_delete AFTER DELETE ON issues BEGIN
+                DELETE FROM issues_fts WHERE rowid = OLD.rowid;
+            END;
+        """))  # type: ignore[call-overload]
+
+        session.commit()
+
+    console.print("[green]✓[/green] Full-text search index created")
+
+    # Report success
+    console.print("\n[bold green]Database initialized successfully![/bold green]")
+    console.print(f"\n[cyan]Database location:[/cyan] {config.db_path}")
+
+    # Show initial state
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+
+        # Count issues
+        issue_count = len(uow.issues.list_issues(limit=1))
+        epic_count = len(uow.epics.list_epics(limit=1))
+        label_count = len(uow.labels.list_labels(limit=1))
+
+    console.print("\n[cyan]Current state:[/cyan]")
+    console.print(f"  Issues: {issue_count}")
+    console.print(f"  Epics: {epic_count}")
+    console.print(f"  Labels: {label_count}")
+
+
+@app.command()
+def info() -> None:
+    """Show system information and database statistics.
+
+    Displays database path, size, and counts of issues, epics, labels, etc.
+
+    Examples:
+        db-issues info
+    """
+    from dot_work.db_issues.config import DbIssuesConfig
+
+    config = DbIssuesConfig.from_env()
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+
+    console.print("[bold]Issue Tracker Information[/bold]\n")
+
+    # Database information
+    console.print(f"[cyan]Database:[/cyan] {config.db_path}")
+
+    # Get database size
+    if config.db_path.exists():
+        size_bytes = config.db_path.stat().st_size
+        size_mb = size_bytes / (1024 * 1024)
+        console.print(f"[cyan]Size:[/cyan] {size_mb:.2f} MB")
+    else:
+        console.print("[cyan]Size:[/cyan] (database does not exist)")
+        console.print("\n[yellow]Run 'db-issues init' to initialize the database.[/yellow]")
+        raise typer.Exit(1)
+
+    # Get statistics
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        issue_service = IssueService(uow, DefaultIdentifierService(), DefaultClock())
+
+        # Get all issues
+        all_issues = issue_service.list_issues(limit=100000)
+
+        # Count by status
+        status_counts: dict[str, int] = {}
+        for issue in all_issues:
+            status = issue.status.value
+            status_counts[status] = status_counts.get(status, 0) + 1
+
+        # Count by priority
+        priority_counts: dict[str, int] = {}
+        for issue in all_issues:
+            priority = issue.priority.name
+            priority_counts[priority] = priority_counts.get(priority, 0) + 1
+
+        # Count epics and labels
+        epics = uow.epics.list_epics(limit=100000)
+        labels = uow.labels.list_labels(limit=100000)
+
+        # Get dependencies count
+        deps = uow.graph.list_all_dependencies()
+
+        # Get last activity
+        last_activity = None
+        if all_issues:
+            last_activity = max(issue.updated_at for issue in all_issues)
+
+    console.print(f"\n[cyan]Issues:[/cyan] {len(all_issues)}")
+
+    # Status breakdown
+    if status_counts:
+        console.print("\n  [cyan]By Status:[/cyan]")
+        for status, count in sorted(status_counts.items()):
+            percentage = (count / len(all_issues)) * 100 if all_issues else 0
+            console.print(f"    {status}: {count} ({percentage:.1f}%)")
+
+    # Priority breakdown
+    if priority_counts:
+        console.print("\n  [cyan]By Priority:[/cyan]")
+        for priority, count in sorted(priority_counts.items()):
+            percentage = (count / len(all_issues)) * 100 if all_issues else 0
+            console.print(f"    {priority}: {count} ({percentage:.1f}%)")
+
+    console.print(f"\n[cyan]Epics:[/cyan] {len(epics)}")
+    console.print(f"[cyan]Labels:[/cyan] {len(labels)}")
+    console.print(f"[cyan]Dependencies:[/cyan] {len(deps)}")
+
+    if last_activity:
+        console.print(f"\n[cyan]Last activity:[/cyan] {last_activity.strftime('%Y-%m-%d %H:%M:%S')}")
+
+
+@app.command()
+def stats(
+    group_by: str | None = typer.Option(None, "--by", "-b", help="Group by: status, priority, type"),
+    trend: bool = typer.Option(False, "--trend", "-t", help="Show trends over time"),
+    format: str = typer.Option("table", "--format", "-f", help="Output format: table, json"),
+) -> None:
+    """Show statistics and metrics for issues.
+
+    Displays comprehensive statistics including counts by status, priority,
+    type, and calculated metrics like average resolution time.
+
+    Examples:
+        # Overall statistics
+        db-issues stats
+
+        # Group by status
+        db-issues stats --by status
+
+        # Group by priority
+        db-issues stats --by priority
+
+        # JSON output
+        db-issues stats --format json
+    """
+    from dot_work.db_issues.config import DbIssuesConfig
+
+    config = DbIssuesConfig.from_env()
+
+    if not config.db_path.exists():
+        console.print(f"[red]Error:[/red] Database not found at {config.db_path}")
+        raise typer.Exit(1)
+
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        stats_service = StatsService(session)
+        stats = stats_service.get_statistics()
+
+    if format == "json":
+        _output_stats_json(stats, console)
+    else:
+        _output_stats_table(stats, console, group_by)
+
+
+def _output_stats_table(stats: Statistics, console: Console, group_by: str | None) -> None:
+    """Output statistics as a formatted table."""
+    console.print("[bold]Issue Statistics[/bold]\n")
+    console.print(f"[cyan]Total Issues:[/cyan] {stats.total}")
+
+    if group_by == "status" or group_by is None:
+        if stats.by_status:
+            console.print("\n[bold]By Status:[/bold]")
+            for stat in stats.by_status:
+                console.print(f"  {stat.status:15} {stat.count:4} ({stat.percentage:5.1f}%)")
+
+    if group_by == "priority" or group_by is None:
+        if stats.by_priority:
+            console.print("\n[bold]By Priority:[/bold]")
+            for stat in stats.by_priority:
+                console.print(f"  {stat.priority:15} {stat.count:4} ({stat.percentage:5.1f}%)")
+
+    if group_by == "type" or group_by is None:
+        if stats.by_type:
+            console.print("\n[bold]By Type:[/bold]")
+            for stat in stats.by_type:
+                console.print(f"  {stat.type:15} {stat.count:4} ({stat.percentage:5.1f}%)")
+
+    console.print("\n[bold]Metrics:[/bold]")
+    console.print(f"  Blocked issues:        {stats.metrics.blocked_count}")
+    console.print(f"  Ready to work:         {stats.metrics.ready_to_work_count}")
+    console.print(f"  Longest chain:         {stats.metrics.longest_dependency_chain}")
+    if stats.metrics.avg_resolution_time_days:
+        console.print(f"  Avg resolution time:  {stats.metrics.avg_resolution_time_days} days")
+
+
+def _output_stats_json(stats: Statistics, console: Console) -> None:
+    """Output statistics as JSON."""
+    from rich.json import JSON
+
+    data = {
+        "total": stats.total,
+        "by_status": [
+            {"status": s.status, "count": s.count, "percentage": s.percentage}
+            for s in stats.by_status
+        ],
+        "by_priority": [
+            {"priority": s.priority, "count": s.count, "percentage": s.percentage}
+            for s in stats.by_priority
+        ],
+        "by_type": [
+            {"type": s.type, "count": s.count, "percentage": s.percentage}
+            for s in stats.by_type
+        ],
+        "metrics": {
+            "blocked_count": stats.metrics.blocked_count,
+            "ready_to_work_count": stats.metrics.ready_to_work_count,
+            "longest_dependency_chain": stats.metrics.longest_dependency_chain,
+            "avg_resolution_time_days": stats.metrics.avg_resolution_time_days,
+        },
+    }
+
+    console.print(JSON(data))
+
+
+@app.command()
+def compact(
+    vacuum: bool = typer.Option(
+        False, "--vacuum", "-v", help="Run VACUUM for deep compaction"
+    ),
+) -> None:
+    """Compact database to reduce size.
+
+    Runs SQLite optimization to reclaim space and reduce database size.
+
+    Examples:
+        # Compact database
+        db-issues compact
+
+        # Deep compact with VACUUM
+        db-issues compact --vacuum
+    """
+    from dot_work.db_issues.config import DbIssuesConfig
+
+    config = DbIssuesConfig.from_env()
+
+    if not config.db_path.exists():
+        console.print(f"[red]Error:[/red] Database not found at {config.db_path}")
+        console.print("\nRun 'db-issues init' to initialize the database.")
+        raise typer.Exit(1)
+
+    # Get size before
+    size_before = config.db_path.stat().st_size
+    size_before_mb = size_before / (1024 * 1024)
+
+    console.print("[cyan]Compacting database...[/cyan]")
+    console.print(f"Before: {size_before_mb:.2f} MB")
+
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+
+    if vacuum:
+        # Run VACUUM for deep compaction
+        from sqlmodel import Session
+
+        with Session(engine) as session:
+            console.print("[cyan]Running VACUUM...[/cyan]")
+            session.exec("VACUUM")
+            session.commit()
+    else:
+        # Run ANALYZE for optimization
+        from sqlmodel import Session
+
+        with Session(engine) as session:
+            console.print("[cyan]Running ANALYZE...[/cyan]")
+            session.exec("ANALYZE")
+            session.commit()
+
+    # Get size after
+    size_after = config.db_path.stat().st_size
+    size_after_mb = size_after / (1024 * 1024)
+    saved_mb = size_before_mb - size_after_mb
+    saved_pct = (saved_mb / size_before_mb) * 100 if size_before_mb > 0 else 0
+
+    console.print(f"After: {size_after_mb:.2f} MB")
+
+    if saved_mb > 0:
+        console.print(
+            f"[green]Saved: {saved_mb:.2f} MB ({saved_pct:.1f}% reduction)[/green]"
+        )
+    else:
+        console.print("[yellow]No space saved (database may already be optimized)[/yellow]")
+
+
+@app.command()
+def rename_prefix(
+    old_prefix: str = typer.Argument(..., help="Current prefix to rename (e.g., FEAT)"),
+    new_prefix: str = typer.Argument(..., help="New prefix (e.g., FEATURE)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without making changes"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+) -> None:
+    """Rename issue ID prefixes for consistency.
+
+    Examples:
+        # Rename FEAT to FEATURE
+        db-issues rename-prefix FEAT FEATURE
+
+        # Preview changes
+        db-issues rename-prefix BUG DEFECT --dry-run
+
+        # Skip confirmation
+        db-issues rename-prefix TASK WORK --yes
+    """
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        issue_service = IssueService(uow, id_service, clock)
+
+        # Find all issues with the old prefix
+        all_issues = issue_service.list_issues(limit=100000)
+        matching_issues = [issue for issue in all_issues if issue.id.startswith(f"{old_prefix}-")]
+
+        if not matching_issues:
+            console.print(f"[yellow]No issues found with prefix:[/yellow] {old_prefix}-")
+            raise typer.Exit(0)
+
+        # Show what will be renamed
+        console.print(f"[bold]Found {len(matching_issues)} issue(s) with prefix:[/bold] {old_prefix}-")
+        console.print()
+
+        # Show first few examples
+        for idx, issue in enumerate(matching_issues[:5], start=1):
+            old_id = issue.id
+            new_id = f"{new_prefix}-{old_id.split('-', 1)[1]}"
+            console.print(f"  {idx}. {old_id} -> {new_id}")
+
+        if len(matching_issues) > 5:
+            console.print(f"  ... and {len(matching_issues) - 5} more")
+
+        if dry_run:
+            console.print("\n[yellow]Dry run mode - no changes made.[/yellow]")
+            console.print("Run without --dry-run to perform the rename.")
+            raise typer.Exit(0)
+
+        # Confirmation prompt
+        if not yes:
+            console.print(f"\n[bold]Rename {len(matching_issues)} issue(s)?[/bold] [y/N]: ", end="")
+            response = input().strip().lower()
+            if response not in ("y", "yes"):
+                console.print("[yellow]Cancelled.[/yellow]")
+                raise typer.Exit(0)
+
+        # Perform rename
+        console.print(f"\n[cyan]Renaming {len(matching_issues)} issue(s)...[/cyan]")
+
+        # Use UnitOfWork context for transactional updates
+        with uow:
+            renamed_count = 0
+            for issue in matching_issues:
+                # Generate new ID
+                old_id = issue.id
+                suffix = old_id.split('-', 1)[1]
+                new_id = f"{new_prefix}-{suffix}"
+
+                # Delete old issue and create new one with renamed ID
+                uow.issues.delete(old_id)
+
+                # Create new issue with new ID
+                renamed_issue = Issue(
+                    id=new_id,
+                    project_id=issue.project_id,
+                    title=issue.title,
+                    description=issue.description,
+                    status=issue.status,
+                    priority=issue.priority,
+                    type=issue.type,
+                    assignee=issue.assignee,
+                    epic_id=issue.epic_id,
+                    labels=issue.labels.copy(),
+                    blocked_reason=issue.blocked_reason,
+                    created_at=issue.created_at,
+                    updated_at=clock.now(),
+                    closed_at=issue.closed_at,
+                )
+                uow.issues.save(renamed_issue)
+                renamed_count += 1
+
+        console.print(f"[green]✓[/green] Renamed [bold]{renamed_count}[/bold] issue(s)")
+
+
+@app.command()
+def cleanup(
+    status: str = typer.Option("completed", "--status", "-s", help="Filter by status"),
+    days: int = typer.Option(90, "--days", "-d", help="Issues older than N days"),
+    archive: bool = typer.Option(False, "--archive", "-a", help="Archive instead of delete"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview without changes"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
+) -> None:
+    """Clean up old completed issues by archiving or deleting them.
+
+    Examples:
+        # Delete completed issues older than 90 days
+        db-issues cleanup --status completed --days 90
+
+        # Archive instead of delete
+        db-issues cleanup --archive
+
+        # Preview what would be cleaned up
+        db-issues cleanup --dry-run
+    """
+    from datetime import timedelta
+
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        issue_service = IssueService(uow, id_service, clock)
+
+        # Parse status filter
+        try:
+            status_enum = IssueStatus(status)
+        except ValueError:
+            console.print(f"[red]Error:[/red] Invalid status '{status}'")
+            console.print(f"Valid values: {', '.join(s.value for s in IssueStatus)}")
+            raise typer.Exit(1)
+
+        # Get all issues and filter by status and age
+        all_issues = issue_service.list_issues(limit=100000)
+        cutoff = clock.now() - timedelta(days=days)
+
+        matching_issues = [
+            issue
+            for issue in all_issues
+            if issue.status == status_enum and issue.updated_at < cutoff
+        ]
+
+        if not matching_issues:
+            console.print(
+                f"[yellow]No issues found with status:[/yellow] {status} older than {days} days"
+            )
+            raise typer.Exit(0)
+
+        # Sort by updated_at
+        matching_issues.sort(key=lambda x: x.updated_at)
+
+        # Show what will be cleaned up
+        action = "Archived" if archive else "Deleted"
+        console.print(
+            f"[bold]Found {len(matching_issues)} issue(s) with status:[/bold] {status} older than {days} days"
+        )
+        console.print()
+
+        # Show oldest issues
+        for idx, issue in enumerate(matching_issues[:5], start=1):
+            age_days = (clock.now() - issue.updated_at).days
+            console.print(
+                f"  {idx}. {issue.id}: {issue.title[:40]}... ({age_days} days old)"
+            )
+
+        if len(matching_issues) > 5:
+            console.print(f"  ... and {len(matching_issues) - 5} more")
+
+        if dry_run:
+            console.print("\n[yellow]Dry run mode - no changes made.[/yellow]")
+            console.print("Run without --dry-run to perform the cleanup.")
+            raise typer.Exit(0)
+
+        # Confirmation prompt
+        if not force:
+            console.print(f"\n[bold]{action} {len(matching_issues)} issue(s)?[/bold] [y/N]: ", end="")
+            response = input().strip().lower()
+            if response not in ("y", "yes"):
+                console.print("[yellow]Cancelled.[/yellow]")
+                raise typer.Exit(0)
+
+        if archive:
+            # Archive to JSONL file
+            from pathlib import Path
+
+            # Create archive directory
+            archive_dir = Path.cwd() / ".work" / "db-issues" / "archive"
+            month_dir = archive_dir / clock.now().strftime("%Y-%m")
+            month_dir.mkdir(parents=True, exist_ok=True)
+
+            # Create archive file
+            timestamp = clock.now().strftime("%Y-%m-%d")
+            archive_file = month_dir / f"issues-{timestamp}.jsonl"
+
+            console.print(f"\n[cyan]Archiving to:[/cyan] {archive_file}")
+
+            # Write archive
+            import json
+
+            with open(archive_file, "w") as f:
+                for issue in matching_issues:
+                    data = {
+                        "id": issue.id,
+                        "project_id": issue.project_id,
+                        "title": issue.title,
+                        "description": issue.description,
+                        "status": issue.status.value,
+                        "priority": issue.priority.value,
+                        "type": issue.type.value,
+                        "assignee": issue.assignee,
+                        "epic_id": issue.epic_id,
+                        "labels": issue.labels,
+                        "blocked_reason": issue.blocked_reason,
+                        "created_at": issue.created_at.isoformat(),
+                        "updated_at": issue.updated_at.isoformat(),
+                    }
+                    if issue.closed_at:
+                        data["closed_at"] = issue.closed_at.isoformat()
+                    f.write(json.dumps(data, separators=(",", ":")) + "\n")
+
+            # Delete archived issues from database
+            with uow:
+                for issue in matching_issues:
+                    uow.issues.delete(issue.id)
+
+            console.print(
+                f"[green]✓[/green] Archived [bold]{len(matching_issues)}[/bold] issue(s)"
+            )
+        else:
+            # Delete issues
+            console.print(f"\n[cyan]Deleting {len(matching_issues)} issue(s)...[/cyan]")
+
+            with uow:
+                for issue in matching_issues:
+                    uow.issues.delete(issue.id)
+
+            console.print(
+                f"[green]✓[/green] Deleted [bold]{len(matching_issues)}[/bold] issue(s)"
+            )
+
+
+@app.command()
+def duplicates(
+    threshold: float = typer.Option(0.7, "--threshold", "-t", help="Similarity threshold (0-1)"),
+    format: str = typer.Option("table", "--format", "-f", help="Output format: table, json"),
+) -> None:
+    """Find potential duplicate issues based on title similarity.
+
+    Examples:
+        # Find duplicates with default threshold (0.7)
+        db-issues duplicates
+
+        # Use higher threshold for stricter matching
+        db-issues duplicates --threshold 0.85
+
+        # Output as JSON
+        db-issues duplicates --format json
+    """
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        issue_service = IssueService(uow, id_service, clock)
+
+        # Get all issues
+        all_issues = issue_service.list_issues(limit=100000)
+
+        if not all_issues:
+            console.print("[yellow]No issues found to scan.[/yellow]")
+            raise typer.Exit(0)
+
+        # Run duplicate detection
+        console.print(f"[cyan]Scanning {len(all_issues)} issues for duplicates...[/cyan]")
+
+        duplicate_service = DuplicateService(clock=clock)
+        result = duplicate_service.find_duplicates(all_issues, threshold=threshold)
+
+        if format == "json":
+            # Output as JSON
+
+            output = {
+                "total_issues": result.total_issues,
+                "duplicates_found": result.duplicates_found,
+                "scan_time": result.scan_time,
+                "groups": [
+                    {
+                        "similarity": g.similarity,
+                        "issues": g.issues,
+                        "representative": g.representative_issue,
+                    }
+                    for g in result.groups
+                ],
+            }
+            console.print_json(data=output)
+        else:
+            # Output as table
+            if not result.groups:
+                console.print(
+                    f"[green]No duplicates found with threshold {threshold}.[/green]"
+                )
+                raise typer.Exit(0)
+
+            console.print(
+                f"\n[bold]Potential duplicates found:[/bold] {len(result.groups)} group(s)"
+            )
+            console.print(f"[dim]Total issues: {result.total_issues}[/dim]")
+            console.print(f"[dim]Duplicates: {result.duplicates_found}[/dim]")
+            console.print(f"[dim]Scan time: {result.scan_time:.3f}s[/dim]\n")
+
+            # Show each group
+            for idx, group in enumerate(result.groups, start=1):
+                console.print(f"[bold]{idx}.[/bold] Similarity: [cyan]{group.similarity:.2f}[/cyan]")
+
+                # Show issue details
+                issue_map = {issue.id: issue for issue in all_issues}
+
+                for issue_id in group.issues:
+                    issue = issue_map.get(issue_id)
+                    if issue:
+                        # Truncate title if too long
+                        title = issue.title[:50] + "..." if len(issue.title) > 50 else issue.title
+                        marker = " →" if issue_id == group.representative_issue else "  -"
+                        console.print(f"  {marker} [cyan]{issue_id}[/cyan]: {title}")
+
+                console.print()  # Blank line between groups
+
+
+@app.command()
+def merge(
+    source_id: str = typer.Argument(..., help="Source issue ID to merge from"),
+    target_id: str = typer.Argument(..., help="Target issue ID to merge into"),
+    keep_comments: bool = typer.Option(False, "--keep-comments", help="Copy comments from source"),
+    keep_labels: bool = typer.Option(True, "--keep-labels/--no-keep-labels", help="Merge labels (default: yes)"),
+    close_source: bool = typer.Option(False, "--close-source", help="Close source instead of deleting"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+) -> None:
+    """Merge source issue into target issue.
+
+    Combines data from source into target:
+    - Labels: union of both sets
+    - Dependencies: all dependencies remapped to target
+    - Comments: optionally copied from source
+
+    By default, the source issue is deleted after merge.
+    Use --close-source to close it instead.
+
+    Examples:
+        # Merge bd-c3d4 into bd-a1b2
+        db-issues merge bd-c3d4 bd-a1b2
+
+        # Merge with comments
+        db-issues merge bd-c3d4 bd-a1b2 --keep-comments
+
+        # Close source instead of delete
+        db-issues merge bd-c3d4 bd-a1b2 --close-source
+    """
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        issue_service = IssueService(uow, id_service, clock)
+
+        # Get both issues for preview
+        source = issue_service.get_issue(source_id)
+        target = issue_service.get_issue(target_id)
+
+        if not source:
+            console.print(f"[red]Source issue not found: {source_id}[/red]")
+            raise typer.Exit(1)
+
+        if not target:
+            console.print(f"[red]Target issue not found: {target_id}[/red]")
+            raise typer.Exit(1)
+
+        if source_id == target_id:
+            console.print("[red]Cannot merge issue into itself[/red]")
+            raise typer.Exit(1)
+
+        # Show merge preview
+        console.print("\n[bold]Merge Preview[/bold]")
+        console.print(f"[cyan]Source:[/cyan] {source_id} - {source.title[:60]}")
+        console.print(f"[cyan]Target:[/cyan] {target_id} - {target.title[:60]}")
+
+        # Calculate what will happen
+        source_label_set = set(source.labels)
+        target_label_set = set(target.labels)
+        new_labels = source_label_set - target_label_set
+        merged_labels = target.labels + sorted(new_labels)
+
+        source_deps = uow.issues.get_dependencies(source_id)
+        source_dependents = uow.issues.get_dependents(source_id)
+        source_comments = uow.issues.get_comments(source_id) if keep_comments else []
+
+        console.print(f"\n[dim]Labels to add:[/dim] {len(new_labels)} new label(s)")
+        if new_labels:
+            for label in sorted(new_labels):
+                console.print(f"  [green]+[/green] {label}")
+
+        console.print(f"[dim]Merged labels:[/dim] {', '.join(merged_labels)}")
+
+        console.print("\n[dim]Dependencies to remap:[/dim]")
+        console.print(f"  [dim]From source ({len(source_deps)} outgoing):[/dim]")
+        if source_deps:
+            for dep in source_deps[:5]:  # Show max 5
+                console.print(f"    {source_id} → {dep.to_issue_id} ({dep.dependency_type.value})")
+            if len(source_deps) > 5:
+                console.print(f"    ... and {len(source_deps) - 5} more")
+        else:
+            console.print("    [dim](none)[/dim]")
+
+        console.print(f"  [dim]To source ({len(source_dependents)} incoming):[/dim]")
+        if source_dependents:
+            for dep in source_dependents[:5]:  # Show max 5
+                console.print(f"    {dep.from_issue_id} → {source_id} ({dep.dependency_type.value})")
+            if len(source_dependents) > 5:
+                console.print(f"    ... and {len(source_dependents) - 5} more")
+        else:
+            console.print("    [dim](none)[/dim]")
+
+        if keep_comments:
+            console.print(f"\n[dim]Comments to copy:[/dim] {len(source_comments)}")
+
+        action = "close" if close_source else "delete"
+        console.print(f"\n[dim]Source will be:[/dim] [yellow]{action}d[/yellow]")
+
+        # Confirm
+        if not yes:
+            console.print("\n[yellow]Proceed with merge?[/yellow] [bold][y/N][/bold]")
+            response = input().strip().lower()
+            if response not in ("y", "yes"):
+                console.print("[yellow]Merge cancelled[/yellow]")
+                raise typer.Exit(0)
+
+        # Perform merge
+        console.print(f"\n[cyan]Merging {source_id} into {target_id}...[/cyan]")
+
+        try:
+            result = issue_service.merge_issues(
+                source_id=source_id,
+                target_id=target_id,
+                keep_comments=keep_comments,
+                close_source=close_source,
+            )
+        except ValueError as e:
+            console.print(f"[red]Error: {e}[/red]")
+            raise typer.Exit(1)
+
+        if result:
+            console.print("\n[green]✓ Merge complete[/green]")
+            console.print(f"[dim]Labels: {len(result.labels)} total[/dim]")
+            console.print(f"[dim]Source {source_id}: {action}d[/dim]")
+            console.print("\n[cyan]View target issue:[/cyan]")
+            console.print(f"  db-issues show {target_id}")
+        else:
+            console.print("[red]Merge failed[/red]")
+            raise typer.Exit(1)
+
+
+@app.command()
+def edit(
+    issue_id: str = typer.Argument(..., help="Issue ID to edit"),
+    editor: str | None = typer.Option(None, "--editor", "-e", help="Editor to use (default: $EDITOR)"),
+) -> None:
+    """Edit an issue in an external editor.
+
+    Opens the issue in your configured editor ($EDITOR or specified via --editor).
+    The issue is presented as YAML for easy editing.
+
+    Examples:
+        # Edit with default editor
+        db-issues edit bd-a1b2
+
+        # Edit with specific editor
+        db-issues edit bd-a1b2 --editor vim
+        db-issues edit bd-a1b2 -e code
+    """
+    import hashlib
+    import os
+    import subprocess
+    import tempfile
+
+    import yaml
+
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        issue_service = IssueService(uow, id_service, clock)
+
+        # Get the issue
+        issue = issue_service.get_issue(issue_id)
+        if not issue:
+            console.print(f"[red]Issue not found: {issue_id}[/red]")
+            raise typer.Exit(1)
+
+        # Determine editor to use
+        editor_cmd = editor or os.environ.get("EDITOR")
+        if not editor_cmd:
+            console.print(
+                "[red]No editor configured. Set $EDITOR or use --editor.[/red]"
+            )
+            console.print("[dim]Examples: --editor vim, --editor nano, --editor code[/dim]")
+            raise typer.Exit(1)
+
+        # Get dependencies for this issue
+        deps = uow.issues.get_dependencies(issue_id)
+
+        # Build the YAML content
+        yaml_content = {
+            "id": issue.id,
+            "title": issue.title,
+            "description": issue.description or "",
+            "priority": issue.priority.value,
+            "type": issue.issue_type.value,
+            "status": issue.status.value,
+            "labels": issue.labels,
+            "assignee": issue.assignee or "",
+        }
+
+        # Add dependencies if any
+        if deps:
+            yaml_content["dependencies"] = {
+                "blocks": [d.to_issue_id for d in deps if d.dependency_type.value == "blocks"],
+                "depends_on": [
+                    d.to_issue_id for d in deps if d.dependency_type.value == "depends_on"
+                ],
+            }
+
+        # Create temp file
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", prefix=f"edit-{issue.id}-", delete=False
+        ) as f:
+            # Write header comments
+            f.write(f"# dot-work db-issues edit: {issue.id}\n")
+            f.write("# Lines starting with # are comments\n")
+            f.write("# Save and exit to apply changes\n")
+            f.write("# Exit without saving to cancel\n")
+            f.write("#\n")
+
+            # Write YAML content
+            yaml.dump(yaml_content, f, default_flow_style=False, sort_keys=False)
+            temp_path = f.name
+
+        # Calculate initial hash for change detection
+        with open(temp_path, "rb") as f:
+            initial_hash = hashlib.sha256(f.read()).hexdigest()
+
+        try:
+            # Open editor
+            console.print(f"[cyan]Opening {issue_id} in {editor_cmd}...[/cyan]")
+            console.print(f"[dim]Temp file: {temp_path}[/dim]")
+
+            # Handle editor commands (split for editors with args like "code --wait")
+            if editor_cmd.strip() == "code":
+                # VS Code needs --wait flag to block
+                editor_args = ["code", "--wait", temp_path]
+            elif editor_cmd.strip() == "vim" or editor_cmd.strip() == "vi":
+                editor_args = [editor_cmd.strip(), temp_path]
+            elif editor_cmd.strip() == "nano":
+                editor_args = [editor_cmd.strip(), temp_path]
+            else:
+                # Try to split, fallback to treating as single command
+                parts = editor_cmd.strip().split()
+                if len(parts) > 1:
+                    editor_args = parts + [temp_path]
+                else:
+                    editor_args = [editor_cmd, temp_path]
+
+            result = subprocess.run(editor_args)
+
+            if result.returncode != 0:
+                console.print(f"[yellow]Editor exited with code {result.returncode}[/yellow]")
+
+            # Check if file was modified
+            with open(temp_path, "rb") as f:
+                final_hash = hashlib.sha256(f.read()).hexdigest()
+
+            if initial_hash == final_hash:
+                console.print("[yellow]No changes detected[/yellow]")
+                raise typer.Exit(0)
+
+            # Parse modified file
+            with open(temp_path) as f:
+                modified_data = yaml.safe_load(f)
+
+            # Validate required fields
+            if not isinstance(modified_data, dict):
+                console.print("[red]Invalid YAML: must be a dictionary[/red]")
+                raise typer.Exit(1)
+
+            required_fields = ["title", "priority", "type", "status"]
+            missing = [f for f in required_fields if f not in modified_data]
+            if missing:
+                console.print(f"[red]Missing required fields: {', '.join(missing)}[/red]")
+                raise typer.Exit(1)
+
+            # Build update parameters
+            update_params: dict[str, Any] = {}
+
+            # Title
+            if modified_data.get("title") != issue.title:
+                update_params["title"] = str(modified_data["title"])
+
+            # Description
+            new_description = modified_data.get("description", "")
+            if new_description != issue.description:
+                update_params["description"] = str(new_description) if new_description else None
+
+            # Priority
+            try:
+                new_priority = IssuePriority(modified_data["priority"])
+                if new_priority != issue.priority:
+                    update_params["priority"] = new_priority
+            except ValueError:
+                console.print(f"[red]Invalid priority: {modified_data['priority']}[/red]")
+                console.print("[dim]Valid: critical, high, medium, low[/dim]")
+                raise typer.Exit(1)
+
+            # Type
+            try:
+                new_type = IssueType(modified_data["type"])
+                if new_type != issue.issue_type:
+                    update_params["issue_type"] = new_type
+            except ValueError:
+                console.print(f"[red]Invalid type: {modified_data['type']}[/red]")
+                console.print("[dim]Valid: bug, feature, task, enhancement, refactor, docs, test, security, performance[/dim]")
+                raise typer.Exit(1)
+
+            # Status
+            try:
+                new_status = IssueStatus(modified_data["status"])
+                if new_status != issue.status:
+                    update_params["status"] = new_status
+            except ValueError:
+                console.print(f"[red]Invalid status: {modified_data['status']}[/red]")
+                console.print("[dim]Valid: proposed, in_progress, blocked, resolved, completed, stale, wont_fix[/dim]")
+                raise typer.Exit(1)
+
+            # Labels
+            new_labels = modified_data.get("labels", [])
+            if isinstance(new_labels, list):
+                if new_labels != issue.labels:
+                    update_params["labels"] = new_labels
+            else:
+                console.print("[yellow]Warning: labels must be a list, ignoring[/yellow]")
+
+            # Assignee
+            new_assignee = modified_data.get("assignee", "")
+            if isinstance(new_assignee, str):
+                if new_assignee != (issue.assignee or ""):
+                    update_params["assignee"] = new_assignee if new_assignee else None
+
+            # Apply changes
+            if update_params:
+                console.print(f"\n[cyan]Updating {issue_id}...[/cyan]")
+
+                # Handle status transition
+                if "status" in update_params:
+                    updated = issue_service.transition_issue(issue_id, update_params["status"])
+                    # Remove status from params so we don't double-apply
+                    update_params.pop("status")
+                else:
+                    updated = issue_service.get_issue(issue_id)
+
+                if updated:
+                    # Apply remaining updates
+                    if update_params:
+                        updated = issue_service.update_issue(issue_id, **update_params)
+
+                    if updated:
+                        console.print("[green]✓ Issue updated[/green]")
+                        console.print(f"[dim]Changes: {', '.join(update_params.keys())}[/dim]")
+                    else:
+                        console.print("[red]Failed to update issue[/red]")
+                        raise typer.Exit(1)
+
+            console.print("\n[cyan]View updated issue:[/cyan]")
+            console.print(f"  db-issues show {issue_id}")
+
+        finally:
+            # Clean up temp file
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+
+
+@app.command()
+def restore(
+    issue_id: str | None = typer.Argument(None, help="Issue ID to restore"),
+    list_deleted: bool = typer.Option(False, "--list", "-l", help="List deleted issues"),
+    restore_all: bool = typer.Option(False, "--all", "-a", help="Restore all deleted issues"),
+) -> None:
+    """Restore soft-deleted issues.
+
+    Examples:
+        # List deleted issues
+        db-issues restore --list
+
+        # Restore specific issue
+        db-issues restore bd-a1b2
+
+        # Restore all deleted issues
+        db-issues restore --all
+    """
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        issue_service = IssueService(uow, id_service, clock)
+
+        if list_deleted:
+            # List deleted issues
+            deleted_issues = issue_service.list_deleted_issues(limit=1000)
+
+            if not deleted_issues:
+                console.print("[green]No deleted issues found[/green]")
+                raise typer.Exit(0)
+
+            console.print(f"\n[bold]Deleted issues:[/bold] {len(deleted_issues)} issue(s)\n")
+
+            for issue in deleted_issues:
+                deleted_date = issue.deleted_at.strftime("%Y-%m-%d") if issue.deleted_at else "unknown"
+                console.print(f"  [cyan]{issue.id}[/cyan]: {issue.title[:60]}")
+                console.print(f"    [dim]Deleted:[/dim] {deleted_date}")
+                console.print(f"    [dim]Status:[/dim] {issue.status.value} [dim]Type:[/dim] {issue.issue_type.value}")
+                console.print()
+
+        elif restore_all:
+            # Restore all deleted issues
+            deleted_issues = issue_service.list_deleted_issues(limit=1000)
+
+            if not deleted_issues:
+                console.print("[green]No deleted issues found[/green]")
+                raise typer.Exit(0)
+
+            console.print(f"\n[cyan]Restoring {len(deleted_issues)} deleted issue(s)...[/cyan]\n")
+
+            restored_count = 0
+            failed_count = 0
+
+            for issue in deleted_issues:
+                restored = issue_service.restore_issue(issue.id)
+                if restored:
+                    restored_count += 1
+                    console.print(f"  [green]✓[/green] {issue.id}: {issue.title[:50]}")
+                else:
+                    failed_count += 1
+                    console.print(f"  [red]✗[/red] {issue.id}: Failed to restore")
+
+            console.print(f"\n[green]Restored {restored_count} issue(s)[/green]")
+            if failed_count > 0:
+                console.print(f"[yellow]Failed to restore {failed_count} issue(s)[/yellow]")
+
+        else:
+            # Restore specific issue
+            if not issue_id:
+                console.print("[red]Error: Issue ID required (unless using --list or --all)[/red]")
+                console.print("[dim]Usage: db-issues restore <id>[/dim]")
+                raise typer.Exit(1)
+
+            # Check if issue exists (is deleted)
+            # We need to check if the issue is in the deleted list
+            deleted_issues = issue_service.list_deleted_issues(limit=1000)
+            deleted_ids = [issue.id for issue in deleted_issues]
+
+            if issue_id not in deleted_ids:
+                console.print(f"[yellow]Issue {issue_id} is not deleted or does not exist[/yellow]")
+                raise typer.Exit(1)
+
+            console.print(f"[cyan]Restoring {issue_id}...[/cyan]")
+
+            restored = issue_service.restore_issue(issue_id)
+
+            if restored:
+                console.print(f"[green]✓ Issue restored: {restored.id}[/green]")
+                console.print(f"[dim]{restored.title}[/dim]")
+                console.print("\n[cyan]View restored issue:[/cyan]")
+                console.print(f"  db-issues show {issue_id}")
+            else:
+                console.print(f"[red]Failed to restore issue: {issue_id}[/red]")
+                raise typer.Exit(1)

@@ -5,11 +5,57 @@ between repositories and enforcing business rules.
 """
 
 import logging
+from dataclasses import dataclass
 
 from dot_work.db_issues.adapters import UnitOfWork
-from dot_work.db_issues.domain.entities import Clock, Epic, EpicStatus, IdentifierService
+from dot_work.db_issues.domain.entities import (
+    Clock,
+    Epic,
+    EpicStatus,
+    IdentifierService,
+    Issue,
+    IssueStatus,
+)
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class EpicInfo:
+    """Summary information about an epic.
+
+    Attributes:
+        epic_id: The epic identifier
+        title: Epic title
+        total_count: Total number of issues in the epic
+        proposed_count: Number of issues with proposed status
+        in_progress_count: Number of issues in progress
+        completed_count: Number of completed issues
+    """
+
+    epic_id: str
+    title: str
+    total_count: int
+    proposed_count: int
+    in_progress_count: int
+    completed_count: int
+
+
+@dataclass(frozen=True)
+class EpicTreeItem:
+    """An item in the epic tree.
+
+    Attributes:
+        issue_id: The issue ID
+        title: Issue title
+        status: Issue status
+        indent_level: Indentation level for tree display
+    """
+
+    issue_id: str
+    title: str
+    status: str
+    indent_level: int
 
 
 class EpicService:
@@ -283,6 +329,165 @@ class EpicService:
         logger.debug("Listing child epics: parent=%s", parent_epic_id)
         return self.uow.epics.get_child_epics(parent_epic_id)
 
+    def get_all_epics_with_counts(self) -> list[EpicInfo]:
+        """Get all epics with issue count summaries.
+
+        Returns:
+            List of EpicInfo objects with counts by status
+
+        Examples:
+            >>> infos = service.get_all_epics_with_counts()
+            >>> for info in infos:
+            ...     print(f"{info.epic_id}: {info.total_count} issues")
+        """
+        logger.debug("Getting all epics with counts")
+
+        # Get all epics
+        epics = self.uow.epics.list_all()
+
+        # Get all issues
+        all_issues = self.uow.issues.list_all(limit=1000000)
+
+        results: list[EpicInfo] = []
+
+        for epic in epics:
+            # Filter issues belonging to this epic
+            epic_issues = [issue for issue in all_issues if issue.epic_id == epic.id]
+
+            total_count = len(epic_issues)
+            proposed_count = sum(1 for issue in epic_issues if issue.status == IssueStatus.PROPOSED)
+            in_progress_count = sum(1 for issue in epic_issues if issue.status == IssueStatus.IN_PROGRESS)
+            completed_count = sum(1 for issue in epic_issues if issue.status == IssueStatus.COMPLETED)
+
+            results.append(
+                EpicInfo(
+                    epic_id=epic.id,
+                    title=epic.title,
+                    total_count=total_count,
+                    proposed_count=proposed_count,
+                    in_progress_count=in_progress_count,
+                    completed_count=completed_count,
+                )
+            )
+
+        return results
+
+    def get_epic_issues(self, epic_id: str) -> list[Issue]:
+        """Get all issues in an epic.
+
+        Args:
+            epic_id: Epic identifier
+
+        Returns:
+            List of issues in the epic
+
+        Examples:
+            >>> issues = service.get_epic_issues("EPIC-001")
+            >>> for issue in issues:
+            ...     print(f"{issue.id}: {issue.title}")
+        """
+        logger.debug("Getting issues for epic: id=%s", epic_id)
+
+        # Verify epic exists
+        epic = self.uow.epics.get(epic_id)
+        if not epic:
+            logger.warning("Epic not found: id=%s", epic_id)
+            return []
+
+        # Get all issues and filter by epic_id
+        all_issues = self.uow.issues.list_all(limit=1000000)
+        return [issue for issue in all_issues if issue.epic_id == epic_id]
+
+    def get_epic_tree(self, epic_id: str) -> list[EpicTreeItem]:
+        """Get hierarchical tree of issues in an epic.
+
+        Builds a tree structure showing issues and their children
+        (issues that have this issue as their parent_id).
+
+        Args:
+            epic_id: Epic identifier
+
+        Returns:
+            List of EpicTreeItem objects representing the tree
+
+        Examples:
+            >>> tree = service.get_epic_tree("EPIC-001")
+            >>> for item in tree:
+            ...     indent = "  " * item.indent_level
+            ...     print(f"{indent}{item.issue_id}: {item.title}")
+        """
+        logger.debug("Getting epic tree: epic_id=%s", epic_id)
+
+        # Verify epic exists
+        epic = self.uow.epics.get(epic_id)
+        if not epic:
+            logger.warning("Epic not found: id=%s", epic_id)
+            return []
+
+        # Get all issues in this epic
+        all_issues = self.uow.issues.list_all(limit=1000000)
+        epic_issues = [issue for issue in all_issues if issue.epic_id == epic_id]
+
+        # Build a parent -> children map
+        children_map: dict[str, list[Issue]] = {}
+        root_issues: list[Issue] = []
+
+        for issue in epic_issues:
+            # Check if this issue has a parent_id (assuming parent_id field exists on Issue)
+            # If not, treat it as a root issue
+            parent_id = getattr(issue, "parent_id", None)
+            if parent_id and parent_id in [i.id for i in epic_issues]:
+                if parent_id not in children_map:
+                    children_map[parent_id] = []
+                children_map[parent_id].append(issue)
+            else:
+                root_issues.append(issue)
+
+        # Build tree using DFS
+        results: list[EpicTreeItem] = []
+
+        def build_tree(issues: list[Issue], level: int) -> None:
+            """Recursively build tree from issues."""
+            for issue in issues:
+                results.append(
+                    EpicTreeItem(
+                        issue_id=issue.id,
+                        title=issue.title,
+                        status=issue.status.value,
+                        indent_level=level,
+                    )
+                )
+
+                # Add children
+                children = children_map.get(issue.id, [])
+                if children:
+                    build_tree(children, level + 1)
+
+        build_tree(root_issues, 0)
+
+        return results
+
+    def get_all_epic_trees(self) -> dict[str, list[EpicTreeItem]]:
+        """Get trees for all epics.
+
+        Returns:
+            Dictionary mapping epic IDs to their tree items
+
+        Examples:
+            >>> trees = service.get_all_epic_trees()
+            >>> for epic_id, items in trees.items():
+            ...     print(f"{epic_id}: {len(items)} issues")
+        """
+        logger.debug("Getting trees for all epics")
+
+        epics = self.uow.epics.list_all()
+        results: dict[str, list[EpicTreeItem]] = {}
+
+        for epic in epics:
+            results[epic.id] = self.get_epic_tree(epic.id)
+
+        return results
+
     def _would_create_cycle(self, parent_id: str, child_id: str) -> bool:
         """Check if adding a child would create a cycle.
 
@@ -311,3 +516,10 @@ class EpicService:
             return False
 
         return dfs(parent_id)
+
+
+__all__ = [
+    "EpicService",
+    "EpicInfo",
+    "EpicTreeItem",
+]

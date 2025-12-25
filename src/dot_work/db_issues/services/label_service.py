@@ -10,6 +10,7 @@ Source reference: /home/thomas/Workspace/glorious/src/glorious_agents/skills/iss
 
 import logging
 import re
+from dataclasses import dataclass
 
 from dot_work.db_issues.adapters import UnitOfWork
 from dot_work.db_issues.domain.entities import (
@@ -164,6 +165,21 @@ def get_terminal_color_code(hex_color: str | None) -> str:
 # =============================================================================
 # Label Service
 # =============================================================================
+
+
+@dataclass(frozen=True)
+class LabelInfo:
+    """Summary information about a label.
+
+    Attributes:
+        name: The label name
+        count: Number of issues with this label
+        color: Optional label color
+    """
+
+    name: str
+    count: int
+    color: str | None
 
 
 class LabelService:
@@ -365,9 +381,88 @@ class LabelService:
         """
         return self.uow.labels.get(label_id)
 
+    def get_all_labels_with_counts(self, include_unused: bool = False) -> list[LabelInfo]:
+        """Get all unique labels with usage counts.
+
+        Scans all issues to collect unique labels and count their usage.
+        Optionally includes only unused labels (count = 0).
+
+        Args:
+            include_unused: If True, only return unused labels (count = 0)
+
+        Returns:
+            List of LabelInfo objects with name, count, and color
+
+        Examples:
+            >>> infos = service.get_all_labels_with_counts()
+            >>> for info in infos:
+            ...     print(f"{info.name}: {info.count} issues")
+            bug: 15 issues
+            feature: 8 issues
+        """
+        logger.debug("Getting all labels with counts: include_unused=%s", include_unused)
+
+        # Get all defined labels (from Label repository)
+        defined_labels = self.uow.labels.list_all()
+        defined_label_map = {label.name: label for label in defined_labels}
+
+        # Get all issues and count label usage
+        all_issues = self.uow.issues.list_all(limit=1000000)
+
+        # Count label usage across all issues
+        label_counts: dict[str, int] = {}
+        for issue in all_issues:
+            for label_name in issue.labels:
+                label_counts[label_name] = label_counts.get(label_name, 0) + 1
+
+        # Build result list
+        results: list[LabelInfo] = []
+
+        if include_unused:
+            # Only show unused labels (count = 0)
+            for label in defined_labels:
+                count = label_counts.get(label.name, 0)
+                if count == 0:
+                    results.append(
+                        LabelInfo(
+                            name=label.name,
+                            count=0,
+                            color=label.color,
+                        )
+                    )
+        else:
+            # Show all labels, with usage counts
+            # First, add labels that were found in issues
+            for label_name, count in label_counts.items():
+                label = defined_label_map.get(label_name)
+                results.append(
+                    LabelInfo(
+                        name=label_name,
+                        count=count,
+                        color=label.color if label else None,
+                    )
+                )
+
+            # Then add defined labels that have no usage (unused)
+            for label in defined_labels:
+                if label.name not in label_counts:
+                    results.append(
+                        LabelInfo(
+                            name=label.name,
+                            count=0,
+                            color=label.color,
+                        )
+                    )
+
+        # Sort by count descending, then by name
+        results.sort(key=lambda x: (-x.count, x.name))
+
+        return results
+
 
 __all__ = [
     "LabelService",
+    "LabelInfo",
     "parse_color",
     "get_terminal_color_code",
     "NAMED_COLORS",

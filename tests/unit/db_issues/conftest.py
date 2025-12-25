@@ -3,6 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Generator
 
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
@@ -94,8 +95,16 @@ def fixed_id_service() -> IdentifierService:
 
 
 @pytest.fixture
-def in_memory_db() -> Session:
+def in_memory_db() -> Generator[Session, None, None]:
     """Create an in-memory SQLite database for testing.
+
+    CRITICAL: This fixture is a major source of memory leaks if not properly cleaned up.
+    The engine.dispose() MUST be called to close all connections in the pool.
+
+    NOTE: We use the default StaticPool for :memory: databases because:
+    - In-memory SQLite creates a SEPARATE database for each connection
+    - StaticPool keeps a single connection alive so the database persists
+    - NullPool would break this by creating new connections with empty databases
 
     Returns:
         SQLModel Session backed by in-memory SQLite
@@ -103,8 +112,19 @@ def in_memory_db() -> Session:
     engine = create_engine("sqlite:///:memory:", echo=False)
     SQLModel.metadata.create_all(engine)
 
-    with Session(engine) as session:
-        yield session
+    try:
+        # The context manager ensures session is closed after test
+        with Session(engine) as session:
+            yield session
+    finally:
+        # CRITICAL: Dispose engine to close ALL connections
+        # For StaticPool + :memory:, this closes the single connection
+        try:
+            engine.dispose()
+        except Exception:
+            pass
+        # Clear engine reference to help garbage collection
+        del engine
 
 
 @pytest.fixture
@@ -136,8 +156,10 @@ def sample_issue(fixed_clock: Clock) -> Issue:
 @pytest.fixture
 def issue_service(
     in_memory_db: Session, fixed_id_service: IdentifierService, fixed_clock: Clock
-) -> IssueService:
+) -> Generator[IssueService, None, None]:
     """Create an IssueService with test dependencies.
+
+    CRITICAL: Must properly close UnitOfWork to prevent memory leaks.
 
     Args:
         in_memory_db: In-memory database session
@@ -150,14 +172,25 @@ def issue_service(
     from dot_work.db_issues.adapters import UnitOfWork
 
     uow = UnitOfWork(in_memory_db)
-    return IssueService(uow, fixed_id_service, fixed_clock)
+    try:
+        yield IssueService(uow, fixed_id_service, fixed_clock)
+    finally:
+        # CRITICAL: Close UnitOfWork to release session reference
+        try:
+            uow.close()
+        except Exception:
+            pass
+        # Clear reference to help garbage collection
+        del uow
 
 
 @pytest.fixture
 def epic_service(
     in_memory_db: Session, fixed_id_service: IdentifierService, fixed_clock: Clock
-) -> EpicService:
+) -> Generator[EpicService, None, None]:
     """Create an EpicService with test dependencies.
+
+    CRITICAL: Must properly close UnitOfWork to prevent memory leaks.
 
     Args:
         in_memory_db: In-memory database session
@@ -170,7 +203,42 @@ def epic_service(
     from dot_work.db_issues.adapters import UnitOfWork
 
     uow = UnitOfWork(in_memory_db)
-    return EpicService(uow, fixed_id_service, fixed_clock)
+    try:
+        yield EpicService(uow, fixed_id_service, fixed_clock)
+    finally:
+        # CRITICAL: Close UnitOfWork to release session reference
+        try:
+            uow.close()
+        except Exception:
+            pass
+        del uow
+
+
+@pytest.fixture
+def dependency_service(in_memory_db: Session) -> Generator["dot_work.db_issues.services.dependency_service.DependencyService", None, None]:
+    """Create a DependencyService with test dependencies.
+
+    CRITICAL: Must properly close UnitOfWork to prevent memory leaks.
+
+    Args:
+        in_memory_db: In-memory database session
+
+    Returns:
+        DependencyService instance configured for testing
+    """
+    from dot_work.db_issues.adapters import UnitOfWork
+    from dot_work.db_issues.services.dependency_service import DependencyService
+
+    uow = UnitOfWork(in_memory_db)
+    try:
+        yield DependencyService(uow)
+    finally:
+        # CRITICAL: Close UnitOfWork to release session reference
+        try:
+            uow.close()
+        except Exception:
+            pass
+        del uow
 
 
 @pytest.fixture
@@ -206,3 +274,32 @@ def temp_db_path(tmp_path: Path) -> Path:
         Path to temporary db-issues directory
     """
     return tmp_path / "db-issues"
+
+
+@pytest.fixture
+def label_service(in_memory_db: Session, fixed_id_service: IdentifierService, fixed_clock: Clock) -> Generator["LabelService", None, None]:
+    """Create a LabelService for testing.
+
+    CRITICAL: Must properly close UnitOfWork to prevent memory leaks.
+
+    Args:
+        in_memory_db: In-memory database session
+        fixed_id_service: Fixed identifier service
+        fixed_clock: Fixed clock
+
+    Returns:
+        LabelService instance configured for testing
+    """
+    from dot_work.db_issues.adapters import UnitOfWork
+    from dot_work.db_issues.services import LabelService
+
+    uow = UnitOfWork(in_memory_db)
+    try:
+        yield LabelService(uow, fixed_id_service, fixed_clock)
+    finally:
+        # CRITICAL: Close UnitOfWork to release session reference
+        try:
+            uow.close()
+        except Exception:
+            pass
+        del uow

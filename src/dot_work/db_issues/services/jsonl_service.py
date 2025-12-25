@@ -161,7 +161,7 @@ class JsonlService:
                             existing.status = issue.status
                             existing.priority = issue.priority
                             existing.type = issue.type
-                            existing.assignee = issue.assignee
+                            existing.assignees = issue.assignees
                             existing.labels = issue.labels
                             existing.updated_at = self.clock.now()
                             self.uow.issues.save(existing)
@@ -268,7 +268,7 @@ class JsonlService:
             "status": issue.status.value,
             "priority": issue.priority.value,
             "type": issue.type.value,
-            "assignee": issue.assignee,
+            "assignees": issue.assignees,
             "epic_id": issue.epic_id,
             "labels": issue.labels,
             "created_at": issue.created_at.isoformat(),
@@ -352,6 +352,13 @@ class JsonlService:
             except (ValueError, AttributeError):
                 logger.warning("Invalid closed_at, ignoring")
 
+        # Handle assignee/assignees for backward compatibility
+        assignees_val = data.get("assignees", [])
+        if not assignees_val and "assignee" in data:
+            assignee_single = data.get("assignee")
+            if assignee_single:
+                assignees_val = [assignee_single]
+
         return Issue(
             id=data["id"],
             project_id=data.get("project_id", "default"),
@@ -360,7 +367,7 @@ class JsonlService:
             status=status,
             priority=priority,
             type=issue_type,
-            assignee=data.get("assignee"),
+            assignees=assignees_val,
             epic_id=data.get("epic_id"),
             labels=data.get("labels", []),
             created_at=created_at,

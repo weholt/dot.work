@@ -352,6 +352,44 @@ Execution Timing (record these):
 Output: Validation report with file-level regression analysis
 ```
 
+#### Pytest Memory Protection (REQUIRED)
+
+⚠️ **ALL pytest executions MUST use memory protection with 4GB max limit and automatic kill.**
+
+**NEVER run pytest directly.** ALWAYS use the pybuilder CLI which enforces memory limits:
+
+```bash
+# ✅ CORRECT - Pybuilder enforces 4GB limit, auto-kills exceeding processes
+uv run python -m dot_work.python.build.cli test
+
+# ❌ WRONG - Never run pytest directly (no memory protection)
+uv run pytest
+pytest
+python -m pytest
+```
+
+**How Memory Enforcement Works:**
+- Default limit: **4GB (4096MB)** - enforced automatically
+- Method: systemd-run with cgroup v2 MemoryMax (preferred) or ulimit fallback
+- Behavior: **Tests are automatically killed** when they exceed 4GB
+- Reporting: Memory statistics shown in build summary
+
+**Custom Limits (only when justified):**
+```bash
+# 8GB limit for known-heavy test suites
+uv run python -m dot_work.python.build.cli test --memory-limit 8192
+
+# Disable enforcement (only for debugging memory issues)
+uv run python -m dot_work.python.build.cli test --no-memory-enforce
+```
+
+**Why 4GB Memory Protection Is Required:**
+- Prevents system freeze from runaway test memory consumption
+- Catches memory leaks early before they become production issues
+- Ensures CI/CD pipelines don't hang on OOM
+- Provides consistent, predictable memory behavior across environments
+- Protects developer machines from exhaustion
+
 **Validation Scenarios:**
 
 ```markdown

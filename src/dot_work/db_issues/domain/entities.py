@@ -142,7 +142,7 @@ class IdentifierService(Protocol):
 
 
 class IssuePriority(IntEnum):
-    """Issue priority levels (0=highest, 3=lowest).
+    """Issue priority levels (0=highest, 4=lowest).
 
     Compatible with issue-tracker project priority system.
     """
@@ -151,6 +151,7 @@ class IssuePriority(IntEnum):
     HIGH = 1  # P1 - Next sprint
     MEDIUM = 2  # P2 - Normal priority (default)
     LOW = 3  # P3 - When convenient
+    BACKLOG = 4  # P4 - Not actively considering
 
 
 # =============================================================================
@@ -164,17 +165,21 @@ class IssueStatus(str, Enum):
     PROPOSED = "proposed"
     IN_PROGRESS = "in_progress"
     BLOCKED = "blocked"
+    RESOLVED = "resolved"
     COMPLETED = "completed"
+    STALE = "stale"
     WONT_FIX = "wont_fix"
 
     def can_transition_to(self, target: "IssueStatus") -> bool:
         """Check if transition to target status is valid.
 
         Valid transitions:
-        - proposed → in_progress, blocked, wont_fix
-        - in_progress → completed, blocked, proposed
-        - blocked → in_progress, proposed
-        - completed → proposed (reopen)
+        - proposed → in_progress, blocked, resolved, stale, wont_fix
+        - in_progress → resolved, completed, blocked, proposed, stale
+        - blocked → in_progress, proposed, stale
+        - resolved → completed, proposed, stale
+        - completed → proposed, stale (reopen)
+        - stale → in_progress, proposed
         - wont_fix → (no transitions allowed)
 
         Args:
@@ -185,10 +190,12 @@ class IssueStatus(str, Enum):
         """
         # Valid transitions map: current_status -> {valid next status values}
         _TRANSITIONS_MAP: dict[str, set[str]] = {
-            "proposed": {"in_progress", "blocked", "wont_fix"},
-            "in_progress": {"completed", "blocked", "proposed"},
-            "blocked": {"in_progress", "proposed"},
-            "completed": {"proposed"},  # Reopen completed issues
+            "proposed": {"in_progress", "blocked", "resolved", "stale", "wont_fix"},
+            "in_progress": {"resolved", "completed", "blocked", "proposed", "stale"},
+            "blocked": {"in_progress", "proposed", "stale"},
+            "resolved": {"completed", "proposed", "stale"},
+            "completed": {"proposed", "stale"},  # Reopen completed issues
+            "stale": {"in_progress", "proposed"},
             "wont_fix": set(),  # No transitions allowed from won't-fix
         }
 
@@ -208,6 +215,8 @@ class IssueType(str, Enum):
     TEST = "test"
     SECURITY = "security"
     PERFORMANCE = "performance"
+    STORY = "story"
+    EPIC = "epic"
 
 
 class EpicStatus(str, Enum):
@@ -250,12 +259,16 @@ class Issue:
         status: Current status
         priority: Priority level
         type: Issue type
-        assignee: Assigned user
+        assignees: List of assigned users (multi-assignee support)
         epic_id: Parent epic ID
         labels: List of label names
+        blocked_reason: Reason for blocked status
+        source_url: Original source URL (e.g., from external issue tracker)
+        references: List of reference URLs or identifiers
         created_at: Creation timestamp
         updated_at: Last modification timestamp
         closed_at: Closure timestamp
+        deleted_at: Soft delete timestamp (None if not deleted)
     """
 
     id: str
@@ -265,12 +278,16 @@ class Issue:
     status: IssueStatus = IssueStatus.PROPOSED
     priority: IssuePriority = IssuePriority.MEDIUM
     type: IssueType = IssueType.TASK
-    assignee: str | None = None
+    assignees: list[str] = field(default_factory=list)
     epic_id: str | None = None
     labels: list[str] = field(default_factory=list)
+    blocked_reason: str | None = None
+    source_url: str | None = None
+    references: list[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=utcnow_naive)
     updated_at: datetime = field(default_factory=utcnow_naive)
     closed_at: datetime | None = None
+    deleted_at: datetime | None = None
 
     def transition(self, new_status: IssueStatus) -> "Issue":
         """Transition to a new status.
@@ -301,9 +318,12 @@ class Issue:
             status=new_status,
             priority=self.priority,
             type=self.type,
-            assignee=self.assignee,
+            assignees=self.assignees.copy(),
             epic_id=self.epic_id,
             labels=self.labels.copy(),
+            blocked_reason=self.blocked_reason,
+            source_url=self.source_url,
+            references=self.references.copy(),
             created_at=self.created_at,
             updated_at=utcnow_naive(),
             closed_at=self.closed_at,
@@ -335,9 +355,12 @@ class Issue:
                 status=self.status,
                 priority=self.priority,
                 type=self.type,
-                assignee=self.assignee,
+                assignees=self.assignees.copy(),
                 epic_id=self.epic_id,
                 labels=new_labels,
+                blocked_reason=self.blocked_reason,
+                source_url=self.source_url,
+                references=self.references.copy(),
                 created_at=self.created_at,
                 updated_at=utcnow_naive(),
                 closed_at=self.closed_at,
@@ -365,9 +388,12 @@ class Issue:
                 status=self.status,
                 priority=self.priority,
                 type=self.type,
-                assignee=self.assignee,
+                assignees=self.assignees.copy(),
                 epic_id=self.epic_id,
                 labels=new_labels,
+                blocked_reason=self.blocked_reason,
+                source_url=self.source_url,
+                references=self.references.copy(),
                 created_at=self.created_at,
                 updated_at=utcnow_naive(),
                 closed_at=self.closed_at,
@@ -375,29 +401,67 @@ class Issue:
         return self
 
     def assign_to(self, assignee: str) -> "Issue":
-        """Assign the issue to a user.
+        """Assign the issue to a user (adds to assignees list).
 
         Args:
             assignee: Username to assign to
 
         Returns:
-            New Issue instance with updated assignee
+            New Issue instance with added assignee
         """
-        return Issue(
-            id=self.id,
-            project_id=self.project_id,
-            title=self.title,
-            description=self.description,
-            status=self.status,
-            priority=self.priority,
-            type=self.type,
-            assignee=assignee,
-            epic_id=self.epic_id,
-            labels=self.labels.copy(),
-            created_at=self.created_at,
-            updated_at=utcnow_naive(),
-            closed_at=self.closed_at,
-        )
+        if assignee not in self.assignees:
+            new_assignees = self.assignees.copy()
+            new_assignees.append(assignee)
+            return Issue(
+                id=self.id,
+                project_id=self.project_id,
+                title=self.title,
+                description=self.description,
+                status=self.status,
+                priority=self.priority,
+                type=self.type,
+                assignees=new_assignees,
+                epic_id=self.epic_id,
+                labels=self.labels.copy(),
+                blocked_reason=self.blocked_reason,
+                source_url=self.source_url,
+                references=self.references.copy(),
+                created_at=self.created_at,
+                updated_at=utcnow_naive(),
+                closed_at=self.closed_at,
+            )
+        return self
+
+    def unassign(self, assignee: str) -> "Issue":
+        """Unassign a user from the issue.
+
+        Args:
+            assignee: Username to unassign
+
+        Returns:
+            New Issue instance with assignee removed
+        """
+        if assignee in self.assignees:
+            new_assignees = [a for a in self.assignees if a != assignee]
+            return Issue(
+                id=self.id,
+                project_id=self.project_id,
+                title=self.title,
+                description=self.description,
+                status=self.status,
+                priority=self.priority,
+                type=self.type,
+                assignees=new_assignees,
+                epic_id=self.epic_id,
+                labels=self.labels.copy(),
+                blocked_reason=self.blocked_reason,
+                source_url=self.source_url,
+                references=self.references.copy(),
+                created_at=self.created_at,
+                updated_at=utcnow_naive(),
+                closed_at=self.closed_at,
+            )
+        return self
 
     def assign_to_epic(self, epic_id: str) -> "Issue":
         """Assign the issue to an epic.
@@ -416,9 +480,12 @@ class Issue:
             status=self.status,
             priority=self.priority,
             type=self.type,
-            assignee=self.assignee,
+            assignees=self.assignees.copy(),
             epic_id=epic_id,
             labels=self.labels.copy(),
+            blocked_reason=self.blocked_reason,
+            source_url=self.source_url,
+            references=self.references.copy(),
             created_at=self.created_at,
             updated_at=utcnow_naive(),
             closed_at=self.closed_at,
@@ -505,6 +572,37 @@ class Epic:
     closed_at: datetime | None = None
 
 
+class ProjectStatus(str, Enum):
+    """Project status values."""
+
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+    ON_HOLD = "on_hold"
+
+
+@dataclass
+class Project:
+    """Project entity for organizing issues.
+
+    Attributes:
+        id: Unique project identifier
+        name: Project name
+        description: Optional project description
+        status: Project status
+        is_default: Whether this is the default project
+        created_at: Creation timestamp
+        updated_at: Last modification timestamp
+    """
+
+    id: str
+    name: str
+    description: str | None = None
+    status: ProjectStatus = ProjectStatus.ACTIVE
+    is_default: bool = False
+    created_at: datetime = field(default_factory=utcnow_naive)
+    updated_at: datetime = field(default_factory=utcnow_naive)
+
+
 @dataclass
 class Label:
     """Label entity for categorizing issues.
@@ -551,10 +649,12 @@ __all__ = [
     "IssueType",
     "EpicStatus",
     "DependencyType",
+    "ProjectStatus",
     # Entities
     "Issue",
     "Comment",
     "Dependency",
     "Epic",
     "Label",
+    "Project",
 ]

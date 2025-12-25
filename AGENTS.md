@@ -49,6 +49,36 @@ uv run python -m pytest tests/unit -v       # Unit tests only
 uv run mypy src/ && uv run ruff check .     # Type check + lint
 ```
 
+## Pytest Memory Quota Enforcement
+
+To prevent system freezes from excessive memory usage during test runs, use the provided memory quota enforcement scripts:
+
+### Recommended: Cgroup v2 (systemd-run)
+```bash
+./scripts/pytest-with-cgroup.sh 8                    # 8GB limit, all tests
+./scripts/pytest-with-cgroup.sh 4 tests/unit/        # 4GB limit, unit tests only
+./scripts/pytest-with-cgroup.sh 12 -k "test_foo"     # 12GB limit, filtered tests
+```
+
+### Alternative: ulimit (simpler, per-session)
+```bash
+./scripts/pytest-with-ulimit.sh 8                    # 8GB limit, all tests
+./scripts/pytest-with-ulimit.sh 4 tests/unit/        # 4GB limit, unit tests only
+```
+
+### Monitor and Kill Exceeding Processes
+```bash
+./scripts/monitor-memory.sh 8192 pytest              # Warn at 8GB
+./scripts/monitor-memory.sh 4096 pytest --kill        # Kill tests exceeding 4GB
+watch -n 5 './scripts/monitor-memory.sh 8192 pytest'  # Continuous monitoring
+```
+
+**When to use memory limits:**
+- CI environments with constrained resources
+- Local development with limited RAM
+- Running tests that may have memory leaks
+- Preventing system freezes from runaway test processes
+
 ## Code Standards
 - Type hints on ALL functions, Google docstrings for public APIs
 - Use `pathlib.Path`, `@dataclass` for structures, `from dot_work import X` (not src.)

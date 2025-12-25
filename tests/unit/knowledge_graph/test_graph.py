@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Generator
 
 import pytest
 
@@ -18,12 +19,15 @@ from dot_work.knowledge_graph.parse_md import Block, BlockKind
 
 
 @pytest.fixture
-def memory_db(tmp_path: Path) -> Database:
+def memory_db(tmp_path: Path) -> Generator[Database, None, None]:
     """Create a temporary database for testing."""
     db_path = tmp_path / "test.sqlite"
     db = Database(db_path)
     db._get_connection()  # Initialize schema lazily
-    return db
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 class TestBuildGraph:

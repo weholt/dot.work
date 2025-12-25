@@ -376,6 +376,36 @@ class Database:
             self._conn.close()
             self._conn = None
 
+    def __enter__(self) -> Database:
+        """Context manager entry.
+
+        Returns:
+            self
+        """
+        return self
+
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+        """Context manager exit - ensures connection is closed.
+
+        Args:
+            exc_type: Exception type if any
+            exc_val: Exception value if any
+            exc_tb: Exception traceback if any
+        """
+        self.close()
+
+    def __del__(self) -> None:
+        """Destructor - ensure connection is closed on garbage collection.
+
+        This is a safety net but should not be relied upon.
+        Always use close() explicitly or use as a context manager.
+        """
+        try:
+            self.close()
+        except Exception:
+            # Ignore errors during cleanup in destructor
+            pass
+
     # Document operations
 
     def insert_document(

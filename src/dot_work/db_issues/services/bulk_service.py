@@ -61,7 +61,7 @@ class IssueInputData:
         description: Issue description
         priority: Issue priority (string for parsing)
         type: Issue type (string for parsing)
-        assignee: Optional assignee
+        assignees: Optional list of assignees
         labels: Optional list of labels
         epic_id: Optional epic ID
         custom_id: Optional custom issue ID
@@ -71,7 +71,8 @@ class IssueInputData:
     description: str = ""
     priority: str = "medium"
     type: str = "task"
-    assignee: str | None = None
+    assignee: str | None = None  # Deprecated: Use assignees
+    assignees: list[str] | None = None
     labels: list[str] | None = None
     epic_id: str | None = None
     custom_id: str | None = None
@@ -101,9 +102,15 @@ class IssueInputData:
             logger.warning("Invalid type '%s', using TASK", self.type)
             result["issue_type"] = IssueType.TASK
 
-        # Optional fields
-        if self.assignee:
-            result["assignee"] = self.assignee
+        # Optional fields - handle both assignee (deprecated) and assignees
+        # Normalize to assignees list
+        assignees_list: list[str] = []
+        if self.assignees:
+            assignees_list = self.assignees
+        elif self.assignee:
+            assignees_list = [self.assignee]
+        if assignees_list:
+            result["assignees"] = assignees_list
         if self.labels:
             result["labels"] = self.labels
         if self.epic_id:
@@ -231,12 +238,22 @@ class BulkService:
                     logger.warning("Skipping item at index %d: missing 'title'", idx)
                     continue
 
+                # Normalize assignee/assignees from JSON
+                # If only 'assignee' is provided, convert to 'assignees' list
+                # If 'assignees' is provided, use it directly
+                assignees_val: list[str] | None = item.get("assignees")
+                if not assignees_val:
+                    assignee_single: str | None = item.get("assignee")
+                    if assignee_single:
+                        assignees_val = [assignee_single]
+
                 issue_data = IssueInputData(
                     title=item["title"],
                     description=item.get("description", ""),
                     priority=item.get("priority", "medium"),
                     type=item.get("type", "task"),
-                    assignee=item.get("assignee"),
+                    assignee=None,  # Deprecated, assignees is used instead
+                    assignees=assignees_val,
                     labels=item.get("labels"),
                     epic_id=item.get("epic_id"),
                     custom_id=item.get("id"),
@@ -421,7 +438,8 @@ class BulkService:
         status: IssueStatus | None = None,
         priority: IssuePriority | None = None,
         issue_type: IssueType | None = None,
-        assignee: str | None = None,
+        assignee: str | None = None,  # Deprecated: Use assignees
+        assignees: list[str] | None = None,
         epic_id: str | None = None,
         filter_status: IssueStatus | None = None,
         filter_priority: IssuePriority | None = None,
@@ -435,7 +453,8 @@ class BulkService:
             status: New status to set
             priority: New priority to set
             issue_type: New issue type to set
-            assignee: New assignee to set
+            assignee: New assignee to set (deprecated, use assignees)
+            assignees: New assignees list to set
             epic_id: New epic ID to set
             filter_status: Filter by current status
             filter_priority: Filter by current priority
@@ -446,6 +465,13 @@ class BulkService:
         Returns:
             Bulk operation result
         """
+        # Normalize assignee -> assignees
+        update_assignees: list[str] | None = None
+        if assignees:
+            update_assignees = assignees
+        elif assignee:
+            update_assignees = [assignee]
+
         # Get issues matching filter criteria
         issues_to_update = self.issue_service.list_issues(
             status=filter_status,
@@ -479,7 +505,7 @@ class BulkService:
                     status=status,
                     priority=priority,
                     type=issue_type,
-                    assignee=assignee,
+                    assignees=update_assignees,
                     epic_id=epic_id,
                 )
                 if result:
@@ -495,6 +521,199 @@ class BulkService:
 
         logger.info(
             "Bulk update complete: %d/%d succeeded, %d failed",
+            succeeded,
+            total,
+            failed,
+        )
+
+        return BulkResult(
+            total=total,
+            succeeded=succeeded,
+            failed=failed,
+            errors=errors,
+            issue_ids=issue_ids,
+        )
+
+
+    def bulk_label_add(
+        self,
+        labels: list[str],
+        status: IssueStatus | None = None,
+        priority: IssuePriority | None = None,
+        issue_type: IssueType | None = None,
+        assignee: str | None = None,
+        existing_label: str | None = None,
+        limit: int = 1000,
+    ) -> BulkResult:
+        """Add labels to multiple issues by filter criteria.
+
+        Args:
+            labels: Labels to add to matching issues
+            status: Filter by current status
+            priority: Filter by current priority
+            issue_type: Filter by current issue type
+            assignee: Filter by current assignee
+            existing_label: Filter by existing label
+            limit: Maximum issues to process
+
+        Returns:
+            Bulk operation result
+        """
+        if not labels:
+            return BulkResult(total=0, succeeded=0, failed=0)
+
+        # Get issues matching filter criteria
+        issues_to_update = self.issue_service.list_issues(
+            status=status,
+            priority=priority,
+            issue_type=issue_type,
+            assignee=assignee,
+            limit=limit,
+        )
+
+        # Filter by existing label if specified
+        if existing_label:
+            issues_to_update = [i for i in issues_to_update if existing_label in i.labels]
+
+        total = len(issues_to_update)
+        if total == 0:
+            logger.info("No issues found matching label add criteria")
+            return BulkResult(total=0, succeeded=0, failed=0)
+
+        succeeded = 0
+        failed = 0
+        errors: list[tuple[str, str]] = []
+        issue_ids: list[str] = []
+
+        for idx, issue in enumerate(issues_to_update, start=1):
+            try:
+                logger.debug(
+                    "Adding labels %s to issue %d/%d: %s (%s)",
+                    labels,
+                    idx,
+                    total,
+                    issue.id,
+                    issue.title[:50],
+                )
+
+                # Add each label to the issue
+                updated_issue = issue
+                for label in labels:
+                    if label not in updated_issue.labels:
+                        updated_issue = updated_issue.add_label(label)
+
+                # Save the updated issue directly (bypasses status transition validation)
+                saved_issue = self.issue_service.uow.issues.save(updated_issue)
+                if saved_issue:
+                    issue_ids.append(issue.id)
+                    succeeded += 1
+                else:
+                    failed += 1
+                    errors.append((issue.id, "Failed to update"))
+            except Exception as e:
+                failed += 1
+                errors.append((issue.id, str(e)))
+                logger.warning("Failed to add labels to issue %s: %s", issue.id, e)
+
+        logger.info(
+            "Bulk label add complete: %d/%d succeeded, %d failed",
+            succeeded,
+            total,
+            failed,
+        )
+
+        return BulkResult(
+            total=total,
+            succeeded=succeeded,
+            failed=failed,
+            errors=errors,
+            issue_ids=issue_ids,
+        )
+
+    def bulk_label_remove(
+        self,
+        labels: list[str],
+        status: IssueStatus | None = None,
+        priority: IssuePriority | None = None,
+        issue_type: IssueType | None = None,
+        assignee: str | None = None,
+        must_have_label: bool = False,
+        limit: int = 1000,
+    ) -> BulkResult:
+        """Remove labels from multiple issues by filter criteria.
+
+        Args:
+            labels: Labels to remove from matching issues
+            status: Filter by current status
+            priority: Filter by current priority
+            issue_type: Filter by current issue type
+            assignee: Filter by current assignee
+            must_have_label: Only process issues that have at least one of the labels
+            limit: Maximum issues to process
+
+        Returns:
+            Bulk operation result
+        """
+        if not labels:
+            return BulkResult(total=0, succeeded=0, failed=0)
+
+        # Get issues matching filter criteria
+        issues_to_update = self.issue_service.list_issues(
+            status=status,
+            priority=priority,
+            issue_type=issue_type,
+            assignee=assignee,
+            limit=limit,
+        )
+
+        # Filter by must_have_label if specified
+        if must_have_label:
+            issues_to_update = [
+                i for i in issues_to_update if any(label in i.labels for label in labels)
+            ]
+
+        total = len(issues_to_update)
+        if total == 0:
+            logger.info("No issues found matching label remove criteria")
+            return BulkResult(total=0, succeeded=0, failed=0)
+
+        succeeded = 0
+        failed = 0
+        errors: list[tuple[str, str]] = []
+        issue_ids: list[str] = []
+
+        for idx, issue in enumerate(issues_to_update, start=1):
+            try:
+                logger.debug(
+                    "Removing labels %s from issue %d/%d: %s (%s)",
+                    labels,
+                    idx,
+                    total,
+                    issue.id,
+                    issue.title[:50],
+                )
+
+                # Remove each label from the issue
+                updated_issue = issue
+                for label in labels:
+                    if label in updated_issue.labels:
+                        updated_issue = updated_issue.remove_label(label)
+
+                # Save the updated issue directly (bypasses status transition validation)
+                saved_issue = self.issue_service.uow.issues.save(updated_issue)
+                if saved_issue:
+                    issue_ids.append(issue.id)
+                    succeeded += 1
+                else:
+                    failed += 1
+                    errors.append((issue.id, "Failed to update"))
+            except Exception as e:
+                failed += 1
+                errors.append((issue.id, str(e)))
+                logger.warning("Failed to remove labels from issue %s: %s", issue.id, e)
+
+        logger.info(
+            "Bulk label remove complete: %d/%d succeeded, %d failed",
             succeeded,
             total,
             failed,

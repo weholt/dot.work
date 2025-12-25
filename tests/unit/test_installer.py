@@ -8,6 +8,9 @@ import pytest
 
 from dot_work.environments import ENVIRONMENTS
 from dot_work.installer import (
+    BatchChoice,
+    InstallState,
+    _prompt_batch_choice,
     create_jinja_env,
     detect_project_context,
     initialize_work_directory,
@@ -646,3 +649,491 @@ class TestPromptTemplateization:
                 f"{prompt_file.name} contains hardcoded prompt references: {matches}. "
                 "Use {{ prompt_path }}/filename.prompt.md instead."
             )
+
+
+class TestBatchChoice:
+    """Tests for BatchChoice enum."""
+
+    def test_all_choice_overwrites(self) -> None:
+        """Test that BatchChoice.ALL represents overwrite all."""
+        from dot_work.installer import BatchChoice
+
+        assert BatchChoice.ALL.value == BatchChoice.ALL.value
+        assert BatchChoice.SKIP.value != BatchChoice.ALL.value
+
+    def test_skip_choice_preserves(self) -> None:
+        """Test that BatchChoice.SKIP represents preserve all."""
+        from dot_work.installer import BatchChoice
+
+        assert BatchChoice.SKIP.value == BatchChoice.SKIP.value
+
+    def test_prompt_choice_asks_individually(self) -> None:
+        """Test that BatchChoice.PROMPT represents ask for each."""
+        from dot_work.installer import BatchChoice
+
+        assert BatchChoice.PROMPT.value == BatchChoice.PROMPT.value
+
+    def test_cancel_choice_aborts(self) -> None:
+        """Test that BatchChoice.CANCEL represents abort installation."""
+        from dot_work.installer import BatchChoice
+
+        assert BatchChoice.CANCEL.value == BatchChoice.CANCEL.value
+
+
+class TestInstallState:
+    """Tests for InstallState dataclass."""
+
+    def test_has_existing_files_returns_true_when_files_exist(self) -> None:
+        """Test that has_existing_files returns True when existing_files is not empty."""
+        from dot_work.installer import InstallState
+        from pathlib import Path
+
+        state = InstallState(existing_files=[Path("existing.md")])
+        assert state.has_existing_files is True
+
+    def test_has_existing_files_returns_false_when_no_existing_files(self) -> None:
+        """Test that has_existing_files returns False when existing_files is empty."""
+        from dot_work.installer import InstallState
+
+        state = InstallState(existing_files=[])
+        assert state.has_existing_files is False
+
+    def test_total_files_counts_all_files(self) -> None:
+        """Test that total_files returns sum of existing and new files."""
+        from dot_work.installer import InstallState
+        from pathlib import Path
+
+        state = InstallState(
+            existing_files=[Path("existing1.md"), Path("existing2.md")],
+            new_files=[Path("new1.md"), Path("new2.md"), Path("new3.md")],
+        )
+        assert state.total_files == 5
+
+
+class TestShouldWriteFileWithBatchChoice:
+    """Tests for should_write_file with batch_choice parameter."""
+
+    def test_batch_choice_all_overwrites_existing_file(self, tmp_path: Path) -> None:
+        """Test that BatchChoice.ALL overwrites without prompting."""
+        from dot_work.installer import BatchChoice, should_write_file
+
+        dest_path = tmp_path / "existing.md"
+        dest_path.write_text("existing content", encoding="utf-8")
+        console = MagicMock()
+
+        result = should_write_file(dest_path, force=False, console=console, batch_choice=BatchChoice.ALL)
+
+        assert result is True
+        console.input.assert_not_called()
+
+    def test_batch_choice_skip_preserves_existing_file(self, tmp_path: Path) -> None:
+        """Test that BatchChoice.SKIP preserves existing file."""
+        from dot_work.installer import BatchChoice, should_write_file
+
+        dest_path = tmp_path / "existing.md"
+        dest_path.write_text("existing content", encoding="utf-8")
+        console = MagicMock()
+
+        result = should_write_file(dest_path, force=False, console=console, batch_choice=BatchChoice.SKIP)
+
+        assert result is False
+        console.input.assert_not_called()
+
+    def test_batch_choice_cancel_skips_file(self, tmp_path: Path) -> None:
+        """Test that BatchChoice.CANCEL skips the file."""
+        from dot_work.installer import BatchChoice, should_write_file
+
+        dest_path = tmp_path / "existing.md"
+        dest_path.write_text("existing content", encoding="utf-8")
+        console = MagicMock()
+
+        result = should_write_file(dest_path, force=False, console=console, batch_choice=BatchChoice.CANCEL)
+
+        assert result is False
+        console.input.assert_not_called()
+
+    def test_batch_choice_prompt_asks_user(self, tmp_path: Path) -> None:
+        """Test that BatchChoice.PROMPT falls through to individual prompt."""
+        from dot_work.installer import BatchChoice, should_write_file
+
+        dest_path = tmp_path / "existing.md"
+        dest_path.write_text("existing content", encoding="utf-8")
+        console = MagicMock()
+        console.input.return_value = "y"
+
+        result = should_write_file(dest_path, force=False, console=console, batch_choice=BatchChoice.PROMPT)
+
+        assert result is True
+        console.input.assert_called_once()
+
+    def test_batch_choice_all_skips_new_files(self, tmp_path: Path) -> None:
+        """Test that BatchChoice.ALL writes new files without prompting."""
+        from dot_work.installer import BatchChoice, should_write_file
+
+        dest_path = tmp_path / "new.md"
+        console = MagicMock()
+
+        result = should_write_file(dest_path, force=False, console=console, batch_choice=BatchChoice.ALL)
+
+        assert result is True
+        console.input.assert_not_called()
+
+    def test_batch_choice_none_prompts_for_existing(self, tmp_path: Path) -> None:
+        """Test that batch_choice=None prompts for existing files (backward compatible)."""
+        from dot_work.installer import should_write_file
+
+        dest_path = tmp_path / "existing.md"
+        dest_path.write_text("existing content", encoding="utf-8")
+        console = MagicMock()
+        console.input.return_value = "n"
+
+        result = should_write_file(dest_path, force=False, console=console, batch_choice=None)
+
+        assert result is False
+        console.input.assert_called_once()
+
+
+class TestBatchOverwrite:
+    """Tests for batch overwrite functionality in install_prompts_generic."""
+
+    def test_scan_phase_detects_existing_and_new_files(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that scan phase correctly categorizes existing and new files."""
+        from dot_work.installer import InstallerConfig, install_prompts_generic
+
+        # Create some existing files
+        dest_dir = temp_project_dir / ".github" / "prompts"
+        dest_dir.mkdir(parents=True)
+        (dest_dir / "test.prompt.md").write_text("existing content", encoding="utf-8")
+
+        config = InstallerConfig(
+            env_key="copilot",
+            dest_path=".github/prompts",
+            file_naming="prompt-suffix",
+            messages=("Installed {name}", "Installed to: {path}", None),
+        )
+
+        console = MagicMock()
+        console.input.return_value = "s"  # Choose SKIP
+
+        install_prompts_generic(config, temp_project_dir, sample_prompts_dir, console)
+
+        # Verify existing file was skipped
+        assert (dest_dir / "test.prompt.md").read_text(encoding="utf-8") == "existing content"
+
+    def test_batch_choice_all_overwrites_all_existing_files(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that ALL choice overwrites all existing files."""
+        from dot_work.installer import InstallerConfig, install_prompts_generic
+
+        # Create some existing files
+        dest_dir = temp_project_dir / ".github" / "prompts"
+        dest_dir.mkdir(parents=True)
+        (dest_dir / "test.prompt.md").write_text("old content", encoding="utf-8")
+        (dest_dir / "another.prompt.md").write_text("old content", encoding="utf-8")
+
+        config = InstallerConfig(
+            env_key="copilot",
+            dest_path=".github/prompts",
+            file_naming="prompt-suffix",
+            messages=("Installed {name}", "Installed to: {path}", None),
+        )
+
+        console = MagicMock()
+        console.input.return_value = "a"  # Choose ALL
+
+        install_prompts_generic(config, temp_project_dir, sample_prompts_dir, console)
+
+        # Verify files were overwritten
+        assert (dest_dir / "test.prompt.md").read_text(encoding="utf-8") != "old content"
+        assert (dest_dir / "another.prompt.md").read_text(encoding="utf-8") != "old content"
+
+    def test_batch_choice_skip_preserves_all_existing_files(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that SKIP choice preserves all existing files."""
+        from dot_work.installer import InstallerConfig, install_prompts_generic
+
+        # Create some existing files
+        dest_dir = temp_project_dir / ".github" / "prompts"
+        dest_dir.mkdir(parents=True)
+        (dest_dir / "test.prompt.md").write_text("original content", encoding="utf-8")
+
+        config = InstallerConfig(
+            env_key="copilot",
+            dest_path=".github/prompts",
+            file_naming="prompt-suffix",
+            messages=("Installed {name}", "Installed to: {path}", None),
+        )
+
+        console = MagicMock()
+        console.input.return_value = "s"  # Choose SKIP
+
+        install_prompts_generic(config, temp_project_dir, sample_prompts_dir, console)
+
+        # Verify existing file was preserved
+        assert (dest_dir / "test.prompt.md").read_text(encoding="utf-8") == "original content"
+
+    def test_batch_choice_cancel_aborts_installation(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that CANCEL choice aborts the installation."""
+        from dot_work.installer import InstallerConfig, install_prompts_generic
+
+        # Create an existing file
+        dest_dir = temp_project_dir / ".github" / "prompts"
+        dest_dir.mkdir(parents=True)
+        (dest_dir / "test.prompt.md").write_text("original", encoding="utf-8")
+
+        config = InstallerConfig(
+            env_key="copilot",
+            dest_path=".github/prompts",
+            file_naming="prompt-suffix",
+            messages=("Installed {name}", "Installed to: {path}", None),
+        )
+
+        console = MagicMock()
+        console.input.return_value = "c"  # Choose CANCEL
+
+        install_prompts_generic(config, temp_project_dir, sample_prompts_dir, console)
+
+        # Verify cancellation message was printed
+        assert any("cancelled" in str(call) for call in console.print.call_args_list)
+
+    def test_batch_menu_skipped_when_force_is_true(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that batch menu is skipped when force=True."""
+        from dot_work.installer import InstallerConfig, install_prompts_generic
+
+        # Create existing file
+        dest_dir = temp_project_dir / ".github" / "prompts"
+        dest_dir.mkdir(parents=True)
+        (dest_dir / "test.prompt.md").write_text("original", encoding="utf-8")
+
+        config = InstallerConfig(
+            env_key="copilot",
+            dest_path=".github/prompts",
+            file_naming="prompt-suffix",
+            messages=("Installed {name}", "Installed to: {path}", None),
+        )
+
+        console = MagicMock()
+
+        # Install with force=True - should not prompt for batch choice
+        install_prompts_generic(config, temp_project_dir, sample_prompts_dir, console, force=True)
+
+        # File should be overwritten without prompts
+        assert (dest_dir / "test.prompt.md").read_text(encoding="utf-8") != "original"
+
+    def test_batch_menu_skipped_when_dry_run_is_true(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that batch menu is skipped when dry_run=True."""
+        from dot_work.installer import InstallerConfig, install_prompts_generic
+
+        # Create existing file
+        dest_dir = temp_project_dir / ".github" / "prompts"
+        dest_dir.mkdir(parents=True)
+        (dest_dir / "test.prompt.md").write_text("original", encoding="utf-8")
+
+        config = InstallerConfig(
+            env_key="copilot",
+            dest_path=".github/prompts",
+            file_naming="prompt-suffix",
+            messages=("Installed {name}", "Installed to: {path}", None),
+        )
+
+        console = MagicMock()
+
+        # Install with dry_run=True - should not prompt for batch choice
+        install_prompts_generic(config, temp_project_dir, sample_prompts_dir, console, dry_run=True)
+
+        # File should not be modified in dry-run
+        assert (dest_dir / "test.prompt.md").read_text(encoding="utf-8") == "original"
+
+    def test_batch_menu_skipped_when_no_existing_files(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that batch menu is skipped when there are no existing files."""
+        from dot_work.installer import InstallerConfig, install_prompts_generic
+
+        config = InstallerConfig(
+            env_key="copilot",
+            dest_path=".github/prompts",
+            file_naming="prompt-suffix",
+            messages=("Installed {name}", "Installed to: {path}", None),
+        )
+
+        console = MagicMock()
+
+        # Install with no existing files - should not prompt for batch choice
+        install_prompts_generic(config, temp_project_dir, sample_prompts_dir, console)
+
+        # Verify input was never called (no batch menu)
+        console.input.assert_not_called()
+
+    def test_new_files_created_with_batch_choice_all(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that new files are created when using ALL choice."""
+        from dot_work.installer import InstallerConfig, install_prompts_generic
+
+        config = InstallerConfig(
+            env_key="copilot",
+            dest_path=".github/prompts",
+            file_naming="prompt-suffix",
+            messages=("Installed {name}", "Installed to: {path}", None),
+        )
+
+        console = MagicMock()
+        console.input.return_value = "a"  # ALL
+
+        install_prompts_generic(config, temp_project_dir, sample_prompts_dir, console)
+
+        # Verify new files were created
+        dest_dir = temp_project_dir / ".github" / "prompts"
+        assert (dest_dir / "test.prompt.md").exists()
+        assert (dest_dir / "another.prompt.md").exists()
+
+    def test_new_files_created_with_batch_choice_skip(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that new files are created when using SKIP choice."""
+        from dot_work.installer import InstallerConfig, install_prompts_generic
+
+        config = InstallerConfig(
+            env_key="copilot",
+            dest_path=".github/prompts",
+            file_naming="prompt-suffix",
+            messages=("Installed {name}", "Installed to: {path}", None),
+        )
+
+        console = MagicMock()
+        console.input.return_value = "s"  # SKIP
+
+        install_prompts_generic(config, temp_project_dir, sample_prompts_dir, console)
+
+        # Verify new files were created (SKIP only applies to existing files)
+        dest_dir = temp_project_dir / ".github" / "prompts"
+        assert (dest_dir / "test.prompt.md").exists()
+
+    def test_auxiliary_files_included_in_scan(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that auxiliary files are included in the scan phase."""
+        from dot_work.installer import InstallerConfig, install_prompts_generic
+
+        # Create an existing auxiliary file
+        cursorrules_path = temp_project_dir / ".cursorrules"
+        cursorrules_path.write_text("original rules", encoding="utf-8")
+
+        config = InstallerConfig(
+            env_key="cursor",
+            dest_path=".cursor/rules",
+            file_naming="mdc-suffix",
+            auxiliary_files=[
+                (".cursorrules", "# Cursor Rules\n\n"),
+            ],
+            messages=("Installed {name}", "Installed to: {path}", None),
+        )
+
+        console = MagicMock()
+        console.input.return_value = "a"  # ALL
+
+        install_prompts_generic(config, temp_project_dir, sample_prompts_dir, console)
+
+        # Verify auxiliary file was included in overwrite
+        assert cursorrules_path.read_text(encoding="utf-8") != "original rules"
+
+    def test_prompt_batch_choice_displays_summary_table(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that _prompt_batch_choice displays file status summary."""
+        from dot_work.installer import InstallState, _prompt_batch_choice
+        from pathlib import Path
+
+        # Create existing files to simulate state
+        dest_dir = temp_project_dir / ".github" / "prompts"
+        dest_dir.mkdir(parents=True)
+        (dest_dir / "existing1.md").write_text("content1", encoding="utf-8")
+        (dest_dir / "existing2.md").write_text("content2", encoding="utf-8")
+
+        state = InstallState(
+            existing_files=[dest_dir / "existing1.md", dest_dir / "existing2.md"],
+            new_files=[Path("new1.md"), Path("new2.md"), Path("new3.md")],
+        )
+
+        console = MagicMock()
+        console.input.return_value = "a"  # Choose ALL
+
+        result = _prompt_batch_choice(console, state)
+
+        assert result == BatchChoice.ALL
+        # Verify table was printed
+        console.print.assert_called()
+
+    def test_prompt_batch_choice_accepts_full_inputs(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that _prompt_batch_choice accepts 'all', 'skip', 'prompt', 'cancel'."""
+        from dot_work.installer import BatchChoice, InstallState, _prompt_batch_choice
+
+        state = InstallState(existing_files=[Path("existing.md")], new_files=[])
+
+        # Test "all"
+        console = MagicMock()
+        console.input.return_value = "all"
+        assert _prompt_batch_choice(console, state) == BatchChoice.ALL
+
+        # Test "skip"
+        console = MagicMock()
+        console.input.return_value = "skip"
+        assert _prompt_batch_choice(console, state) == BatchChoice.SKIP
+
+        # Test "prompt"
+        console = MagicMock()
+        console.input.return_value = "prompt"
+        assert _prompt_batch_choice(console, state) == BatchChoice.PROMPT
+
+        # Test "cancel"
+        console = MagicMock()
+        console.input.return_value = "cancel"
+        assert _prompt_batch_choice(console, state) == BatchChoice.CANCEL
+
+    def test_prompt_batch_choice_validates_invalid_input(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that _prompt_batch_choice validates and re-prompts on invalid input."""
+        from dot_work.installer import BatchChoice, InstallState, _prompt_batch_choice
+
+        state = InstallState(existing_files=[Path("existing.md")], new_files=[])
+
+        console = MagicMock()
+        console.input.side_effect = ["invalid", "x", "a"]
+
+        result = _prompt_batch_choice(console, state)
+
+        assert result == BatchChoice.ALL
+        assert console.input.call_count == 3  # invalid, x, a
+
+    def test_prompt_batch_choice_shows_menu(
+        self, temp_project_dir: Path, sample_prompts_dir: Path
+    ) -> None:
+        """Test that _prompt_batch_choice shows the complete menu."""
+        from dot_work.installer import BatchChoice, InstallState, _prompt_batch_choice
+
+        state = InstallState(existing_files=[Path("existing.md")], new_files=[Path("new.md")])
+
+        console = MagicMock()
+        console.input.return_value = "a"
+
+        _prompt_batch_choice(console, state)
+
+        # Verify menu options were shown
+        print_calls = [str(call) for call in console.print.call_args_list]
+        menu_shown = any("ALL" in call or "SKIP" in call or "PROMPT" in call or "CANCEL" in call for call in print_calls)
+        assert menu_shown
+

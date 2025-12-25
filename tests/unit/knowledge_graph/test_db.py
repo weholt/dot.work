@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generator
 
 import pytest
 
@@ -195,11 +195,14 @@ class TestNodeOperations:
     """Tests for node CRUD operations."""
 
     @pytest.fixture
-    def db_with_doc(self, tmp_path: Path) -> Database:
+    def db_with_doc(self, tmp_path: Path) -> Generator[Database, None, None]:
         """Create database with a document."""
         db = Database(tmp_path / "test.sqlite")
         db.insert_document("doc1", "/test.md", b"content")
-        return db
+        try:
+            yield db
+        finally:
+            db.close()
 
     def test_insert_node(self, db_with_doc: Database) -> None:
         """Insert creates a node with assigned pk."""
@@ -395,7 +398,7 @@ class TestEdgeOperations:
     """Tests for edge CRUD operations."""
 
     @pytest.fixture
-    def db_with_nodes(self, tmp_path: Path) -> tuple[Database, list[Node]]:
+    def db_with_nodes(self, tmp_path: Path) -> Generator[tuple[Database, list[Node]], None, None]:
         """Create database with document and nodes."""
         db = Database(tmp_path / "test.sqlite")
         db.insert_document("doc1", "/test.md", b"content")
@@ -411,7 +414,10 @@ class TestEdgeOperations:
             for i in range(5)
         ])
 
-        return db, nodes
+        try:
+            yield db, nodes
+        finally:
+            db.close()
 
     def test_insert_edge(self, db_with_nodes: tuple[Database, list[Node]]) -> None:
         """Insert creates an edge."""
@@ -503,7 +509,7 @@ class TestFTSOperations:
     """Tests for full-text search operations."""
 
     @pytest.fixture
-    def db_with_indexed_nodes(self, tmp_path: Path) -> Database:
+    def db_with_indexed_nodes(self, tmp_path: Path) -> Generator[Database, None, None]:
         """Create database with indexed nodes."""
         db = Database(tmp_path / "test.sqlite")
         db.insert_document("doc1", "/test.md", b"content")
@@ -539,7 +545,10 @@ class TestFTSOperations:
         db.fts_index_node(nodes[1].node_pk, None, "Variables and functions in Python", "para1")  # type: ignore
         db.fts_index_node(nodes[2].node_pk, "JavaScript Basics", "Learn JavaScript for web", "head2")  # type: ignore
 
-        return db
+        try:
+            yield db
+        finally:
+            db.close()
 
     def test_fts_index_node(self, tmp_path: Path) -> None:
         """FTS index stores node content."""
@@ -647,7 +656,7 @@ class TestDeleteDocument:
     """Tests for delete_document method."""
 
     @pytest.fixture
-    def db_with_graph(self, tmp_path: Path) -> Database:
+    def db_with_graph(self, tmp_path: Path) -> Generator[Database, None, None]:
         """Create database with a document, nodes, edges, and FTS entries."""
         db = Database(tmp_path / "test.sqlite")
         db.insert_document("doc1", "/test.md", b"# Hello\n\nWorld")
@@ -685,7 +694,10 @@ class TestDeleteDocument:
         for node in nodes:
             db.fts_index_node(node.node_pk, node.title, "text", node.short_id)  # type: ignore
 
-        return db
+        try:
+            yield db
+        finally:
+            db.close()
 
     def test_delete_document_removes_document(self, db_with_graph: Database) -> None:
         """Delete removes the document record."""

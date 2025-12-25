@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Generator
 
 import pytest
 
@@ -54,9 +55,13 @@ class FailingEmbedder:
 
 
 @pytest.fixture
-def db(tmp_path: Path) -> Database:
+def db(tmp_path: Path) -> Generator[Database, None, None]:
     """Create a test database."""
-    return Database(tmp_path / "test.sqlite")
+    db = Database(tmp_path / "test.sqlite")
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 @pytest.fixture

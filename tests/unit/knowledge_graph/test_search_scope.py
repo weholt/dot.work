@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Generator
 
 import pytest
 
@@ -12,7 +13,7 @@ from dot_work.knowledge_graph.search_semantic import ScopeFilter as SemanticScop
 
 
 @pytest.fixture
-def db(tmp_path: Path) -> Database:
+def db(tmp_path: Path) -> Generator[Database, None, None]:
     """Create a database with test data including collections and topics."""
     database = Database(tmp_path / "test.db")
 
@@ -114,7 +115,10 @@ def db(tmp_path: Path) -> Database:
     database.tag_with_topic("topic-rust", "node", node3.full_id)
     database.tag_with_topic("topic-shared", "node", node4.full_id)
 
-    return database
+    try:
+        yield database
+    finally:
+        database.close()
 
 
 class TestFTSProjectScoping:

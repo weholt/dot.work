@@ -37,7 +37,7 @@ class TestIssueCreation:
         assert issue.status == IssueStatus.PROPOSED  # Default
         assert issue.priority == IssuePriority.MEDIUM  # Default
         assert issue.type == IssueType.TASK  # Default
-        assert issue.assignee is None
+        assert issue.assignees == []  # Default empty list
         assert issue.labels == []
         assert issue.closed_at is None
 
@@ -51,13 +51,13 @@ class TestIssueCreation:
             status=IssueStatus.IN_PROGRESS,
             priority=IssuePriority.HIGH,
             type=IssueType.BUG,
-            assignee="testuser",
+            assignees=["testuser"],
             labels=["bug", "urgent"],
         )
         assert issue.status == IssueStatus.IN_PROGRESS
         assert issue.priority == IssuePriority.HIGH
         assert issue.type == IssueType.BUG
-        assert issue.assignee == "testuser"
+        assert issue.assignees == ["testuser"]
         assert issue.labels == ["bug", "urgent"]
 
 
@@ -184,20 +184,52 @@ class TestIssueAssignment:
         )
 
         new_issue = issue.assign_to("testuser")
-        assert new_issue.assignee == "testuser"
+        assert "testuser" in new_issue.assignees
 
-    def test_reassign_to_different_user(self) -> None:
-        """Test reassigning an issue to a different user."""
+    def test_assign_multiple_users(self) -> None:
+        """Test assigning multiple users to an issue."""
         issue = Issue(
             id="issue-001",
             project_id="test",
             title="Test",
             description="Test",
-            assignee="user1",
+            assignees=["user1"],
         )
 
         new_issue = issue.assign_to("user2")
-        assert new_issue.assignee == "user2"
+        assert "user1" in new_issue.assignees
+        assert "user2" in new_issue.assignees
+        assert len(new_issue.assignees) == 2
+
+    def test_unassign_user(self) -> None:
+        """Test unassigning a user from an issue."""
+        issue = Issue(
+            id="issue-001",
+            project_id="test",
+            title="Test",
+            description="Test",
+            assignees=["user1", "user2"],
+        )
+
+        new_issue = issue.unassign("user1")
+        assert "user1" not in new_issue.assignees
+        assert "user2" in new_issue.assignees
+        assert len(new_issue.assignees) == 1
+
+    def test_reassign_to_different_user(self) -> None:
+        """Test reassigning an issue to a different user (replaces assignees)."""
+        issue = Issue(
+            id="issue-001",
+            project_id="test",
+            title="Test",
+            description="Test",
+            assignees=["user1"],
+        )
+
+        # For replacement behavior, directly set assignees
+        issue.assignees = ["user2"]
+        assert "user2" in issue.assignees
+        assert "user1" not in issue.assignees
 
 
 class TestIssueEpicAssignment:

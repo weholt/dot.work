@@ -75,6 +75,14 @@ def install(
             help="Overwrite existing files without asking",
         ),
     ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            "-n",
+            help="Preview changes without writing files",
+        ),
+    ] = False,
 ) -> None:
     """Install AI prompts to your project directory."""
     target = target.resolve()
@@ -112,11 +120,17 @@ def install(
 
     # Install
     env_config = ENVIRONMENTS[env_key]
-    console.print(f"\n[bold blue]📦 Installing prompts for {env_config.name}...[/bold blue]\n")
+    if dry_run:
+        console.print(f"\n[bold yellow]🔍 Dry run: Previewing installation for {env_config.name}...[/bold yellow]\n")
+    else:
+        console.print(f"\n[bold blue]📦 Installing prompts for {env_config.name}...[/bold blue]\n")
 
-    install_prompts(env_key, target, prompts_dir, console, force=force)
+    install_prompts(env_key, target, prompts_dir, console, force=force, dry_run=dry_run)
 
-    console.print("\n[bold green]✅ Installation complete![/bold green]")
+    if dry_run:
+        console.print("\n[bold yellow]⚠️  Dry run complete - no files were written[/bold yellow]")
+    else:
+        console.print("\n[bold green]✅ Installation complete![/bold green]")
 
 
 @app.command("list")
