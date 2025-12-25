@@ -1253,3 +1253,62 @@ These are documented "known issues" rather than regressions, so they don't repre
 - Some errors may require adding `# type: ignore` comments if they're false positives
 - Consider this a technical debt item rather than a critical bug
 
+
+---
+id: "AUDIT-GAP-005@e7f8a3"
+title: "Source README.md not migrated to knowledge_graph documentation"
+description: "2,808 byte README from source not present in destination docs/"
+created: 2025-12-26
+section: "knowledge_graph"
+tags: [documentation, migration-gap, audit]
+type: docs
+priority: medium
+status: proposed
+references:
+  - .work/agent/issues/references/AUDIT-KG-001-investigation.md
+  - incoming/kg/README.md
+---
+
+### Problem
+During AUDIT-KG-001 investigation, it was discovered that the source README.md (2,808 bytes) was NOT migrated to the destination documentation folder.
+
+**Documentation Status:**
+| Aspect | Source | Destination | Status |
+|--------|--------|-------------|--------|
+| README.md | 2,808 bytes | NOT in docs/ | ⚠️ **NOT MIGRATED** |
+| docs/ directory | None | docs/ exists but no kg/ | N/A |
+
+**Impact:** Valuable documentation about the knowledge graph module is missing from the destination project.
+
+### Affected Files
+- Missing: `docs/knowledge_graph/README.md` (should contain migrated content from source)
+- Source: `incoming/kg/README.md` (2,808 bytes)
+
+### Importance
+**MEDIUM:** Documentation is important for:
+- User onboarding and understanding the module
+- Preserving knowledge about features and usage
+- Maintaining consistency with other migrated modules
+
+While the code is fully functional and tested, missing documentation makes the module harder to use and understand.
+
+### Proposed Solution
+1. Review `incoming/kg/README.md` content
+2. Create `docs/knowledge_graph/README.md` with migrated content
+3. Update any references from "kgshred" to "knowledge_graph"
+4. Update import paths in examples
+5. Add to main project documentation index if applicable
+
+### Acceptance Criteria
+- [ ] `docs/knowledge_graph/README.md` created with source content
+- [ ] All "kgshred" references updated to "knowledge_graph"
+- [ ] Import paths updated for dot-work structure
+- [ ] Documentation links to correct modules
+- [ ] Content is accurate and helpful
+
+### Notes
+- This is a documentation gap, not a functional issue
+- The code works perfectly - only docs are missing
+- Source README is 2,808 bytes of valuable content
+- See investigation: `.work/agent/issues/references/AUDIT-KG-001-investigation.md`
+

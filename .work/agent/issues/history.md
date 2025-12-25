@@ -3521,3 +3521,67 @@ Source: 2 docs → Destination: 4 docs (README, getting-started, examples, cli-r
 ### Investigation Notes
 See `.work/agent/issues/references/AUDIT-DBISSUES-010-investigation.md` for full investigation details.
 
+
+## 2025-12-26: AUDIT-KG-001 - Knowledge Graph Module Migration Validation
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| AUDIT-KG-001 | ✅ Complete | 2025-12-26 |
+
+### Summary
+- **Task:** Comprehensive migration validation audit for Knowledge Graph module
+- **Status:** ✅ PASS with Minor Issues
+- **Scope:** 8 migration issues (MIGRATE-013 through MIGRATE-020)
+- **Source:** `incoming/kg/src/kgshred/`
+- **Destination:** `src/dot_work/knowledge_graph/`
+
+### Investigation Findings
+
+**Phase 1: Source Structure Verification ✅**
+- Source exists and is very similar to destination
+- 2 files are IDENTICAL (ids.py, parse_md.py)
+- Destination has enhancements (+10KB total improvements)
+
+**Phase 2: Test Coverage Analysis ✅**
+- All 12 unit tests migrated
+- All 2 integration tests migrated
+- 2 tests have bugs due to incomplete migration (AUDIT-GAP-004)
+
+**Phase 3: Enhancements in Destination**
+- **db.py (+7KB):** Added sqlite-vec support, context manager, batched embeddings
+- **search_semantic.py (+3KB):** Added memory-bounded streaming, heap-based top-k, sqlite-vec fallback
+- Improved from O(N) memory to O(batch_size + k) memory for semantic search
+
+**Phase 4: Baseline Comparison ✅**
+- Zero type errors (mypy clean)
+- Zero lint errors (ruff clean)
+- 374 tests passing, 2 failing (test bugs)
+
+### Key Findings Summary
+
+**✅ EXCELLENT: Clean Migration with Enhancements**
+- Enhanced functionality over source
+- All tests migrated (unlike db_issues)
+- Zero type/lint errors
+
+**⚠️ Issues Found:**
+1. **HIGH:** test_build_pipeline.py has bugs (kgshred references) - AUDIT-GAP-004
+2. **MEDIUM:** README.md (2,808 bytes) not migrated - AUDIT-GAP-005
+
+### Audit Verdict
+
+**Overall Assessment:** ✅ PASS with Minor Issues
+
+The knowledge_graph migration is **high quality** with improvements over the source:
+- Enhanced memory usage (streaming + sqlite-vec)
+- Enhanced database features
+- All tests migrated
+- Zero type/lint errors
+
+### Issues Created
+- AUDIT-GAP-004 (HIGH): Fix test_build_pipeline.py bugs
+- AUDIT-GAP-005 (MEDIUM): Migrate README.md to docs/
+
+### Investigation Notes
+See `.work/agent/issues/references/AUDIT-KG-001-investigation.md` for full investigation details.
+

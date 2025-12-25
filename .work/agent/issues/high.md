@@ -435,3 +435,88 @@ Without integration tests, we have:
 - Tests may need fixture updates to match consolidated db_issues structure
 - See investigation report for full details: `.work/agent/issues/references/AUDIT-DBISSUES-010-investigation.md`
 
+
+---
+id: "AUDIT-GAP-004@d3e6f2"
+title: "Integration tests fail due to incomplete migration in test_build_pipeline.py"
+description: "2 tests fail because kgshred references not updated to knowledge_graph"
+created: 2025-12-26
+section: "knowledge_graph"
+tags: [testing, migration-gap, bug, audit]
+type: bug
+priority: high
+status: proposed
+references:
+  - .work/agent/issues/references/AUDIT-KG-001-investigation.md
+  - tests/integration/knowledge_graph/test_build_pipeline.py
+  - incoming/kg/tests/integration/test_build_pipeline.py
+---
+
+### Problem
+During AUDIT-KG-001 investigation, 2 test failures were identified in `test_build_pipeline.py`:
+
+**Test Failures:**
+1. `test_build_script_runs_successfully` - References non-existent `tests/scripts/build.py` path
+2. `test_package_importable_after_install` - Uses undefined `kgshred` variable
+
+**Root Cause:** The test file was **partially updated** during migration. The import was changed but the variable references were not:
+
+| Line | Source | Destination | Issue |
+|------|--------|-------------|-------|
+| 27 | `import kgshred` | `import dot_work.knowledge_graph` | ✅ Updated |
+| 29 | `assert hasattr(kgshred, "__version__")` | `assert hasattr(kgshred, "__version__")` | ❌ `kgshred` undefined |
+| 30 | `assert kgshred.__version__ == "0.1.0"` | `assert kgshred.__version__ == "0.1.0"` | ❌ `kgshred` undefined |
+| 36 | `from kgshred.cli import app` | `from dot_work.knowledge_graph.cli import app` | ✅ Updated |
+
+### Affected Files
+- `tests/integration/knowledge_graph/test_build_pipeline.py` (lines 29-30)
+
+### Importance
+**HIGH:** These tests fail consistently, blocking CI/CD:
+- 374 tests pass but 2 fail
+- Failures are due to incomplete migration (not code logic issues)
+- Simple fix but blocks validation
+
+**Test Output:**
+```
+FAILED test_package_importable_after_install - NameError: name 'kgshred' is not defined
+```
+
+### Proposed Solution
+**Fix the undefined variable reference:**
+
+Change lines 29-30 from:
+```python
+assert hasattr(kgshred, "__version__")
+assert kgshred.__version__ == "0.1.0"
+```
+
+To:
+```python
+import dot_work.knowledge_graph as kg
+assert hasattr(kg, "__version__")
+assert kg.__version__ == "0.1.0"
+```
+
+Or use the already-imported module:
+```python
+assert hasattr(dot_work.knowledge_graph, "__version__")
+assert dot_work.knowledge_graph.__version__ == "0.1.0"
+```
+
+**Also fix the build script path** (line 15):
+- Current: `project_root / "scripts" / "build.py"`
+- Should be: Correct path to build script or remove test if no build script exists
+
+### Acceptance Criteria
+- [ ] Lines 29-30 use correct module reference
+- [ ] All 2 tests pass
+- [ ] Build script path issue resolved (or test removed if N/A)
+- [ ] No regression in other tests
+
+### Notes
+- Source test file: `incoming/kg/tests/integration/test_build_pipeline.py`
+- Destination test file: `tests/integration/knowledge_graph/test_build_pipeline.py`
+- This is a clear migration bug - simple oversight during import updates
+- See investigation: `.work/agent/issues/references/AUDIT-KG-001-investigation.md`
+

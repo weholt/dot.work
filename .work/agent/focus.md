@@ -1,18 +1,27 @@
 # Agent Focus
-Last updated: 2025-12-25T23:45:00Z
+Last updated: 2025-12-26T00:20:00Z
 
 ## Previous
-- Issue: AUDIT-DBISSUES-010 - DB-Issues Module Migration Validation
-- Completed: 2025-12-25T23:45:00Z
-- Outcome: ✅ PASS with Notes - 100% feature parity achieved. 50+ CLI commands verified (reorganized into logical groups). Integration tests not migrated (11 files). 50 pre-existing type errors documented. Full investigation in references/AUDIT-DBISSUES-010-investigation.md
+- Issue: AUDIT-KG-001 - Knowledge Graph Module Migration Validation
+- Completed: 2025-12-26T00:15:00Z
+- Outcome: ✅ PASS with Minor Issues - Clean migration with enhancements (sqlite-vec, memory-bounded streaming). Zero type/lint errors. All tests migrated. Created 2 gap issues: AUDIT-GAP-004 (test bugs), AUDIT-GAP-005 (README not migrated).
 
 ## Current
-None
+- Issue: AUDIT-REVIEW-002 - Review Module Migration Validation
+- Source: shortlist.md (Migration Validation Audits section)
+- Started: 2025-12-26T00:20:00Z
+- Status: in-progress
+- Phase: Investigation
+- Scope:
+  - Source: `incoming/crampus/repo-agent/`
+  - Destination: `src/dot_work/review/`
+  - Migration Range: MIGRATE-001 through MIGRATE-012 (12 issues)
+- Notes: Code review system with Docker integration and template support
 
 ## Next
-- Issue: AUDIT-KG-001 - Knowledge Graph Module Migration Validation
+- Issue: AUDIT-GIT-003 - Git Module Migration Validation
 - Source: shortlist.md (Migration Validation Audits section)
-- Scope: kgshred → knowledge_graph comparison
+- Scope: git-analysis → git comparison
 
 ---
 
