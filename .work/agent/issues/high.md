@@ -356,3 +356,82 @@ CVSS Score: 5.3 (Medium)
 - Review error messages in all user-facing code
 
 ---
+
+---
+id: "AUDIT-GAP-001@7a9f2d"
+title: "Integration tests not migrated for db_issues module"
+description: "11 integration test files from source are absent in destination"
+created: 2025-12-25
+section: "db_issues"
+tags: [testing, integration-tests, migration-gap, audit]
+type: test
+priority: high
+status: proposed
+references:
+  - .work/agent/issues/references/AUDIT-DBISSUES-010-investigation.md
+  - /home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/tests/
+  - tests/unit/db_issues/
+---
+
+### Problem
+During AUDIT-DBISSUES-010, it was discovered that 11 integration test files from the source (glorious agents issues skill) were NOT migrated to the destination (db_issues module).
+
+**Missing Integration Tests:**
+1. test_advanced_filtering.py
+2. test_agent_workflows.py
+3. test_bulk_operations.py
+4. test_comment_repository.py
+5. test_dependency_model.py
+6. test_issue_graph_repository.py
+7. test_issue_lifecycle.py
+8. test_issue_repository.py
+9. test_team_collaboration.py
+10. test_daemon_integration.py (excluded, OK)
+11. test_integration.py (general integration tests)
+
+**Current State:**
+- Source: 50 test files (38 unit + 11 integration)
+- Destination: 13 test files (12 unit + 1 conftest)
+- Only unit tests were migrated (277 tests passing)
+- Integration tests provide end-to-end validation
+
+### Affected Files
+- `tests/unit/db_issues/` (only unit tests exist here)
+- Missing: `tests/integration/db_issues/` directory
+
+### Importance
+**HIGH**: Integration tests provide critical confidence that:
+- Database operations work correctly at integration level
+- Service interactions are verified
+- Full workflows (bulk operations, dependencies, cycles) are validated
+- Multi-service scenarios work as expected
+
+Without integration tests, we have:
+- Unit tests proving components work in isolation
+- No verification that components work together
+- Risk of integration bugs that won't be caught
+
+### Proposed Solution
+1. Create `tests/integration/db_issues/` directory
+2. Migrate integration test files from source:
+   ```
+   /home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/tests/test_*.py
+   ```
+3. Update imports to match db_issues module structure
+4. Exclude daemon-related tests (intentionally not migrated)
+5. Add test fixtures for database setup/teardown
+
+### Acceptance Criteria
+- [ ] Integration test directory created
+- [ ] 10 integration test files migrated (excluding daemon)
+- [ ] All tests pass with new structure
+- [ ] Bulk operations tested end-to-end
+- [ ] Dependency cycle detection tested
+- [ ] Issue lifecycle workflows tested
+
+### Notes
+- Source location: `/home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/tests/`
+- Destination should follow pytest conventions for integration tests
+- Tests may need fixture updates to match consolidated db_issues structure
+- See investigation report for full details: `.work/agent/issues/references/AUDIT-DBISSUES-010-investigation.md`
+

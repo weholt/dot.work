@@ -1170,3 +1170,86 @@ When scanning a file with syntax errors, `_scan_file()` returns a `FileEntity` w
 The current graceful degradation is useful for partial scans, but visibility into errors is important.
 
 ---
+
+---
+id: "AUDIT-GAP-002@b8c4e1"
+title: "Pre-existing type errors in db_issues module from migration"
+description: "50 mypy type errors in db_issues code from original migration"
+created: 2025-12-25
+section: "db_issues"
+tags: [type-checking, mypy, migration-gap, audit]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - .work/agent/issues/references/AUDIT-DBISSUES-010-investigation.md
+  - .work/baseline.md
+  - src/dot_work/db_issues/cli.py
+  - src/dot_work/db_issues/services/issue_service.py
+  - src/dot_work/db_issues/services/dependency_service.py
+  - src/dot_work/db_issues/services/label_service.py
+---
+
+### Problem
+During AUDIT-DBISSUES-010, it was documented that 50 pre-existing mypy type errors exist in the db_issues module. These errors were introduced during the migration (MIGRATE-034 through MIGRATE-085) and have been present since then.
+
+**Type Error Distribution:**
+| File | Count | Error Types |
+|------|-------|-------------|
+| cli.py | 37 | attr-defined (assignee), call-overload (exec), no-redef |
+| issue_service.py | 9 | attr-defined (get_dependencies, add_dependency, add_comment, generate_id) |
+| dependency_service.py | 4 | assignment (list vs set for blockers) |
+| label_service.py | 1 | assignment (Label | None to Label) |
+| installer.py | 4 | assignment (tuple with None to tuple[str, str, str]) |
+
+**Note:** These are **pre-existing issues from the migration**, not new regressions. They are documented in the baseline and were tracked in the original migration issues.
+
+### Affected Files
+- `src/dot_work/db_issues/cli.py` (37 errors - largest file at 209KB)
+- `src/dot_work/db_issues/services/issue_service.py` (9 errors)
+- `src/dot_work/db_issues/services/dependency_service.py` (4 errors)
+- `src/dot_work/db_issues/services/label_service.py` (1 error)
+- `src/dot_work/installer.py` (4 errors)
+
+### Importance
+**MEDIUM**: While these errors don't block functionality, they:
+- Reduce type safety confidence
+- Make refactoring riskier (types don't validate)
+- Indicate incomplete migration to type-safe code
+- May hide real bugs that type checking would catch
+
+These are documented "known issues" rather than regressions, so they don't represent a drop in code quality from the baseline.
+
+### Proposed Solution
+1. **cli.py (37 errors):**
+   - Add type stubs or fix dynamic attribute access
+   - Fix exec() call-overload issues
+   - Resolve no-redef conflicts
+
+2. **issue_service.py (9 errors):**
+   - Add proper type annotations for methods returning dynamically accessed attributes
+   - Consider adding Protocol or dataclass for return types
+
+3. **dependency_service.py (4 errors):**
+   - Fix list vs set type mismatch for blockers field
+
+4. **label_service.py (1 error):**
+   - Fix Label | None assignment
+
+5. **installer.py (4 errors):**
+   - Fix tuple type annotations for version parsing
+
+### Acceptance Criteria
+- [ ] All 50 type errors addressed
+- [ ] mypy passes cleanly on db_issues module
+- [ ] No new type errors introduced
+- [ ] All tests still pass (277 tests)
+- [ ] Type annotations are accurate (not just suppressed with ignore)
+
+### Notes
+- These errors are documented in `.work/baseline.md` as pre-existing issues
+- They were NOT introduced by recent changes
+- Addressing them will improve type safety and maintainability
+- Some errors may require adding `# type: ignore` comments if they're false positives
+- Consider this a technical debt item rather than a critical bug
+
