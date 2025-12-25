@@ -3585,3 +3585,94 @@ The knowledge_graph migration is **high quality** with improvements over the sou
 ### Investigation Notes
 See `.work/agent/issues/references/AUDIT-KG-001-investigation.md` for full investigation details.
 
+
+---
+
+## 2025-12-26: Migration Validation - Review Module (AUDIT-REVIEW-002)
+
+| Audit | Status | Completed |
+|-------|--------|----------|
+| AUDIT-REVIEW-002 | ✅ Complete | 2025-12-26 |
+
+### Summary
+- **Type**: Migration Validation Audit
+- **Source**: `incoming/crampus/repo-agent/`
+- **Destination**: `src/dot_work/review/`
+- **Claimed Migration**: MIGRATE-001 through MIGRATE-012 (12 issues)
+- **Status**: 🔴 **CRITICAL FINDING - NOT A MIGRATION**
+
+### Investigation Findings
+
+**🔴 CRITICAL DISCOVERY**: These are **completely different codebases**:
+
+**Source (repo-agent):**
+- CLI Docker-based LLM agent runner
+- Commands: `repo-agent run`, `repo-agent init`, `repo-agent validate`
+- Reads markdown instruction files with YAML frontmatter
+- Builds and runs Docker containers
+- Runs code tools (OpenCode, Claude, etc.) in containers
+- Auto-commits and creates PRs
+- Template system for instruction files
+- Frontmatter validation
+- Files: cli.py (6.6K), core.py (29K), templates.py (1.6K), validation.py (2.6K)
+- Tests: 7 test files
+
+**Destination (review):**
+- Web-based code review comment management system
+- FastAPI server for review UI
+- JSONL-based comment storage
+- Git diff parsing
+- Export to markdown for agents
+- NO CLI interface at all
+- NO Docker functionality
+- NO agent runner
+- Files: config.py, models.py, git.py, storage.py, exporter.py, server.py
+- Tests: 5 test files, 56 tests passing
+
+**Feature Parity Analysis:**
+
+| Feature | Source | Destination | Status |
+|---------|--------|-------------|--------|
+| CLI interface | ✅ Typer-based | ❌ None | **NOT MIGRATED** |
+| Docker integration | ✅ Full Docker build/run | ❌ None | **NOT MIGRATED** |
+| Agent execution | ✅ Container-based runner | ❌ None | **NOT MIGRATED** |
+| Template system | ✅ DEFAULT_INSTRUCTIONS_TEMPLATE | ❌ None | **NOT MIGRATED** |
+| Validation logic | ✅ validate_instructions() | ❌ None | **NOT MIGRATED** |
+| Web server | ❌ N/A | ✅ FastAPI UI | Different purpose |
+| Comment storage | ❌ N/A | ✅ JSONL storage | Different purpose |
+
+**Quality Metrics (Destination):**
+- Type checking (mypy): ✅ 0 errors
+- Linting (ruff): ✅ 0 errors
+- Unit tests: ✅ 56/56 passing
+
+### Gap Issues Created
+1. **AUDIT-GAP-006 (CRITICAL)**: repo-agent NOT migrated - decision needed on whether to migrate or document intentional exclusion
+2. **AUDIT-GAP-007 (HIGH)**: Missing repo-agent functionality in dot-work
+
+### Implications
+1. **MIGRATE-001 through MIGRATE-012 issues** claim to migrate repo-agent → review, but this is **INCORRECT**
+2. **12 migration issues are based on a false premise**
+3. **repo-agent functionality is MISSING from dot-work**
+4. **The review module is original development**, not a migration
+5. **Decision needed**: Should repo-agent be migrated, or was it intentionally excluded?
+
+### Files NOT Migrated (from source)
+- `cli.py` - Entire CLI interface
+- `core.py` - All Docker agent execution logic
+- `templates.py` - Template system
+- `validation.py` - Validation logic
+- `tests/test_cli.py` - CLI tests
+- `tests/test_core.py` - Core tests
+- `tests/test_templates.py` - Template tests
+- `tests/test_validation.py` - Validation tests
+- `tests/test_integration.py` - Integration tests
+- `tests/test_coderabbit_config.py` - OpenCode config tests
+- `Dockerfile` - Container definition
+- `Dockerfile.smart-alpine` - Alternative container
+- `README.md` - Documentation
+
+### Investigation Notes
+See detailed investigation: `.work/agent/issues/references/AUDIT-REVIEW-002-investigation.md`
+
+---

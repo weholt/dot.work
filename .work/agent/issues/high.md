@@ -358,6 +358,92 @@ CVSS Score: 5.3 (Medium)
 ---
 
 ---
+id: "AUDIT-GAP-007@d4e5f6"
+title: "Missing repo-agent functionality in dot-work"
+description: "CLI Docker agent runner, instruction template system, and frontmatter validation not available in dot-work"
+created: 2025-12-26
+section: "repo-agent"
+tags: [migration-gap, missing-functionality, docker, cli]
+type: enhancement
+priority: high
+status: proposed
+references:
+  - .work/agent/issues/references/AUDIT-REVIEW-002-investigation.md
+  - incoming/crampus/repo-agent/
+---
+
+### Problem
+The repo-agent tool from incoming/crampus/ provides significant functionality that is **not available anywhere in dot-work**:
+
+**Missing Features:**
+1. **CLI Docker Agent Runner** - Execute LLM-powered code agents in containers
+2. **Instruction Template System** - Generate valid markdown instruction templates
+3. **Frontmatter Validation** - Validate instruction file configuration
+4. **Docker Integration** - Build and run containers with tool execution
+5. **Auto-commit and PR Creation** - Automatically commit changes and create PRs
+6. **SSH Authentication Support** - Mount SSH keys for private repos
+7. **OpenCode Integration** - Specific support for OpenCode tool
+8. **Generic Tool Support** - Pluggable tool entrypoint system
+
+**This functionality was NOT migrated to the review module** (see AUDIT-GAP-006).
+
+### Affected Files
+- Missing in dot-work: CLI with `run`, `init`, `validate` commands
+- Missing in dot-work: Docker container execution workflow
+- Missing in dot-work: Template generation system
+- Missing in dot-work: Frontmatter validation logic
+- Source: `incoming/crampus/repo-agent/` (fully functional tool)
+
+### Importance
+**HIGH:** If repo-agent functionality was intentionally excluded, we need to understand:
+1. Was the decision to exclude it deliberate?
+2. Is there an alternative approach in dot-work?
+3. Do we need this functionality for the project's goals?
+
+**If this functionality is needed:**
+- Significant development effort to recreate (would be re-inventing the wheel)
+- Source code already exists and works well
+- 29K of well-tested core logic
+- 7 test files providing coverage
+
+**Use cases for repo-agent:**
+- Automated code modifications via LLM agents
+- Running agents in isolated Docker environments
+- Template-based workflow for code changes
+- Automatic PR creation from agent output
+
+### Proposed Solution
+**Option 1: Migrate repo-agent to dot-work**
+1. Create `src/dot_work/repo_agent/` module
+2. Migrate all Python files (cli.py, core.py, templates.py, validation.py)
+3. Migrate test files (7 files)
+4. Update Docker configuration
+5. Add to CLI entrypoints
+
+**Option 2: Document intentional exclusion**
+1. Add to `.work/agent/issues/history.md` explaining why repo-agent was excluded
+2. Document alternative approach if one exists
+3. Note any functionality gaps and how they're addressed
+
+**Option 3: Alternative implementation**
+1. If different approach chosen, document how same functionality is achieved
+2. Compare trade-offs vs repo-agent approach
+
+### Acceptance Criteria
+- [ ] Decision documented: migrate, exclude, or alternative
+- [ ] If migrating: Migration plan created and executed
+- [ ] If excluding: Documentation explains rationale
+- [ ] If alternative: Comparison of approaches documented
+- [ ] No ambiguity about repo-agent's status
+
+### Notes
+- repo-agent is a well-designed, working tool (~40KB Python code)
+- Source has comprehensive test coverage
+- Docker integration is production-ready
+- See investigation: `.work/agent/issues/references/AUDIT-REVIEW-002-investigation.md`
+- Related to AUDIT-GAP-006 which identifies that review is NOT a migration of repo-agent
+
+---
 id: "AUDIT-GAP-001@7a9f2d"
 title: "Integration tests not migrated for db_issues module"
 description: "11 integration test files from source are absent in destination"
