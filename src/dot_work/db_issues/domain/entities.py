@@ -6,7 +6,7 @@ from the issue-tracker project into a single module for dot-work.
 Source: /home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/src/issue_tracker/
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from enum import Enum, IntEnum
 from typing import Protocol, runtime_checkable
@@ -309,29 +309,17 @@ class Issue:
                 target_state=new_status.value,
             )
 
-        # Create new instance with updated status
-        new_issue = Issue(
-            id=self.id,
-            project_id=self.project_id,
-            title=self.title,
-            description=self.description,
+        # Create new instance with updated status using dataclasses.replace
+        new_issue = replace(
+            self,
             status=new_status,
-            priority=self.priority,
-            type=self.type,
-            assignees=self.assignees.copy(),
-            epic_id=self.epic_id,
-            labels=self.labels.copy(),
-            blocked_reason=self.blocked_reason,
-            source_url=self.source_url,
-            references=self.references.copy(),
-            created_at=self.created_at,
             updated_at=utcnow_naive(),
-            closed_at=self.closed_at,
         )
 
-        # Update closed_at when transitioning to closed
+        # Update closed_at when transitioning to completed
         if new_status == IssueStatus.COMPLETED and self.closed_at is None:
-            new_issue.closed_at = utcnow_naive()
+            # replace() returns a new instance, so we need another replace for closed_at
+            new_issue = replace(new_issue, closed_at=utcnow_naive())
 
         return new_issue
 
@@ -347,23 +335,10 @@ class Issue:
         if label not in self.labels:
             new_labels = self.labels.copy()
             new_labels.append(label)
-            return Issue(
-                id=self.id,
-                project_id=self.project_id,
-                title=self.title,
-                description=self.description,
-                status=self.status,
-                priority=self.priority,
-                type=self.type,
-                assignees=self.assignees.copy(),
-                epic_id=self.epic_id,
+            return replace(
+                self,
                 labels=new_labels,
-                blocked_reason=self.blocked_reason,
-                source_url=self.source_url,
-                references=self.references.copy(),
-                created_at=self.created_at,
                 updated_at=utcnow_naive(),
-                closed_at=self.closed_at,
             )
         return self
 
@@ -380,23 +355,10 @@ class Issue:
             new_labels = [
                 existing_label for existing_label in self.labels if existing_label != label
             ]
-            return Issue(
-                id=self.id,
-                project_id=self.project_id,
-                title=self.title,
-                description=self.description,
-                status=self.status,
-                priority=self.priority,
-                type=self.type,
-                assignees=self.assignees.copy(),
-                epic_id=self.epic_id,
+            return replace(
+                self,
                 labels=new_labels,
-                blocked_reason=self.blocked_reason,
-                source_url=self.source_url,
-                references=self.references.copy(),
-                created_at=self.created_at,
                 updated_at=utcnow_naive(),
-                closed_at=self.closed_at,
             )
         return self
 
@@ -412,23 +374,10 @@ class Issue:
         if assignee not in self.assignees:
             new_assignees = self.assignees.copy()
             new_assignees.append(assignee)
-            return Issue(
-                id=self.id,
-                project_id=self.project_id,
-                title=self.title,
-                description=self.description,
-                status=self.status,
-                priority=self.priority,
-                type=self.type,
+            return replace(
+                self,
                 assignees=new_assignees,
-                epic_id=self.epic_id,
-                labels=self.labels.copy(),
-                blocked_reason=self.blocked_reason,
-                source_url=self.source_url,
-                references=self.references.copy(),
-                created_at=self.created_at,
                 updated_at=utcnow_naive(),
-                closed_at=self.closed_at,
             )
         return self
 
@@ -443,23 +392,10 @@ class Issue:
         """
         if assignee in self.assignees:
             new_assignees = [a for a in self.assignees if a != assignee]
-            return Issue(
-                id=self.id,
-                project_id=self.project_id,
-                title=self.title,
-                description=self.description,
-                status=self.status,
-                priority=self.priority,
-                type=self.type,
+            return replace(
+                self,
                 assignees=new_assignees,
-                epic_id=self.epic_id,
-                labels=self.labels.copy(),
-                blocked_reason=self.blocked_reason,
-                source_url=self.source_url,
-                references=self.references.copy(),
-                created_at=self.created_at,
                 updated_at=utcnow_naive(),
-                closed_at=self.closed_at,
             )
         return self
 
@@ -472,23 +408,10 @@ class Issue:
         Returns:
             New Issue instance with epic assignment
         """
-        return Issue(
-            id=self.id,
-            project_id=self.project_id,
-            title=self.title,
-            description=self.description,
-            status=self.status,
-            priority=self.priority,
-            type=self.type,
-            assignees=self.assignees.copy(),
+        return replace(
+            self,
             epic_id=epic_id,
-            labels=self.labels.copy(),
-            blocked_reason=self.blocked_reason,
-            source_url=self.source_url,
-            references=self.references.copy(),
-            created_at=self.created_at,
             updated_at=utcnow_naive(),
-            closed_at=self.closed_at,
         )
 
 

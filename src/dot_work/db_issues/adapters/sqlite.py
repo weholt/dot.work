@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from types import TracebackType
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, TypeDecorator, create_engine
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Column, Field, Index, Session, SQLModel, String, select
 
@@ -34,6 +34,44 @@ from dot_work.db_issues.domain.entities import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Custom Types
+# =============================================================================
+
+
+class DateTimeAsISOString(TypeDecorator[datetime]):
+    """Custom DateTime type that stores as ISO string and converts transparently.
+
+    This type provides:
+    - Automatic conversion from Python datetime to ISO string on write
+    - Automatic conversion from ISO string to Python datetime on read
+    - Type safety (mypy validates datetime usage)
+    - Backward compatibility with existing string-based data
+
+    SQLite doesn't have a native DATETIME type, so we store as ISO 8601 strings
+    but provide automatic conversion to maintain type safety throughout the codebase.
+    """
+
+    impl = String
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | str | None, dialect) -> str | None:
+        """Convert Python datetime to ISO string for database storage.
+
+        Handles both datetime objects and pre-formatted ISO strings for compatibility.
+        """
+        if value is None:
+            return None
+        if isinstance(value, str):
+            # Already a string (likely from test fixtures or legacy data)
+            return value
+        return value.isoformat()
+
+    def process_result_value(self, value: str | None, dialect) -> datetime | None:
+        """Convert ISO string from database to Python datetime."""
+        return datetime.fromisoformat(value) if value else None
 
 
 # =============================================================================
@@ -65,10 +103,10 @@ class IssueModel(SQLModel, table=True):
     epic_id: str | None = Field(default=None, max_length=50, index=True)
     blocked_reason: str | None = Field(default=None, max_length=1000)
     source_url: str | None = Field(default=None, max_length=2048)
-    created_at: str = Field(index=True)  # Using str for datetime to avoid import issues
-    updated_at: str = Field(index=True)
-    closed_at: str | None = Field(default=None, index=True)
-    deleted_at: str | None = Field(default=None, index=True)
+    created_at: datetime = Field(sa_type=DateTimeAsISOString, index=True)
+    updated_at: datetime = Field(sa_type=DateTimeAsISOString, index=True)
+    closed_at: datetime | None = Field(default=None, sa_type=DateTimeAsISOString, index=True)
+    deleted_at: datetime | None = Field(default=None, sa_type=DateTimeAsISOString, index=True)
 
 
 class LabelModel(SQLModel, table=True):
@@ -83,7 +121,7 @@ class LabelModel(SQLModel, table=True):
     project_id: str = Field(index=True, max_length=50)
     name: str = Field(max_length=100, index=True)
     color: str | None = Field(default=None, max_length=7)  # Hex color
-    created_at: str
+    created_at: datetime = Field(sa_type=DateTimeAsISOString)
 
 
 class IssueLabelModel(SQLModel, table=True):
@@ -93,7 +131,7 @@ class IssueLabelModel(SQLModel, table=True):
 
     issue_id: str = Field(foreign_key="issues.id", primary_key=True, max_length=50)
     label_name: str = Field(primary_key=True, max_length=100)
-    created_at: str
+    created_at: datetime = Field(sa_type=DateTimeAsISOString)
 
 
 class IssueAssigneeModel(SQLModel, table=True):
@@ -103,7 +141,7 @@ class IssueAssigneeModel(SQLModel, table=True):
 
     issue_id: str = Field(foreign_key="issues.id", primary_key=True, max_length=50)
     assignee: str = Field(primary_key=True, max_length=100)
-    created_at: str
+    created_at: datetime = Field(sa_type=DateTimeAsISOString)
 
 
 class IssueReferenceModel(SQLModel, table=True):
@@ -113,7 +151,7 @@ class IssueReferenceModel(SQLModel, table=True):
 
     issue_id: str = Field(foreign_key="issues.id", primary_key=True, max_length=50)
     reference: str = Field(primary_key=True, max_length=2048)
-    created_at: str
+    created_at: datetime = Field(sa_type=DateTimeAsISOString)
 
 
 class CommentModel(SQLModel, table=True):
@@ -128,8 +166,8 @@ class CommentModel(SQLModel, table=True):
     issue_id: str = Field(foreign_key="issues.id", index=True, max_length=50)
     author: str = Field(max_length=100, index=True)
     content: str = Field(sa_column=Column(String))
-    created_at: str = Field(index=True)
-    updated_at: str
+    created_at: datetime = Field(sa_type=DateTimeAsISOString, index=True)
+    updated_at: datetime = Field(sa_type=DateTimeAsISOString)
 
 
 class DependencyModel(SQLModel, table=True):
@@ -149,7 +187,7 @@ class DependencyModel(SQLModel, table=True):
     from_issue_id: str = Field(foreign_key="issues.id", index=True, max_length=50)
     to_issue_id: str = Field(foreign_key="issues.id", index=True, max_length=50)
     type: str = Field(max_length=20, index=True)  # blocks, depends-on, related-to
-    created_at: str
+    created_at: datetime = Field(sa_type=DateTimeAsISOString)
 
 
 class EpicModel(SQLModel, table=True):
@@ -167,9 +205,9 @@ class EpicModel(SQLModel, table=True):
     status: str = Field(max_length=20, index=True)
     progress: int = Field(default=0)  # 0-100
     parent_epic_id: str | None = Field(default=None, max_length=50, index=True)
-    start_date: str | None = None
-    target_date: str | None = None
-    completed_date: str | None = None
+    start_date: datetime | None = Field(default=None, sa_type=DateTimeAsISOString)
+    target_date: datetime | None = Field(default=None, sa_type=DateTimeAsISOString)
+    completed_date: datetime | None = Field(default=None, sa_type=DateTimeAsISOString)
 
 
 class ProjectModel(SQLModel, table=True):
@@ -185,8 +223,8 @@ class ProjectModel(SQLModel, table=True):
     description: str | None = None
     status: str = Field(default="active", max_length=20, index=True)
     is_default: bool = Field(default=False)
-    created_at: str
-    updated_at: str
+    created_at: datetime = Field(sa_type=DateTimeAsISOString)
+    updated_at: datetime = Field(sa_type=DateTimeAsISOString)
 
 
 # =============================================================================
@@ -344,7 +382,7 @@ class IssueRepository:
             label_model = IssueLabelModel(
                 issue_id=issue.id,
                 label_name=label_name,
-                created_at=str(now),
+                created_at=now,
             )
             self.session.add(label_model)
         self.session.flush()
@@ -362,7 +400,7 @@ class IssueRepository:
             assignee_model = IssueAssigneeModel(
                 issue_id=issue.id,
                 assignee=assignee,
-                created_at=str(now),
+                created_at=now,
             )
             self.session.add(assignee_model)
         self.session.flush()
@@ -381,7 +419,7 @@ class IssueRepository:
             ref_model = IssueReferenceModel(
                 issue_id=issue.id,
                 reference=reference,
-                created_at=str(now),
+                created_at=now,
             )
             self.session.add(ref_model)
         self.session.flush()
@@ -403,7 +441,7 @@ class IssueRepository:
         logger.debug("Repository: soft-deleting issue: id=%s", issue_id)
         model = self.session.get(IssueModel, issue_id)
         if model:
-            model.deleted_at = str(utcnow_naive())
+            model.deleted_at = utcnow_naive()
             self.session.flush()
             logger.info("Repository: issue soft-deleted: id=%s", issue_id)
             return True
@@ -445,7 +483,7 @@ class IssueRepository:
         """
         statement = (
             select(IssueModel)
-            .where(IssueModel.deleted_at.is_(None))  # type: ignore[attr-defined]
+            .where(IssueModel.deleted_at.is_(None))  # type: ignore[union-attr]
             .limit(limit)
             .offset(offset)
         )
@@ -464,7 +502,7 @@ class IssueRepository:
         """
         statement = (
             select(IssueModel)
-            .where(IssueModel.deleted_at.is_not(None))  # type: ignore[attr-defined]
+            .where(IssueModel.deleted_at.is_not(None))  # type: ignore[union-attr]
             .limit(limit)
             .offset(offset)
         )
@@ -485,7 +523,7 @@ class IssueRepository:
         statement = (
             select(IssueModel)
             .where(IssueModel.status == status.value)
-            .where(IssueModel.deleted_at.is_(None))  # type: ignore[attr-defined]
+            .where(IssueModel.deleted_at.is_(None))  # type: ignore[union-attr]
             .limit(limit)
             .offset(offset)
         )
@@ -526,7 +564,7 @@ class IssueRepository:
             List of issues assigned to user
         """
         statement = (
-            select(IssueModel).where(IssueModel.assignee == assignee).limit(limit).offset(offset)
+            select(IssueModel).where(IssueModel.assignee == assignee).limit(limit).offset(offset)  # type: ignore[attr-defined]
         )
         models = self.session.exec(statement).all()
         return self._models_to_entities(models)
@@ -584,7 +622,7 @@ class IssueRepository:
         statement = (
             select(IssueModel)
             .where(IssueModel.project_id == project_id)
-            .where(IssueModel.deleted_at.is_(None))  # type: ignore[attr-defined]
+            .where(IssueModel.deleted_at.is_(None))  # type: ignore[union-attr]
             .limit(limit)
             .offset(offset)
         )
@@ -641,16 +679,6 @@ class IssueRepository:
         ref_models = self.session.exec(ref_statement).all()
         references = [ref_model.reference for ref_model in ref_models]
 
-        # Parse datetime strings back to datetime objects
-        created_at = (
-            datetime.fromisoformat(model.created_at) if model.created_at else utcnow_naive()
-        )
-        updated_at = (
-            datetime.fromisoformat(model.updated_at) if model.updated_at else utcnow_naive()
-        )
-        closed_at = datetime.fromisoformat(model.closed_at) if model.closed_at else None
-        deleted_at = datetime.fromisoformat(model.deleted_at) if model.deleted_at else None
-
         return Issue(
             id=model.id,
             project_id=model.project_id,
@@ -665,10 +693,10 @@ class IssueRepository:
             blocked_reason=model.blocked_reason,
             source_url=model.source_url,
             references=references,
-            created_at=created_at,
-            updated_at=updated_at,
-            closed_at=closed_at,
-            deleted_at=deleted_at,
+            created_at=model.created_at or utcnow_naive(),
+            updated_at=model.updated_at or utcnow_naive(),
+            closed_at=model.closed_at,
+            deleted_at=model.deleted_at,
         )
 
     def _models_to_entities(self, models: Sequence[IssueModel]) -> list[Issue]:
@@ -730,16 +758,6 @@ class IssueRepository:
             assignees = assignees_by_issue.get(model.id, [])
             references = refs_by_issue.get(model.id, [])
 
-            # Parse datetime strings back to datetime objects
-            created_at = (
-                datetime.fromisoformat(model.created_at) if model.created_at else utcnow_naive()
-            )
-            updated_at = (
-                datetime.fromisoformat(model.updated_at) if model.updated_at else utcnow_naive()
-            )
-            closed_at = datetime.fromisoformat(model.closed_at) if model.closed_at else None
-            deleted_at = datetime.fromisoformat(model.deleted_at) if model.deleted_at else None
-
             entity = Issue(
                 id=model.id,
                 project_id=model.project_id,
@@ -754,10 +772,10 @@ class IssueRepository:
                 blocked_reason=model.blocked_reason,
                 source_url=model.source_url,
                 references=references,
-                created_at=created_at,
-                updated_at=updated_at,
-                closed_at=closed_at,
-                deleted_at=deleted_at,
+                created_at=model.created_at or utcnow_naive(),
+                updated_at=model.updated_at or utcnow_naive(),
+                closed_at=model.closed_at,
+                deleted_at=model.deleted_at,
             )
             entities.append(entity)
 
@@ -850,7 +868,7 @@ class CommentRepository:
         statement = (
             select(CommentModel)
             .where(CommentModel.issue_id == issue_id)
-            .order_by(CommentModel.created_at)
+            .order_by(CommentModel.created_at)  # type: ignore[arg-type]
         )
         models = self.session.exec(statement).all()
         logger.debug("Repository: found %d comments for issue: id=%s", len(models), issue_id)
@@ -909,12 +927,8 @@ class CommentRepository:
             issue_id=model.issue_id,
             author=model.author,
             text=model.content,
-            created_at=datetime.fromisoformat(model.created_at)
-            if model.created_at
-            else utcnow_naive(),
-            updated_at=datetime.fromisoformat(model.updated_at)
-            if model.updated_at
-            else utcnow_naive(),
+            created_at=model.created_at or utcnow_naive(),
+            updated_at=model.updated_at or utcnow_naive(),
         )
 
 
@@ -1181,14 +1195,14 @@ class EpicRepository:
             # Update existing
             issue_model.title = epic.title
             issue_model.description = epic.description or ""
-            issue_model.updated_at = str(epic.updated_at)
+            issue_model.updated_at = epic.updated_at
             if epic.closed_at:
-                issue_model.closed_at = str(epic.closed_at)
+                issue_model.closed_at = epic.closed_at
 
             epic_model.status = epic.status.value
             epic_model.parent_epic_id = epic.parent_epic_id
             if epic.closed_at:
-                epic_model.completed_date = str(epic.closed_at)
+                epic_model.completed_date = epic.closed_at
 
             self.session.flush()
             self.session.refresh(issue_model)
@@ -1207,16 +1221,16 @@ class EpicRepository:
                 priority=3,  # MEDIUM default
                 type="task",  # Use valid IssueType - epic metadata in EpicModel
                 project_id="default",
-                created_at=str(epic.created_at),
-                updated_at=str(epic.updated_at),
-                closed_at=str(epic.closed_at) if epic.closed_at else None,
+                created_at=epic.created_at,
+                updated_at=epic.updated_at,
+                closed_at=epic.closed_at,
             )
             new_epic = EpicModel(
                 id=epic.id,
                 project_id="default",
                 status=epic.status.value,
                 parent_epic_id=epic.parent_epic_id,
-                completed_date=str(epic.closed_at) if epic.closed_at else None,
+                completed_date=epic.closed_at,
             )
 
             self.session.add(new_issue)
@@ -1313,11 +1327,7 @@ class EpicRepository:
         Returns:
             Epic domain entity
         """
-        closed_at = None
-        if issue_model.closed_at:
-            closed_at = datetime.fromisoformat(issue_model.closed_at)
-        elif epic_model.completed_date:
-            closed_at = datetime.fromisoformat(epic_model.completed_date)
+        closed_at = issue_model.closed_at or epic_model.completed_date
 
         return Epic(
             id=issue_model.id,
@@ -1325,12 +1335,8 @@ class EpicRepository:
             description=issue_model.description if issue_model.description else None,
             status=EpicStatus(epic_model.status),
             parent_epic_id=epic_model.parent_epic_id,
-            created_at=datetime.fromisoformat(issue_model.created_at)
-            if issue_model.created_at
-            else utcnow_naive(),
-            updated_at=datetime.fromisoformat(issue_model.updated_at)
-            if issue_model.updated_at
-            else utcnow_naive(),
+            created_at=issue_model.created_at or utcnow_naive(),
+            updated_at=issue_model.updated_at or utcnow_naive(),
             closed_at=closed_at,
         )
 
@@ -1495,7 +1501,7 @@ class LabelRepository:
             name=model.name,
             color=model.color,
             description=None,  # Not stored in DB currently
-            created_at=datetime.fromisoformat(model.created_at),
+            created_at=model.created_at or utcnow_naive(),
             updated_at=utcnow_naive(),
         )
 
@@ -1578,7 +1584,7 @@ class ProjectRepository:
             model.description = project.description
             model.status = project.status.value
             model.is_default = project.is_default
-            model.updated_at = str(project.updated_at)
+            model.updated_at = project.updated_at
         else:
             # Create new
             model = ProjectModel(
@@ -1587,8 +1593,8 @@ class ProjectRepository:
                 description=project.description,
                 status=project.status.value,
                 is_default=project.is_default,
-                created_at=str(project.created_at),
-                updated_at=str(project.updated_at),
+                created_at=project.created_at,
+                updated_at=project.updated_at,
             )
             self.session.add(model)
 
@@ -1625,8 +1631,8 @@ class ProjectRepository:
         # Clear default flag from all projects
         statement = select(ProjectModel).where(ProjectModel.is_default == True)
         default_models = self.session.exec(statement).all()
-        for model in default_models:
-            model.is_default = False
+        for default_model in default_models:
+            default_model.is_default = False
 
         # Set new default
         model = self.session.get(ProjectModel, project_id)
@@ -1652,8 +1658,8 @@ class ProjectRepository:
             description=model.description,
             status=ProjectStatus(model.status),
             is_default=model.is_default,
-            created_at=datetime.fromisoformat(model.created_at),
-            updated_at=datetime.fromisoformat(model.updated_at),
+            created_at=model.created_at or utcnow_naive(),
+            updated_at=model.updated_at or utcnow_naive(),
         )
 
 

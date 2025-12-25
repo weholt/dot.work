@@ -1192,6 +1192,83 @@ def _parse_edited_issue(content: str, original: Issue) -> dict:
     return result
 
 
+# Whitelist of allowed editors to prevent command injection
+# Users can add to this list if they need other editors
+_ALLOWED_EDITORS = {
+    "vi", "vim", "nvim", "neovim",
+    "emacs", "emacsclient",
+    "nano",
+    "code", "code-server", "codium",
+    "subl", "sublime_text",
+    "atom", "mate",
+    "kak", "micro", "xed",
+    "gedit", "kate", "geany",
+}
+
+
+def _validate_editor(editor_cmd: str | None) -> tuple[str, list[str]]:
+    """Validate editor command and return (executable, args).
+
+    Enforces a whitelist of allowed editors to prevent command injection
+    via unvalidated editor commands from CLI arguments, environment
+    variables, or user prompts.
+
+    Args:
+        editor_cmd: Editor command string (e.g., "code", "vim", "code --wait")
+
+    Returns:
+        Tuple of (executable_name, additional_args)
+
+    Raises:
+        ValueError: If editor is not in the allowed whitelist or contains
+            shell metacharacters (command injection attempt)
+
+    Examples:
+        >>> _validate_editor("vim")
+        ('vim', [])
+        >>> _validate_editor("code --wait")
+        ('code', ['--wait'])
+        >>> _validate_editor("nano")
+        ('nano', [])
+    """
+    # Shell metacharacters that indicate command injection attempts
+    _SHELL_METACHARACTERS = set(";|&`$()<>{}[]'\"'")
+
+    if not editor_cmd:
+        editor_cmd = os.environ.get("EDITOR", "vi")
+
+    # Check for shell metacharacters (command injection)
+    if any(char in editor_cmd for char in _SHELL_METACHARACTERS):
+        raise ValueError(
+            f"Editor command contains invalid characters: {editor_cmd!r}. "
+            f"Only the editor name and arguments are allowed."
+        )
+
+    parts = editor_cmd.strip().split()
+    if not parts or not parts[0]:
+        editor_cmd = "vi"
+        parts = ["vi"]
+
+    executable = parts[0]
+
+    # Extract base name (remove path)
+    base_name = Path(executable).name
+
+    if base_name not in _ALLOWED_EDITORS:
+        allowed_list = ", ".join(sorted(_ALLOWED_EDITORS))
+        raise ValueError(
+            f"Editor '{executable}' is not allowed. "
+            f"Allowed editors: {allowed_list}. "
+            f"Set the EDITOR environment variable or use --editor option."
+        )
+
+    # Special handling for VS Code to ensure it blocks
+    if base_name in ("code", "code-server", "codium") and "--wait" not in parts:
+        parts.insert(1, "--wait")
+
+    return base_name, parts[1:]
+
+
 def _get_text_from_editor(template: str = "") -> str:
     """Open editor and get text input from user.
 
@@ -1201,8 +1278,8 @@ def _get_text_from_editor(template: str = "") -> str:
     Returns:
         Text content from editor (with comment lines removed)
     """
-    # Determine editor
-    editor = os.environ.get("EDITOR", "vi")
+    # Determine and validate editor
+    editor_name, editor_args = _validate_editor(os.environ.get("EDITOR"))
 
     # Create temp file
     with tempfile.NamedTemporaryFile(
@@ -1216,8 +1293,8 @@ def _get_text_from_editor(template: str = "") -> str:
 
     try:
         # Open editor
-        console.print(f"Opening [cyan]{editor}[/cyan]...")
-        result = subprocess.run([editor, str(temp_path)])
+        console.print(f"Opening [cyan]{editor_name}[/cyan]...")
+        result = subprocess.run([editor_name, *editor_args, str(temp_path)])
 
         if result.returncode != 0:
             console.print(f"[red]Editor exited with error code {result.returncode}[/red]")
@@ -1271,9 +1348,8 @@ def edit(
             console.print(f"[red]Issue not found: {issue_id}[/red]")
             raise typer.Exit(1)
 
-        # Determine editor
-        if not editor:
-            editor = os.environ.get("EDITOR", "vi")
+        # Determine and validate editor
+        editor_name, editor_args = _validate_editor(editor)
 
         # Generate template
         template = _generate_issue_template(issue)
@@ -1290,8 +1366,8 @@ def edit(
 
         try:
             # Open editor
-            console.print(f"Opening [cyan]{editor}[/cyan] to edit issue [bold]{issue.id}[/bold]...")
-            result = subprocess.run([editor, str(temp_path)])
+            console.print(f"Opening [cyan]{editor_name}[/cyan] to edit issue [bold]{issue.id}[/bold]...")
+            result = subprocess.run([editor_name, *editor_args, str(temp_path)])
 
             if result.returncode != 0:
                 console.print(f"[red]Editor exited with error code {result.returncode}[/red]")
@@ -5408,27 +5484,13 @@ def edit(
             initial_hash = hashlib.sha256(f.read()).hexdigest()
 
         try:
-            # Open editor
-            console.print(f"[cyan]Opening {issue_id} in {editor_cmd}...[/cyan]")
+            # Validate and parse editor command
+            editor_name, editor_args = _validate_editor(editor_cmd)
+            console.print(f"[cyan]Opening {issue_id} in {editor_name}...[/cyan]")
             console.print(f"[dim]Temp file: {temp_path}[/dim]")
 
-            # Handle editor commands (split for editors with args like "code --wait")
-            if editor_cmd.strip() == "code":
-                # VS Code needs --wait flag to block
-                editor_args = ["code", "--wait", temp_path]
-            elif editor_cmd.strip() == "vim" or editor_cmd.strip() == "vi":
-                editor_args = [editor_cmd.strip(), temp_path]
-            elif editor_cmd.strip() == "nano":
-                editor_args = [editor_cmd.strip(), temp_path]
-            else:
-                # Try to split, fallback to treating as single command
-                parts = editor_cmd.strip().split()
-                if len(parts) > 1:
-                    editor_args = parts + [temp_path]
-                else:
-                    editor_args = [editor_cmd, temp_path]
-
-            result = subprocess.run(editor_args)
+            # Build editor args with validated components
+            result = subprocess.run([editor_name, *editor_args, temp_path])
 
             if result.returncode != 0:
                 console.print(f"[yellow]Editor exited with code {result.returncode}[/yellow]")

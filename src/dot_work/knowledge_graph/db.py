@@ -150,6 +150,7 @@ class Database:
         """
         self.db_path = db_path
         self._conn: sqlite3.Connection | None = None
+        self._vec_available: bool = False  # True if sqlite-vec extension is loaded
         self._ensure_directory()
 
     def _ensure_directory(self) -> None:
@@ -177,6 +178,31 @@ class Database:
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA temp_store=MEMORY")
         conn.execute("PRAGMA foreign_keys=ON")
+
+        # Load sqlite-vec extension if available for fast vector search
+        self._vec_available = self._load_vec_extension(conn)
+
+    def _load_vec_extension(self, conn: sqlite3.Connection) -> bool:
+        """Load sqlite-vec extension if available.
+
+        Args:
+            conn: SQLite connection.
+
+        Returns:
+            True if sqlite-vec was successfully loaded, False otherwise.
+        """
+        try:
+            import sqlite_vec  # type: ignore[import-not-found]
+
+            try:
+                sqlite_vec.load(conn)
+                return True
+            except Exception:
+                # Extension load failed (missing .so file, incompatible version, etc.)
+                return False
+        except ImportError:
+            # sqlite-vec not installed
+            return False
 
     def _ensure_schema(self) -> None:
         """Create tables if they don't exist."""
@@ -1041,6 +1067,63 @@ class Database:
 
         return [self._row_to_embedding(row) for row in cur.fetchall()]
 
+    def get_embeddings_for_model_batched(
+        self, model: str, batch_size: int = 1000, offset: int = 0
+    ) -> list[Embedding]:
+        """Get embeddings for a model in batches to bound memory usage.
+
+        This method allows streaming processing of large embedding collections
+        by loading embeddings in fixed-size batches.
+
+        Args:
+            model: Embedding model name.
+            batch_size: Maximum number of embeddings to return.
+            offset: Number of embeddings to skip.
+
+        Returns:
+            List of up to batch_size Embeddings for the model.
+        """
+        conn = self._get_connection()
+        cur = conn.execute(
+            """
+            SELECT embedding_pk, full_id, model, dimensions, vector, created_at
+            FROM embeddings
+            WHERE model = ?
+            ORDER BY embedding_pk
+            LIMIT ? OFFSET ?
+            """,
+            (model, batch_size, offset),
+        )
+
+        return [self._row_to_embedding(row) for row in cur.fetchall()]
+
+    def stream_embeddings_for_model(
+        self, model: str, batch_size: int = 1000
+    ) -> Iterator[list[Embedding]]:
+        """Stream embeddings for a model in batches.
+
+        This generator yields batches of embeddings, allowing memory-efficient
+        processing of large embedding collections.
+
+        Args:
+            model: Embedding model name.
+            batch_size: Number of embeddings per batch.
+
+        Yields:
+            Lists of Embedding objects, each containing up to batch_size items.
+            The final batch may contain fewer items.
+        """
+        offset = 0
+        while True:
+            batch = self.get_embeddings_for_model_batched(model, batch_size, offset)
+            if not batch:
+                break
+            yield batch
+            offset += len(batch)
+            # If we got fewer than batch_size, we're done
+            if len(batch) < batch_size:
+                break
+
     def _row_to_embedding(self, row: sqlite3.Row) -> Embedding:
         """Convert a database row to an Embedding object."""
         import struct
@@ -1057,6 +1140,101 @@ class Database:
             vector=vector,
             created_at=row["created_at"],
         )
+
+    @property
+    def vec_available(self) -> bool:
+        """Check if sqlite-vec extension is available for fast vector search.
+
+        Returns:
+            True if sqlite-vec extension was successfully loaded.
+        """
+        # Ensure connection is initialized to check extension status
+        _ = self._get_connection()
+        return self._vec_available
+
+    def vec_search(
+        self,
+        model: str,
+        query_vector: list[float],
+        k: int = 10,
+    ) -> list[tuple[str, float]]:
+        """Perform fast vector similarity search using sqlite-vec.
+
+        Creates a vec0 virtual table on-demand for the specified model
+        and performs approximate nearest neighbor search.
+
+        Args:
+            model: Embedding model name (determines which embeddings to search).
+            query_vector: Query vector for similarity search.
+            k: Maximum number of results to return.
+
+        Returns:
+            List of (full_id, score) tuples, sorted by similarity (descending).
+
+        Raises:
+            RuntimeError: If sqlite-vec extension is not available.
+            ValueError: If no embeddings found for the model.
+        """
+        if not self.vec_available:
+            raise RuntimeError("sqlite-vec extension not available")
+
+        conn = self._get_connection()
+
+        # Get dimensions from one embedding for this model
+        cur = conn.execute(
+            "SELECT dimensions FROM embeddings WHERE model = ? LIMIT 1",
+            (model,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise ValueError(f"No embeddings found for model: {model}")
+        dimensions = row[0]
+
+        if len(query_vector) != dimensions:
+            raise ValueError(
+                f"Query vector dimension mismatch: "
+                f"expected {dimensions}, got {len(query_vector)}"
+            )
+
+        # Create a unique table name for this model
+        vec_table_name = f"vec_{model.replace('-', '_').replace('.', '_')}"
+
+        # Create vec0 virtual table if it doesn't exist
+        try:
+            conn.execute(
+                f"CREATE VIRTUAL TABLE IF NOT EXISTS {vec_table_name} "
+                f"USING vec0(embedding_float32({dimensions}))"
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to create vec0 table: {e}") from e
+
+        # Populate vec0 table with current embeddings (upsert to handle duplicates)
+        conn.execute(
+            f"INSERT OR REPLACE INTO {vec_table_name}(rowid, vector) "
+            f"SELECT embedding_pk, vector FROM embeddings WHERE model = ?",
+            (model,),
+        )
+
+        # Convert query vector to sqlite-vec format
+        vector_str = "[" + ",".join(str(v) for v in query_vector) + "]"
+
+        # Perform similarity search
+        cur = conn.execute(
+            f"SELECT e.full_id, distance "
+            f"FROM {vec_table_name} v "
+            f"JOIN embeddings e ON v.rowid = e.embedding_pk "
+            f"WHERE v.vector MATCH ? AND k = ? "
+            f"ORDER BY distance ASC",
+            (vector_str, k),
+        )
+
+        # Convert distance to cosine similarity (distance = 1 - similarity)
+        results = [
+            (row["full_id"], 1.0 - row["distance"])
+            for row in cur.fetchall()
+        ]
+
+        return results
 
     # Schema versioning
 

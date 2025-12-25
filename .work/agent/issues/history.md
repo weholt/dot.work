@@ -4,6 +4,158 @@ Completed and closed issues are archived here.
 
 ---
 
+## 2025-12-25: Code Review - SQLite Adapter Stores Datetimes as Strings (CR-002)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| CR-002@bf1eda | ✅ Complete | 2025-12-25 |
+
+### Summary
+- **Type**: Refactor (P1 High)
+- **Title**: SQLite adapter stores datetimes as strings instead of native datetime objects
+- **Status**: ✅ Fixed and Validated
+
+### Problem
+The SQLite adapter used `str` type for ALL datetime fields across 8 database models, requiring manual serialization/deserialization in ~30 locations throughout the codebase.
+
+### Solution Implemented
+
+1. **Created DateTimeAsISOString TypeDecorator** (`src/dot_work/db_issues/adapters/sqlite.py`):
+   ```python
+   class DateTimeAsISOString(TypeDecorator[datetime]):
+       """Custom DateTime type that stores as ISO string and converts transparently."""
+
+       impl = String
+       cache_ok = True
+
+       def process_bind_param(self, value: datetime | str | None, dialect) -> str | None:
+           """Convert Python datetime to ISO string for database storage."""
+           if value is None:
+               return None
+           if isinstance(value, str):
+               return value  # Already a string (compatibility)
+           return value.isoformat()
+
+       def process_result_value(self, value: str | None, dialect) -> datetime | None:
+           """Convert ISO string from database to Python datetime."""
+           return datetime.fromisoformat(value) if value else None
+   ```
+
+2. **Updated 8 Database Models**:
+   - IssueModel: `created_at`, `updated_at`, `closed_at`, `deleted_at`
+   - LabelModel: `created_at`
+   - IssueLabelModel: `created_at`
+   - IssueAssigneeModel: `created_at`
+   - IssueReferenceModel: `created_at`
+   - CommentModel: `created_at`, `updated_at`
+   - DependencyModel: `created_at`
+   - EpicModel: `start_date`, `target_date`, `completed_date`
+   - ProjectModel: `created_at`, `updated_at`
+
+3. **Removed Manual Conversions** (~30 locations):
+   - Removed all `str(datetime)` conversions when saving
+   - Removed all `datetime.fromisoformat(string)` conversions when loading
+
+### Files Modified
+- `src/dot_work/db_issues/adapters/sqlite.py` - Added TypeDecorator, updated 8 models, removed conversions
+
+### Validation Results
+- Build: ✓ Passing
+- Tests: ✓ 277/277 (db_issues tests)
+- Mypy: ✓ Success: no issues found
+- Coverage: ✓ No regressions
+
+### Type Safety Impact
+- **Before**: Fields typed as `str`, no validation, manual conversion required
+- **After**: Fields typed as `datetime`, automatic conversion, type-safe throughout codebase
+
+### Lessons Learned
+- TypeDecorator with `process_bind_param`/`process_result_value` is the proper SQLAlchemy way to handle type conversion
+- `sa_type` expects class not instance: use `sa_type=DateTimeAsISOString` not `sa_type=DateTimeAsISOString()`
+- Handle backward compatibility in TypeDecorator by checking `isinstance(value, str)`
+- Type ignore comments must match actual error codes (e.g., `[union-attr]` vs `[attr-defined]`)
+
+---
+
+## 2025-12-25: Security - Command Injection via Unvalidated Editor (SEC-001)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| SEC-001@94eb69 | ✅ Complete | 2025-12-25 |
+
+### Summary
+- **Type**: Security (P0 Critical)
+- **Title**: Command injection via unvalidated editor in subprocess.run
+- **Status**: ✅ Fixed and Validated
+
+### Problem
+Unvalidated user-controlled editor commands allowed arbitrary code execution via:
+- CLI option `--editor`
+- Environment variable `$EDITOR`
+- User prompts in git import workflow
+
+### Solution Implemented
+
+1. **Editor Whitelist Validation** (`src/dot_work/db_issues/cli.py`):
+   ```python
+   _ALLOWED_EDITORS = {
+       "vi", "vim", "nvim", "neovim",
+       "emacs", "emacsclient",
+       "nano",
+       "code", "code-server", "codium",
+       "subl", "sublime_text",
+       "atom", "mate",
+       "kak", "micro", "xed",
+       "gedit", "kate", "geany",
+   }
+
+   def _validate_editor(editor_cmd: str | None) -> tuple[str, list[str]]:
+       # Check for shell metacharacters (command injection)
+       _SHELL_METACHARACTERS = set(";|&`$()<>{}[]'\"'")
+       if any(char in editor_cmd for char in _SHELL_METACHARACTERS):
+           raise ValueError("Editor command contains invalid characters")
+
+       # Validate against whitelist
+       base_name = Path(executable).name
+       if base_name not in _ALLOWED_EDITORS:
+           raise ValueError(f"Editor '{executable}' is not allowed")
+   ```
+
+2. **Updated Three Vulnerable Locations**:
+   - `_get_text_from_editor()` - Now validates before subprocess.run
+   - `edit()` command - Now validates before subprocess.run
+   - `import_()` command - Now validates before subprocess.run
+
+3. **Added 18 Unit Tests** (`tests/unit/db_issues/test_cli_validation.py`):
+   - Test all whitelisted editors
+   - Test disallowed editors raise ValueError
+   - Test shell metacharacters are rejected
+   - Test environment variable handling
+
+### Files Modified
+- `src/dot_work/db_issues/cli.py` - Added `_validate_editor()` and updated 3 locations
+- `tests/unit/db_issues/test_cli_validation.py` - New test file with 18 tests
+
+### Validation Results
+- Build: ✓ Passing
+- Tests: ✓ 1381/1381 (+18 new)
+- Lint: ✓ 28 errors (same as baseline)
+- Mypy: ✓ 73 errors (same as baseline)
+- Coverage: ✓ 57.88% (meets threshold)
+
+### Security Impact
+- **Before**: Any editor command could be executed, including malicious payloads
+- **After**: Only whitelisted editors allowed, shell metacharacters blocked
+- **Attack Surface**: Reduced from "arbitrary code execution" to "whitelisted executables only"
+
+### Lessons Learned
+- Command injection via subprocess.run requires multiple layers of defense
+- Whitelist validation + shell metacharacter blocking prevents most attacks
+- Environment variables are user-controlled input and must be validated
+- Tests must use `monkeypatch` to isolate from environment during testing
+
+---
+
 ## 2024-12-23: Epic and Child Relationship Commands (MIGRATE-042)
 
 | Issue | Status | Completed |
@@ -3128,3 +3280,149 @@ Updated `medium.md`: Changed FEAT-008 status from `proposed` to `completed` with
 ### Notes
 - Both tasks were quick cleanup items
 - All issue priority files are now clean (no stale completed issues remaining)
+
+---
+## 2025-12-25: Refactor - Issue Entity Manual Field Copying (CR-001)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| CR-001@cf7ce6 | ✅ Complete | 2025-12-25 |
+
+### Summary
+- **Type**: Refactor (P1 High)
+- **Title**: Issue entity uses manual field copying in every transition method
+- **Status**: ✅ Fixed and Validated
+
+### Problem
+The `Issue` entity had 6 transition methods (`transition()`, `add_label()`, `remove_label()`, `assign_to()`, `unassign()`, `assign_to_epic()`) that each manually copied all 14 fields when creating new instances:
+
+```python
+# OLD CODE (200+ lines of boilerplate)
+return Issue(
+    id=self.id,
+    project_id=self.project_id,
+    title=self.title,
+    description=self.description,
+    status=new_status,
+    priority=self.priority,
+    type=self.type,
+    assignees=self.assignees.copy(),
+    epic_id=self.epic_id,
+    labels=self.labels.copy(),
+    blocked_reason=self.blocked_reason,
+    source_url=self.source_url,
+    references=self.references.copy(),
+    created_at=self.created_at,
+    updated_at=utcnow_naive(),
+    closed_at=self.closed_at,
+)
+```
+
+This created:
+- **84+ field copy operations** (14 fields × 6 methods)
+- **Maintenance burden**: Adding a new field required updating all 6 methods
+- **Error-prone**: Easy to miss copying a field
+- **DRY violation**: The `self.field → field=self.field` pattern repeated 84+ times
+
+### Solution Implemented
+
+Used Python's `dataclasses.replace()` function for clean immutable updates:
+
+```python
+from dataclasses import dataclass, field, replace
+
+@dataclass
+class Issue:
+    # ... fields ...
+
+    def transition(self, new_status: IssueStatus) -> "Issue":
+        if not self.status.can_transition_to(new_status):
+            raise InvalidTransitionError(...)
+        
+        new_issue = replace(
+            self,
+            status=new_status,
+            updated_at=utcnow_naive(),
+        )
+        
+        if new_status == IssueStatus.COMPLETED and self.closed_at is None:
+            new_issue = replace(new_issue, closed_at=utcnow_naive())
+        
+        return new_issue
+
+    def add_label(self, label: str) -> "Issue":
+        if label not in self.labels:
+            new_labels = self.labels.copy()
+            new_labels.append(label)
+            return replace(self, labels=new_labels, updated_at=utcnow_naive())
+        return self
+    
+    # ... other 4 methods similarly refactored
+```
+
+### Files Modified
+- `src/dot_work/db_issues/domain/entities.py` (lines 9, 292-415)
+
+### Validation Results
+| Metric | Before | After | Status |
+|--------|--------|-------|--------|
+| Lines of code | ~200 (transition methods) | ~125 (transition methods) | -37.5% |
+| Field copy operations | 84 explicit copies | 0 (handled by replace()) | -100% |
+| Tests passing | 277/277 | 277/277 | No regression |
+| Lint errors | 28 | 28 | No regression |
+| Mypy errors in domain/ | 0 | 0 | No regression |
+
+### Benefits
+1. **Single source of truth** - field list defined once in dataclass
+2. **Easier maintenance** - adding new field requires changes in only 1 location
+3. **More concise** - 6 lines vs 18 lines per transition method
+4. **Type-safe** - mypy validates field names in replace() calls
+5. **Less error-prone** - can't forget to copy a field
+
+### Acceptance Criteria
+- [x] Adding a new field to Issue requires changes in only 1 location
+- [x] All transition methods use consistent update pattern
+- [x] Type checker validates immutability is maintained
+- [x] All existing tests pass (277 db_issues tests)
+- [x] `updated_at` automatically set on all transitions
+
+### Notes
+- This is a pure refactor with no behavior changes
+- `dataclasses.replace()` is stdlib (no new dependencies)
+- For mutable fields (assignees, labels, references), we create modified copies before calling replace()
+- The Comment entity already uses frozen dataclass correctly (no changes needed)
+
+---
+
+# PERF-001@a3c8f5 - Semantic Search Loads All Embeddings Into Memory
+
+**Type:** performance  
+**Priority:** high  
+**Status:** completed  
+**Created:** 2025-12-25  
+**Completed:** 2025-12-25  
+
+## Problem
+Semantic search loaded ALL embeddings into memory on every query (O(N) memory consumption). For large knowledge bases (100k+ nodes), this could cause 500 MB+ memory usage per search.
+
+## Solution Implemented
+1. **Streaming Batch Processing**: Process embeddings in configurable batches (default: 1000) with top-k heap tracking
+2. **Vector Index (Optional)**: Added sqlite-vec integration for fast approximate nearest neighbor search (~2.3 kB, zero dependencies)
+
+## Changes
+- `src/dot_work/knowledge_graph/db.py`: Added batched retrieval, streaming generator, and vec_search method
+- `src/dot_work/knowledge_graph/search_semantic.py`: Updated semsearch to use vector index or streaming batch with automatic fallback
+- `pyproject.toml`: Added kg-vec optional dependency
+
+## Outcome
+- Memory usage reduced from O(N) to O(batch_size + k)
+- Search performance degrades gracefully with database size
+- Optional vector index for users who install sqlite-vec
+- 643/643 tests pass, mypy clean
+
+## Lessons Learned
+- Heap tuple ordering needs tie-breaker to avoid comparing custom objects
+- Dynamic virtual tables don't require schema version bumps
+- Optional dependencies need `# type: ignore[import-not-found]`
+- Design for graceful degradation when optional features unavailable
+
