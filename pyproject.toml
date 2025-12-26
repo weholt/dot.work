@@ -64,6 +64,11 @@ git-llm = [
 version-llm = ["httpx>=0.24.0"]
 # scan optional features (dependency visualization)
 scan-graph = ["networkx>=3.0", "pyvis>=0.3.0"]
+# harness optional features (Claude Agent SDK)
+harness = [
+    "claude-agent-sdk>=0.1.0",
+    "anyio>=4.0.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
@@ -126,6 +131,7 @@ ignore = ["E501"]
 "src/dot_work/python/scan/cli.py" = ["B008", "B904"]
 "src/dot_work/version/cli.py" = ["B008", "B904"]
 "src/dot_work/overview/cli.py" = ["B008", "B904"]
+"src/dot_work/harness/cli.py" = ["B008"]
 # import-untyped: frontmatter library has no type stubs
 "src/dot_work/container/provision/core.py" = ["S603"]
 "src/dot_work/container/provision/validation.py" = []

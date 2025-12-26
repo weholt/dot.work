@@ -68,7 +68,7 @@ class InstallerConfig:
     combined_path: str = ""
     auxiliary_files: list[tuple[str, str]] = field(default_factory=list)
     sort_files: bool = False
-    messages: tuple[str, str, str] = (
+    messages: tuple[str, str, str | None] = (
         "Installed {name}",
         "Prompts installed to: {path}",
         None,
@@ -256,7 +256,10 @@ def install_prompts(
     force: bool = False,
     dry_run: bool = False,
 ) -> None:
-    """Install prompts for the specified environment.
+    """Install prompts for the specified environment using canonical frontmatter.
+
+    Reads prompt frontmatter to discover supported environments and installs
+    using the paths specified in each prompt's environment configuration.
 
     Args:
         env_key: The environment key (e.g., 'copilot', 'claude').
@@ -265,7 +268,24 @@ def install_prompts(
         console: Rich console for output.
         force: If True, overwrite existing files without prompting.
         dry_run: If True, preview changes without writing files.
+
+    Raises:
+        ValueError: If environment not found in any prompt prompts.
     """
+    # First try to use canonical prompt installation
+    try:
+        install_canonical_prompts_by_environment(
+            env_key, target, prompts_dir, console, force=force, dry_run=dry_run
+        )
+        return
+    except ValueError as e:
+        # If no canonical prompts found, fall back to legacy installer
+        if "not found in any prompt files" in str(e):
+            console.print("[dim]⚠ No canonical prompts found, trying legacy installation...[/dim]\n")
+        else:
+            raise
+
+    # Legacy fallback for non-canonical prompts
     installer = INSTALLERS.get(env_key)
     if not installer:
         raise ValueError(f"Unknown environment: {env_key}")
@@ -1209,3 +1229,186 @@ def install_canonical_prompt_directory(
         )
 
     console.print(f"[green]✓[/green] Completed installation of {installed_count} canonical prompts")
+
+
+# =============================================================================
+# Canonical Prompt Frontmatter Discovery
+# =============================================================================
+
+def discover_available_environments(prompts_dir: Path) -> dict[str, set[str]]:
+    """Discover available environments from prompt file frontmatter.
+
+    Scans all *.prompt.md files, parses their canonical frontmatter,
+    and returns which environments each prompt supports.
+
+    Args:
+        prompts_dir: Directory containing prompt files with canonical frontmatter.
+
+    Returns:
+        Dictionary mapping environment names to sets of prompt file names that support them.
+        Example: {"claude": {"do-work", "new-issue"}, "copilot": {"do-work"}}
+    """
+    from dot_work.prompts.canonical import CanonicalPromptParser
+
+    parser = CanonicalPromptParser()
+    environments: dict[str, set[str]] = {}
+
+    # Find all prompt files with canonical frontmatter
+    for prompt_file in prompts_dir.glob("*.prompt.md"):
+        try:
+            prompt = parser.parse(prompt_file)
+            prompt_name = prompt_file.stem
+
+            # Add this prompt to each environment it supports
+            for env_name in prompt.environments:
+                if env_name not in environments:
+                    environments[env_name] = set()
+                environments[env_name].add(prompt_name)
+        except Exception:
+            # Skip files that can't be parsed (not canonical format)
+            continue
+
+    return environments
+
+
+def install_canonical_prompts_by_environment(
+    env_name: str,
+    target: Path,
+    prompts_dir: Path,
+    console: Console,
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+) -> None:
+    """Install canonical prompts for a specific environment using frontmatter paths.
+
+    For each prompt file that supports the specified environment, reads the
+    environment configuration from its frontmatter and installs it to the
+    target path specified in the frontmatter.
+
+    Args:
+        env_name: Name of the environment to install for (e.g., 'claude', 'copilot').
+        target: Target project directory to install in.
+        prompts_dir: Source directory containing canonical prompt files.
+        console: Rich console for output.
+        force: If True, overwrite existing files without prompting.
+        dry_run: If True, preview changes without writing files.
+
+    Raises:
+        ValueError: If environment not found in any prompts or installation fails.
+    """
+    from dot_work.prompts.canonical import CanonicalPromptParser
+
+    parser = CanonicalPromptParser()
+    prompt_files = list(prompts_dir.glob("*.prompt.md"))
+    installed_count = 0
+    skipped_count = 0
+
+    if not prompt_files:
+        raise ValueError(f"No prompt files found in {prompts_dir}")
+
+    console.print(f"Installing prompts for environment: [bold cyan]{env_name}[/bold cyan]")
+    console.print(f"Source: {prompts_dir}")
+    console.print(f"Target: {target}\n")
+
+    # Scan phase: categorize files
+    state = InstallState()
+    install_plan: list[tuple[Path, Path, Path]] = []  # (prompt_file, output_dir, output_path)
+
+    for prompt_file in prompt_files:
+        try:
+            prompt = parser.parse(prompt_file)
+
+            # Skip if prompt doesn't support this environment
+            if env_name not in prompt.environments:
+                continue
+
+            # Get environment config from frontmatter
+            env_config = prompt.get_environment(env_name)
+
+            # Determine output directory from frontmatter target
+            if env_config.target.startswith("/"):
+                # Absolute path (relative to target root)
+                output_dir = target / env_config.target.lstrip("/")
+            elif env_config.target.startswith("./"):
+                # Relative path
+                output_dir = target / env_config.target[2:]
+            else:
+                # Relative path
+                output_dir = target / env_config.target
+
+            # Determine filename from frontmatter
+            if env_config.filename:
+                output_filename = env_config.filename
+            elif env_config.filename_suffix:
+                # Use prompt file stem with suffix
+                output_filename = prompt_file.stem + env_config.filename_suffix
+            else:
+                # Default to original filename
+                output_filename = prompt_file.name
+
+            output_path = output_dir / output_filename
+            install_plan.append((prompt_file, output_dir, output_path))
+
+            # Track for batch prompting
+            if output_path.exists():
+                state.existing_files.append(output_path)
+            else:
+                state.new_files.append(output_path)
+
+        except Exception as e:
+            console.print(f"  [yellow]⚠[/yellow] Skipping {prompt_file.name}: {e}")
+            skipped_count += 1
+
+    if not install_plan:
+        raise ValueError(
+            f"Environment '{env_name}' not found in any prompt files. "
+            f"Checked {len(prompt_files)} file(s)."
+        )
+
+    # Show batch menu if there are existing files and not in force/dry-run mode
+    batch_choice: BatchChoice | None = None
+    if state.has_existing_files and not force and not dry_run:
+        batch_choice = _prompt_batch_choice(console, state)
+        if batch_choice == BatchChoice.CANCEL:
+            console.print("[yellow]Installation cancelled.[/yellow]")
+            return
+
+    # Installation phase
+    if not dry_run:
+        console.print(f"Installing {len(install_plan)} prompt(s)...\n")
+    else:
+        console.print(f"[yellow][DRY-RUN] Would install {len(install_plan)} prompt(s):[/yellow]\n")
+
+    for prompt_file, output_dir, output_path in install_plan:
+        # Check if we should write
+        if not dry_run and not should_write_file(
+            output_path, force, console, batch_choice=batch_choice
+        ):
+            console.print(f"  [dim]⏭[/dim] Skipped {output_path.name}")
+            continue
+
+        # Create directory if needed
+        if not dry_run:
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Read prompt content
+        prompt = parser.parse(prompt_file)
+
+        # Write output (without extra frontmatter - prompts already have it)
+        if dry_run:
+            action = "[CREATE]" if not output_path.exists() else "[OVERWRITE]"
+            console.print(f"  [yellow][DRY-RUN][/yellow] [dim]{action}[/dim] {output_path}")
+        else:
+            # Write the prompt file as-is (it already has proper frontmatter)
+            output_path.write_text(prompt_file.read_text(encoding="utf-8"), encoding="utf-8")
+            console.print(f"  [green]✓[/green] Installed {output_path.name}")
+            installed_count += 1
+
+    if dry_run:
+        console.print(f"\n[cyan]📁 Dry-run complete: {len(install_plan)} file(s) would be installed[/cyan]")
+    else:
+        console.print(f"\n[cyan]📁 Installed {installed_count} prompt(s) for {env_name}[/cyan]")
+
+    if skipped_count > 0:
+        console.print(f"[dim]⚠ {skipped_count} file(s) skipped due to errors[/dim]")

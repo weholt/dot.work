@@ -1,4 +1,38 @@
-# 🚀 Transform Discussion to Python Project
+---
+meta:
+  title: "Python Project from Discussion"
+  description: "Transform a loose discussion into a production-ready Python project"
+  version: "0.1.1"
+
+environments:
+  claude:
+    target: ".claude/commands/"
+    filename_suffix: ".md"
+  opencode:
+    target: ".opencode/prompts/"
+    filename_suffix: ".md"
+  cursor:
+    target: ".cursor/rules/"
+    filename_suffix: ".mdc"
+  windsurf:
+    target: ".windsurf/rules/"
+    filename_suffix: ".md"
+  cline:
+    target: ".clinerules/"
+    filename_suffix: ".md"
+  kilo:
+    target: ".kilocode/rules/"
+    filename_suffix: ".md"
+  aider:
+    target: ".aider/"
+    filename_suffix: ".md"
+  continue:
+    target: ".continue/prompts/"
+    filename_suffix: ".md"
+  copilot:
+    target: ".github/prompts/"
+    filename_suffix: ".prompt.md"
+---
 
 Convert a loose discussion (markdown or pasted text) into a **production-ready Python project** with proper structure, tooling, and best practices.
 

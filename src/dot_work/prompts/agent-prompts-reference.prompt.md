@@ -1,3 +1,39 @@
+---
+meta:
+  title: "Agent Prompts Reference"
+  description: "Quick reference for all available agent prompts and their integration with the issue tracker system"
+  version: "0.1.1"
+
+environments:
+  claude:
+    target: ".claude/commands/"
+    filename_suffix: ".md"
+  opencode:
+    target: ".opencode/prompts/"
+    filename_suffix: ".md"
+  cursor:
+    target: ".cursor/rules/"
+    filename_suffix: ".mdc"
+  windsurf:
+    target: ".windsurf/rules/"
+    filename_suffix: ".md"
+  cline:
+    target: ".clinerules/"
+    filename_suffix: ".md"
+  kilo:
+    target: ".kilocode/rules/"
+    filename_suffix: ".md"
+  aider:
+    target: ".aider/"
+    filename_suffix: ".md"
+  continue:
+    target: ".continue/prompts/"
+    filename_suffix: ".md"
+  copilot:
+    target: ".github/prompts/"
+    filename_suffix: ".prompt.md"
+---
+
 ````prompt
 # 🤖 Agent Prompts Reference
 
@@ -247,4 +283,4 @@ strictness: strict
 | [establish-baseline.prompt.md]({{ prompt_path }}/establish-baseline.prompt.md) | Baseline capture agent |
 | [compare-baseline.prompt.md]({{ prompt_path }}/compare-baseline.prompt.md) | Regression detection agent |
 
-````
+```

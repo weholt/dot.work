@@ -1,4 +1,38 @@
-# 🔄 Optimal Iteration Workflow for AI Agents
+---
+meta:
+  title: "Optimal Iteration Workflow for AI Agents"
+  description: "Defines the optimal execution pattern for AI agents working iteratively on issues"
+  version: "0.1.1"
+
+environments:
+  claude:
+    target: ".claude/commands/"
+    filename_suffix: ".md"
+  opencode:
+    target: ".opencode/prompts/"
+    filename_suffix: ".md"
+  cursor:
+    target: ".cursor/rules/"
+    filename_suffix: ".mdc"
+  windsurf:
+    target: ".windsurf/rules/"
+    filename_suffix: ".md"
+  cline:
+    target: ".clinerules/"
+    filename_suffix: ".md"
+  kilo:
+    target: ".kilocode/rules/"
+    filename_suffix: ".md"
+  aider:
+    target: ".aider/"
+    filename_suffix: ".md"
+  continue:
+    target: ".continue/prompts/"
+    filename_suffix: ".md"
+  copilot:
+    target: ".github/prompts/"
+    filename_suffix: ".prompt.md"
+---
 
 This prompt defines the **optimal execution pattern** for AI agents working iteratively on issues in a file-based issue tracking system. It maximizes efficiency, maintains quality, and ensures deterministic behavior across sessions.
 

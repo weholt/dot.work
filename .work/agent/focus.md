@@ -1,19 +1,29 @@
 # Agent Focus
-Last updated: 2025-12-26T05:30:00Z
+Last updated: 2025-12-26T13:00:00Z
 
 ## Previous
-- Issue: AUDIT-REVIEW-002 - Container Provision Module Migration Validation (CORRECTED)
-- Completed: 2025-12-26T05:30:00Z
-- Outcome: ✅ CLEAN MIGRATION - repo-agent WAS migrated to container/provision (not review). Corrected earlier error where I compared to wrong destination. Removed invalid gap issues AUDIT-GAP-007, AUDIT-GAP-010, AUDIT-GAP-011.
+- Issue: FEAT-021@b2c3d4 - Update installer to read prompt frontmatter for environment selection
+- Completed: 2025-12-26T13:00:00Z
+- Outcome: Added discover_available_environments(), install_canonical_prompts_by_environment(), updated CLI to use frontmatter
 
 ## Current
-- Issue: AUDIT CORRECTIONS COMPLETE
-- Status: All invalid findings corrected
-- Phase: Documenting corrections
+- Issue: FEAT-022@c3d4e5 - Create interactive prompt wizard for new canonical prompts
+- Started: 2025-12-26T13:00:00Z
+- Status: in-progress
+- Phase: Investigation
+- Progress:
+  - [x] FEAT-020 completed (convert prompts to canonical format)
+  - [x] FEAT-021 completed (update installer for frontmatter)
+  - [ ] Analyze wizard requirements
+  - [ ] Design wizard flow
+  - [ ] Implement wizard logic
+  - [ ] Add CLI command
+  - [ ] Write tests
 
 ## Next
-- None - All 8 migration validation audits are clean
-- Remaining gap issues (AUDIT-GAP-001, AUDIT-GAP-004) are valid test gaps
+- Issue: FEAT-022@c3d4e5 - Create interactive prompt wizard for new canonical prompts
+- Source: shortlist.md
+- Reason: Last item in prompt installation system series
 
 ---
 
@@ -25,7 +35,7 @@ All 52 DB-Issues migration issues (MIGRATE-034 through MIGRATE-085) have been co
 
 ## Migration Validation Audits: ✅ ALL COMPLETE
 
-All 10 comprehensive migration validation audits have been completed:
+All 10 comprehensive migration validation audits have been completed.
 
 | Audit ID | Source | Destination | Status |
 |----------|--------|-------------|--------|

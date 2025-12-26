@@ -4275,3 +4275,125 @@ The enum schemas have been successfully merged to include:
 - [x] RESOLVED status preserved
 
 ---
+
+## 2025-12-26: Prompts - Convert to Canonical Format with Environment Frontmatter (FEAT-020)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| FEAT-020@a1b2c3 | ✅ Complete | 2025-12-26 |
+
+### Summary
+- **Type**: Enhancement (P2 Medium)
+- **Title**: Convert prompts to canonical format with environment frontmatter
+- **Status**: ✅ Completed and Validated
+
+### Problem
+Current prompt files in `src/dot_work/prompts/` lacked installation metadata:
+- No `environments:` frontmatter section
+- No target destination declarations per environment
+- Installer used hardcoded `InstallerConfig` for each environment
+- Users running `dot-work install` didn't see prompts/slash commands in their tools
+
+### Solution Implemented
+
+Added canonical frontmatter to all 18 prompt files with:
+- `meta:` section (title, description, version)
+- `environments:` section with 9 AI coding environments:
+  - claude: `.claude/commands/`
+  - opencode: `.opencode/prompts/`
+  - cursor: `.cursor/rules/`
+  - windsurf: `.windsurf/rules/`
+  - cline: `.clinerules/`
+  - kilo: `.kilocode/rules/`
+  - aider: `.aider/`
+  - continue: `.continue/prompts/`
+  - copilot: `.github/prompts/`
+
+### Files Modified
+All 18 prompt files in `src/dot_work/prompts/`:
+- agent-prompts-reference.prompt.md
+- api-export.prompt.md
+- bump-version.prompt.md
+- code-review.prompt.md
+- compare-baseline.prompt.md
+- critical-code-review.prompt.md
+- do-work.prompt.md
+- establish-baseline.prompt.md
+- external-project-reality-auditor.prompt.md
+- improvement-discovery.prompt.md
+- new-issue.prompt.md
+- performance-review.prompt.md
+- python-project-from-discussion.prompt.md
+- pythonic-code.prompt.md
+- security-review.prompt.md
+- setup-issue-tracker.prompt.md
+- spec-delivery-auditor.prompt.md
+- task-assessment.prompt.md
+
+### Validation Results
+- All 18 prompts validated with CanonicalPromptValidator
+- Version synced from pyproject.toml (0.1.1)
+- Zero errors, zero warnings
+
+### Next Steps
+- FEAT-021: Update installer to read prompt frontmatter for environment selection
+- FEAT-022: Create interactive prompt wizard for new canonical prompts
+
+---
+
+## 2025-12-26: Prompts - Update Installer to Read Prompt Frontmatter (FEAT-021)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| FEAT-021@b2c3d4 | ✅ Complete | 2025-12-26 |
+
+### Summary
+- **Type**: Enhancement (P2 Medium)
+- **Title**: Update installer to read prompt frontmatter for environment selection
+- **Status**: ✅ Completed and Validated
+
+### Problem
+The installer used hardcoded `InstallerConfig` per environment with `install_for_*()` functions, showed fixed list of environments, couldn't adapt to new environments without code changes, and didn't validate that selected environment was supported by prompts.
+
+### Solution Implemented
+
+1. **Added `discover_available_environments()`** (`src/dot_work/installer.py`):
+   - Scans all `*.prompt.md` files
+   - Parses canonical frontmatter using `CanonicalPromptParser`
+   - Returns `{environment_name: {prompt_names that support it}}`
+
+2. **Added `install_canonical_prompts_by_environment()`**:
+   - For each prompt file that supports the selected environment
+   - Gets environment config from frontmatter
+   - Installs using paths from frontmatter `target:` field
+   - Uses filename from frontmatter `filename:` or `filename_suffix:` field
+
+3. **Updated `install_prompts()`**:
+   - First tries canonical installation using frontmatter
+   - Falls back to legacy installer if no canonical prompts found
+   - Shows warning if selected environment not found in any prompt
+
+4. **Updated CLI** (`src/dot_work/cli.py`):
+   - Added import for `discover_available_environments`
+   - Modified `install()` to discover available environments
+   - Updated `prompt_for_environment()` to accept and show discovered environments
+   - Shows prompt count for each environment
+   - Warns if user selects environment not supported by any prompt
+
+5. **Fixed type annotations**:
+   - Changed `InstallerConfig.messages` type from `tuple[str, str, str]` to `tuple[str, str, str | None]`
+
+### Files Modified
+- `src/dot_work/installer.py` - Added discovery function, canonical installer, updated install_prompts
+- `src/dot_work/cli.py` - Added environment discovery, updated prompt_for_environment
+
+### Validation Results
+- All 18 prompts discovered for all 9 environments
+- Dry-run tests successful for claude and copilot
+- Type checking passes (mypy)
+- Functional tests pass
+
+### Next Steps
+- FEAT-022: Create interactive prompt wizard for new canonical prompts
+
+---

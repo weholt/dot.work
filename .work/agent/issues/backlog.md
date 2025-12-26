@@ -3,245 +3,223 @@
 Untriaged ideas and future work.
 
 ---
+
 ---
-id: "FEAT-001@112e52"
-title: "Create Claude Agent SDK example: iterative autonomous task processing"
-description: "Python example using Claude Agent SDK for autonomous agent that processes tasks from markdown file iteratively until complete"
+id: "FEAT-023@a7b3c9"
+title: "Implement Agent Skills support per agentskills.io specification"
+description: "Add skills discovery, parsing, validation, and prompt generation for agent capabilities"
 created: 2025-12-26
-section: "examples"
-tags: [claude-agent-sdk, autonomous-agent, iterative, task-processing, python, anyio]
+section: "skills"
+tags: [feature, agent-skills, discovery, prompts, progressive-disclosure]
 type: enhancement
 priority: medium
 status: proposed
 references:
-  - chat-harness.md
-  - examples/
-  - https://pypi.org/project/claude-code-sdk/
-  - https://platform.claude.com/docs/en/agent-sdk/python
+  - .work/agent/issues/references/skills_spec.md
+  - src/dot_work/prompts/canonical.py
+  - src/dot_work/harness/
 ---
 
 ### Problem
-Need a complete, runnable Python example demonstrating the **Claude Agent SDK** (not the deprecated `claude-code-sdk`) for autonomous iterative task processing:
-- Read tasks from a markdown file (checkbox format: `- [ ] Task name`)
-- Process tasks iteratively with Claude Agent SDK's `query()` / `receive_response()` pattern
-- Agent selects next unchecked task, implements it, verifies, marks as done
-- Continues until all tasks complete or blocked
-- Track progress and handle errors
+dot-work currently supports prompts for static instructions but lacks support for [Agent Skills](https://agentskills.io/specification) - reusable agent capability packages with structured metadata, progressive disclosure, and optional bundled resources (scripts, references, assets).
 
-**Important:** Use `claude-agent-sdk` (embeds Claude Code tooling), NOT the deprecated `claude-code-sdk`.
+Skills complement prompts by providing:
+- Dynamic capability discovery at runtime
+- Lightweight metadata loading (~100 tokens per skill)
+- Full content activation on-demand
+- Support for scripts, references, and assets
 
 ### Affected Files
-- `examples/` (new directory to be created)
-- `chat-harness.md` (reference documentation with full spec)
-- `examples/run_tasks.py` (main example script)
-- `examples/tasks.md` (example tasks file)
+- NEW: `src/dot_work/skills/__init__.py`
+- NEW: `src/dot_work/skills/models.py`
+- NEW: `src/dot_work/skills/parser.py`
+- NEW: `src/dot_work/skills/validator.py`
+- NEW: `src/dot_work/skills/discovery.py`
+- NEW: `src/dot_work/skills/prompt_generator.py`
+- `src/dot_work/cli.py` (add `skills` subcommand group)
+- `src/dot_work/harness/` (integration for skill injection)
 
 ### Importance
-Users learning autonomous agent patterns need practical examples for:
-- **Claude Agent SDK usage**: `ClaudeSDKClient`, `ClaudeAgentOptions`, async `query()/receive_response()`
-- **Autonomous iteration**: Agent controls task selection and completion
-- **File-backed state**: Tasks tracked in markdown, agent updates file directly
-- **Tool integration**: Read, Write, Edit, Glob, Grep, Bash tools
-- **Progress tracking**: Evidence-based task completion, blocked task handling
-- **Safety patterns**: Max iterations, max turns per iteration, permission modes
+Agent Skills is an emerging standard for defining reusable agent capabilities. Supporting it in dot-work:
+- Enables interoperability with other tools supporting the spec
+- Provides progressive disclosure (metadata first, full content on activation)
+- Allows bundling scripts and references with skills
+- Complements the existing prompts feature
 
 ### Proposed Solution
+Implementation per `skills_spec.md`:
 
-**Full specification from `chat-harness.md`:**
+**Phase 1: Core Models**
+1. Create `SkillMetadata` dataclass (name, description, license, compatibility, metadata, allowed_tools)
+2. Create `Skill` dataclass (meta, content, path, scripts, references, assets)
+3. Add validation in `__post_init__` methods
 
-**File: `examples/tasks.md` (example input)**
-```markdown
-# Tasks
-- [ ] T-001: Create a python module `src/app.py` that exposes `add(a,b)` and `mul(a,b)` with type hints.
-- [ ] T-002: Add unit tests for `add` and `mul` using pytest.
-- [ ] T-003: Add `pyproject.toml` with minimal config to run `pytest -q`.
+**Phase 2: Parser**
+1. Create `SkillParser` mirroring `CanonicalPromptParser` pattern
+2. Support YAML frontmatter extraction from SKILL.md
+3. Add `parse_metadata_only()` for lightweight discovery
+
+**Phase 3: Validator**
+1. Validate name: 1-64 chars, `[a-z0-9-]`, no leading/trailing/consecutive hyphens
+2. Validate name matches parent directory
+3. Validate description: 1-1024 chars
+4. Validate compatibility: max 500 chars if provided
+
+**Phase 4: Discovery**
+1. Create `SkillDiscovery` class
+2. Search paths: `.skills/` (project), `~/.config/dot-work/skills/` (user), bundled
+3. Support `discover()` for metadata and `load_skill()` for full content
+
+**Phase 5: Prompt Generation**
+1. Generate `<available_skills>` XML format
+2. Include name, description, and location
+3. Support `include_paths` parameter
+
+**Phase 6: CLI Commands**
+```
+dot-work skills list              # List discovered skills
+dot-work skills validate <path>   # Validate a skill directory
+dot-work skills show <name>       # Display full skill content
+dot-work skills prompt            # Generate available_skills XML
+dot-work skills install <source>  # Copy skill to project .skills/
 ```
 
-**File: `examples/run_tasks.py`** (complete implementation):
-```python
-import argparse
-import re
-from dataclasses import dataclass
-from pathlib import Path
-from typing import List, Tuple
-
-import anyio
-from claude_agent_sdk import (
-    ClaudeSDKClient,
-    ClaudeAgentOptions,
-    AssistantMessage,
-    TextBlock,
-)
-
-TASK_RE = re.compile(r"^\s*-\s*\[\s*(?P<state>[xX ])\s*\]\s*(?P<text>.+?)\s*$")
-
-
-@dataclass(frozen=True)
-class Task:
-    line_no: int
-    done: bool
-    text: str
-
-
-def load_tasks(md_path: Path) -> Tuple[str, List[Task]]:
-    content = md_path.read_text(encoding="utf-8")
-    tasks: List[Task] = []
-    for i, line in enumerate(content.splitlines()):
-        m = TASK_RE.match(line)
-        if not m:
-            continue
-        tasks.append(
-            Task(
-                line_no=i,
-                done=(m.group("state").lower() == "x"),
-                text=m.group("text").strip(),
-            )
-        )
-    return content, tasks
-
-
-def count_done(tasks: List[Task]) -> int:
-    return sum(1 for t in tasks if t.done)
-
-
-def next_open_task(tasks: List[Task]) -> Task | None:
-    for t in tasks:
-        if not t.done:
-            return t
-    return None
-
-
-async def run_one_iteration(
-    client: ClaudeSDKClient,
-    cwd: Path,
-    tasks_path: Path,
-    max_tool_turns: int,
-) -> str:
-    prompt = (
-        "You are an autonomous coding agent working in this repository.\n"
-        f"- Working directory: {cwd}\n"
-        f"- Task file: {tasks_path}\n\n"
-        "Loop goal: complete tasks in the task file until none remain.\n\n"
-        "For THIS iteration:\n"
-        "1) Read the task file.\n"
-        "2) Select the FIRST unchecked task.\n"
-        "3) Implement it in the repo (edit/create files as needed).\n"
-        "4) Run verification commands appropriate for the repo (at least: `pytest -q` if tests exist).\n"
-        "5) Mark that task as done by changing `[ ]` to `[x]` in the task file, and add one indented sub-bullet under it: `  - Evidence: <commands run>`.\n"
-        "6) If blocked, add an indented sub-bullet: `  - BLOCKED: <exact reason>` and DO NOT mark it done.\n\n"
-        "Return a short status message (1-3 lines)."
-    )
-
-    await client.query(prompt)
-
-    out_text_parts: list[str] = []
-    async for msg in client.receive_response():
-        if isinstance(msg, AssistantMessage):
-            for block in msg.content:
-                if isinstance(block, TextBlock):
-                    out_text_parts.append(block.text)
-
-    return "\n".join(s.strip() for s in out_text_parts if s.strip())
-
-
-async def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--cwd", default=".", help="Repo working directory")
-    ap.add_argument("--tasks", default="tasks.md", help="Path to tasks markdown file (relative to cwd)")
-    ap.add_argument("--max-iterations", type=int, default=50, help="Hard stop to avoid infinite loops")
-    ap.add_argument("--max-turns", type=int, default=25, help="Max agent/tool turns per iteration")
-    args = ap.parse_args()
-
-    cwd = Path(args.cwd).resolve()
-    tasks_path = (cwd / args.tasks).resolve()
-
-    if not tasks_path.exists():
-        raise SystemExit(f"tasks file not found: {tasks_path}")
-
-    options = ClaudeAgentOptions(
-        cwd=str(cwd),
-        permission_mode="acceptEdits",
-        allowed_tools=["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
-        max_turns=args.max_turns,
-        system_prompt=(
-            "Follow the task-file workflow strictly. "
-            "Never mark a task done without updating the repo and adding Evidence."
-        ),
-    )
-
-    async with ClaudeSDKClient(options=options) as client:
-        for iteration in range(1, args.max_iterations + 1):
-            before_content, before_tasks = load_tasks(tasks_path)
-            open_task = next_open_task(before_tasks)
-            if open_task is None:
-                print("DONE: no unchecked tasks remain.")
-                return
-
-            before_done = count_done(before_tasks)
-
-            status = await run_one_iteration(
-                client=client,
-                cwd=cwd,
-                tasks_path=tasks_path,
-                max_tool_turns=args.max_turns,
-            )
-
-            after_content, after_tasks = load_tasks(tasks_path)
-            after_done = count_done(after_tasks)
-
-            print(f"\n--- Iteration {iteration} ---")
-            print(f"Next task: {open_task.text}")
-            if status:
-                print(status)
-
-            if after_done > before_done:
-                continue
-
-            print("STOP: no task was marked done in this iteration. Check tasks.md for a BLOCKED note.")
-            return
-
-        print("STOP: reached --max-iterations without completing all tasks.")
-
-
-if __name__ == "__main__":
-    anyio.run(main)
-```
-
-**Installation:**
-```bash
-python -m venv .venv && source .venv/bin/activate && pip install -U pip && pip install claude-agent-sdk anyio
-```
-
-**Usage:**
-```bash
-python run_tasks.py --cwd . --tasks tasks.md --max-iterations 50 --max-turns 25
-```
+**Phase 7: Harness Integration**
+- Inject discovered skills into agent sessions via `generate_skills_prompt()`
 
 ### Acceptance Criteria
-- [ ] Create `examples/` directory
-- [ ] Add `run_tasks.py` with complete implementation from spec
-- [ ] Add `tasks.md` example file with checkbox format
-- [ ] Add `README.md` in examples/ with:
-  - [ ] Installation instructions (`claude-agent-sdk`, `anyio`)
-  - [ ] Usage examples and command-line options
-  - [ ] Task file format documentation
-  - [ ] Links to Claude Agent SDK docs
-- [ ] Include example tasks demonstrating different work types
-- [ ] Code uses `claude-agent-sdk` (NOT deprecated `claude-code-sdk`)
-- [ ] Async pattern with `query()` / `receive_response()`
-- [ ] Task state tracking in markdown file
-- [ ] Evidence-based completion
-- [ ] Blocked task handling
-- [ ] Configurable limits (max-iterations, max-turns)
+- [ ] `SkillMetadata` and `Skill` dataclasses with validation
+- [ ] `SkillParser` parses SKILL.md with YAML frontmatter
+- [ ] `SkillValidator` enforces Agent Skills spec constraints
+- [ ] `SkillDiscovery` finds skills in configured paths
+- [ ] `generate_skills_prompt()` produces valid XML
+- [ ] CLI commands: list, validate, show, prompt, install
+- [ ] Unit tests for all components
+- [ ] Test fixtures with valid and invalid skill directories
+- [ ] Integration with harness for skill injection
 
 ### Notes
-- **CRITICAL:** Use `claude-agent-sdk` from PyPI, NOT `claude-code-sdk` (deprecated)
-- Agent SDK provides `ClaudeSDKClient` which embeds Claude Code tooling
-- Reference: https://pypi.org/project/claude-code-sdk/
-- Reference: https://platform.claude.com/docs/en/agent-sdk/python
-- Permission mode `acceptEdits` auto-accepts file changes (change for production use)
-- Tools: Read, Write, Edit, Glob, Grep, Bash
-- Uses `anyio` for async runtime
+- Specification: https://agentskills.io/specification
+- Full design document: `.work/agent/issues/references/skills_spec.md`
+- Skills are complementary to prompts (static instructions) and subagents (AI personalities)
+- Progressive disclosure keeps initial context usage low
 
 ---
+
 ---
+id: "FEAT-024@b8c4d0"
+title: "Implement cross-environment Subagent/Custom Agent support"
+description: "Add subagent definition, parsing, and deployment across Claude Code, OpenCode, and GitHub Copilot"
+created: 2025-12-26
+section: "subagents"
+tags: [feature, subagents, custom-agents, claude-code, opencode, copilot, multi-environment]
+type: enhancement
+priority: medium
+status: proposed
+references:
+  - .work/agent/issues/references/subagents_spec.md
+  - src/dot_work/prompts/canonical.py
+  - src/dot_work/environments.py
+---
+
+### Problem
+AI coding environments (Claude Code, OpenCode, GitHub Copilot) each support custom agents/subagents with different file formats, tool configurations, and invocation patterns. Currently, users must manually maintain separate agent definitions for each environment.
+
+**Platform Differences:**
+| Aspect | Claude Code | OpenCode | GitHub Copilot |
+|--------|-------------|----------|----------------|
+| Location | `.claude/agents/` | `.opencode/agent/` | `.github/agents/` |
+| Tools | Comma-separated | Boolean map/wildcards | String list with aliases |
+| Model | `sonnet`, `opus`, `haiku` | `provider/model-id` | External config |
+| Permissions | `permissionMode` | `permission` object | `infer` boolean |
+
+### Affected Files
+- NEW: `src/dot_work/subagents/__init__.py`
+- NEW: `src/dot_work/subagents/models.py`
+- NEW: `src/dot_work/subagents/parser.py`
+- NEW: `src/dot_work/subagents/validator.py`
+- NEW: `src/dot_work/subagents/discovery.py`
+- NEW: `src/dot_work/subagents/generator.py`
+- NEW: `src/dot_work/subagents/environments/base.py`
+- NEW: `src/dot_work/subagents/environments/claude_code.py`
+- NEW: `src/dot_work/subagents/environments/opencode.py`
+- NEW: `src/dot_work/subagents/environments/copilot.py`
+- `src/dot_work/cli.py` (add `subagents` subcommand group)
+
+### Importance
+Subagents are increasingly important in AI-assisted development:
+- Claude Code uses subagents for isolated context and specialized tasks
+- OpenCode distinguishes primary agents (Tab-switchable) from subagents (@-mentionable)
+- GitHub Copilot supports custom agents at repository/org/enterprise levels
+
+A unified canonical format enables:
+- Write once, deploy to all environments
+- Consistent agent definitions across tools
+- Easier team collaboration on agent configurations
+
+### Proposed Solution
+Implementation per `subagents_spec.md`:
+
+**Phase 1: Core Models (1-2 days)**
+1. `SubagentMetadata` dataclass (name, description)
+2. `SubagentConfig` dataclass with all platform fields:
+   - Common: name, description, prompt, tools, model
+   - Claude Code: permission_mode, skills
+   - OpenCode: mode, temperature, max_steps, permissions
+   - Copilot: target, infer, mcp_servers
+3. `CanonicalSubagent` with environment-specific overrides
+
+**Phase 2: Environment Adapters (2-3 days)**
+1. `SubagentEnvironmentAdapter` base class with:
+   - `get_target_path(project_root) -> Path`
+   - `generate_native(config) -> str`
+   - `parse_native(content) -> SubagentConfig`
+   - `map_tools(tools) -> list | dict`
+2. Claude Code adapter
+3. OpenCode adapter
+4. GitHub Copilot adapter
+5. Tool name mapping table
+
+**Phase 3: Generator (1-2 days)**
+1. Canonical to native conversion
+2. Tool name translation per environment
+3. Model name translation
+4. File generation with correct frontmatter
+
+**Phase 4: CLI Commands (1-2 days)**
+```
+dot-work subagents list [--env ENV]           # List discovered subagents
+dot-work subagents validate <path>            # Validate subagent file
+dot-work subagents show <name>                # Display subagent details
+dot-work subagents install <file> --env ENV   # Install canonical subagent
+dot-work subagents generate <file> --env ENV  # Generate native file (stdout)
+dot-work subagents sync <dir>                 # Sync canonical to all environments
+```
+
+**Phase 5: Bundled Subagents (1 day)**
+Create canonical definitions for:
+- code-reviewer - Code quality and security review
+- test-runner - Run tests and fix failures
+- debugger - Root cause analysis for errors
+- docs-writer - Documentation specialist
+- security-auditor - Security vulnerability detection
+- refactorer - Code refactoring specialist
+
+### Acceptance Criteria
+- [ ] Data models support all three platforms' configurations
+- [ ] Parser handles canonical format with environment overrides
+- [ ] Validators enforce platform-specific constraints
+- [ ] Environment adapters for Claude Code, OpenCode, Copilot
+- [ ] Tool name mapping works correctly across platforms
+- [ ] CLI commands: list, validate, show, install, generate, sync
+- [ ] Bundled subagents work across all environments
+- [ ] Unit tests for models, parser, validator, adapters
+- [ ] Integration tests for end-to-end generation
+- [ ] Test fixtures for canonical and native formats
+
+### Notes
+- Canonical format mirrors prompts feature (similar to `CanonicalPrompt`)
+- Design document: `.work/agent/issues/references/subagents_spec.md`
+- Subagents complement skills (capabilities) and prompts (instructions)
+- Future: Cursor/Windsurf support (may share Copilot adapter)
+- Future: MCP server integration in subagent configs

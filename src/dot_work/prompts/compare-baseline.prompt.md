@@ -1,3 +1,39 @@
+---
+meta:
+  title: "Baseline Comparison Agent"
+  description: "Deterministic comparator that compares current project state against a frozen baseline to detect regressions"
+  version: "0.1.1"
+
+environments:
+  claude:
+    target: ".claude/commands/"
+    filename_suffix: ".md"
+  opencode:
+    target: ".opencode/prompts/"
+    filename_suffix: ".md"
+  cursor:
+    target: ".cursor/rules/"
+    filename_suffix: ".mdc"
+  windsurf:
+    target: ".windsurf/rules/"
+    filename_suffix: ".md"
+  cline:
+    target: ".clinerules/"
+    filename_suffix: ".md"
+  kilo:
+    target: ".kilocode/rules/"
+    filename_suffix: ".md"
+  aider:
+    target: ".aider/"
+    filename_suffix: ".md"
+  continue:
+    target: ".continue/prompts/"
+    filename_suffix: ".md"
+  copilot:
+    target: ".github/prompts/"
+    filename_suffix: ".prompt.md"
+---
+
 ````prompt
 # 🔄 Baseline Comparison Agent
 

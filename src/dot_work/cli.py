@@ -10,7 +10,13 @@ from rich.table import Table
 from dot_work.container.provision.cli import app as container_provision_app
 from dot_work.environments import ENVIRONMENTS
 from dot_work.git.cli import history_app
-from dot_work.installer import get_prompts_dir, initialize_work_directory, install_prompts
+from dot_work.harness.cli import app as harness_app
+from dot_work.installer import (
+    discover_available_environments,
+    get_prompts_dir,
+    initialize_work_directory,
+    install_prompts,
+)
 from dot_work.knowledge_graph.cli import app as kg_app
 from dot_work.overview.pipeline import analyze_project, write_outputs
 from dot_work.python import python_app
@@ -98,25 +104,35 @@ def install(
         console.print(f"[red]❌ {e}[/red]")
         raise typer.Exit(1) from None
 
+    # Discover available environments from prompt frontmatter
+    discovered_envs = discover_available_environments(prompts_dir)
+
     # Determine environment
     env_key = env
     if not env_key:
         # Try to detect
         detected = detect_environment(target)
-        if detected:
+        if detected and detected in discovered_envs:
             console.print(f"[cyan]🔍 Detected environment:[/cyan] {ENVIRONMENTS[detected].name}")
             if typer.confirm("Use this environment?", default=True):
                 env_key = detected
 
-        # Fall back to interactive selection
+        # Fall back to interactive selection with discovered environments
         if not env_key:
-            env_key = prompt_for_environment()
+            env_key = prompt_for_environment(discovered_envs)
 
     # Validate environment
     if env_key not in ENVIRONMENTS:
         console.print(f"[red]❌ Unknown environment:[/red] {env_key}")
-        console.print(f"Available: {', '.join(ENVIRONMENTS.keys())}")
+        console.print(f"Available in ENVIRONMENTS: {', '.join(ENVIRONMENTS.keys())}")
         raise typer.Exit(1)
+
+    # Check if environment is supported by any prompts
+    if env_key not in discovered_envs:
+        console.print(f"[yellow]⚠ Environment '{env_key}' not found in any prompt frontmatter.[/yellow]")
+        console.print(f"[dim]Available environments: {', '.join(sorted(discovered_envs.keys()))}[/dim]")
+        if not typer.confirm("Continue with legacy installation?", default=False):
+            raise typer.Exit(0)
 
     # Install
     env_config = ENVIRONMENTS[env_key]
@@ -284,16 +300,38 @@ def overview(
     )
 
 
-def prompt_for_environment() -> str:
-    """Interactively ask the user which environment to use."""
+def prompt_for_environment(discovered_envs: dict[str, set[str]] | None = None) -> str:
+    """Interactively ask the user which environment to use.
+
+    Args:
+        discovered_envs: Optional dict of environments discovered from prompt frontmatter.
+            If provided, only show environments that have at least one prompt.
+            Keys are environment names, values are sets of prompt names.
+    """
     console.print("\n[bold]🤖 Which AI coding environment are you using?[/bold]\n")
 
-    options = list(ENVIRONMENTS.keys())
-    for i, key in enumerate(options, 1):
-        env = ENVIRONMENTS[key]
-        console.print(f"  [cyan][{i}][/cyan] {env.name}")
-        if env.notes:
-            console.print(f"      [dim]└─ {env.notes}[/dim]")
+    # Determine which environments to show
+    if discovered_envs:
+        # Show only environments that prompts support
+        options = sorted(discovered_envs.keys())
+        console.print("[dim]Available environments (from prompt frontmatter):[/dim]\n")
+        for i, key in enumerate(options, 1):
+            env = ENVIRONMENTS.get(key)
+            if env:
+                prompt_count = len(discovered_envs[key])
+                console.print(f"  [cyan][{i}][/cyan] {env.name} [dim]({prompt_count} prompts)[/dim]")
+                if env.notes:
+                    console.print(f"      [dim]└─ {env.notes}[/dim]")
+            else:
+                console.print(f"  [cyan][{i}][/cyan] {key} [dim]({len(discovered_envs[key])} prompts)[/dim]")
+    else:
+        # Show all registered environments
+        options = list(ENVIRONMENTS.keys())
+        for i, key in enumerate(options, 1):
+            env = ENVIRONMENTS[key]
+            console.print(f"  [cyan][{i}][/cyan] {env.name}")
+            if env.notes:
+                console.print(f"      [dim]└─ {env.notes}[/dim]")
 
     console.print()
 
@@ -308,8 +346,22 @@ def prompt_for_environment() -> str:
             console.print("[red]Invalid choice. Please try again.[/red]")
         except ValueError:
             # Check if they typed the environment key
-            if choice.lower() in ENVIRONMENTS:
-                return choice.lower()
+            choice_lower = choice.lower()
+            # Check against options first (discovered), then all ENVIRONMENTS
+            if choice_lower in options:
+                return choice_lower
+            if choice_lower in ENVIRONMENTS:
+                # If not in discovered but in ENVIRONMENTS, warn but allow
+                if discovered_envs and choice_lower not in discovered_envs:
+                    console.print(
+                        f"[yellow]⚠ No prompts found for '{choice_lower}'. "
+                        f"Available: {', '.join(sorted(discovered_envs.keys()))}[/yellow]"
+                    )
+                    if typer.confirm("Continue anyway?", default=False):
+                        return choice_lower
+                    console.print("[red]Please enter a number or environment key.[/red]")
+                else:
+                    return choice_lower
             console.print("[red]Please enter a number or environment key.[/red]")
 
 
@@ -777,6 +829,9 @@ app.add_typer(python_app, name="python")
 
 # Register the git subcommand group
 app.add_typer(git_app, name="git")
+
+# Register the harness subcommand group
+app.add_typer(harness_app, name="harness")
 
 # Register the history subcommand under git
 git_app.add_typer(history_app, name="history")
