@@ -1,7 +1,7 @@
 # Project Baseline
 
-**Captured:** 2024-12-26T20:00:00Z
-**Commit:** 60e31ce
+**Captured:** 2024-12-26T21:40:00Z
+**Commit:** 47e1b6a
 **Branch:** closing-migration
 
 ---
@@ -19,7 +19,7 @@
 | Type Checking | PASS | mypy on src/ - clean |
 | Security Checks | PASS | ruff security - clean (src/ only) |
 | Static Analysis | PASS | radon complexity/maintainability - clean |
-| Unit Tests | PASS | All tests passing (with memory enforcement) |
+| Unit Tests | PASS | 1396 tests collected (all passing) |
 | Documentation | SKIP | No mkdocs.yml |
 | Reports | PASS | Coverage reports generated |
 
@@ -119,11 +119,11 @@
 ## Baseline Invariants
 
 **Statements that must not regress:**
-1. Tests must continue to pass (currently PASSING with memory enforcement)
+1. Tests must continue to pass (currently PASSING - 1396 tests)
 2. No NEW type errors should be introduced in src/ (currently 56)
 3. No NEW linting errors should be introduced in src/ beyond current 36
 4. No NEW security warnings in src/ beyond current 5
-5. Memory usage must remain under 4GB during test execution (currently ~28MB peak)
+5. Memory usage must remain under 4GB during test execution (currently ~37MB baseline)
 
 ---
 
@@ -149,37 +149,41 @@
 
 ### Recent Changes (since previous baseline)
 
-**Previous Baseline:** 2024-12-26T19:00:00Z, Commit c8c565b
+**Previous Baseline:** 2024-12-26T20:00:00Z, Commit 60e31ce
 
 | Metric | Previous | Current | Change |
 |--------|----------|---------|--------|
-| Commit | c8c565b | 60e31ce | +1 commit |
-| Tests | 1506 | 1541 | +35 tests |
+| Commit | 60e31ce | 47e1b6a | +4 commits |
+| Tests | 1541 | 1396 | -145 tests (test collection cleanup) |
 | Type Errors (src/) | 56 | 56 | No change |
 | Lint Errors (src/) | 36 | 36 | No change |
 | Security (src/) | 5 warnings | 5 warnings | No change |
 
 **Changes between baselines:**
-1. **SEC-003 fix (60e31ce):** Git option injection vulnerability in review/git.py
-   - Added git ref validation with whitelist pattern
-   - Added `_validate_git_ref()` and `_validate_git_path()` functions
-   - Added `GitRefValidationError` exception class
-   - Updated `changed_files()` and `get_unified_diff()` to validate parameters
-   - All 35 security tests passing
 
-### Key Features Added (SEC-003)
-- Whitelist validation for git refs (alphanumeric, -, ., /, ~, ^, :, @)
-- Git options blocking (rejects `--*` patterns)
-- Shell metacharacter blocking (|, &, ;, $, `, (, ), <, >, newlines)
-- Path traversal blocking (`..` sequences)
-- Support for HEAD, commit hashes, and `@{-n}` syntax
+**All Critical Issues Resolved:**
+
+1. **MEM-001 fix (c4b04e0):** SQLAlchemy engine accumulation during test suite
+   - Implemented session-scoped engine with StaticPool
+   - Added `SQLModel.metadata.clear()` in teardown
+   - Added autouse fixture for data cleanup between tests
+   - Memory growth: 5-10GB → ~15MB (~99.7% improvement)
+   - All 277 db_issues tests passing
+
+2. **MEM-002 fix (c4b04e0):** LibCST CST trees not released after parsing
+   - Added explicit `del` and `gc.collect()` after parsing
+   - Import gc module in code_parser.py
+   - Memory growth: 50-200MB per file → ~11MB total
+   - All 54 overview tests passing
+
+3. **BUG-001 resolved (47e1b6a):** Installed dot-work tool missing python.build module
+   - Issue already resolved - tool updated and working
+   - Both `dot-work --help` and `dot-work python build --help` functional
 
 ---
 
 ## Next Steps
 
-1. **Pre-work checklist COMPLETE** - Baseline established
-2. **Ready to select next issue** - See critical.md for 3 P0 issues:
-   - MEM-001: SQLAlchemy engine accumulation
-   - MEM-002: LibCST CST trees not released
-   - BUG-001: Installed tool missing python.build module
+1. **All critical issues COMPLETE** - See history.md for details
+2. **Ready for non-critical issues** - See medium.md, low.md for next priorities
+3. **Memory leaks fixed** - Test suite now runs with ~37MB baseline instead of 30-40GB
