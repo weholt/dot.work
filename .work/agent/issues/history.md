@@ -4054,3 +4054,66 @@ The existing `knowledge_graph` module in dot-work provides:
 See detailed investigation: `.work/agent/issues/references/AUDIT-KGTOOL-008-investigation.md`
 
 ---
+---
+
+## 2025-12-26: Migration Gap Analysis - Regression Guard Module (AUDIT-REGGUARD-009)
+
+| Audit | Status | Completed |
+|-------|--------|----------|
+| AUDIT-REGGUARD-009 | ✅ Complete | 2025-12-26 |
+
+### Summary
+- **Type**: Migration Gap Analysis
+- **Source**: `incoming/crampus/regression-guard/`
+- **Destination**: NOT MIGRATED
+- **Status**: ⚠️ **FUNCTIONALITY GAP**
+
+### Investigation Findings
+
+**regression-guard was NOT migrated** to dot-work.
+
+**regression-guard provides unique functionality:**
+- **Multi-agent validation system** - Prevent regressions through iterative validation
+- **Task decomposition** - Break tasks into atomic subtasks
+- **Baseline capture** - Capture baseline for comparison
+- **Incremental validation** - Validate subtasks incrementally
+- **Integration validation** - Integration testing workflow
+
+**Source Size:** ~43K Python code (1,328 lines)
+- cli.py: 96 lines - CLI interface with 5 commands
+- capture_baseline.py: 194 lines - Baseline capture
+- decompose.py: 177 lines - Task decomposition
+- orchestrator.py: 251 lines - RegressionOrchestrator
+- validate_incremental.py: 289 lines - Incremental validation
+- validate_integration.py: 312 lines - Integration validation
+
+**CLI Commands:**
+- `regression-guard start "description"` - Start new task
+- `regression-guard validate subtask-id` - Validate subtask
+- `regression-guard finalize task-id` - Finalize task
+- `regression-guard status task-id` - Show task status
+- `regression-guard list` - List all tasks
+
+### Integration Assessment
+
+**Note:** The existing `do-work.prompt.md` workflow may provide similar functionality:
+- .work/agent/issues/ structure for issue tracking
+- focus.md for execution state tracking (Previous/Current/Next)
+- Baseline system for regression detection
+
+### Gap Issues Created
+1. **AUDIT-GAP-011 (HIGH)**: regression-guard NOT migrated - multi-agent validation system lost
+   - Decision needed: migrate, use as external tool, or rely on do-work workflow
+
+### Assessment
+**Recommendation:** Project maintainers should decide if regression-guard's workflow is needed in dot-work.
+
+**Options:**
+1. **Migrate regression-guard** to dot-work as standalone module
+2. **Use as external tool** from `incoming/` directory
+3. **Rely on do-work workflow** which may provide equivalent functionality
+
+### Investigation Notes
+See detailed investigation: `.work/agent/issues/references/AUDIT-REGGUARD-009-investigation.md`
+
+---

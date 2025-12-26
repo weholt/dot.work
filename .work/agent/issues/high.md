@@ -679,3 +679,87 @@ The existing knowledge_graph module uses semantic search with embeddings, which 
   - `kgtool build --input INPUT --output OUTPUT --min-sim 0.3`
   - `kgtool extract --topic TOPIC --graph GRAPH --output OUTPUT`
 
+---
+
+id: "AUDIT-GAP-011@f8g9h0"
+title: "regression-guard NOT migrated - multi-agent validation system lost"
+description: "regression-guard provides multi-agent iterative validation system to prevent code regressions through task decomposition and incremental validation"
+created: 2025-12-26
+section: "regression-guard"
+tags: [migration-gap, validation, workflow, regression-prevention, audit]
+type: enhancement
+priority: high
+status: proposed
+references:
+  - .work/agent/issues/references/AUDIT-REGGUARD-009-investigation.md
+  - incoming/crampus/regression-guard/
+---
+
+### Problem
+
+During AUDIT-REGGUARD-009, it was discovered that regression-guard was **NOT migrated** to dot-work.
+
+**regression-guard provides unique functionality:**
+1. **Multi-agent validation system** - Prevent regressions through iterative validation
+2. **Task decomposition** - Break tasks into atomic subtasks
+3. **Baseline capture** - Capture baseline for comparison
+4. **Incremental validation** - Validate subtasks incrementally
+5. **Integration validation** - Integration testing workflow
+
+**Source:** `incoming/crampus/regression-guard/` (~43K Python code, 1,328 lines)
+**Destination:** NOT FOUND in dot-work
+
+### Affected Files
+- Missing: `src/dot_work/regression_guard/` or integration into existing workflow
+- Source: orchestrator.py (251 lines), validate_integration.py (312 lines), validate_incremental.py (289 lines)
+- Source: capture_baseline.py (194 lines), decompose.py (177 lines), cli.py (96 lines)
+
+### Importance
+
+**HIGH:** regression-guard provides a structured workflow for preventing code regressions through task decomposition and incremental validation.
+
+**CLI Commands:**
+- `regression-guard start "description"` - Start new task
+- `regression-guard validate subtask-id` - Validate subtask
+- `regression-guard finalize task-id` - Finalize task
+- `regression-guard status task-id` - Show task status
+- `regression-guard list` - List all tasks
+
+**Note:** The existing `do-work.prompt.md` workflow may provide similar functionality:
+- .work/agent/issues/ structure for issue tracking
+- focus.md for execution state tracking (Previous/Current/Next)
+- Baseline comparison workflow
+
+### Proposed Solution
+
+**Decision needed from project maintainers:**
+
+**Option 1: Migrate regression-guard to dot-work**
+1. Create `src/dot_work/regression_guard/` module
+2. Migrate all 7 Python files (~43K code)
+3. Update CLI integration
+4. Add tests
+
+**Option 2: Use as external tool**
+1. Keep regression-guard as standalone tool
+2. Document as available in `incoming/` directory
+3. Use when needed for complex tasks
+
+**Option 3: Rely on do-work workflow**
+1. Existing do-work.prompt.md may provide sufficient functionality
+2. .work/agent/issues/ for issue tracking
+3. focus.md for execution tracking
+4. Baseline system for regression detection
+
+### Acceptance Criteria
+- [ ] Decision made: migrate, use as external tool, or rely on do-work workflow
+- [ ] If migrating: regression-guard added to dot-work with tests
+- [ ] If external: Documentation added explaining how to use
+- [ ] If relying on do-work: Confirm workflow provides equivalent functionality
+- [ ] No ambiguity about regression-guard status
+
+### Notes
+
+- See investigation: `.work/agent/issues/references/AUDIT-REGGUARD-009-investigation.md`
+- regression-guard provides RegressionOrchestrator class for workflow management
+
