@@ -179,6 +179,7 @@ Example focus.md check:
 - Switching to a new branch
 - After a commit that changes the codebase state
 - User explicitly requests it
+- There should be no issues before baseline is created - fix all issues THEN create baseline
 
 ### Phase 2: SELECT
 

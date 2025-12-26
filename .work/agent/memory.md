@@ -279,3 +279,11 @@ cat test_logs/test_execution_log.txt
 - [PERF-001@a3c8f5] 2025-12-25: **Design for graceful degradation** - When implementing optional features (like vector indexing), design the system to fall back gracefully when the feature is unavailable. The `semsearch()` function tries vec_search first, then falls back to streaming batch search on any error.
 - [PERF-001@a3c8f5] 2025-12-25: **SQLite extensions: Load early, cache availability** - Load SQLite extensions during database initialization (in `_configure_pragmas()` or similar), not during first use. Cache the availability status in a boolean attribute (`_vec_available`) so the check is fast and doesn't repeat import attempts.
 - [PERF-001@a3c8f5] 2025-12-25: **Memory-bounded algorithms: streaming + top-k heap** - For O(N) operations that need top-k results, use streaming batch processing with a heap to track only the best k candidates. Memory usage becomes O(batch_size + k) instead of O(N).
+
+- [CR-009@de01dcc] 2024-12-26: **Python package executables should use __main__.py**
+  - When running `python -m package.module`, Python imports the package first, then tries to execute the module
+  - This causes RuntimeWarning: "module found in sys.modules after import of package"
+  - Solution: Create `__main__.py` in the package directory that imports and calls the main function
+  - Users then run: `python -m package` (not `python -m package.module`)
+  - This is the Python-recommended pattern per PEP 338 and runpy module documentation
+  - CLI entry points (like `dot-work python build`) continue to work via pyproject.toml [project.scripts]

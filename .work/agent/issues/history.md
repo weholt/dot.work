@@ -4888,3 +4888,73 @@ dot-work prompt create \
 - Future enhancements: update existing prompts, template library
 
 ---
+
+---
+
+## 2024-12-26: Refactor - Module naming conflict in dot_work.python.build.cli (CR-009)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| CR-009@de01dcc | ✅ Complete | 2024-12-26 |
+
+### Summary
+- **Type**: Refactor (P1 High)
+- **Title**: RuntimeWarning when running python -m dot_work.python.build.cli
+- **Status**: ✅ Fixed and Validated
+
+### Problem
+When running `uv run python -m dot_work.python.build.cli`, Python produces a RuntimeWarning:
+```
+<frozen runpy>:128: RuntimeWarning: 'dot_work.python.build.cli' found in sys.modules 
+after import of package 'dot_work.python.build', but prior to execution of 
+'dot_work.python.build.cli'; this may result in unpredictable behaviour
+```
+
+**Root Cause:**
+This is a well-known Python pitfall when a package's module is executed with 
+`python -m package.module` pattern. Python imports the package first, then 
+tries to execute the submodule as a script, detecting the module was already 
+loaded.
+
+### Solution Implemented
+Created `src/dot_work/python/build/__main__.py` following Python's recommended 
+pattern for package executables:
+
+```python
+from dot_work.python.build.cli import main
+
+if __name__ == "__main__":
+    main()
+```
+
+**New invocation:**
+```bash
+python -m dot_work.python.build
+```
+
+**Old invocation (still works but produces warning):**
+```bash
+python -m dot_work.python.build.cli
+```
+
+**CLI entry point (unchanged):**
+```bash
+dot-work python build
+```
+
+### Validation
+- Lint: Clean (ruff check passes)
+- Type check: Clean (mypy passes)
+- Tests: 41 python unit tests pass
+- Both invocation patterns work:
+  - `python -m dot_work.python.build` - No warning ✓
+  - `dot-work python build` - Still works ✓
+
+### Files Modified
+- **Created:** `src/dot_work/python/build/__main__.py`
+- **No changes:** `__init__.py`, `cli.py` (already properly structured)
+
+### Notes
+- The `__init__.py` already imported from `runner`, not `cli`, which was good
+- This is the Python-recommended approach for package executables (PEP 338)
+- No breaking changes - old invocation still works, just produces warning

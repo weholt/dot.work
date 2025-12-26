@@ -1,18 +1,22 @@
 # Agent Focus
-Last updated: 2024-12-26T21:35:00Z
+Last updated: 2024-12-26T22:40:00Z
 
 ## Previous
-- Issue: BUG-001@fe313e - Installed dot-work tool missing python.build module
-- Completed: 2024-12-26T21:35:00Z
-- Outcome: Issue already resolved - tool updated and working
+- Issue: CR-009@de01dcc - Module naming conflict in dot_work.python.build.cli
+- Completed: 2024-12-26T22:40:00Z
+- Outcome: Fixed by creating __main__.py, no RuntimeWarning, all tests pass
 
 ## Current
-- All critical issues completed
-- Ready to regenerate baseline
+- Issue: PERF-002@b4e7d2 - File scanner uses nested fnmatch loop
+- Started: 2024-12-26T22:40:00Z
+- Status: in-progress
+- Phase: Investigation
+- Source: high.md
 
 ## Next
-- Regenerate baseline to reflect all fixes
-- Continue with non-critical issues if needed
+- Issue: PERF-003@c5d9e1 - Issue service loads all issues for stale query
+- Source: high.md
+- Reason: Next high-priority performance issue
 
 ---
 

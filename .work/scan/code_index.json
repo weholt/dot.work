@@ -1,15 +1,15 @@
 {
-  "root_path": "/tmp/pytest-of-thomas/pytest-31/test_scan_run_command0",
+  "root_path": "/tmp/pytest-of-thomas/pytest-53/test_scan_run_command0",
   "files": {
-    "/tmp/pytest-of-thomas/pytest-31/test_scan_run_command0/module.py": {
-      "path": "/tmp/pytest-of-thomas/pytest-31/test_scan_run_command0/module.py",
+    "/tmp/pytest-of-thomas/pytest-53/test_scan_run_command0/module.py": {
+      "path": "/tmp/pytest-of-thomas/pytest-53/test_scan_run_command0/module.py",
       "line_count": 1,
       "has_syntax_error": false,
       "error_message": null,
       "functions": [
         {
           "name": "foo",
-          "file_path": "/tmp/pytest-of-thomas/pytest-31/test_scan_run_command0/module.py",
+          "file_path": "/tmp/pytest-of-thomas/pytest-53/test_scan_run_command0/module.py",
           "line_no": 1,
           "end_line_no": 1,
           "is_async": false,
