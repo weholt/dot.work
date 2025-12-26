@@ -4397,3 +4397,93 @@ The installer used hardcoded `InstallerConfig` per environment with `install_for
 - FEAT-022: Create interactive prompt wizard for new canonical prompts
 
 ---
+
+## 2025-12-26: Prompts - Create Interactive Prompt Wizard (FEAT-022)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| FEAT-022@c3d4e5 | ✅ Complete | 2025-12-26 |
+
+### Summary
+- **Type**: Enhancement (P2 Medium)
+- **Title**: Create interactive prompt wizard for new canonical prompts
+- **Status**: ✅ Completed and Validated
+
+### Problem
+Creating new prompts with canonical frontmatter was manual and error-prone:
+- User must remember exact YAML structure
+- Easy to forget required fields (`meta:`, `environments:`)
+- No validation that frontmatter is correct
+- No guidance on appropriate targets per environment
+- Examples exist but require copying and manual editing
+
+### Solution Implemented
+
+1. **Implemented `PromptWizard` class** (`src/dot_work/prompts/wizard.py`):
+   - Interactive wizard with Rich console UI
+   - Collects: title, description, version, prompt type, environments
+   - Generates canonical frontmatter automatically
+   - Creates file in `src/dot_work/prompts/` with `.prompt.md` suffix
+   - Opens `$EDITOR` for content editing
+   - Validates created file with `CanonicalPromptValidator`
+
+2. **Added prompt type suggestions**:
+   - Agent workflow → claude, opencode
+   - Slash command → claude, copilot
+   - Code review → all 9 environments
+   - Other → manual selection
+
+3. **Added CLI commands** (`src/dot_work/cli.py`):
+   - `dot-work prompt create` - Primary command
+   - `dot-work prompts create` - Alias
+   - Supports both interactive and non-interactive modes
+   - Options: `--title`, `--description`, `--type`, `--env`
+
+4. **Environment target configurations**:
+   - 9 environments: claude, copilot, cursor, windsurf, cline, kilo, aider, continue, opencode
+   - Each with configured target path and file suffix
+
+### Files Modified
+- **New:** `src/dot_work/prompts/wizard.py` - Wizard implementation
+- **Modified:** `src/dot_work/cli.py` - Added `prompt_app` group and `create` command
+- **New:** `tests/unit/test_wizard.py` - Test suite
+
+### Validation Results
+- 17 tests passing
+- Type checking passes (mypy)
+- CLI help works correctly
+- Created prompts validate with `CanonicalPromptValidator`
+
+### Acceptance Criteria
+- [x] `dot-work prompt create` command exists and is discoverable (`--help`)
+- [x] Wizard collects: title, description, type, supported environments
+- [x] Wizard suggests appropriate targets based on prompt type
+- [x] Generated frontmatter validates with `CanonicalPromptValidator` strict mode
+- [x] Created file is in `src/dot_work/prompts/` with `.prompt.md` suffix
+- [x] Wizard opens $EDITOR for prompt body after creating frontmatter
+- [x] Tests verify wizard creates valid prompts
+- [x] Help text explains wizard and provides examples
+
+### Usage Examples
+
+```bash
+# Interactive mode - full wizard
+dot-work prompt create
+
+# Provide title upfront
+dot-work prompt create --title "My Review Prompt"
+
+# Non-interactive mode - all parameters
+dot-work prompt create \
+  --title "Security Review" \
+  --description "Security-focused code review" \
+  --type review \
+  --env claude,cursor,copilot
+```
+
+### Notes
+- Templates directory not needed (wizard generates frontmatter directly)
+- Used Rich library for TUI (already a dependency)
+- Future enhancements: update existing prompts, template library
+
+---

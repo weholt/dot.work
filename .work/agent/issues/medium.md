@@ -4,6 +4,242 @@ Enhancements, technical debt.
 
 ---
 
+id: "MEM-006@d2e8f3"
+title: "Memory Leak: Git repository object accumulation during tests"
+description: "GitPython Repo objects created repeatedly without cleanup, causing 1-3GB memory growth"
+created: 2025-12-26
+section: "git"
+tags: [memory-leak, gitpython, testing, medium]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/utils.py
+  - tests/integration/test_git_history.py
+  - memory_leak.md
+---
+
+### Problem
+In `src/dot_work/git/utils.py:204-226`, the `is_git_repository()` function creates GitPython `Repo` objects without explicit cleanup.
+
+**Code at line 204-226:**
+```python
+def is_git_repository(path: Path) -> bool:
+    try:
+        import git
+        git.Repo(path)  # Creates Repo object, never explicitly closed
+        return True
+    except Exception:
+        return False
+```
+
+**Additional instances:**
+- Integration tests in `tests/integration/test_git_history.py` invoke CLI commands that create Repo objects
+- Various git utility functions create Repo instances without using context managers
+
+**Why this leaks memory:**
+1. GitPython's `Repo` objects hold file handles and subprocess handles
+2. No explicit `.close()` or context manager usage
+3. Creating Repo objects repeatedly (e.g., scanning many paths) accumulates resources
+4. File descriptors may not be released immediately
+5. Git subprocess handles may not be cleaned up
+6. Memory accumulates across test runs
+
+**Memory impact:** ~10-50MB per Repo object. With frequent calls in tests, contributes 1-3GB total.
+
+### Affected Files
+- `src/dot_work/git/utils.py` (lines 204-226: is_git_repository)
+- `tests/integration/test_git_history.py` (CLI commands creating Repo objects)
+- Any code calling git utilities that create Repo instances
+
+### Importance
+**MEDIUM:** While not the largest leak, GitPython Repo objects:
+- Hold file handles and subprocess handles
+- Can cause file descriptor exhaustion
+- Contribute to 1-3GB memory during integration test runs
+- May cause test failures on systems with low file descriptor limits
+
+### Proposed Solution
+1. **Use context manager for Repo objects:**
+   ```python
+   def is_git_repository(path: Path) -> bool:
+       try:
+           import git
+           with git.Repo(path) as repo:
+               return True
+       except Exception:
+           return False
+   ```
+
+2. **Add explicit close() if context manager not available:**
+   ```python
+   def is_git_repository(path: Path) -> bool:
+       try:
+           import git
+           repo = git.Repo(path)
+           try:
+               return True
+           finally:
+               repo.close()
+       except Exception:
+           return False
+   ```
+
+3. **Cache Repo objects for repeated access:**
+   ```python
+   _repo_cache: dict[Path, git.Repo] = {}
+   
+   def get_repository(path: Path) -> git.Repo:
+       if path not in _repo_cache:
+           _repo_cache[path] = git.Repo(path)
+       return _repo_cache[path]
+   ```
+
+4. **Add cleanup in test teardown:**
+   ```python
+   def pytest_sessionfinish(session, exitstatus):
+       # Clear any cached Repo objects
+       _repo_cache.clear()
+   ```
+
+### Acceptance Criteria
+- [ ] All Repo object creation uses context manager or explicit close()
+- [ ] is_git_repository() updated with proper cleanup
+- [ ] Git utility functions audit for Repo leaks
+- [ ] Memory growth during git tests reduced to <500MB
+- [ ] File descriptors properly released
+- [ ] All git-related tests still pass
+
+### Notes
+- GitPython Repo objects should be treated as resources requiring cleanup
+- Full investigation in `memory_leak.md` (section 6)
+- Related: MEM-001 (SQLAlchemy), MEM-002 (libcst)
+
+---
+
+id: "MEM-007@e9f2a4"
+title: "Memory Leak: Connection pool cleanup only runs at session end, not between tests"
+description: "SQLAlchemy connection pools grow throughout test session, causing 2-5GB accumulation"
+created: 2025-12-26
+section: "tests"
+tags: [memory-leak, sqlalchemy, connection-pool, medium]
+type: bug
+priority: medium
+status: proposed
+references:
+  - tests/conftest.py
+  - tests/unit/db_issues/conftest.py
+  - memory_leak.md
+---
+
+### Problem
+In `tests/conftest.py:246-252`, SQLAlchemy connection pool cleanup only runs at session finish, not between individual tests.
+
+**Code at line 246-252:**
+```python
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    logger.info("pytest session finished")
+    try:
+        from sqlalchemy import pool
+        pool.dispose_all()
+    except Exception:
+        pass
+```
+
+**Root cause:**
+1. Connection pools accumulate connections throughout the test session
+2. Each test may create connections that aren't immediately returned to pool
+3. `pool.dispose_all()` only runs at session end, allowing pools to grow unbounded
+4. Memory for connection objects and their associated state accumulates
+5. With 277 db_issues tests + other database tests, this adds up
+
+**Why this leaks memory:**
+- SQLite connection pools maintain cached connection objects
+- Each connection object holds memory for transaction state
+- Pools don't shrink between tests, only grow
+- 2-5MB per connection cached in pool
+- With dozens/hundreds of tests, pools can accumulate 50-100+ connections
+
+### Affected Files
+- `tests/conftest.py` (lines 246-252: pytest_sessionfinish)
+- `tests/unit/db_issues/conftest.py` (creates many engines/connections)
+- `tests/unit/knowledge_graph/conftest.py` (creates Database instances)
+
+### Importance
+**MEDIUM:** Connection pool accumulation contributes to 2-5GB memory usage:
+- Connection pools grow unbounded during test session
+- Memory for cached connections not released between tests
+- Combined with MEM-001 (engine accumulation), creates major pressure
+- Cleanup only happens at end, allowing accumulation
+
+### Proposed Solution
+1. **Add module-level pool cleanup:**
+   ```python
+   @pytest.fixture(autouse=True, scope="module")
+   def cleanup_connection_pools():
+       """Cleanup connection pools between test modules."""
+       yield
+       try:
+           from sqlalchemy import pool
+           pool.dispose_all()
+       except Exception:
+           pass
+   ```
+
+2. **Add per-test cleanup for memory-intensive tests:**
+   ```python
+   @pytest.fixture(autouse=True)
+   def cleanup_test_pools():
+       """Cleanup after each test for memory-intensive modules."""
+       yield
+       try:
+           from sqlalchemy import pool
+           pool.dispose_all()
+       except Exception:
+           pass
+   ```
+
+3. **Configure connection pool size limits:**
+   ```python
+   @pytest.fixture
+   def db_engine():
+       engine = create_engine(
+           "sqlite:///:memory:",
+           poolclass=StaticPool,
+           pool_size=5,  # Limit pool size
+           max_overflow=10  # Limit overflow
+       )
+       yield engine
+   ```
+
+4. **Use session-scoped pools with fixed size:**
+   ```python
+   @pytest.fixture(scope="session")
+   def db_engine():
+       engine = create_engine(
+           "sqlite:///:memory:",
+           poolclass=QueuePool,
+           pool_size=1,  # Single connection per session
+           max_overflow=0
+       )
+       yield engine
+       engine.dispose()
+   ```
+
+### Acceptance Criteria
+- [ ] Connection pool cleanup runs between test modules
+- [ ] Connection pool size limited to reasonable number
+- [ ] Memory growth from connection pools bounded to <1GB
+- [ ] All tests still pass with pool cleanup
+- [ ] No performance degradation from excessive pool disposal
+
+### Notes
+- This is related to MEM-001 (engine accumulation) - should be fixed together
+- Session-scoped pools (MEM-001 fix) may eliminate need for frequent cleanup
+- Full investigation in `memory_leak.md` (section 7)
+
+---
+
 ---
 id: "SEC-007@94eb69"
 title: "Security: Missing HTTPS validation in file upload"

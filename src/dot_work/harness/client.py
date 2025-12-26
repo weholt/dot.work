@@ -5,6 +5,7 @@ Provides async interface to Claude Agent SDK with proper configuration.
 """
 
 from pathlib import Path
+from typing import Literal, NotRequired, TypedDict
 
 try:
     from claude_agent_sdk import (
@@ -19,6 +20,9 @@ except ImportError:
     ClaudeSDKClient = None  # type: ignore
     ClaudeAgentOptions = None  # type: ignore
 
+# Permission mode literal type
+PermissionMode = Literal["default", "acceptEdits", "plan", "bypassPermissions"]
+
 
 class HarnessClient:
     """Client wrapper for Claude Agent SDK autonomous agent execution."""
@@ -26,7 +30,7 @@ class HarnessClient:
     def __init__(
         self,
         cwd: Path,
-        permission_mode: str = "acceptEdits",
+        permission_mode: PermissionMode = "acceptEdits",
         allowed_tools: list[str] | None = None,
         max_turns: int = 25,
         system_prompt: str | None = None,
@@ -121,7 +125,7 @@ async def run_harness_async(
     tasks_path: Path,
     max_iterations: int = 50,
     max_turns: int = 25,
-    permission_mode: str = "acceptEdits",
+    permission_mode: PermissionMode = "acceptEdits",
 ) -> None:
     """Run the harness asynchronously.
 
@@ -182,7 +186,7 @@ def run_harness(
     tasks_path: Path,
     max_iterations: int = 50,
     max_turns: int = 25,
-    permission_mode: str = "acceptEdits",
+    permission_mode: PermissionMode = "acceptEdits",
 ) -> None:
     """Run the harness (synchronous wrapper).
 

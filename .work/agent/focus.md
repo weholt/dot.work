@@ -1,29 +1,31 @@
 # Agent Focus
-Last updated: 2025-12-26T13:00:00Z
+Last updated: 2024-12-26T16:00:00Z
 
 ## Previous
-- Issue: FEAT-021@b2c3d4 - Update installer to read prompt frontmatter for environment selection
-- Completed: 2025-12-26T13:00:00Z
-- Outcome: Added discover_available_environments(), install_canonical_prompts_by_environment(), updated CLI to use frontmatter
+- Issue: FEAT-022@c3d4e5 - Create interactive prompt wizard for new canonical prompts
+- Completed: 2024-12-26T16:00:00Z
+- Outcome: Implemented PromptWizard class, added `dot-work prompt create` CLI command, wrote 17 tests
 
 ## Current
-- Issue: FEAT-022@c3d4e5 - Create interactive prompt wizard for new canonical prompts
-- Started: 2025-12-26T13:00:00Z
-- Status: in-progress
-- Phase: Investigation
+- Issue: None
+- Started: N/A
+- Status: Available for new work
+- Phase: Complete
 - Progress:
   - [x] FEAT-020 completed (convert prompts to canonical format)
   - [x] FEAT-021 completed (update installer for frontmatter)
-  - [ ] Analyze wizard requirements
-  - [ ] Design wizard flow
-  - [ ] Implement wizard logic
-  - [ ] Add CLI command
-  - [ ] Write tests
+  - [x] FEAT-022 completed (prompt wizard)
+  - [x] Pre-work checklist: .work/ structure exists
+  - [x] Pre-work checklist: Working directory clean (committed f61773c)
+  - [x] Pre-work checklist: Baseline established (f61773c)
+  - [x] Pre-work checklist: Completed issues moved to history
+  - [x] Pre-work checklist: Cleaned shortlist.md
+  - [x] FEAT-022 implementation complete
 
 ## Next
-- Issue: FEAT-022@c3d4e5 - Create interactive prompt wizard for new canonical prompts
-- Source: shortlist.md
-- Reason: Last item in prompt installation system series
+- Issue: None identified
+- Source: N/A
+- Reason: All prompt installation system issues complete
 
 ---
 

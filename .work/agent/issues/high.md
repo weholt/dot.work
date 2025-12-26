@@ -357,20 +357,347 @@ CVSS Score: 5.3 (Medium)
 
 ---
 
-id: "AUDIT-GAP-001@7a9f2d"
-title: "Integration tests not migrated for db_issues module"
-description: "11 integration test files from source are absent in destination"
-created: 2025-12-25
-section: "db_issues"
-tags: [testing, integration-tests, migration-gap, audit]
-type: test
+id: "MEM-003@a7b8c9"
+title: "Memory Leak: Embedding vectors stored as Python lists instead of efficient arrays"
+description: "Large float arrays in knowledge graph stored as Python lists, consuming 2-5GB memory"
+created: 2025-12-26
+section: "knowledge-graph"
+tags: [memory-leak, embeddings, semantic-search, high]
+type: bug
 priority: high
 status: proposed
 references:
-  - .work/agent/issues/references/AUDIT-DBISSUES-010-investigation.md
-  - /home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/tests/
-  - tests/unit/db_issues/
+  - src/dot_work/knowledge_graph/search_semantic.py
+  - src/dot_work/knowledge_graph/db.py
+  - memory_leak.md
 ---
+
+### Problem
+In `src/dot_work/knowledge_graph/search_semantic.py:175-207`, semantic search loads embedding vectors into memory for comparison with the query vector.
+
+**Root Cause at lines 1127-1142 (`_row_to_embedding`):**
+```python
+def _row_to_embedding(self, row: sqlite3.Row) -> Embedding:
+    dimensions = row["dimensions"]
+    vector_blob = row["vector"]
+    vector = struct.unpack(f"{dimensions}f", vector_blob)
+    # vector is now a tuple of Python floats, stored in Embedding object
+```
+
+**Why this wastes memory:**
+1. Python lists/tuples of floats have significant overhead (~24 bytes per float vs 4 bytes for numpy float32)
+2. Embedding vectors stored in heap-allocated Python objects
+3. With dimensions of 384-1536 floats, each embedding consumes 1.5-6KB
+4. The `top_k_heap` in semantic search holds `Embedding` objects with their full vectors
+5. Large knowledge graphs with thousands of embeddings consume 50-200MB during search
+
+**Additional issue at lines 175-207 (brute-force search):**
+```python
+top_k_heap: list[tuple[float, int, Embedding]] = []
+for batch in db.stream_embeddings_for_model(model, batch_size):
+    for emb in batch:
+        score = cosine_similarity(query_vector, emb.vector)
+        if len(top_k_heap) < k:
+            heapq.heappush(top_k_heap, (score, heap_index, emb))
+```
+
+The heap retains full `Embedding` objects including their vector data.
+
+### Affected Files
+- `src/dot_work/knowledge_graph/db.py` (lines 1127-1142: `_row_to_embedding`)
+- `src/dot_work/knowledge_graph/search_semantic.py` (lines 175-207: semantic search heap)
+- `src/dot_work/knowledge_graph/db.py` (Embedding dataclass stores vector as list)
+
+### Importance
+**HIGH:** Memory usage scales with knowledge graph size:
+- 1,000 embeddings @ 384 dims → ~6MB in numpy, ~24MB in Python lists
+- 10,000 embeddings @ 768 dims → ~30MB in numpy, ~180MB in Python lists
+- Semantic search temporarily holds all candidates in heap before filtering
+
+Contributes to 2-5GB memory usage during test runs with large knowledge graphs.
+
+### Proposed Solution
+1. **Store vectors as numpy arrays internally:**
+   ```python
+   import numpy as np
+   
+   class Embedding:
+       id: str
+       node_id: str
+       model: str
+       vector: np.ndarray  # Use numpy instead of list
+   
+   def _row_to_embedding(self, row: sqlite3.Row) -> Embedding:
+       dimensions = row["dimensions"]
+       vector_blob = row["vector"]
+       vector = np.frombuffer(vector_blob, dtype=np.float32)
+       return Embedding(..., vector=vector)
+   ```
+
+2. **Use numpy for cosine similarity:**
+   ```python
+   def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+       return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+   ```
+
+3. **Store only IDs in heap, fetch vectors for final results:**
+   ```python
+   top_k_heap: list[tuple[float, int, str]] = []  # Store embedding IDs instead of objects
+   for emb in batch:
+       score = cosine_similarity(query_vector, emb.vector)
+       if len(top_k_heap) < k:
+           heapq.heappush(top_k_heap, (score, heap_index, emb.id))
+   # Fetch full Embedding objects for final top-k results
+   ```
+
+### Acceptance Criteria
+- [ ] Embedding vectors stored as numpy arrays
+- [ ] Cosine similarity uses numpy operations
+- [ ] Semantic search heap stores IDs, not full objects
+- [ ] Memory usage per embedding reduced to ~4x file size
+- [ ] All knowledge_graph tests still pass
+- [ ] numpy added to project dependencies
+
+### Notes
+- Requires numpy as dependency (check if already in pyproject.toml)
+- Full investigation in `memory_leak.md`
+- Related: MEM-001 (SQLAlchemy), MEM-002 (libcst), MEM-004 (database leaks)
+
+---
+
+id: "MEM-004@b9c5d6"
+title: "Memory Leak: Database connection leaks in knowledge_graph tests"
+description: "43+ tests create inline Database instances without consistent cleanup, causing 2-5GB growth"
+created: 2025-12-26
+section: "tests"
+tags: [memory-leak, testing, knowledge-graph, high]
+type: bug
+priority: high
+status: proposed
+references:
+  - tests/unit/knowledge_graph/test_db.py
+  - tests/unit/knowledge_graph/conftest.py
+  - memory_leak.md
+---
+
+### Problem
+In `tests/unit/knowledge_graph/test_db.py`, 43+ tests create `Database` instances inline without using the `kg_database` fixture, leading to inconsistent cleanup.
+
+**Examples of inline Database creation:**
+```python
+def test_init_creates_directory(self, tmp_path: Path) -> None:
+    db_path = tmp_path / "subdir" / "deep" / "db.sqlite"
+    db = Database(db_path)
+    db._get_connection()
+    assert db_path.parent.exists()
+    db.close()  # Manual close - easy to forget if exception occurs
+```
+
+**Root causes:**
+1. **Manual cleanup prone to errors**: Tests must remember to call `db.close()`
+2. **No context manager usage**: Missing exception handling around close
+3. **Fixture available but unused**: `kg_database` fixture exists at conftest.py:39-62
+4. **Lazy connection initialization**: `_get_connection()` may not be called, leaving internal state inconsistent
+
+**Fixture definition at conftest.py:39-62:**
+```python
+@pytest.fixture
+def kg_database(temp_db_path: Path) -> Generator[Database, None, None]:
+    db = Database(temp_db_path)
+    try:
+        yield db
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
+        del db
+```
+
+**Why this leaks memory:**
+- Each Database instance holds SQLite connection handles
+- WAL journal files may persist if not properly closed
+- 43+ tests creating/destroying instances accumulates resources
+- Missing `db.close()` in exception paths causes leaks
+
+### Affected Files
+- `tests/unit/knowledge_graph/test_db.py` (43+ tests with inline Database creation)
+- `tests/unit/knowledge_graph/conftest.py` (kg_database fixture exists but not used)
+- `src/dot_work/knowledge_graph/db.py` (Database class lazy initialization)
+
+### Importance
+**HIGH:** Contributes 2-5GB memory growth during test runs:
+- 43+ Database instances created/destroyed per test module
+- Each instance holds SQLite connection and WAL journal
+- Manual cleanup error-prone
+- Blocker for running tests on memory-constrained systems
+
+### Proposed Solution
+1. **Convert all tests to use kg_database fixture:**
+   ```python
+   def test_init_creates_directory(self, kg_database: Database, tmp_path: Path) -> None:
+       # fixture provides db, cleanup handled automatically
+       assert kg_database.db_path.parent.exists()
+   ```
+
+2. **Add context manager support to Database class:**
+   ```python
+   class Database:
+       def __enter__(self) -> "Database":
+           return self
+       
+       def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+           self.close()
+   ```
+
+3. **Mark tests that need custom db_path:**
+   ```python
+   @pytest.fixture
+   def custom_db_path(tmp_path: Path) -> Path:
+       return tmp_path / "custom" / "db.sqlite"
+   
+   @pytest.fixture
+   def custom_database(custom_db_path: Path) -> Generator[Database, None, None]:
+       with Database(custom_db_path) as db:
+           yield db
+   ```
+
+### Acceptance Criteria
+- [ ] All 43+ tests use kg_database fixture or custom fixture
+- [ ] Database class implements __enter__/__exit__ for context manager support
+- [ ] No inline Database creation in test files
+- [ ] Memory growth during kg tests reduced to <1GB
+- [ ] All tests still pass after refactor
+- [ ] WAL journal files cleaned up consistently
+
+### Notes
+- This is a test hygiene issue that causes real memory leaks
+- Full investigation in `memory_leak.md` (section 5)
+- Related: MEM-001 (SQLAlchemy), MEM-007 (pool management)
+
+---
+
+id: "MEM-005@c8e7f1"
+title: "Memory Leak: Multiple UnitOfWork instances share same session causing repository cache accumulation"
+description: "Service fixtures create separate UnitOfWork instances from same session, accumulating repository caches"
+created: 2025-12-26
+section: "tests"
+tags: [memory-leak, sqlalchemy, testing, high]
+type: bug
+priority: high
+status: proposed
+references:
+  - tests/unit/db_issues/conftest.py
+  - src/dot_work/db_issues/adapters/sqlite.py
+  - memory_leak.md
+---
+
+### Problem
+In `tests/unit/db_issues/conftest.py`, each service fixture creates its own `UnitOfWork` instance from the **same session**, leading to repository cache accumulation.
+
+**Service fixtures at lines 157-184, 187-214, 217-241, 279-305:**
+```python
+@pytest.fixture
+def issue_service(...) -> Generator[IssueService, None, None]:
+    uow = UnitOfWork(in_memory_db)
+    try:
+        yield IssueService(uow, fixed_id_service, fixed_clock)
+    finally:
+        uow.close()
+        del uow
+
+@pytest.fixture
+def epic_service(...) -> Generator[EpicService, None, None]:
+    uow = UnitOfWork(in_memory_db)  # Same session, new UoW instance
+    try:
+        yield EpicService(uow, fixed_id_service, fixed_clock)
+    finally:
+        uow.close()
+        del uow
+```
+
+**Why this leaks memory:**
+1. Multiple `UnitOfWork` instances share the same SQLAlchemy session
+2. Each `UnitOfWork` has lazy-loaded repository properties (`issues`, `comments`, etc.)
+3. When tests use multiple fixtures, multiple UoWs maintain separate repository instances
+4. Repository objects hold internal caches and query result sets
+5. `__del__` methods in UnitOfWork and repositories can create cleanup order issues
+6. Session-level identity map holds references to entities across all UoWs
+
+**Memory impact:** Each repository instance adds ~1-5MB of cached state. With 4-5 services per test, this adds ~20-25MB per test.
+
+### Affected Files
+- `tests/unit/db_issues/conftest.py` (lines 157-184, 187-214, 217-241, 279-305)
+- `src/dot_work/db_issues/adapters/sqlite.py` (UnitOfWork class)
+- `src/dot_work/db_issues/services/issue_service.py` (IssueService)
+- `src/dot_work/db_issues/services/epic_service.py` (EpicService)
+- `src/dot_work/db_issues/services/dependency_service.py` (DependencyService)
+- `src/dot_work/db_issues/services/label_service.py` (LabelService)
+
+### Importance
+**HIGH:** Contributes to memory growth in db_issues tests:
+- 4-5 UnitOfWork instances per test using multiple fixtures
+- Each UoW has separate repository caches
+- Session identity map holds shared entity references
+- Combined with MEM-001 (engine accumulation), creates major memory pressure
+
+### Proposed Solution
+1. **Share single UnitOfWork across all service fixtures:**
+   ```python
+   @pytest.fixture
+   def uow(in_memory_db: Session) -> Generator[UnitOfWork, None, None]:
+       uow = UnitOfWork(in_memory_db)
+       try:
+           yield uow
+       finally:
+           uow.close()
+           del uow
+   
+   @pytest.fixture
+   def issue_service(uow: UnitOfWork, fixed_id_service, fixed_clock) -> IssueService:
+       return IssueService(uow, fixed_id_service, fixed_clock)
+   
+   @pytest.fixture
+   def epic_service(uow: UnitOfWork, fixed_id_service, fixed_clock) -> EpicService:
+       return EpicService(uow, fixed_id_service, fixed_clock)
+   ```
+
+2. **Add session rollback between tests:**
+   ```python
+   @pytest.fixture(autouse=True)
+   def cleanup_session(in_memory_db: Session):
+       yield
+       in_memory_db.rollback()  # Clear identity map
+   ```
+
+3. **Clear repository caches in UnitOfWork.close():**
+   ```python
+   def close(self) -> None:
+       if self._session:
+           self._session.close()
+       # Clear repository references
+       for attr in list(self.__dict__.keys()):
+           if hasattr(self, attr) and attr.startswith('_'):
+               continue
+           setattr(self, attr, None)
+   ```
+
+### Acceptance Criteria
+- [ ] Single UnitOfWork instance shared across all service fixtures
+- [ ] Session rollback called between tests
+- [ ] Repository caches cleared in UnitOfWork.close()
+- [ ] Memory growth per db_issues test reduced to <5MB
+- [ ] All 277 db_issues tests still pass
+- [ ] Test isolation maintained (no state leakage between tests)
+
+### Notes
+- This works in conjunction with MEM-001 fix (session-scoped engine)
+- Full investigation in `memory_leak.md` (section 2)
+- The pattern of "multiple UoWs, one session" is an anti-pattern
+
+---
+
+id: "AUDIT-GAP-004@d3e6f2"
 
 ### Problem
 During AUDIT-DBISSUES-010, it was discovered that 11 integration test files from the source (glorious agents issues skill) were NOT migrated to the destination (db_issues module).

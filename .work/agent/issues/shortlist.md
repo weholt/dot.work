@@ -167,104 +167,21 @@ See history.md for complete migration summary dated 2024-12-24.
 
 ## Prompt Installation System
 
----
-
-### FEAT-020@a1b2c3: Convert prompts to canonical format with environment frontmatter
-
-**Status:** ✅ COMPLETED - See history.md
-
-### Summary
-- All 18 prompt files converted to canonical format
-- Added `meta:` and `environments:` frontmatter to each prompt
-- Supports 9 AI coding environments (claude, copilot, cursor, windsurf, cline, kilo, aider, continue, opencode)
-- All prompts validated with CanonicalPromptValidator
-
----
-
-### FEAT-021@b2c3d4: Update installer to read prompt frontmatter for environment selection
-
-**Status:** ✅ COMPLETED - See history.md
-
-### Summary
-- Added `discover_available_environments()` to scan prompts for supported environments
-- Added `install_canonical_prompts_by_environment()` to install using frontmatter paths
-- Updated `install_prompts()` to use canonical installation with legacy fallback
-- Updated CLI to discover and show only available environments to user
-- Fixed type annotations for `InstallerConfig.messages` field
+**Status:** ✅ COMPLETE - All prompt installation features implemented
 
 ---
 
 ### FEAT-022@c3d4e5: Create interactive prompt wizard for new canonical prompts
 
-**Status:** 📋 Proposed
+**Status:** ✅ COMPLETED - See history.md
 
-**Description:** Build an interactive CLI wizard that guides users through creating new prompts with proper canonical frontmatter
-
-### Problem
-Creating new prompts with canonical frontmatter is currently manual and error-prone:
-- User must remember exact YAML structure
-- Easy to forget required fields (`meta:`, `environments:`)
-- No validation that frontmatter is correct
-- No guidance on appropriate targets per environment
-- Examples exist but require copying and manual editing
-
-### Background
-After FEAT-020 converts existing prompts, all prompts will use canonical format. New prompts should follow the same pattern. A wizard would:
-1. Ask for prompt title, description, purpose
-2. Guide through selecting supported environments
-3. Suggest appropriate targets based on prompt type
-4. Generate valid frontmatter automatically
-5. Create file in correct location with valid structure
-
-### Affected Files
-- **New:** `src/dot_work/prompts/wizard.py` - wizard logic
-- **New:** `src/dot_work/prompts/templates/` - prompt templates
-- `src/dot_work/cli.py` - add `dot-work prompt create` command
-- `tests/unit/test_wizard.py` - tests for wizard
-
-### Importance
-- **MEDIUM**: Lowers barrier to contributing new prompts
-- **MEDIUM**: Ensures new prompts follow canonical format consistently
-- **LOW**: Not blocking - users can manually create prompts with examples
-
-### Proposed Solution
-1. Add CLI command `dot-work prompt create` or `dot-work prompts new`
-2. Interactive prompts using `typer` or `questionary`:
-   ```
-   Prompt title: My Code Review Prompt
-   Description: Helps review Python code for security issues
-   What type of prompt is this?
-     [1] Agent workflow prompt
-     [2] Slash command
-     [3] Code review prompt
-     [4] Other
-   Which environments should this support?
-     [ ] claude (Claude Code)
-     [ ] copilot (GitHub Copilot)
-     [ ] cursor
-     [ ] windsurf
-   ```
-3. Generate frontmatter based on selections:
-   - Agent prompts → `.claude/` for Claude, `.github/prompts/` for Copilot
-   - Slash commands → `.claude/commands/` for Claude
-   - Code review → appropriate locations
-4. Open editor for prompt body content
-5. Validate with `CanonicalPromptValidator` before saving
-
-### Acceptance Criteria
-- [ ] `dot-work prompt create` command exists and is discoverable (`--help`)
-- [ ] Wizard collects: title, description, type, supported environments
-- [ ] Wizard suggests appropriate targets based on prompt type
-- [ ] Generated frontmatter validates with `CanonicalPromptValidator` strict mode
-- [ ] Created file is in `src/dot_work/prompts/` with `.prompt.md` suffix
-- [ ] Wizard opens $EDITOR for prompt body after creating frontmatter
-- [ ] Tests verify wizard creates valid prompts
-- [ ] Help text explains wizard and provides examples
-
-### Notes
-- Consider using `questionary` for nicer TUI if dependency acceptable
-- Alternative: simple typer prompts with defaults
-- Should wizard support updating existing prompts? (future enhancement)
-- Should wizard have template library? (e.g., "create new slash command")
+### Summary
+- Implemented `PromptWizard` class in `src/dot_work/prompts/wizard.py`
+- Added CLI commands: `dot-work prompt create` and `dot-work prompts create`
+- Wizard supports both interactive and non-interactive modes
+- Prompt type suggestions (agent, command, review, other)
+- Environment target configurations for 9 environments
+- Automatic frontmatter generation with validation
+- 17 tests covering wizard functionality
 
 ---

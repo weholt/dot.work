@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 from dot_work.container.provision.cli import app as container_provision_app
@@ -38,6 +39,9 @@ review_app = typer.Typer(help="Interactive code review with AI-friendly export."
 
 # Create subcommand group for canonical prompts
 canonical_app = typer.Typer(help="Validate and install canonical prompt files.")
+
+# Create subcommand group for prompt management
+prompt_app = typer.Typer(help="Create and manage canonical prompt files.")
 
 # Create subcommand group for container operations
 container_app = typer.Typer(help="Container-based operations.")
@@ -806,8 +810,113 @@ def canonical_extract(
         raise typer.Exit(1) from e
 
 
+# ============================================================================
+# Prompt Management Commands (prompt_app)
+# ============================================================================
+
+
+@prompt_app.command("create")
+def prompt_create(
+    title: Annotated[
+        str | None,
+        typer.Option("--title", "-t", help="Prompt title (skip wizard prompt)"),
+    ] = None,
+    description: Annotated[
+        str | None,
+        typer.Option("--description", "-d", help="Prompt description (skip wizard prompt)"),
+    ] = None,
+    type: Annotated[
+        str | None,
+        typer.Option(
+            "--type",
+            "-T",
+            help="Prompt type (agent, command, review, other) - skip wizard prompt",
+        ),
+    ] = None,
+    environments: Annotated[
+        str | None,
+        typer.Option(
+            "--env",
+            "-e",
+            help="Comma-separated environment list (skip wizard prompt)",
+        ),
+    ] = None,
+) -> None:
+    """Create a new canonical prompt using an interactive wizard.
+
+    This command launches an interactive wizard that guides you through
+    creating a new prompt with proper canonical frontmatter.
+
+    Wizard steps:
+      1. Enter prompt title (required)
+      2. Enter prompt description (required)
+      3. Select prompt type (suggests appropriate environments)
+      4. Select target environments
+      5. Confirm configuration
+      6. Create file with frontmatter
+      7. Open editor for content
+
+    The wizard generates valid canonical frontmatter and validates
+    the created file using CanonicalPromptValidator.
+
+    Examples:
+        # Run full interactive wizard
+        dot-work prompt create
+
+        # Provide title upfront
+        dot-work prompt create --title "My Review Prompt"
+
+        # Provide all options non-interactively
+        dot-work prompt create --title "Security Review" \\
+            --description "Security-focused code review" \\
+            --type review \\
+            --env claude,cursor,copilot
+    """
+    from dot_work.prompts.wizard import create_prompt_interactive
+
+    # Parse environments if provided
+    env_list: list[str] | None = None
+    if environments:
+        env_list = [e.strip() for e in environments.split(",") if e.strip()]
+
+    try:
+        prompt_path = create_prompt_interactive(
+            title=title,
+            description=description,
+            prompt_type=type,
+            environments=env_list,
+            console=console,
+        )
+
+        console.print()
+        console.print(
+            Panel(
+                f"[green]✓[/green] Prompt created successfully!\n\n"
+                f"[cyan]File:[/cyan] {prompt_path}\n\n"
+                f"[dim]Next steps:[/dim]\n"
+                f"  1. Edit the prompt content with specific guidelines\n"
+                f"  2. Test with: [cyan]dot-work canonical validate {prompt_path}[/cyan]\n"
+                f"  3. Install to your project with: [cyan]dot-work install[/cyan]",
+                title="✨ Prompt Created",
+                border_style="green",
+            )
+        )
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Wizard cancelled.[/yellow]")
+        raise typer.Exit(0)
+
+    except Exception as e:
+        console.print(f"\n[red]Error creating prompt:[/red] {e}")
+        raise typer.Exit(1) from e
+
+
 # Register the canonical subcommand group
 app.add_typer(canonical_app, name="canonical")
+
+# Register the prompt management subcommand group (also as 'prompts' alias)
+app.add_typer(prompt_app, name="prompt")
+app.add_typer(prompt_app, name="prompts")
 
 # Register the review subcommand group
 app.add_typer(review_app, name="review")
