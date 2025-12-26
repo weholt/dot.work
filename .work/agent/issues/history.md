@@ -4,6 +4,40 @@ Completed and closed issues are archived here.
 
 ---
 
+## 2024-12-26: Installation Issue - dot-work tool missing python.build module (BUG-001)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| BUG-001@fe313e | ✅ Resolved | 2024-12-26 |
+
+### Summary
+- **Type**: Installation Issue (P0 Critical)
+- **Title**: Installed dot-work tool missing python.build module
+- **Status**: ✅ Resolved (No action required)
+
+### Problem
+When running `dot-work install` (or any dot-work command), the installed tool would fail with:
+```
+ModuleNotFoundError: No module named 'dot_work.python.build'
+```
+
+**Root Cause:**
+The installed uv tool version (dated Dec 26 02:36) predated the addition of the `build/` module to the codebase. The import occurred at `dot_work/python/__init__.py:12`.
+
+### Resolution
+Investigation revealed the installed tool has already been updated. The `build/` module exists at:
+- Source: `src/dot_work/python/build/` (present)
+- Installed: `~/.local/share/uv/tools/dot-work/lib/python3.13/site-packages/dot_work/python/build/` (present)
+
+Both `dot-work --help` and `dot-work python build --help` commands work correctly.
+
+### Notes
+- Issue was resolved between original report and current investigation
+- No code changes were required
+- Tool reinstallation may have occurred manually
+
+---
+
 ## 2024-12-26: Memory Leak - LibCST CST Trees Not Released (MEM-002)
 
 | Issue | Status | Completed |
