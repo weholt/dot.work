@@ -1,7 +1,7 @@
 # Project Baseline
 
-**Captured:** 2024-12-26T19:00:00Z
-**Commit:** c8c565b
+**Captured:** 2024-12-26T20:00:00Z
+**Commit:** 60e31ce
 **Branch:** closing-migration
 
 ---
@@ -72,7 +72,7 @@
 
 ## Tests
 
-- **Total tests:** 1506 collected (103 errors during collection - in incoming/)
+- **Total tests:** 1541 collected (103 errors during collection - in incoming/)
 - **Unit tests:** All passing (with 4GB memory limit enforced)
 - **Execution time:** ~587 seconds
 - **Coverage:** 74% (overall)
@@ -149,38 +149,37 @@
 
 ### Recent Changes (since previous baseline)
 
-**Previous Baseline:** 2024-12-26T17:30:00Z, Commit 0b13948
+**Previous Baseline:** 2024-12-26T19:00:00Z, Commit c8c565b
 
 | Metric | Previous | Current | Change |
 |--------|----------|---------|--------|
-| Commit | 0b13948 | c8c565b | +2 commits |
-| Tests | 1494 | 1506 | +12 tests |
+| Commit | c8c565b | 60e31ce | +1 commit |
+| Tests | 1506 | 1541 | +35 tests |
 | Type Errors (src/) | 56 | 56 | No change |
-| Lint Errors (src/) | 0 | 36 | +36 (pre-existing unreported) |
-| Security (src/) | 0 | 5 warnings | +5 (pre-existing unreported) |
+| Lint Errors (src/) | 36 | 36 | No change |
+| Security (src/) | 5 warnings | 5 warnings | No change |
 
 **Changes between baselines:**
-1. **SEC-002 fix (de01dcc):** SQL injection vulnerability in FTS5 search
-   - Added strict input validation with whitelist approach
-   - Added `allow_advanced` parameter to `search()`
-   - All 378 knowledge_graph tests passing
-   - 46 search_fts tests passing (8 new security tests)
+1. **SEC-003 fix (60e31ce):** Git option injection vulnerability in review/git.py
+   - Added git ref validation with whitelist pattern
+   - Added `_validate_git_ref()` and `_validate_git_path()` functions
+   - Added `GitRefValidationError` exception class
+   - Updated `changed_files()` and `get_unified_diff()` to validate parameters
+   - All 35 security tests passing
 
-2. **CR-009 issue (c8c565b):** Module naming conflict in python.build (documentation only)
-
-### Key Features Added (SEC-002)
-- Whitelist validation for simple queries
-- FTS5 operators rejected by default
-- Dangerous patterns never allowed (wildcards, NEAR, column filters)
-- Advanced query validation (balanced parens/quotes, length/complexity limits)
+### Key Features Added (SEC-003)
+- Whitelist validation for git refs (alphanumeric, -, ., /, ~, ^, :, @)
+- Git options blocking (rejects `--*` patterns)
+- Shell metacharacter blocking (|, &, ;, $, `, (, ), <, >, newlines)
+- Path traversal blocking (`..` sequences)
+- Support for HEAD, commit hashes, and `@{-n}` syntax
 
 ---
 
 ## Next Steps
 
 1. **Pre-work checklist COMPLETE** - Baseline established
-2. **Ready to select next issue** - See critical.md for 4 P0 issues:
-   - SEC-003: Unvalidated git command argument
+2. **Ready to select next issue** - See critical.md for 3 P0 issues:
    - MEM-001: SQLAlchemy engine accumulation
    - MEM-002: LibCST CST trees not released
    - BUG-001: Installed tool missing python.build module
