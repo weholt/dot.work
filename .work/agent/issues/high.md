@@ -606,3 +606,76 @@ assert dot_work.knowledge_graph.__version__ == "0.1.0"
 - This is a clear migration bug - simple oversight during import updates
 - See investigation: `.work/agent/issues/references/AUDIT-KG-001-investigation.md`
 
+---
+
+id: "AUDIT-GAP-010@e7f8a9"
+title: "kgtool NOT migrated - unique topic discovery functionality lost"
+description: "kgtool provides unsupervised topic discovery from markdown using KMeans clustering, which is NOT available in the existing knowledge_graph module"
+created: 2025-12-26
+section: "kgtool"
+tags: [migration-gap, topic-discovery, knowledge-graph, audit]
+type: enhancement
+priority: high
+status: proposed
+references:
+  - .work/agent/issues/references/AUDIT-KGTOOL-008-investigation.md
+  - incoming/crampus/kgtool/
+---
+
+### Problem
+
+During AUDIT-KGTOOL-008, it was discovered that kgtool was **NOT migrated** to dot-work.
+
+**kgtool provides unique functionality:**
+1. **discover_topics** - KMeans clustering for unsupervised topic discovery from markdown
+2. **build_graph** - Build knowledge graph from markdown using TF-IDF + YAKE + NetworkX
+3. **extract_topic_context** - Topic-based context extraction from graphs
+
+**Source:** `incoming/crampus/kgtool/` (~13K Python code)
+**Destination:** NOT FOUND in dot-work
+
+### Affected Files
+- Missing: `src/dot_work/kgtool/` or integration into `src/dot_work/knowledge_graph/`
+- Source: `incoming/crampus/kgtool/kgtool/pipeline.py` (11K, 330 lines)
+- Source: `incoming/crampus/kgtool/kgtool/cli.py` (2.4K)
+
+### Importance
+
+**HIGH:** kgtool provides unique topic discovery capabilities that are **NOT present** in the existing knowledge_graph module.
+
+**Differences:**
+- **kgtool**: Topic discovery using unsupervised learning (KMeans clustering, TF-IDF, YAKE)
+- **knowledge_graph**: Full-featured knowledge graph with semantic search, embeddings, database, FTS
+
+The existing knowledge_graph module uses semantic search with embeddings, which may provide similar but different functionality. However, kgtool's KMeans clustering approach is unique and may be valuable for certain use cases.
+
+### Proposed Solution
+
+**Decision needed from project maintainers:**
+
+**Option 1: Migrate kgtool to dot-work**
+1. Create `src/dot_work/kgtool/` or integrate into `src/dot_work/knowledge_graph/`
+2. Migrate pipeline.py (11K, 330 lines) - core functionality
+3. Migrate cli.py (2.4K) - CLI interface
+4. Add dependencies: networkx, yake, rapidfuzz, sklearn
+5. Update documentation
+
+**Option 2: Document intentional exclusion**
+1. Add to history.md noting kgtool was intentionally excluded
+2. Document reason (e.g., superseded by knowledge_graph's semantic search)
+3. Note that functionality is available in source if needed later
+
+### Acceptance Criteria
+- [ ] Decision made: migrate kgtool or document intentional exclusion
+- [ ] If migrating: kgtool added to dot-work with tests
+- [ ] If excluding: Documentation added explaining rationale
+- [ ] No ambiguity about kgtool status
+
+### Notes
+
+- See investigation: `.work/agent/issues/references/AUDIT-KGTOOL-008-investigation.md`
+- kgtool CLI commands:
+  - `kgtool discover-topics --input INPUT --output OUTPUT --num-topics 5`
+  - `kgtool build --input INPUT --output OUTPUT --min-sim 0.3`
+  - `kgtool extract --topic TOPIC --graph GRAPH --output OUTPUT`
+

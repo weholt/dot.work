@@ -4000,3 +4000,57 @@ All core functionality successfully migrated:
 See detailed investigation: `.work/agent/issues/references/AUDIT-PYBUILD-007-investigation.md`
 
 ---
+---
+
+## 2025-12-26: Migration Gap Analysis - KGTool Module (AUDIT-KGTOOL-008)
+
+| Audit | Status | Completed |
+|-------|--------|----------|
+| AUDIT-KGTOOL-008 | ✅ Complete | 2025-12-26 |
+
+### Summary
+- **Type**: Migration Gap Analysis
+- **Source**: `incoming/crampus/kgtool/`
+- **Destination**: NOT MIGRATED
+- **Status**: ⚠️ **FUNCTIONALITY GAP**
+
+### Investigation Findings
+
+**kgtool was NOT migrated** to dot-work.
+
+**kgtool provides unique functionality:**
+- **discover_topics**: KMeans clustering for unsupervised topic discovery from markdown
+- **build_graph**: TF-IDF + YAKE + NetworkX for document knowledge graphs
+- **extract_topic_context**: Topic-based context extraction from graphs
+
+**Source Size:** ~13K Python code
+- pipeline.py: 11K (330 lines) - core functionality
+- cli.py: 2.4K - CLI interface
+
+**Dependencies:** networkx, yake, rapidfuzz, sklearn
+
+### Comparison with Existing knowledge_graph Module
+
+The existing `knowledge_graph` module in dot-work provides:
+- Semantic search with embeddings
+- Full-text search (FTS)
+- Database operations with sqlite-vec
+- Graph operations and rendering
+
+**Conclusion:** These are **different tools** with different purposes. kgtool provides unique unsupervised topic discovery (KMeans clustering) that is NOT present in knowledge_graph.
+
+### Gap Issues Created
+1. **AUDIT-GAP-010 (HIGH)**: kgtool NOT migrated - unique topic discovery functionality lost
+   - Decision needed: migrate or document intentional exclusion
+
+### Assessment
+**Recommendation:** Project maintainers should decide whether kgtool's topic discovery functionality is needed in dot-work.
+
+**Options:**
+1. **Migrate kgtool** to dot-work (add as new module or integrate into knowledge_graph)
+2. **Document intentional exclusion** if superseded by semantic search with embeddings
+
+### Investigation Notes
+See detailed investigation: `.work/agent/issues/references/AUDIT-KGTOOL-008-investigation.md`
+
+---
