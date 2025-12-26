@@ -3,83 +3,6 @@
 Blockers, security issues, data loss risks.
 
 ---
-id: "SEC-002@94eb69"
-title: "Security: SQL injection risk in FTS5 search query"
-description: "Insufficient input sanitization in full-text search allows potential FTS5 query injection"
-created: 2025-12-25
-section: "knowledge-graph"
-tags: [security, sql-injection, fts5, search]
-type: security
-priority: critical
-status: proposed
-references:
-  - src/dot_work/knowledge_graph/search_fts.py
-  - src/dot_work/knowledge_graph/db.py
----
-
-### Problem
-In `src/dot_work/knowledge_graph/search_fts.py`, the `_prepare_query()` function attempts to escape FTS5 search terms, but the escaping logic has significant gaps:
-
-1. **Line 161**: Detects FTS5 operators (AND, OR, NOT, quotes, parentheses)
-2. **Line 165**: If operators detected, **trusts user input completely** without validation
-3. **Line 181**: `_escape_fts_term()` only removes non-alphanumeric characters using regex `r"[^\w\s-]"`
-
-**Vulnerabilities:**
-- If user provides FTS5 query with operators, it bypasses all sanitization
-- Regex escape is insufficient for complex FTS5 syntax (column filters, proximity searches)
-- Special FTS5 syntax like `^term*` (prefix search) and `term NEAR/2 term` can bypass filtering
-
-Attack vectors:
-- `SELECT * FROM users WHERE name MATCH 'abc OR 1=1'` → Could leak all records
-- Column filter injection: `email: *" OR "*` → Could bypass filters
-- Phrase search injection with malformed unicode
-
-### Affected Files
-- `src/dot_work/knowledge_graph/search_fts.py` (lines 150-182)
-- `src/dot_work/knowledge_graph/db.py` (line 896 - fts_search passes query directly)
-
-### Importance
-**CRITICAL**: SQL injection via FTS5 syntax can lead to:
-- Information disclosure (bypass access controls)
-- Denial of service (complex query DoS)
-- Potential data corruption in some SQLite configurations
-
-While FTS5 is more limited than full SQL, clever queries can still cause harm:
-- FTS5 allows column filtering: `col:term`
-- Phrase searches with wildcards: `"term*"`
-- Proximity searches: `NEAR/2 term`
-- Boolean logic combinations
-
-CVSS Score: 7.5 (High)
-- Attack Vector: Network (if search is web-exposed)
-- Attack Complexity: Low
-- Privileges Required: None (user-provided input)
-- Impact: High (Confidentiality)
-
-### Proposed Solution
-1. **Strict input validation**: Whitelist allowed characters for simple searches:
-   ```python
-   if not re.match(r'^[\w\s\-\.]+$', query):
-       raise ValueError("Invalid search query")
-   ```
-
-2. **Reject FTS5 operators by default**: Remove auto-detection, require explicit flag for advanced queries
-3. **Parameterize column filters**: If column filters are needed, pass as separate parameters
-4. **Query complexity limits**: Limit query length and operator count
-
-### Acceptance Criteria
-- [ ] FTS5 operators (AND, OR, NOT, parentheses) rejected by default
-- [ ] Only alphanumeric + space + hyphen + period allowed in simple mode
-- [ ] Optional `--allow-advanced-search` flag for trusted users
-- [ ] Tests verify injection attempts are blocked
-- [ ] Documentation warns about advanced search risks
-
-### Notes
-- FTS5 documentation: https://www.sqlite.org/fts5.html
-- Consider using dedicated search library (like whoosh) for complex needs
-- Current `_escape_fts_term()` at line 177 is insufficient for security
-
----
 id: "SEC-003@94eb69"
 title: "Security: Unvalidated git command argument in review/git.py"
 description: "Git ref parameters not validated before subprocess execution"
@@ -232,7 +155,7 @@ def in_memory_db() -> Generator[Session, None, None]:
        yield engine
        engine.dispose()
        SQLModel.metadata.clear()  # Critical: clear global metadata cache
-   
+
    @pytest.fixture
    def in_memory_db(db_engine) -> Generator[Session, None, None]:
        with Session(db_engine) as session:
@@ -264,7 +187,7 @@ def in_memory_db() -> Generator[Session, None, None]:
 
 ---
 id: "MEM-002@9c4b3d"
-title: "Memory Leak: libcst CST trees not released after parsing"
+title: "Memory Leak: LibCST CST trees not released after parsing"
 description: "Code parser holds large CST trees in memory without explicit cleanup, causing 5-15GB growth"
 created: 2025-12-26
 section: "overview"
@@ -331,12 +254,12 @@ This template is used for `code_for_node()` rendering and holds internal caches.
            collector = _Collector(...)
            module.visit(collector)
            result = {"features": collector.features, "models": collector.models}
-           
+
            # Explicit cleanup to help GC
            del module
            del collector
            gc.collect()  # Force collection of CST structures
-           
+
            return result
        except Exception:
            return {"features": [], "models": []}

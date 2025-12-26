@@ -10,7 +10,6 @@ import pytest
 from dot_work.knowledge_graph.db import Database, Node
 from dot_work.knowledge_graph.search_fts import (
     SearchResult,
-    _escape_fts_term,
     _extract_search_terms,
     _generate_snippet,
     _highlight_terms,
@@ -122,7 +121,7 @@ class TestSearch:
 
     def test_search_limits_results(self, indexed_db: Database) -> None:
         """Search respects the k limit."""
-        results = search(indexed_db, "Python OR Variables OR Functions", k=2)
+        results = search(indexed_db, "Python Variables Functions", k=2)
 
         assert len(results) <= 2
 
@@ -187,7 +186,7 @@ class TestIndexNode:
 
 
 class TestPrepareQuery:
-    """Tests for query preparation."""
+    """Tests for query preparation with security validation."""
 
     def test_prepare_query_empty(self) -> None:
         """Empty query returns empty string."""
@@ -205,38 +204,147 @@ class TestPrepareQuery:
         assert "python" in result
         assert "tutorial" in result
 
-    def test_prepare_query_preserves_operators(self) -> None:
-        """FTS5 operators are preserved."""
-        assert _prepare_query("python AND tutorial") == "python AND tutorial"
-        assert _prepare_query("python OR ruby") == "python OR ruby"
-        assert _prepare_query("python NOT java") == "python NOT java"
+    def test_prepare_query_allows_hyphen_and_period(self) -> None:
+        """Hyphens and periods are allowed in simple queries."""
+        assert _prepare_query("full-stack") == "full-stack"
+        assert _prepare_query("python3.11") == "python3.11"
 
-    def test_prepare_query_preserves_quotes(self) -> None:
-        """Quoted phrases are preserved."""
-        query = '"python tutorial"'
-        assert _prepare_query(query) == query
+    def test_prepare_query_allows_unicode(self) -> None:
+        """Unicode letters are allowed."""
+        assert "ñ" in _prepare_query("español")
 
-    def test_prepare_query_escapes_special_chars(self) -> None:
-        """Special characters are escaped."""
-        result = _prepare_query("test@example")
-        assert "@" not in result
+    def test_prepare_query_rejects_special_chars(self) -> None:
+        """Special characters are rejected (injection prevention)."""
+        with pytest.raises(ValueError, match="invalid characters"):
+            _prepare_query("test@example")
+
+        with pytest.raises(ValueError, match="invalid characters"):
+            _prepare_query("test$#@")
+
+    def test_prepare_query_rejects_operators_by_default(self) -> None:
+        """FTS5 operators are rejected by default (security)."""
+        with pytest.raises(ValueError, match="Advanced search syntax"):
+            _prepare_query("python AND tutorial")
+
+        with pytest.raises(ValueError, match="Advanced search syntax"):
+            _prepare_query("python OR ruby")
+
+        with pytest.raises(ValueError, match="Advanced search syntax"):
+            _prepare_query('"python tutorial"')
+
+        with pytest.raises(ValueError, match="Advanced search syntax"):
+            _prepare_query("(python OR tutorial)")
+
+    def test_prepare_query_allows_operators_with_flag(self) -> None:
+        """FTS5 operators allowed when allow_advanced=True."""
+        result = _prepare_query("python AND tutorial", allow_advanced=True)
+        assert result == "python AND tutorial"
+
+    def test_prepare_query_advanced_validates_structure(self) -> None:
+        """Advanced queries still reject dangerous patterns."""
+        # Wildcards blocked
+        with pytest.raises(ValueError, match="prohibited syntax"):
+            _prepare_query("python*", allow_advanced=True)
+
+        # NEAR blocked
+        with pytest.raises(ValueError, match="prohibited syntax"):
+            _prepare_query("python NEAR/2 tutorial", allow_advanced=True)
+
+        # Column filters blocked
+        with pytest.raises(ValueError, match="prohibited syntax"):
+            _prepare_query("title:python", allow_advanced=True)
+
+    def test_prepare_query_advanced_checks_balanced_parens(self) -> None:
+        """Advanced queries require balanced parentheses."""
+        with pytest.raises(ValueError, match="Unbalanced parentheses"):
+            _prepare_query("(python OR tutorial", allow_advanced=True)
+
+        with pytest.raises(ValueError, match="Unbalanced parentheses"):
+            _prepare_query("python OR tutorial)", allow_advanced=True)
+
+    def test_prepare_query_advanced_checks_balanced_quotes(self) -> None:
+        """Advanced queries require balanced quotes."""
+        # Unbalanced quote with operators should be caught
+        with pytest.raises(ValueError, match="Unbalanced quotes"):
+            _prepare_query('"python OR tutorial', allow_advanced=True)
+
+    def test_prepare_query_advanced_limits_length(self) -> None:
+        """Advanced queries have length limits."""
+        # Need to create a long query with operators to trigger advanced validation
+        # Use 57 words to exceed 500 character limit with " AND " separators
+        long_query = " AND ".join(["word"] * 57)
+        with pytest.raises(ValueError, match="too long"):
+            _prepare_query(long_query, allow_advanced=True)
+
+    def test_prepare_query_advanced_limits_complexity(self) -> None:
+        """Advanced queries limit OR count."""
+        # Use 12 words to create 11 " OR " separators (exceeds limit of 10)
+        long_query = " OR ".join(["word"] * 12)
+        with pytest.raises(ValueError, match="Too many OR"):
+            _prepare_query(long_query, allow_advanced=True)
 
 
-class TestEscapeFtsTerm:
-    """Tests for term escaping."""
+class TestSecurityInjectionPrevention:
+    """Tests for SQL injection prevention via FTS5."""
 
-    def test_escape_alphanumeric(self) -> None:
-        """Alphanumeric terms pass through."""
-        assert _escape_fts_term("python3") == "python3"
+    def test_injection_or_boolean_blocked(self) -> None:
+        """Boolean injection attempts are blocked."""
+        with pytest.raises(ValueError, match="Advanced search syntax"):
+            _prepare_query("term OR 1=1")
 
-    def test_escape_removes_special_chars(self) -> None:
-        """Special characters are removed."""
-        assert "@" not in _escape_fts_term("test@example")
-        assert "*" not in _escape_fts_term("test*")
+        with pytest.raises(ValueError, match="Advanced search syntax"):
+            _prepare_query("term OR true")
 
-    def test_escape_preserves_unicode(self) -> None:
-        """Unicode letters are preserved."""
-        assert "ñ" in _escape_fts_term("español")
+    def test_injection_wildcard_blocked(self) -> None:
+        """Wildcard injection is blocked."""
+        with pytest.raises(ValueError, match="prohibited syntax"):
+            _prepare_query("*")
+
+        # Even with allow_advanced, wildcards blocked
+        with pytest.raises(ValueError, match="prohibited syntax"):
+            _prepare_query("*", allow_advanced=True)
+
+    def test_injection_column_filter_bypass_blocked(self) -> None:
+        """Column filter bypass attempts are blocked."""
+        # Column filter syntax is blocked (contains colon)
+        with pytest.raises(ValueError, match="prohibited syntax"):
+            _prepare_query('email: *" OR "*"')
+
+        # Even with allow_advanced, column filters blocked
+        with pytest.raises(ValueError, match="prohibited syntax"):
+            _prepare_query('email: test', allow_advanced=True)
+
+    def test_injection_parenthesis_breakout_blocked(self) -> None:
+        """Parenthesis breakout attempts are blocked."""
+        # Operators are rejected without allow_advanced
+        with pytest.raises(ValueError, match="Advanced search syntax"):
+            _prepare_query('term) OR (1=1')
+
+        # With allow_advanced, unbalanced parens are caught
+        # Note: 'term) OR (1=1' has balanced parens (1 each), use truly unbalanced
+        with pytest.raises(ValueError, match="Unbalanced parentheses"):
+            _prepare_query('(term OR 1=1', allow_advanced=True)
+
+    def test_injection_quote_breakout_blocked(self) -> None:
+        """Quote breakout attempts are blocked."""
+        with pytest.raises(ValueError, match="Advanced search syntax"):
+            _prepare_query('term" OR "1=1"')
+
+    def test_safe_queries_still_work(self) -> None:
+        """Safe simple queries continue to work."""
+        # Single word
+        assert _prepare_query("python") == "python"
+
+        # Multiple words are joined with OR
+        result = _prepare_query("python programming tutorial")
+        assert result == "python OR programming OR tutorial"
+
+        # With hyphens and periods
+        result = _prepare_query("full-stack development")
+        assert result == "full-stack OR development"
+
+        result = _prepare_query("python3.11 features")
+        assert result == "python3.11 OR features"
 
 
 class TestExtractSearchTerms:
@@ -339,19 +447,31 @@ class TestTruncate:
 class TestSearchEdgeCases:
     """Tests for edge cases in search."""
 
-    def test_search_special_characters(self, indexed_db: Database) -> None:
-        """Search handles special characters."""
-        # Should not raise
-        results = search(indexed_db, "test@#$%")
-        assert isinstance(results, list)
-
     def test_search_unicode(self, indexed_db: Database) -> None:
         """Search handles unicode."""
         results = search(indexed_db, "café")
         assert isinstance(results, list)
 
-    def test_search_very_long_query(self, indexed_db: Database) -> None:
-        """Search handles very long queries."""
-        long_query = "python " * 100
-        results = search(indexed_db, long_query)
+    def test_search_special_characters_rejected(self, indexed_db: Database) -> None:
+        """Special characters are rejected for security."""
+        with pytest.raises(ValueError, match="invalid characters"):
+            search(indexed_db, "test@#$%")
+
+    def test_search_operators_rejected_by_default(self, indexed_db: Database) -> None:
+        """FTS5 operators rejected by default for security."""
+        with pytest.raises(ValueError, match="Advanced search syntax"):
+            search(indexed_db, "python AND tutorial")
+
+    def test_search_operators_allowed_with_flag(self, indexed_db: Database) -> None:
+        """FTS5 operators work when explicitly enabled."""
+        # Should not raise when allow_advanced=True
+        results = search(indexed_db, "Python OR Variables", allow_advanced=True)
         assert isinstance(results, list)
+
+    def test_search_limits_query_length(self, indexed_db: Database) -> None:
+        """Search rejects overly long queries in advanced mode."""
+        # Create a query that exceeds the OR count limit (need 12 words for 11 ORs)
+        long_query = " OR ".join(["word"] * 12)
+
+        with pytest.raises(ValueError, match="Too many OR"):
+            search(indexed_db, long_query, allow_advanced=True)

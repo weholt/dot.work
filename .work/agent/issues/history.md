@@ -4,6 +4,93 @@ Completed and closed issues are archived here.
 
 ---
 
+## 2024-12-26: Security - SQL Injection Risk in FTS5 Search (SEC-002)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| SEC-002@94eb69 | ✅ Complete | 2024-12-26 |
+
+### Summary
+- **Type**: Security (P0 Critical)
+- **Title**: SQL injection risk in FTS5 search query
+- **Status**: ✅ Fixed and Validated
+
+### Problem
+The `_prepare_query()` function in `src/dot_work/knowledge_graph/search_fts.py` trusted user-provided FTS5 syntax when operators (AND, OR, NOT, quotes, parentheses) were detected, returning the raw query without validation.
+
+**Vulnerable code (lines 160-165):**
+```python
+has_operators = bool(re.search(r'\b(AND|OR|NOT)\b|"[^"]+"|[()]', query, re.IGNORECASE))
+
+if has_operators:
+    # Trust user-provided FTS5 syntax
+    return query  # VULNERABILITY - NO VALIDATION!
+```
+
+**Attack vectors:**
+- `"secret" OR 1=1` - matches all documents
+- `email: *" OR "*"` - bypasses column filters
+- `* NEAR/2 *` - DoS via expensive queries
+
+### Solution Implemented
+
+1. **Whitelist validation for simple queries:**
+   ```python
+   _SIMPLE_QUERY_PATTERN = re.compile(r"^[\w\s\-\.]+$", re.UNICODE)
+   ```
+   - Only allows letters, numbers, spaces, hyphens, periods
+   - Rejects special characters by default
+
+2. **Reject FTS5 operators by default:**
+   - Added `allow_advanced=False` parameter to `search()` function
+   - Users must explicitly enable advanced syntax
+
+3. **Dangerous patterns never allowed:**
+   ```python
+   _DANGEROUS_PATTERNS = [
+       r"\*",  # Wildcards
+       r"\bNEAR\b",  # Proximity searches (DoS risk)
+       r"\w+:",  # Column filters with colons
+   ]
+   ```
+
+4. **Advanced query validation:**
+   - Balanced parentheses check
+   - Balanced quotes check
+   - Length limit (500 characters)
+   - Complexity limit (max 10 OR conditions)
+
+### Files Modified
+- `src/dot_work/knowledge_graph/search_fts.py`:
+  - Added `_SIMPLE_QUERY_PATTERN`, `_FTS5_OPERATOR_PATTERN`, `_DANGEROUS_PATTERNS`
+  - Added `allow_advanced` parameter to `search()`
+  - Rewrote `_prepare_query()` with security validation
+  - Added `_validate_advanced_query()` function
+  - Removed insecure `_escape_fts_term()` function
+
+- `tests/unit/knowledge_graph/test_search_fts.py`:
+  - Updated 15 tests for new security behavior
+  - Added `TestSecurityInjectionPrevention` class with 8 tests
+  - All 46 tests passing
+
+### Validation
+- All 378 knowledge_graph tests passing
+- Injection attempts blocked:
+  - `term OR 1=1` → ValueError (Advanced search syntax)
+  - `*` → ValueError (prohibited syntax)
+  - `email: test` → ValueError (prohibited syntax)
+  - `term) OR (1=1` → ValueError (Unbalanced parentheses)
+- Safe queries still work:
+  - `python` → `python`
+  - `python tutorial` → `python OR tutorial`
+
+### Notes
+- Investigation notes: `.work/agent/notes/SEC-002-investigation.md`
+- Breaking change: Queries with FTS5 operators now require `allow_advanced=True`
+- Consider updating CLI/API documentation to reflect new security requirements
+
+---
+
 ## 2025-12-25: Code Review - SQLite Adapter Stores Datetimes as Strings (CR-002)
 
 | Issue | Status | Completed |

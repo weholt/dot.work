@@ -13,6 +13,20 @@ if TYPE_CHECKING:
     from dot_work.knowledge_graph.db import Database, Node
 
 
+# Whitelist pattern for simple queries (no FTS5 operators)
+_SIMPLE_QUERY_PATTERN = re.compile(r"^[\w\s\-\.]+$", re.UNICODE)
+
+# Patterns for detecting FTS5 operators
+_FTS5_OPERATOR_PATTERN = re.compile(r'\b(AND|OR|NOT)\b|"[^"]+"|[()]', re.IGNORECASE)
+
+# Dangerous patterns that are never allowed, even with allow_advanced=True
+_DANGEROUS_PATTERNS = [
+    r"\*",  # Wildcards (can match everything)
+    r"\bNEAR\b",  # Proximity searches (DoS risk)
+    r"\w+:",  # Column filters with colons (can bypass filters) - catches `title:term` style
+]
+
+
 @dataclass
 class ScopeFilter:
     """Scope filter for limiting search results.
@@ -49,27 +63,32 @@ def search(
     k: int = 20,
     snippet_length: int = 150,
     scope: ScopeFilter | None = None,
+    *,
+    allow_advanced: bool = False,
 ) -> list[SearchResult]:
     """Search for nodes matching the query.
 
     Args:
         db: Database connection.
-        query: Search query (supports FTS5 syntax).
+        query: Search query.
         k: Maximum number of results.
         snippet_length: Maximum length of snippet.
         scope: Optional scope filter to limit results.
+        allow_advanced: Allow FTS5 operators (AND, OR, NOT, quotes, parentheses).
+            Default is False for security. Only enable in trusted contexts.
 
     Returns:
         List of SearchResult, sorted by relevance (best first).
 
     Raises:
-        ValueError: If scope specifies unknown project or topic.
+        ValueError: If scope specifies unknown project or topic, or if query
+            contains invalid/injected syntax.
     """
     if not query or not query.strip():
         return []
 
-    # Escape special characters for safety, but preserve FTS5 operators
-    safe_query = _prepare_query(query)
+    # Escape and validate query for security
+    safe_query = _prepare_query(query, allow_advanced=allow_advanced)
 
     if not safe_query:
         return []
@@ -147,39 +166,105 @@ def index_node(
     )
 
 
-def _prepare_query(query: str) -> str:
-    """Prepare query for FTS5.
+def _prepare_query(query: str, allow_advanced: bool = False) -> str:
+    """Prepare and validate query for FTS5.
 
-    Handles common query patterns and escapes dangerous characters.
+    This function implements strict security validation to prevent SQL injection
+    via FTS5 query syntax.
+
+    Args:
+        query: Raw user search query.
+        allow_advanced: Allow FTS5 operators (AND, OR, NOT, quotes, parentheses).
+            Default is False for security. Only enable in trusted contexts.
+
+    Returns:
+        Safe query string for FTS5.
+
+    Raises:
+        ValueError: If query contains invalid or dangerous syntax.
     """
     query = query.strip()
 
     if not query:
         return ""
 
-    # Check if query uses FTS5 operators (AND, OR, NOT, quotes, etc.)
-    has_operators = bool(re.search(r'\b(AND|OR|NOT)\b|"[^"]+"|[()]', query, re.IGNORECASE))
+    # Check for dangerous patterns that are NEVER allowed
+    # This check happens first, before any other validation
+    for pattern in _DANGEROUS_PATTERNS:
+        if re.search(pattern, query, re.IGNORECASE):
+            raise ValueError(
+                f"Query contains prohibited syntax: {pattern}. "
+                "Wildcards, NEAR searches, and column filters are not allowed."
+            )
+
+    # Check if query uses FTS5 operators
+    has_operators = bool(_FTS5_OPERATOR_PATTERN.search(query))
 
     if has_operators:
-        # Trust user-provided FTS5 syntax
-        return query
+        if not allow_advanced:
+            raise ValueError(
+                "Advanced search syntax (AND, OR, NOT, quotes, parentheses) "
+                "is not allowed. Use simple word search with letters, numbers, "
+                "spaces, hyphens, and periods only."
+            )
+        # Validate advanced query structure
+        return _validate_advanced_query(query)
+
+    # Simple query: whitelist validation
+    if not _SIMPLE_QUERY_PATTERN.match(query):
+        raise ValueError(
+            "Query contains invalid characters. "
+            "Use only letters, numbers, spaces, hyphens, and periods."
+        )
 
     # Simple query: treat as implicit OR between words
     words = query.split()
     if len(words) == 1:
-        return _escape_fts_term(words[0])
+        return words[0]
 
-    # Multiple words: join with OR
-    escaped = [_escape_fts_term(w) for w in words if w]
-    return " OR ".join(escaped)
+    # Multiple words: join with OR (safe because we validated with whitelist)
+    return " OR ".join(words)
 
 
-def _escape_fts_term(term: str) -> str:
-    """Escape a single term for FTS5."""
-    # Remove characters that could break FTS5 syntax
-    # Allow alphanumeric, underscore, and unicode letters
-    clean = re.sub(r"[^\w\s-]", "", term, flags=re.UNICODE)
-    return clean.strip()
+def _validate_advanced_query(query: str) -> str:
+    """Validate advanced FTS5 query structure.
+
+    This function validates queries that use FTS5 operators, checking for
+    dangerous patterns that could cause injection or DoS attacks.
+
+    Args:
+        query: Query with FTS5 operators.
+
+    Returns:
+        The validated query.
+
+    Raises:
+        ValueError: If query contains dangerous patterns or structural issues.
+    """
+    # Check for dangerous patterns that are never allowed
+    for pattern in _DANGEROUS_PATTERNS:
+        if re.search(pattern, query, re.IGNORECASE):
+            raise ValueError(
+                f"Query contains prohibited syntax: {pattern}. "
+                "Wildcards, NEAR searches, and column filters are not allowed."
+            )
+
+    # Check for balanced parentheses
+    if query.count("(") != query.count(")"):
+        raise ValueError("Unbalanced parentheses in query")
+
+    # Check for balanced quotes
+    if query.count('"') % 2 != 0:
+        raise ValueError("Unbalanced quotes in query")
+
+    # Limit query complexity to prevent DoS
+    if len(query) > 500:
+        raise ValueError("Query too long (maximum 500 characters)")
+
+    if query.count(" OR ") > 10:
+        raise ValueError("Too many OR conditions (maximum 10)")
+
+    return query
 
 
 def _get_node_text(db: Database, node: Node) -> str:
