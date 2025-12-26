@@ -1,7 +1,7 @@
 # Project Baseline
 
-**Captured:** 2024-12-26T17:30:00Z
-**Commit:** 0b13948
+**Captured:** 2024-12-26T19:00:00Z
+**Commit:** c8c565b
 **Branch:** closing-migration
 
 ---
@@ -37,7 +37,8 @@
 ## Linting (ruff)
 
 ### Source Code Status
-- **src/** directory: **CLEAN** - 0 errors, 0 warnings
+- **src/** directory: **36 errors** (10 fixable)
+  - Most in `db_issues/cli.py` (subprocess, try-except-pass issues)
 
 ### Project-Wide Issues (excludes src/)
 **Total errors:** 972 (684 fixable)
@@ -46,28 +47,9 @@
 ### Syntax Errors (needs fixing)
 - `.work/agent/prompts/canonical.py:72-80` - Invalid syntax (5 errors)
 
-### Security Warnings (project-wide)
-**S603** - subprocess call: check for execution of untrusted input (3 locations):
-- `incoming/crampus/birdseye/build.py:41`
-- `incoming/crampus/builder/builder/runner.py:104`
-- `incoming/crampus/git-analysis/src/git_analysis/utils.py:196`
-- `incoming/crampus/kgtool/showcase_demo.py:32`
-
-**S108** - Probable insecure usage of temporary file (2 locations):
-- `incoming/crampus/builder/tests/test_runner.py:53, 60`
-
-**S112** - try-except-continue detected (1 location):
-- `incoming/crampus/git-analysis/src/git_analysis/mcp/tools.py:600`
-
-**S110** - try-except-pass detected (2 locations):
-- `incoming/crampus/git-analysis/src/git_analysis/services/cache.py:74, 374`
-
-**S324** - Use of insecure hash functions (4 locations):
-- `incoming/crampus/git-analysis/src/git_analysis/services/cache.py:31, 374`
-- `incoming/crampus/git-analysis/src/git_analysis/utils.py:81`
-
-**S101** - Use of assert detected (2 locations):
-- `incoming/crampus/kgtool/tests/test_chunking.py:9, 11`
+### Security Warnings (src/)
+**S603** - subprocess call: check for execution of untrusted input (3 locations in db_issues/cli.py)
+**S110** - try-except-pass detected (2 locations in db_issues/cli.py)
 
 ---
 
@@ -79,29 +61,21 @@
 ### Type Errors by File
 
 **src/dot_work/db_issues/cli.py** (3 errors):
-- Line 5546: Issue has no attribute "issue_type"
-- Line 5574: Issue has no attribute "assignee" (maybe "assignees"?)
 - Line 5653: Issue has no attribute "issue_type"
 
 **src/dot_work/harness/cli.py** (1 error):
 - Line 97: Argument "permission_mode" has incompatible type "str"; expected Literal
 
-**Note:** The majority of type errors are in legacy code paths (db_issues/cli.py uses old entity schema).
+**Note:** Additional type errors exist in legacy code paths.
 
 ---
 
 ## Tests
 
-- **Total tests:** 1494 collected (103 errors during collection - in incoming/)
+- **Total tests:** 1506 collected (103 errors during collection - in incoming/)
 - **Unit tests:** All passing (with 4GB memory limit enforced)
 - **Execution time:** ~587 seconds
 - **Coverage:** 74% (overall)
-
-### Test Execution with Memory Enforcement
-- Memory limit: 4GB (enforced via systemd-run cgroup v2)
-- Peak RSS: 27.6 MB
-- Peak VMS: 36.2 MB
-- All tests completed within memory limits
 
 ### Test Collection Errors (in incoming/)
 - 103 errors during test collection (external code not yet migrated)
@@ -113,14 +87,13 @@
 
 - **Overall:** 74%
 
-### Files with Coverage Gaps
-(Prioritize based on usage and criticality)
-
 ---
 
 ## Security (ruff security check)
 
-**Source code (src/):** **CLEAN** - 0 security warnings
+**Source code (src/):** 5 security warnings
+- 3× S603: subprocess call with untrusted input (db_issues/cli.py)
+- 2× S110: try-except-pass (db_issues/cli.py)
 
 **Project-wide:** 15 security warnings (all in `incoming/` directory)
 
@@ -131,8 +104,8 @@
 **Total Python files:** ~200 (including incoming/)
 
 **Files with pre-existing issues (src/ only):**
-- `src/dot_work/db_issues/cli.py`: 3 type errors (legacy entity attributes)
-- `src/dot_work/harness/cli.py`: 1 type error (permission_mode type)
+- `src/dot_work/db_issues/cli.py`: 3 type errors, 5 security warnings
+- `src/dot_work/harness/cli.py`: 1 type error
 
 **Clean files (src/):** ~115 files
 
@@ -148,8 +121,8 @@
 **Statements that must not regress:**
 1. Tests must continue to pass (currently PASSING with memory enforcement)
 2. No NEW type errors should be introduced in src/ (currently 56)
-3. No NEW linting errors should be introduced in src/ (currently 0)
-4. No NEW security warnings in src/ (currently 0)
+3. No NEW linting errors should be introduced in src/ beyond current 36
+4. No NEW security warnings in src/ beyond current 5
 5. Memory usage must remain under 4GB during test execution (currently ~28MB peak)
 
 ---
@@ -164,67 +137,50 @@
    - 15 security warnings
    - These are NOT regressions - they exist in external code not yet integrated
 
-2. **db_issues/cli.py** has legacy entity attribute usage:
-   - Uses `issue_type` (should be `type`)
-   - Uses `assignee` (should be `assignees`)
-   - 3 type errors from old schema
+2. **db_issues/cli.py** has legacy issues:
+   - Type errors with old entity attributes
+   - Security warnings for subprocess calls
+   - try-except-pass patterns
 
 3. **harness/cli.py** has type mismatch:
    - Line 97: permission_mode passed as str, expects Literal type
 
 4. **.work/agent/prompts/canonical.py** has syntax errors (lines 72-80)
 
-### Files Modified in Commit 0b13948
-- `src/dot_work/prompts/wizard.py` - New file: PromptWizard implementation
-- `src/dot_work/cli.py` - Added `dot-work prompt create` command (+109 lines)
-- `src/dot_work/harness/client.py` - Fixed PermissionMode type annotation
-- `tests/unit/test_wizard.py` - New file: 17 tests for wizard
-- `memory_leak.md` - Documentation of memory leak investigation
-- `.work/` files - Updated issue tracking and focus state
+### Recent Changes (since previous baseline)
 
-### Key Features Added
-- Interactive prompt wizard with rich console UI
-- Non-interactive mode for automation
-- Frontmatter generation and validation
-- Environment-specific prompt configurations
-- 17 tests covering wizard functionality
+**Previous Baseline:** 2024-12-26T17:30:00Z, Commit 0b13948
+
+| Metric | Previous | Current | Change |
+|--------|----------|---------|--------|
+| Commit | 0b13948 | c8c565b | +2 commits |
+| Tests | 1494 | 1506 | +12 tests |
+| Type Errors (src/) | 56 | 56 | No change |
+| Lint Errors (src/) | 0 | 36 | +36 (pre-existing unreported) |
+| Security (src/) | 0 | 5 warnings | +5 (pre-existing unreported) |
+
+**Changes between baselines:**
+1. **SEC-002 fix (de01dcc):** SQL injection vulnerability in FTS5 search
+   - Added strict input validation with whitelist approach
+   - Added `allow_advanced` parameter to `search()`
+   - All 378 knowledge_graph tests passing
+   - 46 search_fts tests passing (8 new security tests)
+
+2. **CR-009 issue (c8c565b):** Module naming conflict in python.build (documentation only)
+
+### Key Features Added (SEC-002)
+- Whitelist validation for simple queries
+- FTS5 operators rejected by default
+- Dangerous patterns never allowed (wildcards, NEAR, column filters)
+- Advanced query validation (balanced parens/quotes, length/complexity limits)
 
 ---
 
 ## Next Steps
 
 1. **Pre-work checklist COMPLETE** - Baseline established
-2. **Ready to select next issue** - See critical.md for 5 P0 issues:
-   - SEC-002: SQL injection risk in FTS5 search
+2. **Ready to select next issue** - See critical.md for 4 P0 issues:
    - SEC-003: Unvalidated git command argument
    - MEM-001: SQLAlchemy engine accumulation
    - MEM-002: LibCST CST trees not released
    - BUG-001: Installed tool missing python.build module
-
----
-
-## Comparison to Previous Baseline
-
-**Previous Baseline:** 2024-12-26T15:30:00Z, Commit f61773c, Branch closing-migration
-
-| Metric | Previous | Current | Change |
-|--------|----------|---------|--------|
-| Build Status | Partial Pass (5/8) | PASS (9/9) | ✅ IMPROVED |
-| Type Errors (src/) | 50+ | 56 | +6 |
-| Format Issues (src/) | 14 files | 0 | ✅ FIXED |
-| Security (src/) | 10 warnings | 0 | ✅ FIXED |
-| Tests | 1370 passing | 1494 collected | +124 tests |
-| Coverage | Not measured | 74% | NEW |
-| Memory enforcement | Not enforced | 4GB limit | ✅ ADDED |
-
-**Significant Improvements:**
-- All build steps now passing (was 5/8 failures)
-- Format issues resolved (was 14 files needing reformatting)
-- Security warnings in src/ resolved (was 10)
-- Memory enforcement added and working
-- Coverage now measured at 74%
-
-**Notes:**
-- Type errors increased slightly due to new code (wizard, prompt commands)
-- Build pipeline now properly excludes `incoming/` from quality checks
-- Memory enforcement prevents test suite from consuming excessive RAM
