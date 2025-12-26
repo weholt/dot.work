@@ -1,64 +1,17 @@
-# Backlog
+can you create a simple python-based example using claude code sdk to have an iterative loop getting the same prompt to process a list of tasks in a file until all tasks are done?
 
-Untriaged ideas and future work.
+`claude-code-sdk` is deprecated; use the **Claude Agent SDK** (`claude-agent-sdk`), which embeds Claude Code tooling and provides `query()` / `ClaudeSDKClient`. ([PyPI][1])
 
----
----
-id: "FEAT-001@112e52"
-title: "Create Claude Agent SDK example: iterative autonomous task processing"
-description: "Python example using Claude Agent SDK for autonomous agent that processes tasks from markdown file iteratively until complete"
-created: 2025-12-26
-section: "examples"
-tags: [claude-agent-sdk, autonomous-agent, iterative, task-processing, python, anyio]
-type: enhancement
-priority: medium
-status: proposed
-references:
-  - chat-harness.md
-  - examples/
-  - https://pypi.org/project/claude-code-sdk/
-  - https://platform.claude.com/docs/en/agent-sdk/python
----
-
-### Problem
-Need a complete, runnable Python example demonstrating the **Claude Agent SDK** (not the deprecated `claude-code-sdk`) for autonomous iterative task processing:
-- Read tasks from a markdown file (checkbox format: `- [ ] Task name`)
-- Process tasks iteratively with Claude Agent SDK's `query()` / `receive_response()` pattern
-- Agent selects next unchecked task, implements it, verifies, marks as done
-- Continues until all tasks complete or blocked
-- Track progress and handle errors
-
-**Important:** Use `claude-agent-sdk` (embeds Claude Code tooling), NOT the deprecated `claude-code-sdk`.
-
-### Affected Files
-- `examples/` (new directory to be created)
-- `chat-harness.md` (reference documentation with full spec)
-- `examples/run_tasks.py` (main example script)
-- `examples/tasks.md` (example tasks file)
-
-### Importance
-Users learning autonomous agent patterns need practical examples for:
-- **Claude Agent SDK usage**: `ClaudeSDKClient`, `ClaudeAgentOptions`, async `query()/receive_response()`
-- **Autonomous iteration**: Agent controls task selection and completion
-- **File-backed state**: Tasks tracked in markdown, agent updates file directly
-- **Tool integration**: Read, Write, Edit, Glob, Grep, Bash tools
-- **Progress tracking**: Evidence-based task completion, blocked task handling
-- **Safety patterns**: Max iterations, max turns per iteration, permission modes
-
-### Proposed Solution
-
-**Full specification from `chat-harness.md`:**
-
-**File: `examples/tasks.md` (example input)**
-```markdown
+```md
+# filename: tasks.md
 # Tasks
 - [ ] T-001: Create a python module `src/app.py` that exposes `add(a,b)` and `mul(a,b)` with type hints.
 - [ ] T-002: Add unit tests for `add` and `mul` using pytest.
 - [ ] T-003: Add `pyproject.toml` with minimal config to run `pytest -q`.
 ```
 
-**File: `examples/run_tasks.py`** (complete implementation):
 ```python
+# filename: run_tasks.py
 import argparse
 import re
 from dataclasses import dataclass
@@ -117,6 +70,7 @@ async def run_one_iteration(
     tasks_path: Path,
     max_tool_turns: int,
 ) -> str:
+    # Same instruction each time; repo state comes from the file Claude reads.
     prompt = (
         "You are an autonomous coding agent working in this repository.\n"
         f"- Working directory: {cwd}\n"
@@ -160,7 +114,7 @@ async def main() -> None:
 
     options = ClaudeAgentOptions(
         cwd=str(cwd),
-        permission_mode="acceptEdits",
+        permission_mode="acceptEdits",  # auto-accept file edits
         allowed_tools=["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
         max_turns=args.max_turns,
         system_prompt=(
@@ -197,6 +151,8 @@ async def main() -> None:
             if after_done > before_done:
                 continue
 
+            # No progress: stop so a human can inspect the BLOCKED reason or fix prompts.
+            # (You can change this behavior to skip blocked tasks.)
             print("STOP: no task was marked done in this iteration. Check tasks.md for a BLOCKED note.")
             return
 
@@ -207,41 +163,12 @@ if __name__ == "__main__":
     anyio.run(main)
 ```
 
-**Installation:**
-```bash
-python -m venv .venv && source .venv/bin/activate && pip install -U pip && pip install claude-agent-sdk anyio
-```
+Run (single-line commands):
 
-**Usage:**
-```bash
-python run_tasks.py --cwd . --tasks tasks.md --max-iterations 50 --max-turns 25
-```
+* `python -m venv .venv && source .venv/bin/activate && pip install -U pip && pip install claude-agent-sdk anyio` ([Claude Developer Platform][2])
+* `python run_tasks.py --cwd . --tasks tasks.md --max-iterations 50 --max-turns 25`
 
-### Acceptance Criteria
-- [ ] Create `examples/` directory
-- [ ] Add `run_tasks.py` with complete implementation from spec
-- [ ] Add `tasks.md` example file with checkbox format
-- [ ] Add `README.md` in examples/ with:
-  - [ ] Installation instructions (`claude-agent-sdk`, `anyio`)
-  - [ ] Usage examples and command-line options
-  - [ ] Task file format documentation
-  - [ ] Links to Claude Agent SDK docs
-- [ ] Include example tasks demonstrating different work types
-- [ ] Code uses `claude-agent-sdk` (NOT deprecated `claude-code-sdk`)
-- [ ] Async pattern with `query()` / `receive_response()`
-- [ ] Task state tracking in markdown file
-- [ ] Evidence-based completion
-- [ ] Blocked task handling
-- [ ] Configurable limits (max-iterations, max-turns)
+API references for `ClaudeSDKClient`, `ClaudeAgentOptions`, and the async `query()/receive_response()` pattern. ([Claude Developer Platform][2])
 
-### Notes
-- **CRITICAL:** Use `claude-agent-sdk` from PyPI, NOT `claude-code-sdk` (deprecated)
-- Agent SDK provides `ClaudeSDKClient` which embeds Claude Code tooling
-- Reference: https://pypi.org/project/claude-code-sdk/
-- Reference: https://platform.claude.com/docs/en/agent-sdk/python
-- Permission mode `acceptEdits` auto-accepts file changes (change for production use)
-- Tools: Read, Write, Edit, Glob, Grep, Bash
-- Uses `anyio` for async runtime
-
----
----
+[1]: https://pypi.org/project/claude-code-sdk/?utm_source=chatgpt.com "claude-code-sdk"
+[2]: https://platform.claude.com/docs/en/agent-sdk/python "Agent SDK reference - Python - Claude Docs"

@@ -88,6 +88,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dot_work"]
+ignore-vcs = true
 artifacts = [
     "src/dot_work/prompts/*",
     "src/dot_work/review/templates/*",
