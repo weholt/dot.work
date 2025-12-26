@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import Generator
 
 import pytest
+import sqlmodel
+from sqlalchemy import Engine
+from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
 from dot_work.db_issues.config import DbIssuesConfig
@@ -23,6 +26,98 @@ from dot_work.db_issues.domain.entities import (
     IssueType,
 )
 from dot_work.db_issues.services import EpicService, IssueService
+
+
+# =============================================================================
+# Session-Scoped Database Engine
+# =============================================================================
+
+@pytest.fixture(scope="session")
+def db_engine() -> Generator[Engine, None, None]:
+    """Create a single SQLAlchemy engine shared across all tests.
+
+    This fixture is session-scoped (runs once per test session) to prevent
+    memory leaks from creating multiple engines. Each engine creation with
+    SQLModel.metadata.create_all() accumulates metadata in the global singleton.
+
+    The engine uses StaticPool which keeps a single connection alive for
+    :memory: databases so the database persists across tests.
+
+    Yields:
+        SQLAlchemy Engine backed by in-memory SQLite
+    """
+    engine = create_engine(
+        "sqlite:///:memory:",
+        echo=False,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
+    # Create all tables once for the entire test session
+    SQLModel.metadata.create_all(engine)
+
+    try:
+        yield engine
+    finally:
+        # CRITICAL: Clear global metadata to prevent memory leaks
+        SQLModel.metadata.clear()
+
+        # Dispose engine to close all connections
+        try:
+            engine.dispose()
+        except Exception:
+            pass
+
+
+@pytest.fixture(autouse=True)
+def _reset_database_state(db_engine: Engine) -> None:
+    """Automatically reset database state between tests.
+
+    This fixture is autouse=True so it runs before and after every test.
+    It deletes all data from the database to ensure test isolation.
+
+    For in-memory SQLite with StaticPool, we can't rely on transaction
+    rollback alone because the database persists across tests. We need
+    to explicitly delete all data.
+
+    Args:
+        db_engine: The session-scoped database engine
+    """
+    def _delete_all_data(session: Session) -> None:
+        """Delete all data from all tables, ignoring errors for missing tables."""
+        tables = [
+            "epic_issues",
+            "issue_dependencies",
+            "comments",
+            "issues",
+            "epics",
+            "projects",
+        ]
+        for table in tables:
+            try:
+                session.exec(sqlmodel.text(f"DELETE FROM {table}"))
+            except Exception:
+                # Table doesn't exist or other error - ignore
+                pass
+        try:
+            session.commit()
+        except Exception:
+            pass
+
+    # Before test: ensure we're starting fresh
+    with Session(db_engine) as session:
+        _delete_all_data(session)
+
+    yield
+
+    # After test: clean up again for next test
+    with Session(db_engine) as session:
+        _delete_all_data(session)
+
+
+# =============================================================================
+# Test Fixtures
+# =============================================================================
 
 
 class FixedClock(Clock):
@@ -95,36 +190,39 @@ def fixed_id_service() -> IdentifierService:
 
 
 @pytest.fixture
-def in_memory_db() -> Generator[Session, None, None]:
-    """Create an in-memory SQLite database for testing.
+def in_memory_db(db_engine: Engine) -> Generator[Session, None, None]:
+    """Create an in-memory SQLite database session for testing.
 
-    CRITICAL: This fixture is a major source of memory leaks if not properly cleaned up.
-    The engine.dispose() MUST be called to close all connections in the pool.
+    This fixture uses the shared db_engine (session-scoped) and provides
+    a fresh session for each test. The database schema is already created
+    by the db_engine fixture, so we only need to create a new session.
 
-    NOTE: We use the default StaticPool for :memory: databases because:
-    - In-memory SQLite creates a SEPARATE database for each connection
-    - StaticPool keeps a single connection alive so the database persists
-    - NullPool would break this by creating new connections with empty databases
+    Using a single engine across all tests prevents memory leaks from
+    SQLModel.metadata accumulation that occurs with multiple create_all() calls.
+
+    Args:
+        db_engine: The session-scoped database engine
 
     Returns:
         SQLModel Session backed by in-memory SQLite
     """
-    engine = create_engine("sqlite:///:memory:", echo=False)
-    SQLModel.metadata.create_all(engine)
+    # Create a new session for this test
+    session = Session(db_engine)
 
     try:
-        # The context manager ensures session is closed after test
-        with Session(engine) as session:
-            yield session
+        yield session
     finally:
-        # CRITICAL: Dispose engine to close ALL connections
-        # For StaticPool + :memory:, this closes the single connection
+        # Rollback any changes made during the test
         try:
-            engine.dispose()
+            session.rollback()
         except Exception:
             pass
-        # Clear engine reference to help garbage collection
-        del engine
+
+        # Close the session
+        try:
+            session.close()
+        except Exception:
+            pass
 
 
 @pytest.fixture

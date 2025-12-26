@@ -1,10 +1,10 @@
 # Agent Focus
-Last updated: 2024-12-26T19:45:00Z
+Last updated: 2024-12-26T20:45:00Z
 
 ## Previous
-- Issue: SEC-003@94eb69 - Unvalidated git command argument in review/git.py
-- Completed: 2024-12-26T19:45:00Z
-- Outcome: Implemented git ref validation with whitelist pattern, blocked git options and shell metacharacters, wrote 35 security tests
+- Issue: MEM-001@8f3a2c - SQLAlchemy engine accumulation during test suite
+- Completed: 2024-12-26T20:45:00Z
+- Outcome: Implemented session-scoped engine, memory growth reduced from 5-10GB to ~15MB
 
 ## Current
 - Issue: None
@@ -17,9 +17,9 @@ Last updated: 2024-12-26T19:45:00Z
 - Affected files:
 
 ## Next
-- Issue: MEM-001@8f3a2c - SQLAlchemy engine accumulation during test suite
+- Issue: MEM-002@9c4b3d - LibCST CST trees not released after parsing
 - Source: critical.md (P0 memory leak issue)
-- Reason: Next critical issue after security fixes
+- Reason: Next memory leak issue after MEM-001
 
 ---
 

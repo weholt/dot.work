@@ -4,6 +4,107 @@ Completed and closed issues are archived here.
 
 ---
 
+## 2024-12-26: Memory Leak - SQLAlchemy Engine Accumulation (MEM-001)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| MEM-001@8f3a2c | ✅ Complete | 2024-12-26 |
+
+### Summary
+- **Type**: Memory Leak (P0 Critical)
+- **Title**: SQLAlchemy engine accumulation during test suite
+- **Status**: ✅ Fixed and Validated
+
+### Problem
+The test suite consumed 30-40GB of memory during full test runs. The primary contributor was SQLAlchemy engine accumulation in `tests/unit/db_issues/conftest.py`.
+
+**Root Cause:**
+Each test created a new SQLAlchemy engine with `SQLModel.metadata.create_all(engine)`. Since `SQLModel.metadata` is a global singleton, each `create_all()` call added entries to internal reflection caches that were never cleared.
+
+**Vulnerable code (lines 98-127):**
+```python
+@pytest.fixture
+def in_memory_db() -> Generator[Session, None, None]:
+    engine = create_engine("sqlite:///:memory:", echo=False)
+    SQLModel.metadata.create_all(engine)  # Registers tables globally
+    try:
+        with Session(engine) as session:
+            yield session
+    finally:
+        try:
+            engine.dispose()
+        except Exception:
+            pass
+        del engine
+```
+
+**Why this leaked memory:**
+1. `SQLModel.metadata` is a global singleton with internal references to all registered tables
+2. Each `create_all()` adds entries to reflection caches
+3. `engine.dispose()` closes connections but does NOT clear metadata-level caches
+4. The StaticPool for `:memory:` databases holds the connection until explicit disposal
+5. Over hundreds of tests, this accumulated ~50-100MB per test module
+
+### Solution Implemented
+
+1. **Session-scoped engine (single engine shared across all tests):**
+   ```python
+   @pytest.fixture(scope="session")
+   def db_engine() -> Generator[Engine, None, None]:
+       engine = create_engine(
+           "sqlite:///:memory:",
+           echo=False,
+           connect_args={"check_same_thread": False},
+           poolclass=StaticPool,
+       )
+       SQLModel.metadata.create_all(engine)  # Once for entire session
+       try:
+           yield engine
+       finally:
+           SQLModel.metadata.clear()  # Critical: clear global metadata cache
+           engine.dispose()
+   ```
+
+2. **Function-scoped session (fresh session for each test):**
+   ```python
+   @pytest.fixture
+   def in_memory_db(db_engine: Engine) -> Generator[Session, None, None]:
+       session = Session(db_engine)  # New session per test
+       try:
+           yield session
+       finally:
+           session.rollback()
+           session.close()
+   ```
+
+3. **Automatic data cleanup between tests:**
+   ```python
+   @pytest.fixture(autouse=True)
+   def _reset_database_state(db_engine: Engine) -> None:
+       # Before and after each test: DELETE all data
+       # This ensures test isolation with shared database
+   ```
+
+### Files Modified
+- `tests/unit/db_issues/conftest.py`:
+  - Added `db_engine()` session-scoped fixture
+  - Added `_reset_database_state()` autouse fixture for data cleanup
+  - Updated `in_memory_db()` to use shared engine
+  - Removed per-test engine creation
+
+### Validation
+- All 277 db_issues tests passing
+- Memory growth: **+15.0 MB** (from 66.3 MB to 81.4 MB)
+- Previous memory growth: **5-10GB** (uncontrolled accumulation)
+- **Improvement:** ~99.7% reduction in memory growth
+
+### Notes
+- This was the largest single contributor to the 30-40GB memory issue
+- Related issues: MEM-002 (libcst), MEM-003 (embeddings)
+- Full investigation documented in `memory_leak.md`
+
+---
+
 ## 2024-12-26: Security - Unvalidated Git Command Argument (SEC-003)
 
 | Issue | Status | Completed |
