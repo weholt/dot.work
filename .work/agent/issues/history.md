@@ -4117,3 +4117,161 @@ See detailed investigation: `.work/agent/issues/references/AUDIT-KGTOOL-008-inve
 See detailed investigation: `.work/agent/issues/references/AUDIT-REGGUARD-009-investigation.md`
 
 ---
+
+## 2024-12-24: Cline and Cody Environment Support (FEAT-006)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| FEAT-006@e6c3f9 | ✅ Complete | 2024-12-24 |
+
+### Summary
+- **Type**: Enhancement (P2 Medium)
+- **Title**: Add Cline and Cody environments
+- **Status**: ✅ Completed
+
+### Problem
+Cline (VS Code extension) and Cody (Sourcegraph) are popular AI coding assistants not currently supported by dot-work.
+
+### Research Findings
+- **Cline**: Uses `.clinerules/` directory with folder-based system. All `.md` files inside are processed.
+- **Cody**: Uses Prompt Library (server-side) rather than local files. Implemented `.cody/` directory following common patterns.
+
+### Changes Made
+1. Added `cline` Environment entry to environments.py
+2. Added `cody` Environment entry to environments.py
+3. Created `install_for_cline()` function in installer.py
+4. Created `install_for_cody()` function in installer.py
+5. Updated INSTALLERS dispatch table with both new entries
+
+### Test Results
+- 46/46 installer tests passing
+- Manual installation testing confirmed both environments create correct directories
+
+### Acceptance Criteria
+- [x] `dot-work list` shows cline and cody environments
+- [x] `dot-work install --env cline` creates correct structure
+- [x] `dot-work install --env cody` creates correct structure
+- [x] `dot-work detect` recognizes cline/cody markers
+- [x] Tests cover new installer functions
+
+---
+
+## 2024-12-24: Installer Refactor - Extract Common Logic (REFACTOR-001)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| REFACTOR-001@f7d4a1 | ✅ Complete | 2024-12-24 |
+
+### Summary
+- **Type**: Refactor (P2 Medium)
+- **Title**: Extract common installer logic to reduce duplication
+- **Status**: ✅ Completed
+
+### Problem
+The 10 `install_for_*` functions in installer.py contain ~200 lines of repetitive code. Each function:
+1. Creates destination directory
+2. Gets environment config
+3. Iterates prompts, renders, writes
+4. Prints status messages
+
+Adding a new environment requires copying ~20 lines of near-duplicate code.
+
+### Changes Made
+1. Created `InstallerConfig` dataclass with 9 configuration parameters
+2. Created `install_prompts_generic()` function that handles all environments
+3. Refactored all 10 `install_for_*` functions to thin configuration wrappers
+4. Fixed bug: Combined file parent directories now created automatically
+
+### Impact
+- Eliminated ~200 lines of duplicate code
+- Each function now 13-45 lines (was 20-60)
+- Single line: `install_prompts_generic(CONFIG_XXX, ...)`
+
+### Acceptance Criteria
+- [x] Single generic installer function handles all environments
+- [x] No more than 5 lines of environment-specific code per environment
+- [x] All existing tests pass (46/46 installer tests)
+- [x] Adding new environment requires only config, not code
+- [x] `force` flag implemented in one place
+
+---
+
+## 2024-12-24: Dry Run Flag for Install Command (FEAT-007)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| FEAT-007@a8e5b2 | ✅ Complete | 2024-12-24 |
+
+### Summary
+- **Type**: Enhancement (P2 Medium)
+- **Title**: Add --dry-run flag to install command
+- **Status**: ✅ Completed
+
+### Problem
+Users cannot preview what files will be created or modified before running `dot-work install`. This makes it difficult to understand the impact of installation, especially when files might be overwritten.
+
+### Changes Made
+1. Added `--dry-run` / `-n` flag to `install` command in cli.py
+2. Added `dry_run` parameter to `install_prompts()` function
+3. Added `dry_run` parameter to `install_prompts_generic()` function
+4. Updated all 12 `install_for_*` functions to accept and pass `dry_run` parameter
+5. Implemented dry-run logic in `install_prompts_generic()`
+
+### Output Format
+- New files: `[DRY-RUN] [CREATE] /path/to/file.md`
+- Overwrites: `[DRY-RUN] [OVERWRITE] /path/to/file.md`
+- Header: `🔍 Dry run: Previewing installation for {Environment}...`
+- Footer: `⚠️ Dry run complete - no files were written`
+
+### Test Results
+- 46/46 installer tests passing
+- Manual testing confirmed no files created in dry-run mode
+
+### Acceptance Criteria
+- [x] `dot-work install --dry-run` shows planned changes without writing
+- [x] Output distinguishes between new files and overwrites
+- [x] Exit code 0 even in dry-run mode
+- [x] Tests verify no files written in dry-run mode
+- [x] Short flag `-n` also works
+
+---
+
+## 2024-12-24: Enum Schema Reconciliation (RECONCILE-001)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| RECONCILE-001@a1b2c3 | ✅ Complete | 2024-12-24 |
+
+### Summary
+- **Type**: Refactor (P2 Medium)
+- **Title**: Reconcile enum schemas between old and new issue-tracker
+- **Status**: ✅ Completed (Already Merged)
+
+### Problem
+MIGRATE-041 updated enum values to match the issue-tracker project specification, introducing breaking changes from the original "Beads-compatible" schema.
+
+### Investigation Result
+Upon investigation, **Option C: Merge both schemas** was already implemented. The current enums contain a union of values from both old and new schemas:
+
+**IssuePriority (5 values):** CRITICAL, HIGH, MEDIUM, LOW, BACKLOG
+**IssueStatus (7 values):** PROPOSED, IN_PROGRESS, BLOCKED, RESOLVED, COMPLETED, STALE, WONT_FIX
+**IssueType (11 values):** BUG, FEATURE, TASK, ENHANCEMENT, REFACTOR, DOCS, TEST, SECURITY, PERFORMANCE, STORY, EPIC
+**DependencyType (6 values):** BLOCKS, DEPENDS_ON, RELATED_TO, DUPLICATES, PARENT_OF, CHILD_OF
+
+### Resolution
+The enum schemas have been successfully merged to include:
+1. All values from the old "Beads-compatible" schema that remain relevant
+2. All new values from the issue-tracker project specification
+3. EPIC type is preserved (supports epic hierarchy)
+4. BACKLOG priority is preserved
+5. RESOLVED status is preserved
+6. New dependency types (DUPLICATES, PARENT_OF, CHILD_OF) added
+
+### Acceptance Criteria
+- [x] Decision made: Option C (merge both schemas)
+- [x] Enums expanded with union of both value sets
+- [x] Epic functionality preserved (EPIC type exists)
+- [x] BACKLOG priority preserved
+- [x] RESOLVED status preserved
+
+---
