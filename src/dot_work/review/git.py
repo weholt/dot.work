@@ -2,17 +2,116 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from dot_work.review.models import DiffHunk, DiffLine, FileDiff
 
+# Pattern for validating git references (refs, tags, branches, commit hashes)
+# Allows: alphanumeric, underscore, hyphen, dot, forward slash, tilde, caret, colon, at
+# Also allows full commit hashes (40+ hex characters)
+# Blocks: git options (starting with --), shell metacharacters, path traversal
+_REF_PATTERN = re.compile(
+    r'^[a-zA-Z0-9_\-./~^:@]+$'   # Standard ref characters
+    r'|^[a-fA-F0-9]{40,64}$'     # Full commit hash
+    r'|^HEAD$'                   # HEAD reference
+    r'|^@\{-[0-9]+\}$'           # @annotation syntax (e.g., @{-1})
+)
+
 
 class GitError(RuntimeError):
     """Error from git operations."""
 
     pass
+
+
+class GitRefValidationError(GitError):
+    """Error when a git reference fails validation."""
+
+    pass
+
+
+def _validate_git_ref(ref: str) -> str:
+    """Validate a git reference for security.
+
+    This function validates git references (branches, tags, commit hashes, etc.)
+    to prevent git option injection attacks.
+
+    Args:
+        ref: Git reference to validate.
+
+    Returns:
+        The validated ref.
+
+    Raises:
+        GitRefValidationError: If the ref contains invalid characters or patterns.
+    """
+    if not ref:
+        raise GitRefValidationError("Git reference cannot be empty")
+
+    # Block git options (most dangerous attack vector)
+    if ref.startswith("--"):
+        raise GitRefValidationError(
+            f"Git options are not allowed: '{ref}'. "
+            "Only valid git references are permitted."
+        )
+
+    # Block shell metacharacters that could enable command injection
+    dangerous_chars = ["|", "&", ";", "$", "`", "(", ")", "<", ">", "\n", "\r"]
+    if any(char in ref for char in dangerous_chars):
+        raise GitRefValidationError(
+            f"Git reference contains dangerous characters: '{ref}'"
+        )
+
+    # Block path traversal attempts
+    if ".." in ref:
+        raise GitRefValidationError(
+            f"Git reference contains path traversal sequence: '{ref}'"
+        )
+
+    # Validate against whitelist pattern
+    if not _REF_PATTERN.match(ref):
+        raise GitRefValidationError(
+            f"Invalid git reference: '{ref}'. "
+            "Valid references include branch names, tags, commit hashes, and HEAD."
+        )
+
+    return ref
+
+
+def _validate_git_path(path: str) -> str:
+    """Validate a file path for use in git commands.
+
+    This function validates file paths to prevent git option injection.
+
+    Args:
+        path: File path to validate.
+
+    Returns:
+        The validated path.
+
+    Raises:
+        GitRefValidationError: If the path contains dangerous patterns.
+    """
+    if not path:
+        raise GitRefValidationError("Path cannot be empty")
+
+    # Block git options
+    if path.startswith("--"):
+        raise GitRefValidationError(
+            f"Git options are not allowed in paths: '{path}'"
+        )
+
+    # Block shell metacharacters
+    dangerous_chars = ["|", "&", ";", "$", "`", "\n", "\r"]
+    if any(char in path for char in dangerous_chars):
+        raise GitRefValidationError(
+            f"Path contains dangerous characters: '{path}'"
+        )
+
+    return path
 
 
 def _run_git(args: list[str], cwd: str | None = None) -> str:
@@ -134,7 +233,13 @@ def changed_files(cwd: str, base: str = "HEAD") -> set[str]:
 
     Returns:
         Set of changed file paths.
+
+    Raises:
+        GitRefValidationError: If base contains invalid characters.
     """
+    # Validate the base reference to prevent git option injection
+    _validate_git_ref(base)
+
     try:
         out = _run_git(["diff", "--name-only", base, "--"], cwd=cwd)
         return {line.strip() for line in out.splitlines() if line.strip()}
@@ -184,7 +289,14 @@ def get_unified_diff(cwd: str, path: str, base: str = "HEAD") -> str:
 
     Returns:
         Unified diff output.
+
+    Raises:
+        GitRefValidationError: If base or path contains invalid characters.
     """
+    # Validate both base reference and path to prevent injection
+    _validate_git_ref(base)
+    _validate_git_path(path)
+
     return _run_git(["diff", "--no-color", "--unified=3", base, "--", path], cwd=cwd)
 
 

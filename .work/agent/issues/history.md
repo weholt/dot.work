@@ -4,6 +4,109 @@ Completed and closed issues are archived here.
 
 ---
 
+## 2024-12-26: Security - Unvalidated Git Command Argument (SEC-003)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| SEC-003@94eb69 | ✅ Complete | 2024-12-26 |
+
+### Summary
+- **Type**: Security (P0 Critical)
+- **Title**: Unvalidated git command argument in review/git.py
+- **Status**: ✅ Fixed and Validated
+
+### Problem
+The `_run_git()` function in `src/dot_work/review/git.py` passed user-controlled arguments directly to git subprocess without validation. The `base` parameter in `changed_files()` and `get_unified_diff()` was particularly vulnerable.
+
+**Vulnerable code (lines 31-32):**
+```python
+def _run_git(args: list[str], cwd: str | None = None) -> str:
+    cmd = ["git", *args]  # User-controlled args directly inserted
+    result = subprocess.run(cmd, ...)  # No validation
+```
+
+**Attack vectors:**
+- `--upload-pack=|rm -rf /|` - Remote code execution via git option injection
+- `--git-dir=/etc/passwd` - Arbitrary file read
+- `--work-tree=/tmp` - Repository escape
+- `-c core.sshCommand=/tmp/evil.sh` - Config injection
+- Shell metacharacters: `|`, `&`, `;`, `$`, `` ` ``
+
+CVSS Score: 8.5 (High)
+- Attack Vector: Local (but network-exposed via web hooks)
+- Attack Complexity: Low
+- Privileges Required: Low (user-level)
+- Impact: High (Confidentiality, Integrity, Availability)
+
+### Solution Implemented
+
+1. **Git ref whitelist validation:**
+   ```python
+   _REF_PATTERN = re.compile(
+       r'^[a-zA-Z0-9_\-./~^:@]+$'   # Standard ref characters
+       r'|^[a-fA-F0-9]{40,64}$'     # Full commit hash
+       r'|^HEAD$'                   # HEAD reference
+       r'|^@\{-[0-9]+\}$'           # @annotation syntax (e.g., @{-1})
+   )
+   ```
+
+2. **Git option blocking:**
+   - Rejects any ref starting with `--`
+   - Rejects shell metacharacters (`|`, `&`, `;`, `$`, `` ` ``, `(`, `)`, `<`, `>`, newlines)
+   - Rejects path traversal (`..`)
+
+3. **Path validation:**
+   - Separate `_validate_git_path()` function
+   - Blocks git options and shell metacharacters in paths
+
+4. **Function integration:**
+   - `changed_files()` now validates `base` parameter
+   - `get_unified_diff()` now validates both `base` and `path` parameters
+
+### Files Modified
+- `src/dot_work/review/git.py`:
+  - Added `_REF_PATTERN` regex for whitelist validation
+  - Added `GitRefValidationError` exception class
+  - Added `_validate_git_ref()` function
+  - Added `_validate_git_path()` function
+  - Updated `changed_files()` to validate `base` parameter
+  - Updated `get_unified_diff()` to validate `base` and `path` parameters
+
+- `tests/unit/review/test_git.py`:
+  - Created new test file with 35 security tests
+  - Added `TestValidateGitRef` class (8 tests)
+  - Added `TestGitRefValidationSecurity` class (11 tests)
+  - Added `TestValidateGitPath` class (5 tests)
+  - Added `TestChangedFilesSecurity` class (2 tests)
+  - Added `TestGetUnifiedDiffSecurity` class (3 tests)
+  - Added `TestParseUnifiedDiff` class (3 tests)
+  - All 35 tests passing
+
+### Validation
+- All 35 new security tests passing
+- Git option injection blocked:
+  - `--upload-pack=|evil|` → GitRefValidationError (Git options are not allowed)
+  - `--git-dir=/etc/passwd` → GitRefValidationError (Git options are not allowed)
+  - `-c core.sshCommand=evil` → GitRefValidationError (Invalid git reference)
+- Shell metacharacters blocked:
+  - `main|rm -rf /` → GitRefValidationError (dangerous characters)
+  - `main;cat /etc/passwd` → GitRefValidationError (dangerous characters)
+  - `main$(whoami)` → GitRefValidationError (dangerous characters)
+- Safe git refs still work:
+  - `HEAD` → accepted
+  - `main` → accepted
+  - `feature/my-feature` → accepted
+  - `origin/main` → accepted
+  - `abc123...` (40 char hash) → accepted
+
+### Notes
+- Investigation notes: `.work/agent/notes/SEC-003-investigation.md`
+- Breaking change: None - valid git refs continue to work
+- Git options and shell metacharacters are now properly rejected
+- Consider updating documentation to note validation requirements
+
+---
+
 ## 2024-12-26: Security - SQL Injection Risk in FTS5 Search (SEC-002)
 
 | Issue | Status | Completed |

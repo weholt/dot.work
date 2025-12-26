@@ -3,88 +3,6 @@
 Blockers, security issues, data loss risks.
 
 ---
-id: "SEC-003@94eb69"
-title: "Security: Unvalidated git command argument in review/git.py"
-description: "Git ref parameters not validated before subprocess execution"
-created: 2025-12-25
-section: "review"
-tags: [security, git-injection, subprocess]
-type: security
-priority: critical
-status: proposed
-references:
-  - src/dot_work/review/git.py
-  - src/dot_work/review/git.py:32-40
-  - src/dot_work/review/git.py:139
-  - src/dot_work/review/git.py:188
----
-
-### Problem
-In `src/dot_work/review/git.py`, the `_run_git()` function builds git commands with user-controlled arguments:
-
-```python
-def _run_git(args: list[str], cwd: str | None = None) -> str:
-    cmd = ["git", *args]  # noqa: S607
-    result = subprocess.run(  # noqa: S603
-        cmd,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-    )
-```
-
-**Vulnerabilities:**
-1. The `args` parameter is passed through from callers without validation
-2. Line 139: `base` parameter in `changed_files()` is used directly in git diff
-3. Line 188: `base` parameter in `get_unified_diff()` is used directly
-4. Git allows passing options via ref names (e.g., `--upload-pack=` for RCE)
-
-**Attack vectors:**
-- If `from_ref` or `to_ref` contains `--upload-pack=|rm -rf /;` → Remote code execution
-- Git config injection via ref names
-- Arbitrary file read via `--git-dir=` or `--work-tree=` options
-
-While this is primarily a developer tool, if used in CI/CD with PR-controlled refs, it could be exploited.
-
-### Affected Files
-- `src/dot_work/review/git.py` (lines 18-40, 139, 188)
-
-### Importance
-**CRITICAL**: Git option injection can lead to arbitrary code execution. Git has a history of security issues related to untrusted ref handling.
-
-CVSS Score: 8.5 (High)
-- Attack Vector: Local (but network-exposed via web hooks)
-- Attack Complexity: Low
-- Privileges Required: Low (user-level)
-- Impact: High (Confidentiality, Integrity, Availability)
-
-### Proposed Solution
-1. **Validate ref names**: Only allow safe ref patterns:
-   ```python
-   import re
-   REF_PATTERN = re.compile(r'^[a-zA-Z0-9_\-./~^:]+$')
-   if not REF_PATTERN.match(ref):
-       raise ValueError(f"Invalid git ref: {ref}")
-   ```
-
-2. **Use git rev-parse to validate**: Resolve refs to commit hashes before use
-3. **Block git options**: Reject args starting with `--`
-4. **Consider gitpython library**: Use GitPython's safer abstractions (already imported in project)
-
-### Acceptance Criteria
-- [ ] All git refs validated with strict regex
-- [ ] Git options (args starting with `--`) blocked
-- [ ] Tests verify malicious ref names are rejected
-- [ ] Security audit passes all git command constructions
-
-### Notes
-- Git ref format specification: https://git-scm.com/docs/git-check-ref-format
-- Consider using GitPython's `repo.commit()` which validates refs
-- The `noqa: S607` and `noqa: S603` comments acknowledge the risk - these need fixing
-
----
-
----
 id: "MEM-001@8f3a2c"
 title: "Memory Leak: SQLAlchemy engine accumulation during test suite"
 description: "Each test creates new SQLAlchemy engine without proper metadata cleanup, causing 5-10GB memory growth"
@@ -181,10 +99,9 @@ def in_memory_db() -> Generator[Session, None, None]:
 ### Notes
 - Full investigation documented in `memory_leak.md`
 - This is the largest single contributor to the 30-40GB memory issue
-- Related issues: MEM-002 (libcst), MEM-003 (embedding vectors)
+- Related issues: MEM-002 (libcst), MEM-003 (embeddings)
 
 ---
-
 ---
 id: "MEM-002@9c4b3d"
 title: "Memory Leak: LibCST CST trees not released after parsing"

@@ -1,10 +1,10 @@
 # Agent Focus
-Last updated: 2024-12-26T18:30:00Z
+Last updated: 2024-12-26T19:45:00Z
 
 ## Previous
-- Issue: SEC-002@94eb69 - SQL injection risk in FTS5 search query
-- Completed: 2024-12-26T18:30:00Z
-- Outcome: Implemented strict input validation with whitelist approach, added `allow_advanced` parameter, wrote comprehensive security tests
+- Issue: SEC-003@94eb69 - Unvalidated git command argument in review/git.py
+- Completed: 2024-12-26T19:45:00Z
+- Outcome: Implemented git ref validation with whitelist pattern, blocked git options and shell metacharacters, wrote 35 security tests
 
 ## Current
 - Issue: None
@@ -17,9 +17,9 @@ Last updated: 2024-12-26T18:30:00Z
 - Affected files:
 
 ## Next
-- Issue: SEC-003@94eb69 - Unvalidated git command argument in review/git.py
-- Source: critical.md (P0 security issue)
-- Reason: Next critical security issue in priority list
+- Issue: MEM-001@8f3a2c - SQLAlchemy engine accumulation during test suite
+- Source: critical.md (P0 memory leak issue)
+- Reason: Next critical issue after security fixes
 
 ---
 
