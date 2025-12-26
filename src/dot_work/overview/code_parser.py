@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import json
 import textwrap
 from collections.abc import Iterable
@@ -71,7 +72,11 @@ def _safe_mi(code: str, fallback: float) -> float:
 
 
 def parse_python_file(path: Path, code: str, module_path: str) -> dict[str, list[Any]]:
-    """Return discovered features and models for a given Python file."""
+    """Return discovered features and models for a given Python file.
+
+    Explicitly cleans up CST structures after parsing to prevent memory leaks.
+    LibCST trees can consume 10-50x the file size in memory.
+    """
 
     file_metrics, item_metrics = _calc_metrics(code)
 
@@ -86,7 +91,15 @@ def parse_python_file(path: Path, code: str, module_path: str) -> dict[str, list
         item_metrics=item_metrics,
     )
     module.visit(collector)
-    return {"features": collector.features, "models": collector.models}
+    result = {"features": collector.features, "models": collector.models}
+
+    # Explicit cleanup to help GC - CST trees consume significant memory
+    # and may not be immediately collected due to circular references.
+    del module
+    del collector
+    gc.collect()
+
+    return result
 
 
 class _Collector(cst.CSTVisitor):
