@@ -16,6 +16,40 @@ class Environment:
     detection: list[str] = field(default_factory=list)
     notes: str = ""
 
+    def __post_init__(self) -> None:
+        """Validate environment configuration after initialization.
+
+        Raises:
+            ValueError: If prompt_dir contains invalid values.
+        """
+        # Validate prompt_dir if provided
+        if self.prompt_dir is not None:
+            # Check for empty string
+            if not self.prompt_dir or not self.prompt_dir.strip():
+                raise ValueError(
+                    f"Environment '{self.name}' (key: {self.key}): "
+                    f"prompt_dir cannot be empty, got: {self.prompt_dir!r}"
+                )
+
+            # Check for path traversal attempts
+            if self.prompt_dir.startswith(".."):
+                raise ValueError(
+                    f"Environment '{self.name}' (key: {self.key}): "
+                    f"path traversal not allowed in prompt_dir, got: {self.prompt_dir}"
+                )
+
+            # Check for absolute paths (relative paths expected)
+            # Allow absolute paths for some environments but warn about them
+            # This is intentionally lenient for flexibility but logged
+            import logging
+
+            logger = logging.getLogger(__name__)
+            if self.prompt_dir.startswith("/"):
+                logger.warning(
+                    f"Environment '{self.name}' has absolute prompt_dir: {self.prompt_dir}. "
+                    f"Relative paths are recommended."
+                )
+
 
 # Environment configurations
 ENVIRONMENTS: dict[str, Environment] = {

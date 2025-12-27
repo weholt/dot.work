@@ -9,6 +9,7 @@ to creating pull requests.
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import subprocess
 import tempfile
@@ -39,6 +40,56 @@ OPENCODE_AUTH_PATH = "~/.local/share/opencode/auth.json"
 # Boolean string values
 BOOL_TRUE = "1"
 BOOL_FALSE = "0"
+
+
+# Docker image name validation pattern
+# Pattern: [registry/][namespace/]name[:tag|@digest]
+# Simplified for common cases: registry.io/namespace/image:tag
+DOCKER_IMAGE_PATTERN = re.compile(
+    r'^('
+    r'(localhost/|[^/]+/|)'  # optional registry (localhost/ or registry.io/)
+    r'[a-z0-9]+([._-][a-z0-9]+)*'  # first component (namespace or image)
+    r'(/[a-z0-9]+([._-][a-z0-9]+)*)*'  # optional additional components
+    r'(:[a-zA-Z0-9]+([._-][a-zA-Z0-9]+)*)?'  # optional tag
+    r')$'
+)
+
+
+def validate_docker_image(image: str) -> None:
+    """Validate Docker image name format.
+
+    Args:
+        image: Docker image name to validate.
+
+    Raises:
+        ValueError: If image name is invalid.
+    """
+    if not DOCKER_IMAGE_PATTERN.match(image):
+        raise ValueError(
+            f"Invalid docker image name: {image}. "
+            f"Expected format: [registry/]namespace/image[:tag]"
+        )
+
+
+def validate_dockerfile_path(dockerfile: Path | None, project_root: Path) -> None:
+    """Validate Dockerfile path is within project directory.
+
+    Args:
+        dockerfile: Path to Dockerfile (or None).
+        project_root: Root directory of the project.
+
+    Raises:
+        ValueError: If dockerfile path escapes project directory.
+    """
+    if dockerfile is None:
+        return
+
+    try:
+        dockerfile.resolve().relative_to(project_root.resolve())
+    except ValueError:
+        raise ValueError(
+            f"Dockerfile must be within project directory: {dockerfile}"
+        )
 
 
 class RepoAgentError(Exception):
@@ -354,9 +405,18 @@ def _docker_build_if_needed(cfg: RunConfig) -> None:
 
     Raises:
         subprocess.CalledProcessError: If docker build command fails.
+        ValueError: If docker image name or dockerfile path is invalid.
     """
     if not cfg.dockerfile:
         return
+
+    # Validate docker image name
+    validate_docker_image(cfg.docker_image)
+
+    # Validate dockerfile path is within project
+    project_root = cfg.instructions_path.parent
+    validate_dockerfile_path(cfg.dockerfile, project_root)
+
     build_cmd = [
         "docker",
         "build",
@@ -686,6 +746,9 @@ def _build_docker_run_cmd(
 
     Returns:
         Complete Docker run command as a list of strings.
+
+    Raises:
+        ValueError: If docker image name is invalid.
     """
     env_args = _build_env_args(cfg)
     volume_args = _build_volume_args(cfg, workdir, instructions_body_path)
@@ -695,6 +758,9 @@ def _build_docker_run_cmd(
     opencode_config = cfg.instructions_path.parent / OPENCODE_CONFIG_FILENAME
     if opencode_config.exists():
         env_args.extend(["-e", f"OPENCODE_CONFIG={OPENCODE_CONFIG_CONTAINER_PATH}"])
+
+    # Validate docker image name before using in command
+    validate_docker_image(cfg.docker_image)
 
     cmd = [
         "docker",

@@ -1,948 +1,353 @@
 # Medium Priority Issues (P2)
 
-Enhancements, technical debt.
+Enhancements, technical debt, code quality improvements.
 
 ---
 
-id: "MEM-006@d2e8f3"
-title: "Memory Leak: Git repository object accumulation during tests"
-description: "GitPython Repo objects created repeatedly without cleanup, causing 1-3GB memory growth"
-created: 2025-12-26
+---
+id: "CR-028@a4b6c8"
+title: "Display functions in git/cli.py should be extracted to formatters module"
+description: "260 lines of _display_* functions embedded in CLI module"
+created: 2024-12-27
 section: "git"
-tags: [memory-leak, gitpython, testing, medium]
-type: bug
+tags: [refactor, separation-of-concerns]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/cli.py
+---
+
+### Problem
+Private display functions (`_display_table_results`, `_display_commit_analysis`, etc.) in `cli.py:269-527` total ~260 lines embedded in the CLI module. These should be in a separate `display.py` or `formatters.py` module to separate concerns.
+
+### Affected Files
+- `src/dot_work/git/cli.py` (lines 269-527)
+
+### Importance
+Separation of concerns improves testability and maintainability.
+
+### Proposed Solution
+1. Create `git/formatters.py` or `git/display.py`
+2. Move all `_display_*` functions
+3. Update imports in cli.py
+
+### Acceptance Criteria
+- [ ] Display functions extracted
+- [ ] CLI module focused on command handling
+- [ ] Tests continue to pass
+
+---
+
+---
+id: "CR-029@b5c7d9"
+title: "CacheManager class in git module is never used"
+description: "Dead code that creates unnecessary abstraction"
+created: 2024-12-27
+section: "git"
+tags: [dead-code, cleanup]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/services/cache.py
+---
+
+### Problem
+`CacheManager` class in `cache.py:304-408` is never instantiated in the codebase. `GitAnalysisService` uses `AnalysisCache` directly.
+
+### Affected Files
+- `src/dot_work/git/services/cache.py`
+
+### Importance
+Dead code increases maintenance burden.
+
+### Proposed Solution
+Delete the `CacheManager` class. If multi-cache becomes needed, implement it then.
+
+### Acceptance Criteria
+- [ ] CacheManager class deleted
+- [ ] No regressions
+- [ ] Tests pass
+
+---
+
+---
+id: "CR-030@c6d8e0"
+title: "TagGenerator is over-engineered at 695 lines"
+description: "Elaborate emoji mappings and priority systems for simple tag generation"
+created: 2024-12-27
+section: "git"
+tags: [refactor, simplification]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/services/tag_generator.py
+---
+
+### Problem
+`TagGenerator` (695 lines) has elaborate emoji-to-tag mappings, redundancy filtering, and priority systems. Consider if simpler keyword matching (50-100 lines) would suffice for commit tagging.
+
+### Affected Files
+- `src/dot_work/git/services/tag_generator.py`
+
+### Importance
+Complexity proportional to value delivered. Simpler code is easier to maintain.
+
+### Proposed Solution
+1. Evaluate if elaborate logic is actually needed
+2. Consider simplifying to basic keyword matching
+3. Remove unused sophistication
+
+### Acceptance Criteria
+- [ ] Complexity evaluated against requirements
+- [ ] Unnecessary complexity removed
+- [ ] Tag quality maintained or improved
+
+---
+
+---
+id: "CR-031@d7e9f1"
+title: "Dead code in utils.py - extract_emoji_indicators and calculate_commit_velocity"
+description: "~100 lines of never-called functions"
+created: 2024-12-27
+section: "git"
+tags: [dead-code, cleanup]
+type: refactor
 priority: medium
 status: proposed
 references:
   - src/dot_work/git/utils.py
-  - tests/integration/test_git_history.py
-  - memory_leak.md
 ---
 
 ### Problem
-In `src/dot_work/git/utils.py:204-226`, the `is_git_repository()` function creates GitPython `Repo` objects without explicit cleanup.
+In `utils.py`:
+- `extract_emoji_indicators()` (lines 333-382) - never called
+- `calculate_commit_velocity()` (lines 418-477) - never called
+- `identify_commit_patterns()` - never called
 
-**Code at line 204-226:**
-```python
-def is_git_repository(path: Path) -> bool:
-    try:
-        import git
-        git.Repo(path)  # Creates Repo object, never explicitly closed
-        return True
-    except Exception:
-        return False
-```
-
-**Additional instances:**
-- Integration tests in `tests/integration/test_git_history.py` invoke CLI commands that create Repo objects
-- Various git utility functions create Repo instances without using context managers
-
-**Why this leaks memory:**
-1. GitPython's `Repo` objects hold file handles and subprocess handles
-2. No explicit `.close()` or context manager usage
-3. Creating Repo objects repeatedly (e.g., scanning many paths) accumulates resources
-4. File descriptors may not be released immediately
-5. Git subprocess handles may not be cleaned up
-6. Memory accumulates across test runs
-
-**Memory impact:** ~10-50MB per Repo object. With frequent calls in tests, contributes 1-3GB total.
+~100 lines of dead code.
 
 ### Affected Files
-- `src/dot_work/git/utils.py` (lines 204-226: is_git_repository)
-- `tests/integration/test_git_history.py` (CLI commands creating Repo objects)
-- Any code calling git utilities that create Repo instances
+- `src/dot_work/git/utils.py`
 
 ### Importance
-**MEDIUM:** While not the largest leak, GitPython Repo objects:
-- Hold file handles and subprocess handles
-- Can cause file descriptor exhaustion
-- Contribute to 1-3GB memory during integration test runs
-- May cause test failures on systems with low file descriptor limits
+Dead code increases maintenance burden and confusion.
 
 ### Proposed Solution
-1. **Use context manager for Repo objects:**
-   ```python
-   def is_git_repository(path: Path) -> bool:
-       try:
-           import git
-           with git.Repo(path) as repo:
-               return True
-       except Exception:
-           return False
-   ```
-
-2. **Add explicit close() if context manager not available:**
-   ```python
-   def is_git_repository(path: Path) -> bool:
-       try:
-           import git
-           repo = git.Repo(path)
-           try:
-               return True
-           finally:
-               repo.close()
-       except Exception:
-           return False
-   ```
-
-3. **Cache Repo objects for repeated access:**
-   ```python
-   _repo_cache: dict[Path, git.Repo] = {}
-   
-   def get_repository(path: Path) -> git.Repo:
-       if path not in _repo_cache:
-           _repo_cache[path] = git.Repo(path)
-       return _repo_cache[path]
-   ```
-
-4. **Add cleanup in test teardown:**
-   ```python
-   def pytest_sessionfinish(session, exitstatus):
-       # Clear any cached Repo objects
-       _repo_cache.clear()
-   ```
+Delete unused functions.
 
 ### Acceptance Criteria
-- [ ] All Repo object creation uses context manager or explicit close()
-- [ ] is_git_repository() updated with proper cleanup
-- [ ] Git utility functions audit for Repo leaks
-- [ ] Memory growth during git tests reduced to <500MB
-- [ ] File descriptors properly released
-- [ ] All git-related tests still pass
-
-### Notes
-- GitPython Repo objects should be treated as resources requiring cleanup
-- Full investigation in `memory_leak.md` (section 6)
-- Related: MEM-001 (SQLAlchemy), MEM-002 (libcst)
+- [ ] Dead functions deleted
+- [ ] No regressions
+- [ ] Tests pass
 
 ---
 
-id: "MEM-007@e9f2a4"
-title: "Memory Leak: Connection pool cleanup only runs at session end, not between tests"
-description: "SQLAlchemy connection pools grow throughout test session, causing 2-5GB accumulation"
-created: 2025-12-26
-section: "tests"
-tags: [memory-leak, sqlalchemy, connection-pool, medium]
+---
+id: "CR-032@e8f0a2"
+title: "Unused type aliases in git/models.py"
+description: "CommitHash, BranchName, TagName, FilePath defined but never used"
+created: 2024-12-27
+section: "git"
+tags: [dead-code, cleanup]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/models.py
+---
+
+### Problem
+Type aliases `CommitHash`, `BranchName`, `TagName`, `FilePath` (lines 240-244) are defined but never used anywhere in the codebase.
+
+### Affected Files
+- `src/dot_work/git/models.py`
+
+### Importance
+Unused definitions suggest incomplete implementation or abandoned design.
+
+### Proposed Solution
+1. Delete unused type aliases, or
+2. Use them throughout the codebase for type safety
+
+### Acceptance Criteria
+- [ ] Dead code removed or utilized
+- [ ] Consistent use of type aliases if kept
+
+---
+
+---
+id: "CR-033@f9a1b3"
+title: "Unused harness_app Typer instance in harness/__init__.py"
+description: "Competing CLI entry points create confusion"
+created: 2024-12-27
+section: "harness"
+tags: [dead-code, cleanup]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/harness/__init__.py
+  - src/dot_work/harness/cli.py
+---
+
+### Problem
+Two competing Typer app instances exist: `harness_app` in `__init__.py` and `app` in `cli.py`. Only `cli.py:app` is actually used (imported in `dot_work/cli.py`).
+
+### Affected Files
+- `src/dot_work/harness/__init__.py`
+- `src/dot_work/harness/cli.py`
+
+### Importance
+Confusing about which is the canonical entry point.
+
+### Proposed Solution
+Delete `harness_app` from `__init__.py` or consolidate with `cli.py:app`.
+
+### Acceptance Criteria
+- [ ] Single CLI entry point
+- [ ] No dead code
+
+---
+
+---
+id: "CR-034@a0b2c4"
+title: "Unused imports in harness/client.py"
+description: "NotRequired and TypedDict imported but never used"
+created: 2024-12-27
+section: "harness"
+tags: [dead-code, cleanup]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/harness/client.py
+---
+
+### Problem
+`client.py:8` imports `NotRequired` and `TypedDict` but neither is used anywhere in the file.
+
+### Affected Files
+- `src/dot_work/harness/client.py`
+
+### Importance
+Dead imports indicate incomplete implementation or abandoned design.
+
+### Proposed Solution
+Delete unused imports.
+
+### Acceptance Criteria
+- [ ] Unused imports removed
+
+---
+
+---
+id: "CR-035@b1c3d5"
+title: "File read race condition in harness iteration loop"
+description: "File read twice without locking could produce incorrect comparison"
+created: 2024-12-27
+section: "harness"
+tags: [concurrency, reliability]
 type: bug
 priority: medium
 status: proposed
 references:
-  - tests/conftest.py
-  - tests/unit/db_issues/conftest.py
-  - memory_leak.md
+  - src/dot_work/harness/client.py
 ---
 
 ### Problem
-In `tests/conftest.py:246-252`, SQLAlchemy connection pool cleanup only runs at session finish, not between individual tests.
-
-**Code at line 246-252:**
-```python
-def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
-    logger.info("pytest session finished")
-    try:
-        from sqlalchemy import pool
-        pool.dispose_all()
-    except Exception:
-        pass
-```
-
-**Root cause:**
-1. Connection pools accumulate connections throughout the test session
-2. Each test may create connections that aren't immediately returned to pool
-3. `pool.dispose_all()` only runs at session end, allowing pools to grow unbounded
-4. Memory for connection objects and their associated state accumulates
-5. With 277 db_issues tests + other database tests, this adds up
-
-**Why this leaks memory:**
-- SQLite connection pools maintain cached connection objects
-- Each connection object holds memory for transaction state
-- Pools don't shrink between tests, only grow
-- 2-5MB per connection cached in pool
-- With dozens/hundreds of tests, pools can accumulate 50-100+ connections
+In `client.py:165-168`, the task file is read twice in quick succession: once before iteration (`load_tasks`) and once after. If another process modifies the file between reads, comparison logic could produce incorrect results. No file locking or atomic read mechanism exists.
 
 ### Affected Files
-- `tests/conftest.py` (lines 246-252: pytest_sessionfinish)
-- `tests/unit/db_issues/conftest.py` (creates many engines/connections)
-- `tests/unit/knowledge_graph/conftest.py` (creates Database instances)
+- `src/dot_work/harness/client.py`
 
 ### Importance
-**MEDIUM:** Connection pool accumulation contributes to 2-5GB memory usage:
-- Connection pools grow unbounded during test session
-- Memory for cached connections not released between tests
-- Combined with MEM-001 (engine accumulation), creates major pressure
-- Cleanup only happens at end, allowing accumulation
+Race condition could cause harness to exit prematurely or continue incorrectly.
 
 ### Proposed Solution
-1. **Add module-level pool cleanup:**
-   ```python
-   @pytest.fixture(autouse=True, scope="module")
-   def cleanup_connection_pools():
-       """Cleanup connection pools between test modules."""
-       yield
-       try:
-           from sqlalchemy import pool
-           pool.dispose_all()
-       except Exception:
-           pass
-   ```
-
-2. **Add per-test cleanup for memory-intensive tests:**
-   ```python
-   @pytest.fixture(autouse=True)
-   def cleanup_test_pools():
-       """Cleanup after each test for memory-intensive modules."""
-       yield
-       try:
-           from sqlalchemy import pool
-           pool.dispose_all()
-       except Exception:
-           pass
-   ```
-
-3. **Configure connection pool size limits:**
-   ```python
-   @pytest.fixture
-   def db_engine():
-       engine = create_engine(
-           "sqlite:///:memory:",
-           poolclass=StaticPool,
-           pool_size=5,  # Limit pool size
-           max_overflow=10  # Limit overflow
-       )
-       yield engine
-   ```
-
-4. **Use session-scoped pools with fixed size:**
-   ```python
-   @pytest.fixture(scope="session")
-   def db_engine():
-       engine = create_engine(
-           "sqlite:///:memory:",
-           poolclass=QueuePool,
-           pool_size=1,  # Single connection per session
-           max_overflow=0
-       )
-       yield engine
-       engine.dispose()
-   ```
+1. Add file locking, or
+2. Use atomic operations, or
+3. Document single-user assumption
 
 ### Acceptance Criteria
-- [ ] Connection pool cleanup runs between test modules
-- [ ] Connection pool size limited to reasonable number
-- [ ] Memory growth from connection pools bounded to <1GB
-- [ ] All tests still pass with pool cleanup
-- [ ] No performance degradation from excessive pool disposal
-
-### Notes
-- This is related to MEM-001 (engine accumulation) - should be fixed together
-- Session-scoped pools (MEM-001 fix) may eliminate need for frequent cleanup
-- Full investigation in `memory_leak.md` (section 7)
+- [ ] Race condition addressed or documented
+- [ ] Reliable comparison logic
 
 ---
 
 ---
-id: "SEC-007@94eb69"
-title: "Security: Missing HTTPS validation in file upload"
-description: "Zip file upload does not verify SSL certificates by default"
-created: 2025-12-25
-section: "zip"
-tags: [security, ssl, https, upload]
-type: security
-priority: medium
-status: proposed
-references:
-  - src/dot_work/zip/uploader.py
-  - src/dot_work/zip/uploader.py:45
----
-
-### Problem
-In `src/dot_work/zip/uploader.py` at line 45:
-```python
-response = requests.post(api_url, files=files, timeout=30)
-```
-
-The `requests.post()` call does not explicitly set SSL verification parameters. While `requests` does verify SSL certificates by default, this should be explicit for security-sensitive operations.
-
-**Issues:**
-1. No explicit `verify=True` parameter makes security policy unclear
-2. No timeout for SSL handshake (30s timeout only applies to request)
-3. No validation of `api_url` scheme (could be http:// in testing)
-4. No protection against malicious server responses
-
-### Affected Files
-- `src/dot_work/zip/uploader.py` (line 45)
-
-### Importance
-**MEDIUM**: While requests defaults to secure, explicit security parameters prevent accidental misconfiguration and make security intent clear.
-
-CVSS Score: 4.3 (Medium)
-- Attack Vector: Network
-- Attack Complexity: High
-- Privileges Required: None
-- Impact: Low (integrity of upload only)
-
-### Proposed Solution
-1. **Explicit SSL verification**:
-   ```python
-   response = requests.post(api_url, files=files, timeout=30, verify=True)
-   ```
-
-2. **Validate URL scheme**:
-   ```python
-   if not api_url.startswith('https://'):
-       raise ValueError("Only HTTPS URLs are supported")
-   ```
-
-3. **Add connection timeout**:
-   ```python
-   response = requests.post(api_url, files=files, timeout=(10, 30))
-   ```
-
-### Acceptance Criteria
-- [ ] SSL verification explicitly set to `verify=True`
-- [ ] URL scheme validated to be HTTPS
-- [ ] Separate connection timeout from read timeout
-- [ ] Tests verify HTTP URLs are rejected
-- [ ] Tests verify invalid certificates are rejected
-
-### Notes
-- Default behavior is secure, but explicit is better for security-critical code
-- Consider adding certificate bundle option for enterprise environments
-- Document security requirements for `api_url`
-
----
-id: "SEC-008@94eb69"
-title: "Security: Unsafe temporary file handling in editor workflows"
-description: "Temp files created with predictable names and permissions"
-created: 2025-12-25
-section: "db-issues"
-tags: [security, tempfile, race-condition]
-type: security
-priority: medium
-status: proposed
-references:
-  - src/dot_work/db_issues/cli.py
-  - src/dot_work/db_issues/cli.py:1209-1242
----
-
-### Problem
-In `src/dot_work/db_issues/cli.py`, temporary files for editor workflows are created using:
-```python
-with tempfile.NamedTemporaryFile(
-    mode="w",
-    suffix=".md",
-    prefix="db-issues-editor-",
-    delete=False,
-) as f:
-```
-
-**Security issues:**
-1. **`delete=False`**: Files persist if exception occurs before cleanup
-2. **Predictable names**: Prefix pattern makes names guessable
-3. **Default permissions**: Temp files inherit umask (often 0644, world-readable)
-4. **Cleanup in finally block**: Could fail silently
-
-**Attack scenario:**
-- Attacker monitors temp directory
-- Predicts temp file name from prefix
-- Races to read sensitive content before user finishes editing
-- Or races to replace content with malicious data
-
-### Affected Files
-- `src/dot_work/db_issues/cli.py` (lines 1209-1242, 1282-1308)
-
-### Importance
-**MEDIUM**: While local attack with timing constraints, sensitive issue content could be exposed in shared environments (CI, cloud IDEs).
-
-CVSS Score: 3.7 (Low)
-- Attack Vector: Local
-- Attack Complexity: High (race condition)
-- Privileges Required: Low (same user)
-- Impact: Low (confidentiality of issue tracker)
-
-### Proposed Solution
-1. **Use `delete=True`** with proper context management:
-   ```python
-   with tempfile.NamedTemporaryFile(
-       mode="w",
-       suffix=".yaml",
-       prefix="db-issues-edit-",
-       encoding="utf-8",
-   ) as f:
-       # Use f.name directly, no manual cleanup
-   ```
-
-2. **Set restrictive permissions**:
-   ```python
-   import os
-   import stat
-   os.chmod(temp_path, stat.S_IRUSR | stat.S_IWUSR)  # 0600
-   ```
-
-3. **Use secure directory**: Consider temp subdir with restricted permissions
-
-### Acceptance Criteria
-- [ ] Temp files use `delete=True` where possible
-- [ ] File permissions set to 0600 (owner read/write only)
-- [ ] Cleanup happens even on exceptions
-- [ ] Tests verify temp files are cleaned up
-- [ ] Tests verify file permissions are restrictive
-
-### Notes
-- For `delete=False` cases, add robust cleanup with atexit
-- Consider using `tempfile.mkstemp()` for even more control
-- Document security assumptions in docstrings
-
----
-id: "SEC-009@94eb69"
-title: "Security: Missing authorization checks in database operations"
-description: "No user/context validation before database modifications"
-created: 2025-12-25
-section: "db-issues"
-tags: [security, authorization, database]
-type: security
-priority: medium
-status: proposed
-references:
-  - src/dot_work/db_issues/adapters/sqlite.py
-  - src/dot_work/db_issues/services/*
----
-
-### Problem
-The db_issues module performs database operations without any authorization checks:
-
-**Examples:**
-1. `IssueService` can create, update, delete any issue without user validation
-2. No project-level access control
-3. No audit trail of who made changes
-4. Bulk operations lack authorization
-
-**In `src/dot_work/db_issues/adapters/sqlite.py`:**
-- `insert_issue()` - No user validation
-- `update_issue()` - No user validation
-- `delete_issue()` - No user validation
-
-**Security impact:**
-- Any user with CLI access can modify any issue
-- No way to restrict users to specific projects
-- No accountability for changes
-- Could be abused in CI/CD with shared credentials
-
-### Affected Files
-- `src/dot_work/db_issues/adapters/sqlite.py` (all mutation methods)
-- `src/dot_work/db_issues/services/*.py` (service layer lacks auth)
-
-### Importance
-**MEDIUM**: While primarily a developer tool, lack of authorization becomes a risk when:
-- Used in team environments with shared databases
-- Integrated with web interfaces
-- Used in CI/CD with elevated permissions
-
-CVSS Score: 4.6 (Medium)
-- Attack Vector: Local
-- Attack Complexity: Low
-- Privileges Required: Low (CLI access)
-- Impact: Low (issue tracker data)
-
-### Proposed Solution
-1. **Add user context to service methods**:
-   ```python
-   def update_issue(self, issue_id: str, changes: dict, user: User) -> Issue:
-       if not self.can_modify_issue(issue_id, user):
-           raise PermissionError(...)
-   ```
-
-2. **Add project ownership**:
-   ```python
-   class Project:
-       owner_id: str
-       collaborators: list[str]
-   ```
-
-3. **Add audit logging**:
-   ```python
-   def _audit_log(self, action: str, entity: str, user: User):
-       self.audit_log.append(AuditEntry(action, entity, user, time.now()))
-   ```
-
-4. **Make auth optional** (for single-user setups)
-
-### Acceptance Criteria
-- [ ] Service methods accept optional user context
-- [ ] Project-level access control implemented
-- [ ] Audit trail tracks all modifications
-- [ ] Single-user mode bypasses auth for usability
-- [ ] Tests verify authorization enforcement
-
-### Notes
-- Balance security with usability for developer tools
-- Consider integrating with system user or git config
-- Document security model in README
-
----
-id: "PERF-004@d6e8f3"
-title: "Performance: Scan metrics creates unnecessary intermediate lists"
-description: "O(N) memory usage for collecting all functions"
-created: 2025-12-25
-section: "python_scan"
-tags: [performance, memory, algorithm]
-type: performance
-priority: medium
-status: proposed
-references:
-  - src/dot_work/python/scan/service.py
----
-
-### Problem
-The `_update_metrics()` method in `service.py` lines 156-169 creates a flat list of ALL functions in the codebase:
-```python
-all_functions: list[Any] = []
-for file_entity in index.files.values():
-    all_functions.extend(file_entity.functions)
-    for cls in file_entity.classes:
-        all_functions.extend(cls.methods)
-```
-
-This uses O(N) additional memory where N = total functions across all files. For large codebases (thousands of functions), this is wasteful since we only need to:
-- Count total functions
-- Calculate average complexity
-- Find max complexity
-- List high-complexity functions
-
-### Affected Files
-- `src/dot_work/python/scan/service.py` (lines 156-169)
-
-### Importance
-- Memory overhead scales with codebase size
-- Metrics calculation uses more memory than necessary
-- For large projects with 10k+ functions, this adds significant memory pressure
-- All metrics can be calculated with streaming (O(1) memory)
-
-### Proposed Solution
-Use generator-based or streaming approach to calculate metrics without storing all functions:
-```python
-total_functions = 0
-complexities = []
-high_complexity = []
-
-for file_entity in index.files.values():
-    total_functions += len(file_entity.functions)
-    for f in file_entity.functions:
-        complexities.append(f.complexity)
-    for cls in file_entity.classes:
-        total_functions += len(cls.methods)
-        for m in cls.methods:
-            complexities.append(m.complexity)
-```
-
-Or even better, calculate aggregates incrementally without storing complexities list.
-
-### Acceptance Criteria
-- [ ] Metrics calculation uses O(1) additional memory
-- [ ] No intermediate list of all functions created
-- [ ] Tests verify same metrics values produced
-- [ ] Performance improvement measurable on large codebases
-
-### Notes
-This is a common optimization pattern: replace "collect all, then process" with "process incrementally".
-
----
-id: "PERF-005@e7f9a4"
-title: "Performance: JSON repository uses human-readable formatting for storage"
-description: "Unnecessary indent=2 increases file size and write time"
-created: 2025-12-25
-section: "python_scan"
-tags: [performance, i/o, serialization]
-type: performance
-priority: medium
-status: proposed
-references:
-  - src/dot_work/python/scan/repository.py
----
-
-### Problem
-The `save()` method in `repository.py` line 52 uses `json.dumps(data, indent=2)` which:
-- Increases file size by ~30-40% due to whitespace
-- Slower write time due to more bytes written
-- Slower read time due to more bytes to parse
-- Human formatting is unnecessary for a machine-readable cache file
-
-Code:
-```python
-self.config.index_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-```
-
-### Affected Files
-- `src/dot_work/python/scan/repository.py` (line 52)
-
-### Importance
-- Cache file larger than necessary
-- Slower save/load operations
-- For codebases with thousands of files, the index can be hundreds of KB
-- Human readability of cache is not a requirement (it's an internal format)
-
-### Proposed Solution
-Use compact JSON formatting:
-```python
-# For storage (compact)
-json.dumps(data, separators=(',', ':'))
-
-# For debugging (if needed)
-json.dumps(data, indent=2)
-```
-
-Or provide a configuration option for pretty printing during development.
-
-### Acceptance Criteria
-- [ ] Default storage uses compact JSON (no unnecessary whitespace)
-- [ ] Optional debug mode for human-readable output
-- [ ] File size reduced by ~30%
-- [ ] Write/read operations measurably faster
-- [ ] Tests verify data can be loaded correctly
-
-### Notes
-This is a minor optimization but adds up for frequently-written cache files. Compact JSON is still readable in editors if needed for debugging.
-
----
-id: "PERF-006@f8a0b5"
-title: "Performance: Git file scanner uses rglob without early filtering"
-description: "Creates unnecessary Path objects for ignored directories"
-created: 2025-12-25
-section: "review"
-tags: [performance, file-scanning, pathlib]
-type: performance
-priority: medium
-status: proposed
-references:
-  - src/dot_work/review/git.py
----
-
-### Problem
-The `list_all_files()` function in `git.py` line 114 uses `Path.rglob("*")` which recursively walks the entire directory tree, creating Path objects for every file, then filters them out later:
-```python
-for item in root_path.rglob("*"):
-    if item.is_file():
-        # Check if any parent directory should be ignored
-        rel = item.relative_to(root_path)
-        parts = rel.parts
-        if any(part in ignore_dirs ... for part in parts[:-1]):
-            continue
-```
-
-This creates Path objects for files in ignored directories only to discard them.
-
-### Affected Files
-- `src/dot_work/review/git.py` (lines 114-125)
-
-### Importance
-- Unnecessary filesystem operations
-- Creates Path objects for files that will be ignored
-- For node_modules, .git, venv this can mean thousands of wasted iterations
-- Slower repository scanning
-
-### Proposed Solution
-1. Use os.walk() with directory pruning (like scanner.py does)
-2. Pre-check directories before recursing
-3. Use explicit iteration with early continue
-
-Example:
-```python
-for root, dirs, files in os.walk(root_path):
-    # Prune ignored directories
-    dirs[:] = [d for d in dirs if d not in ignore_dirs]
-    for file in files:
-        # Process files
-```
-
-### Acceptance Criteria
-- [ ] Path objects only created for non-ignored files
-- [ ] Directories pruned before recursing
-- [ ] Performance measurable on projects with large ignored folders
-- [ ] Tests verify same files found
-
-### Notes
-The scanner.py file already uses this pattern correctly (line 61-65). This same optimization should be applied here.
-
----
-id: "PERF-007@g9b1c6"
-title: "Performance: Bulk operations lack proper database batching"
-description: "Sequential operations instead of batch INSERT/UPDATE"
-created: 2025-12-25
-section: "db_issues"
-tags: [performance, database, batch-operations]
-type: performance
-priority: medium
-status: proposed
-references:
-  - src/dot_work/db_issues/services/bulk_service.py
----
-
-### Problem
-The `bulk_create()` and other bulk operations in `bulk_service.py` perform sequential database operations:
-```python
-for idx, issue_data in enumerate(issues_data, start=1):
-    issue = self.issue_service.create_issue(**issue_dict)
-    issue_ids.append(issue.id)
-```
-
-Each create/update is a separate database transaction. For 100 issues, this means 100 round-trips to the database.
-
-### Affected Files
-- `src/dot_work/db_issues/services/bulk_service.py` (lines 317-333: bulk_create)
-- Same pattern in bulk_close, bulk_update, bulk_label_add, bulk_label_remove
-
-### Importance
-- Bulk operations are much slower than necessary
-- Each operation is a separate transaction (overhead)
-- Database round-trips add latency
-- For 1000 issues, this could take seconds instead of milliseconds
-
-### Proposed Solution
-1. Add batch insert methods to repository layer
-2. Use executemany() for bulk SQLite operations
-3. Single transaction for entire batch operation
-4. Consider prepared statements for repeated operations
-
-Example:
-```python
-# Repository method
-def insert_issues_batch(self, issues: list[Issue]) -> list[Issue]:
-    with self.transaction() as conn:
-        conn.executemany(
-            "INSERT INTO issues (...) VALUES (...)",
-            [(i.id, i.title, ...) for i in issues]
-        )
-```
-
-### Acceptance Criteria
-- [ ] Bulk create uses single transaction
-- [ ] Bulk operations use executemany() or equivalent
-- [ ] Performance measurable: 100 issues < 100ms
-- [ ] All-or-nothing semantics (transaction rollback on error)
-- [ ] Tests verify batch atomicity
-
-### Notes
-SQLite supports executemany() for batch operations. The current sequential approach defeats the purpose of "bulk" operations.
-
-
----
-id: "CR-003@bc5a3f"
-title: "Database repository queries don't use consistent error handling"
-description: "Some repository methods return None on not found, others raise exceptions"
-created: 2025-12-25
-section: "db-issues"
-tags: [error-handling, repository-pattern, consistency]
+id: "CR-036@c2d4e6"
+title: "FTS5 query validation regex is scattered and fragile"
+description: "Query validation patterns spread across search_fts.py"
+created: 2024-12-27
+section: "knowledge_graph"
+tags: [maintainability, refactor]
 type: refactor
 priority: medium
 status: proposed
 references:
-  - src/dot_work/db_issues/adapters/sqlite.py
+  - src/dot_work/knowledge_graph/search_fts.py
 ---
 
 ### Problem
-Repository methods have inconsistent error handling patterns:
-1. `get()` methods return `None` if not found (IssueRepository.get(), CommentRepository.get(), etc.)
-2. `delete()` methods return `False` if not found (IssueRepository.delete(), CommentRepository.delete())
-3. No methods raise the domain `NotFoundError` exception
-
-This creates mixed contracts where callers must check for `None`/`False` instead of catching exceptions.
-
-**Evidence:** 9 different return patterns across repositories - None for not-found, False for deletion failure, implicit success for other operations.
+Query validation regex patterns (`_SIMPLE_QUERY_PATTERN`, `_FTS5_OPERATOR_PATTERN`, `_DANGEROUS_PATTERNS` in lines 20-24 and 173-231) are scattered across `search_fts.py`. If FTS5 syntax changes or new operators are added, multiple regex patterns must be updated.
 
 ### Affected Files
-- `src/dot_work/db_issues/adapters/sqlite.py` (all repository classes)
+- `src/dot_work/knowledge_graph/search_fts.py`
 
 ### Importance
-1. **Unclear contract**: Callers don't know whether to check for None/False or catch exceptions
-2. **Silent failures**: `delete()` returning False could be confused with successful deletion
-3. **Inconsistent with domain**: Domain layer defines `NotFoundError` (entities.py:63) that repositories don't use
-4. **Principle of Least Surprise**: Similar operations should have similar error handling
+Fragile maintenance. Changes require updating multiple patterns.
 
 ### Proposed Solution
-**Option A: Use domain exceptions consistently**
-- Always raise `NotFoundError` when entity not found
-- Always raise `DatabaseError` on database failures  
-- Remove boolean return values from delete operations
-
-**Option B: Return Result/Either type**
-- Use a Result type that encapsulates success/failure
-- More explicit but requires more code changes
+Centralize query validation logic in one place.
 
 ### Acceptance Criteria
-- [ ] All repository methods use consistent error handling
-- [ ] Delete operations raise exception on failure instead of returning False
-- [ ] Get operations raise NotFoundError instead of returning None
-- [ ] All existing tests updated to expect exceptions
-- [ ] Documentation updated with error handling patterns
-
-### Notes
-The domain layer defines `NotFoundError` and `DatabaseError` exceptions (lines 63, 79) but repositories don't use them. This creates a mismatch between domain and adapter layers.
+- [ ] Validation logic centralized
+- [ ] Easier to update for FTS5 changes
 
 ---
 
 ---
-id: "CR-004@4842ab"
-title: "Service layer directly depends on concrete UnitOfWork implementation"
-description: "Services create UnitOfWork instances without dependency injection, making testing difficult"
-created: 2025-12-25
-section: "db-issues"
-tags: [dependency-injection, testing, architecture]
+id: "CR-037@d3e5f7"
+title: "Unused validate_path function in knowledge_graph/config.py"
+description: "Function defined but never called in production"
+created: 2024-12-27
+section: "knowledge_graph"
+tags: [dead-code, cleanup]
 type: refactor
 priority: medium
 status: proposed
 references:
-  - src/dot_work/db_issues/services/issue_service.py
+  - src/dot_work/knowledge_graph/config.py
 ---
 
 ### Problem
-Service classes directly import and instantiate `UnitOfWork` from the adapter layer:
-
-```python
-from dot_work.db_issues.adapters.sqlite import UnitOfWork  # Direct import
-
-def _get_uow(self) -> UnitOfWork:
-    session = Session(self.engine)
-    return UnitOfWork(session)
-```
-
-**Evidence:** All services (IssueService, DependencyService, EpicService, LabelService, BulkService) directly create UnitOfWork without dependency injection.
+`validate_path()` function (lines 54-78) is defined but never called from production code. It validates that paths have file extensions, but `get_db_path()` and `ensure_db_directory()` don't use it.
 
 ### Affected Files
-- `src/dot_work/db_issues/services/issue_service.py` (imports UnitOfWork directly)
-- `src/dot_work/db_issues/services/dependency_service.py`
-- `src/dot_work/db_issues/services/epic_service.py`
-- `src/dot_work/db_issues/services/label_service.py`
-- `src/dot_work/db_issues/services/bulk_service.py`
+- `src/dot_work/knowledge_graph/config.py`
 
 ### Importance
-1. **Hard to test**: Cannot mock UnitOfWork in tests without complex patches
-2. **Tight coupling**: Services are coupled to SQLite implementation
-3. **Violates Dependency Inversion Principle**: Depend on concrete, not abstraction
-4. **Blocks alternatives**: Can't easily swap in PostgreSQL or in-memory UoW
+Dead code increases maintenance burden.
 
 ### Proposed Solution
-**Option A: Inject UnitOfWork factory**
-```python
-class IssueService:
-    def __init__(self, uow_factory: Callable[[], UnitOfWork]):
-        self._uow_factory = uow_factory
-```
-
-**Option B: Protocol-based abstraction**
-- Define `UnitOfWorkProtocol` that services depend on
-- SQLite implements the protocol
+Either use it or delete it.
 
 ### Acceptance Criteria
-- [ ] Services accept UnitOfWork via constructor
-- [ ] Tests can inject mock UnitOfWork
-- [ ] Services don't directly import sqlite module
-- [ ] All existing tests pass
-- [ ] Integration tests still work with real SQLite
+- [ ] Function used or deleted
 
 ---
 
 ---
-id: "CR-005@a782a8"
-title: "Environment configuration lacks validation on target paths"
-description: "Environment entries allow arbitrary target paths without validation"
-created: 2025-12-25
-section: "environments"
-tags: [validation, configuration, security]
-type: enhancement
-priority: medium
-status: proposed
-references:
-  - src/dot_work/environments.py
----
-
-### Problem
-The `Environment` dataclass doesn't validate that `prompt_dir` paths are well-formed. This allows entries like:
-- `prompt_dir=""` (empty string)
-- `prompt_dir="../../../etc"` (path traversal)
-- `prompt_dir="/absolute/path"` (when expecting relative)
-
-### Affected Files
-- `src/dot_work/environments.py` (Environment dataclass)
-
-### Importance
-1. **Security**: Path traversal could write files outside intended directory
-2. **Robustness**: Invalid paths cause confusing errors later
-3. **User experience**: Early validation with clear errors
-
-### Proposed Solution
-Add `__post_init__` validation to Environment:
-```python
-def __post_init__(self):
-    if not self.prompt_dir or not self.prompt_dir.strip():
-        raise ValueError(f"Environment {self.name}: prompt_dir cannot be empty")
-    if self.prompt_dir.startswith(".."):
-        raise ValueError(f"Environment {self.name}: path traversal not allowed")
-```
-
-### Acceptance Criteria
-- [ ] Environment validates prompt_dir on construction
-- [ ] Path traversal attempts raise ValueError
-- [ ] Empty prompt_dir raises ValueError
-- [ ] Test suite verifies validation
-- [ ] Clear error messages for invalid configurations
-
----
-
----
-id: "CR-006@b935c0"
-title: "Scan service doesn't validate input paths before scanning"
-description: "Service may attempt to scan non-existent or invalid paths"
-created: 2025-12-25
-section: "python_scan"
-tags: [validation, error-handling, scanner]
-type: enhancement
-priority: medium
-status: proposed
-references:
-  - src/dot_work/python/scan/service.py
----
-
-### Problem
-The `ScanService.scan()` method accepts a `root_path: Path` parameter but doesn't validate:
-1. The path exists
-2. The path is a directory (not a file)
-3. The path is within allowed bounds
-
-The scanner handles errors gracefully (scanner.py:94-105), but the service could provide earlier validation.
-
-### Affected Files
-- `src/dot_work/python/scan/service.py` (ScanService.scan, lines 31-59)
-
-### Importance
-1. **User experience**: Clear error "path does not exist" vs generic scan error
-2. **Performance**: Fail fast before walking directory tree
-3. **Security**: Validate path bounds to prevent scanning unintended directories
-
-### Proposed Solution
-Add validation to `ScanService.scan()`:
-```python
-if not root_path.exists():
-    raise FileNotFoundError(f"Scan path does not exist: {root_path}")
-if not root_path.is_dir():
-    raise NotADirectoryError(f"Scan path is not a directory: {root_path}")
-```
-
-### Acceptance Criteria
-- [ ] Service validates path exists before scanning
-- [ ] Service validates path is directory
-- [ ] Clear error messages for invalid paths
-- [ ] Tests verify validation behavior
-
----
-
----
-id: "CR-007@2d38b2"
-title: "Canonical prompt parser doesn't validate duplicate environment names"
-description: "Parser allows multiple environments with same name, last one wins"
-created: 2025-12-25
+id: "CR-038@e4f6a8"
+title: "Unreachable fallback code in prompts/canonical.py"
+description: "Default filename generation cannot be reached due to validation"
+created: 2024-12-27
 section: "prompts"
-tags: [validation, parser, canonical-prompts]
-type: enhancement
+tags: [dead-code, clarity]
+type: refactor
 priority: medium
 status: proposed
 references:
@@ -950,233 +355,1983 @@ references:
 ---
 
 ### Problem
-The `CanonicalPromptParser._parse_environments()` method (lines 177-195) doesn't check for duplicate environment names. If YAML contains:
-
-```yaml
-environments:
-  copilot:
-    target: ".github/prompts/"
-  copilot:  # Duplicate!
-    target: ".copilot/"
-```
-
-The parser silently uses the second definition, overwriting the first.
-
-**Evidence**: The `environments` dict (line 179) doesn't check for existing keys before adding.
+In `canonical.py:348-370`, `generate_environment_prompt` has a fallback path (lines 369-370) that generates a default filename when neither `filename` nor `filename_suffix` is set. However, `EnvironmentConfig.__post_init__` (lines 63-65) already enforces that one must be provided. The fallback is unreachable dead code.
 
 ### Affected Files
-- `src/dot_work/prompts/canonical.py` (lines 177-195)
+- `src/dot_work/prompts/canonical.py`
 
 ### Importance
-1. **User error**: Typo in environment name could silently override config
-2. **Debugging difficulty**: No indication that duplicate was detected
-3. **Data integrity**: Silent overwrites lose configuration
+Dead code creates confusion about actual contract.
 
 ### Proposed Solution
-Add duplicate detection:
-```python
-if env_name in environments:
-    raise ValueError(f"Duplicate environment name: '{env_name}'")
-```
+Delete unreachable fallback or relax validation if fallback is intended.
 
 ### Acceptance Criteria
-- [ ] Parser raises ValueError on duplicate environment names
-- [ ] Error message includes which environment was duplicated
-- [ ] Tests verify duplicate detection
-
-### Notes
-The validator (lines 261-274) checks for duplicate **targets** but not duplicate **names**. These are different validations.
+- [ ] Dead code removed or validation relaxed
 
 ---
 
 ---
-id: "CR-008@8e3f6d"
-title: "AST scanner silently ignores syntax errors in Python files"
-description: "Files with syntax errors are marked but scan doesn't report errors or fail"
-created: 2025-12-25
-section: "python_scan"
-tags: [error-handling, ast-parsing, scanner]
-type: enhancement
+id: "CR-039@f5a7b9"
+title: "Inconsistent filename generation between canonical.py and wizard.py"
+description: "Different regex patterns for title-to-filename transformation"
+created: 2024-12-27
+section: "prompts"
+tags: [consistency, bug-risk]
+type: bug
 priority: medium
 status: proposed
 references:
-  - src/dot_work/python/scan/scanner.py
+  - src/dot_work/prompts/canonical.py
+  - src/dot_work/prompts/wizard.py
 ---
 
 ### Problem
-When scanning a file with syntax errors, `_scan_file()` returns a `FileEntity` with `has_syntax_error=True`, but the scanner doesn't:
-1. Log the error
-2. Count syntax errors
-3. Provide a way to list files with errors
-4. Fail the scan if critical files have errors
-
-**Evidence:** Lines 94-105 return error entity but don't aggregate or report errors.
+Title-to-filename transformation in `canonical.py:366` uses a different regex pattern than `wizard.py:319-321`. This inconsistency makes reasoning about filename generation difficult and could produce different results.
 
 ### Affected Files
-- `src/dot_work/python/scan/scanner.py` (lines 94-105)
-- Related: `src/dot_work/python/scan/ast_extractor.py`
+- `src/dot_work/prompts/canonical.py`
+- `src/dot_work/prompts/wizard.py`
 
 ### Importance
-1. **Visibility**: Users don't know which files failed to parse
-2. **Quality**: Syntax errors in code should be flagged
-3. **CI/CD**: Should fail scans if critical files have errors
-4. **Debugging**: No aggregate count of problematic files
+Inconsistent behavior confuses users and developers.
 
 ### Proposed Solution
-1. Log syntax errors at WARNING level
-2. Add `get_files_with_errors()` method to `ScanService`
-3. Add optional `fail_on_error` parameter to `scan()`
-4. Return error summary from scan operation
+1. Extract shared filename generation function
+2. Use consistently in both modules
 
 ### Acceptance Criteria
-- [ ] Syntax errors logged during scan
-- [ ] Service provides method to list files with errors
-- [ ] Optional `fail_on_error` parameter causes scan to raise exception
-- [ ] Error count included in scan metrics
-
-### Notes
-The current graceful degradation is useful for partial scans, but visibility into errors is important.
+- [ ] Single source of truth for filename generation
+- [ ] Consistent behavior
 
 ---
 
 ---
-id: "AUDIT-GAP-002@b8c4e1"
-title: "Pre-existing type errors in db_issues module from migration"
-description: "50 mypy type errors in db_issues code from original migration"
-created: 2025-12-25
-section: "db_issues"
-tags: [type-checking, mypy, migration-gap, audit]
+id: "CR-040@a6b8c0"
+title: "Late import in wizard.py creates circular dependency risk"
+description: "Import of get_prompts_dir inside method body"
+created: 2024-12-27
+section: "prompts"
+tags: [architecture, imports]
 type: refactor
 priority: medium
 status: proposed
 references:
-  - .work/agent/issues/references/AUDIT-DBISSUES-010-investigation.md
-  - .work/baseline.md
-  - src/dot_work/db_issues/cli.py
-  - src/dot_work/db_issues/services/issue_service.py
-  - src/dot_work/db_issues/services/dependency_service.py
-  - src/dot_work/db_issues/services/label_service.py
+  - src/dot_work/prompts/wizard.py
 ---
 
 ### Problem
-During AUDIT-DBISSUES-010, it was documented that 50 pre-existing mypy type errors exist in the db_issues module. These errors were introduced during the migration (MIGRATE-034 through MIGRATE-085) and have been present since then.
-
-**Type Error Distribution:**
-| File | Count | Error Types |
-|------|-------|-------------|
-| cli.py | 37 | attr-defined (assignee), call-overload (exec), no-redef |
-| issue_service.py | 9 | attr-defined (get_dependencies, add_dependency, add_comment, generate_id) |
-| dependency_service.py | 4 | assignment (list vs set for blockers) |
-| label_service.py | 1 | assignment (Label | None to Label) |
-| installer.py | 4 | assignment (tuple with None to tuple[str, str, str]) |
-
-**Note:** These are **pre-existing issues from the migration**, not new regressions. They are documented in the baseline and were tracked in the original migration issues.
+In `wizard.py:344-346`, `get_prompts_dir` is imported from `dot_work.installer` inside `_create_prompt_file`. This creates circular dependency risk and makes the dependency graph harder to understand.
 
 ### Affected Files
-- `src/dot_work/db_issues/cli.py` (37 errors - largest file at 209KB)
-- `src/dot_work/db_issues/services/issue_service.py` (9 errors)
-- `src/dot_work/db_issues/services/dependency_service.py` (4 errors)
-- `src/dot_work/db_issues/services/label_service.py` (1 error)
-- `src/dot_work/installer.py` (4 errors)
+- `src/dot_work/prompts/wizard.py`
 
 ### Importance
-**MEDIUM**: While these errors don't block functionality, they:
-- Reduce type safety confidence
-- Make refactoring riskier (types don't validate)
-- Indicate incomplete migration to type-safe code
-- May hide real bugs that type checking would catch
-
-These are documented "known issues" rather than regressions, so they don't represent a drop in code quality from the baseline.
+Circular dependencies cause hard-to-debug import errors.
 
 ### Proposed Solution
-1. **cli.py (37 errors):**
-   - Add type stubs or fix dynamic attribute access
-   - Fix exec() call-overload issues
-   - Resolve no-redef conflicts
-
-2. **issue_service.py (9 errors):**
-   - Add proper type annotations for methods returning dynamically accessed attributes
-   - Consider adding Protocol or dataclass for return types
-
-3. **dependency_service.py (4 errors):**
-   - Fix list vs set type mismatch for blockers field
-
-4. **label_service.py (1 error):**
-   - Fix Label | None assignment
-
-5. **installer.py (4 errors):**
-   - Fix tuple type annotations for version parsing
+1. Move import to module level, or
+2. Inject the dependency, or
+3. Restructure to avoid circular imports
 
 ### Acceptance Criteria
-- [ ] All 50 type errors addressed
-- [ ] mypy passes cleanly on db_issues module
-- [ ] No new type errors introduced
-- [ ] All tests still pass (277 tests)
-- [ ] Type annotations are accurate (not just suppressed with ignore)
-
-### Notes
-- These errors are documented in `.work/baseline.md` as pre-existing issues
-- They were NOT introduced by recent changes
-- Addressing them will improve type safety and maintainability
-- Some errors may require adding `# type: ignore` comments if they're false positives
-- Consider this a technical debt item rather than a critical bug
-
+- [ ] No late imports for core dependencies
+- [ ] Import graph clear
 
 ---
-id: "AUDIT-GAP-005@e7f8a3"
-title: "Source README.md not migrated to knowledge_graph documentation"
-description: "2,808 byte README from source not present in destination docs/"
-created: 2025-12-26
-section: "knowledge_graph"
-tags: [documentation, migration-gap, audit]
+
+---
+id: "CR-041@b7c9d1"
+title: "Dead code logic in version/config.py"
+description: "Conditional that sets same value in both branches"
+created: 2024-12-27
+section: "version"
+tags: [dead-code, cleanup]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/version/config.py
+---
+
+### Problem
+In `config.py:48-54`, lines 50-53 check if `.work` exists, but both branches set `work_dir` to the same value (`Path.cwd() / ".work"`). The conditional serves no purpose.
+
+### Affected Files
+- `src/dot_work/version/config.py` (lines 48-54)
+
+### Importance
+Dead code indicates likely bug or incomplete implementation.
+
+### Proposed Solution
+1. Remove dead conditional, or
+2. Fix the intended behavior
+
+### Acceptance Criteria
+- [ ] Dead code removed or fixed
+
+---
+
+---
+id: "CR-042@c8d0e2"
+title: "validate() mutates state in version/config.py"
+description: "Validation method has side effect of converting strings to Paths"
+created: 2024-12-27
+section: "version"
+tags: [side-effects, naming]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/version/config.py
+---
+
+### Problem
+In `config.py:105-115`, `validate()` mutates `self.version_file` and `self.changelog_file` by converting strings to Paths. This side effect in a validation method violates the principle of least surprise.
+
+### Affected Files
+- `src/dot_work/version/config.py` (lines 105-115)
+
+### Importance
+Unexpected mutations make code harder to reason about.
+
+### Proposed Solution
+1. Rename to `normalize_and_validate()`, or
+2. Don't mutate - do conversion at construction time
+
+### Acceptance Criteria
+- [ ] No surprising side effects
+- [ ] Clear API contract
+
+---
+
+---
+id: "CR-043@d9e1f3"
+title: "append_to_changelog actually prepends entries"
+description: "Method name is misleading"
+created: 2024-12-27
+section: "version"
+tags: [naming, clarity]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/version/changelog.py
+---
+
+### Problem
+`append_to_changelog()` (lines 225-240) actually PREPENDS new entries (line 235: `new_content = entry + "\n" + existing`). The method name is misleading.
+
+### Affected Files
+- `src/dot_work/version/changelog.py`
+
+### Importance
+Misleading names cause bugs when developers make assumptions.
+
+### Proposed Solution
+Rename to `prepend_to_changelog()` or `add_entry_to_changelog()`.
+
+### Acceptance Criteria
+- [ ] Method name reflects behavior
+
+---
+
+---
+id: "CR-044@e0f2a4"
+title: "tools/__init__.py claims zero-dependency but yaml_validator uses PyYAML"
+description: "Incorrect documentation about dependencies"
+created: 2024-12-27
+section: "tools"
+tags: [documentation, accuracy]
 type: docs
 priority: medium
 status: proposed
 references:
-  - .work/agent/issues/references/AUDIT-KG-001-investigation.md
-  - incoming/kg/README.md
+  - src/dot_work/tools/__init__.py
+  - src/dot_work/tools/yaml_validator.py
 ---
 
 ### Problem
-During AUDIT-KG-001 investigation, it was discovered that the source README.md (2,808 bytes) was NOT migrated to the destination documentation folder.
-
-**Documentation Status:**
-| Aspect | Source | Destination | Status |
-|--------|--------|-------------|--------|
-| README.md | 2,808 bytes | NOT in docs/ | ⚠️ **NOT MIGRATED** |
-| docs/ directory | None | docs/ exists but no kg/ | N/A |
-
-**Impact:** Valuable documentation about the knowledge graph module is missing from the destination project.
+`tools/__init__.py:1-4` docstring claims "zero-dependency validation tools using only Python 3.11+ stdlib" but `yaml_validator.py` imports PyYAML (`import yaml`) which is NOT stdlib.
 
 ### Affected Files
-- Missing: `docs/knowledge_graph/README.md` (should contain migrated content from source)
-- Source: `incoming/kg/README.md` (2,808 bytes)
+- `src/dot_work/tools/__init__.py`
+- `src/dot_work/tools/yaml_validator.py`
 
 ### Importance
-**MEDIUM:** Documentation is important for:
-- User onboarding and understanding the module
-- Preserving knowledge about features and usage
-- Maintaining consistency with other migrated modules
-
-While the code is fully functional and tested, missing documentation makes the module harder to use and understand.
+Incorrect documentation misleads users and developers.
 
 ### Proposed Solution
-1. Review `incoming/kg/README.md` content
-2. Create `docs/knowledge_graph/README.md` with migrated content
-3. Update any references from "kgshred" to "knowledge_graph"
-4. Update import paths in examples
-5. Add to main project documentation index if applicable
+1. Update documentation to reflect actual dependencies, or
+2. Use stdlib-only YAML parsing if possible
 
 ### Acceptance Criteria
-- [ ] `docs/knowledge_graph/README.md` created with source content
-- [ ] All "kgshred" references updated to "knowledge_graph"
-- [ ] Import paths updated for dot-work structure
-- [ ] Documentation links to correct modules
-- [ ] Content is accurate and helpful
+- [ ] Documentation accurate
+
+---
+
+---
+id: "CR-045@f1a3b5"
+title: "Incorrect return type annotation in yaml_validator.py"
+description: "parse_yaml can return scalars but annotation says dict|list"
+created: 2024-12-27
+section: "tools"
+tags: [type-hints, correctness]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/tools/yaml_validator.py
+---
+
+### Problem
+`parse_yaml()` (lines 208-220) return type annotation is `dict[str, Any] | list[Any]`. YAML can parse scalars - `parse_yaml("42")` returns `42`, not a dict or list. Type annotation is incorrect.
+
+### Affected Files
+- `src/dot_work/tools/yaml_validator.py`
+
+### Importance
+Incorrect types cause mypy false positives and mislead developers.
+
+### Proposed Solution
+Fix return type to `Any` or appropriate union.
+
+### Acceptance Criteria
+- [ ] Type annotation accurate
+
+---
+
+---
+id: "CR-046@a2b4c6"
+title: "ProjectFile wrapper in overview/scanner.py adds no value"
+description: "Thin wrapper around Path that could be eliminated"
+created: 2024-12-27
+section: "overview"
+tags: [simplification, refactor]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/overview/scanner.py
+---
+
+### Problem
+`ProjectFile` dataclass (lines 33-44) wraps `Path` but only adds `suffix` property and `read_text()`. This is a thin wrapper that doesn't justify its existence; direct `Path` usage would be simpler.
+
+### Affected Files
+- `src/dot_work/overview/scanner.py`
+
+### Importance
+Unnecessary abstractions increase cognitive load.
+
+### Proposed Solution
+Use `Path` directly instead of `ProjectFile`.
+
+### Acceptance Criteria
+- [ ] Unnecessary wrapper removed
+- [ ] Code simplified
+
+---
+
+---
+id: "CR-047@b3c5d7"
+title: "Parallel dicts in overview/code_parser.py should be consolidated"
+description: "_INTERFACE_DECORATOR_MARKERS and _INTERFACE_DOC_MARKERS have same keys"
+created: 2024-12-27
+section: "overview"
+tags: [maintainability, refactor]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/overview/code_parser.py
+---
+
+### Problem
+`_INTERFACE_DECORATOR_MARKERS` and `_INTERFACE_DOC_MARKERS` (lines 18-30) are parallel dictionaries with the same keys. They could become inconsistent if one is updated without the other.
+
+### Affected Files
+- `src/dot_work/overview/code_parser.py`
+
+### Importance
+Risk of inconsistency. Data structure should be unified.
+
+### Proposed Solution
+Consolidate into a single data structure (e.g., a dataclass or dict of dicts).
+
+### Acceptance Criteria
+- [ ] Single source of truth for interface markers
+- [ ] No risk of drift
+
+---
+
+---
+id: "CR-048@c4d6e8"
+title: "Silent exception swallowing in overview/code_parser.py"
+description: "Bare except Exception blocks return zeros without logging"
+created: 2024-12-27
+section: "overview"
+tags: [error-handling, observability]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/overview/code_parser.py
+---
+
+### Problem
+In `code_parser.py:56-57` and `70-71`, bare `except Exception` swallows all errors from radon metrics, returning zeros. Silent failures make debugging difficult when metrics are unexpectedly zero.
+
+### Affected Files
+- `src/dot_work/overview/code_parser.py`
+
+### Importance
+Silent failures mask problems and make debugging difficult.
+
+### Proposed Solution
+Log the exception before returning fallback value.
+
+### Acceptance Criteria
+- [ ] Exceptions logged
+- [ ] Debugging possible
+
+---
+
+---
+id: "CR-049@d5e7f9"
+title: "Frontend CDN dependencies break offline usage"
+description: "Review module depends on external CDNs for Tailwind and Highlight.js"
+created: 2024-12-27
+section: "review"
+tags: [dependencies, reliability]
+type: enhancement
+priority: medium
+status: proposed
+references:
+  - src/dot_work/review/templates/index.html
+---
+
+### Problem
+The review template (index.html:8-12) depends on external CDNs (Tailwind, Highlight.js) which require internet access. This breaks offline usage and introduces version pinning concerns.
+
+### Affected Files
+- `src/dot_work/review/templates/index.html`
+
+### Importance
+Offline usage is a reasonable requirement for development tools.
+
+### Proposed Solution
+1. Bundle these assets locally, or
+2. Provide fallbacks for offline mode
+
+### Acceptance Criteria
+- [ ] Works offline or fallback provided
+- [ ] Dependencies version-pinned
+
+---
+
+---
+id: "CR-050@e6f8a0"
+title: "Server closures capture stale state in review/server.py"
+description: "Files computed once at startup won't reflect changes during session"
+created: 2024-12-27
+section: "review"
+tags: [state-management, reliability]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/review/server.py
+---
+
+### Problem
+In `server.py:67-72`, `files`, `tracked`, `changed`, and `all_changed` are computed once at app creation and captured in route closures. If files change during the review session, the UI shows stale data.
+
+### Affected Files
+- `src/dot_work/review/server.py`
+
+### Importance
+Long-running sessions could show incorrect file state.
+
+### Proposed Solution
+1. Recompute file lists on each request, or
+2. Add refresh mechanism, or
+3. Document limitation
+
+### Acceptance Criteria
+- [ ] File state accurate or limitation documented
+
+---
+
+---
+id: "CR-051@f7a9b1"
+title: "Inconsistent parameter naming include_unused vs unused_only"
+description: "Parameter name suggests inclusion but filters exclusively"
+created: 2024-12-27
+section: "db_issues"
+tags: [naming, clarity]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/db_issues/services/label_service.py
+---
+
+### Problem
+`list_labels(include_unused: bool = False)` (line 358-371) parameter name is misleading. When `True`, it only returns unused labels (not includes them). Should be `unused_only` or `filter_unused`.
+
+### Affected Files
+- `src/dot_work/db_issues/services/label_service.py`
+
+### Importance
+Misleading parameter names cause usage errors.
+
+### Proposed Solution
+Rename to `unused_only` to match behavior.
+
+### Acceptance Criteria
+- [ ] Parameter name reflects behavior
+
+---
+
+---
+id: "CR-052@a8b0c2"
+title: "Bulk service bypasses IssueService encapsulation"
+description: "Direct repository access skips audit logging"
+created: 2024-12-27
+section: "db_issues"
+tags: [architecture, encapsulation]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/db_issues/services/bulk_service.py
+---
+
+### Problem
+In `bulk_service.py:606` and `703`, `bulk_label_add` and `bulk_label_remove` bypass `IssueService` by calling `self.issue_service.uow.issues.save(updated_issue)` directly. This breaks encapsulation and may skip audit logging.
+
+### Affected Files
+- `src/dot_work/db_issues/services/bulk_service.py`
+
+### Importance
+Bypassing service layer can skip validation and audit.
+
+### Proposed Solution
+Use IssueService methods for updates.
+
+### Acceptance Criteria
+- [ ] All updates go through IssueService
+- [ ] Audit logging consistent
+
+---
+
+---
+id: "CR-053@b9c1d3"
+title: "Inconsistent transaction management in db_issues services"
+description: "Some methods use with self.uow context, others don't"
+created: 2024-12-27
+section: "db_issues"
+tags: [consistency, transactions]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/db_issues/services/issue_service.py
+  - src/dot_work/db_issues/services/epic_service.py
+---
+
+### Problem
+`set_epic` and `clear_epic` (issue_service.py:701-740) use `with self.uow:` context manager and call `self.uow.commit()`, while most other methods don't. In epic_service, `create_epic` and `update_epic` use `with self.uow:` but `get_epic`, `list_epics`, `delete_epic` don't.
+
+### Affected Files
+- `src/dot_work/db_issues/services/issue_service.py`
+- `src/dot_work/db_issues/services/epic_service.py`
+
+### Importance
+Inconsistent transaction handling could cause unexpected behavior.
+
+### Proposed Solution
+Establish and document consistent transaction pattern.
+
+### Acceptance Criteria
+- [ ] Consistent transaction usage
+- [ ] Pattern documented
+
+---
+
+---
+id: "CR-054@c0d2e4"
+title: "Bare gitignore parse failure in zip/zipper.py"
+description: "Parse failure prints warning but continues, potentially exposing sensitive files"
+created: 2024-12-27
+section: "zip"
+tags: [error-handling, security]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/zip/zipper.py
+---
+
+### Problem
+In `zipper.py:70-74`, gitignore parse failure prints warning and continues. This may lead to including sensitive files that should be excluded.
+
+### Affected Files
+- `src/dot_work/zip/zipper.py`
+
+### Importance
+Security concern - sensitive files could be included in zip.
+
+### Proposed Solution
+1. Fail fast on gitignore parse error, or
+2. Require explicit `--ignore-gitignore-errors` flag to continue
+
+### Acceptance Criteria
+- [ ] Safe default behavior
+- [ ] Users aware of ignored gitignore
+
+---
+
+---
+id: "CR-055@d1e3f5"
+title: "Bare except Exception in zip/zipper.py swallows errors"
+description: "All gitignore matcher exceptions silently swallowed"
+created: 2024-12-27
+section: "zip"
+tags: [error-handling]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/zip/zipper.py
+---
+
+### Problem
+In `zipper.py:33-37`, bare `except Exception:` swallows all errors from the gitignore matcher, including `MemoryError`, `KeyboardInterrupt` (through exception chaining), etc.
+
+### Affected Files
+- `src/dot_work/zip/zipper.py`
+
+### Importance
+Swallowing all exceptions can mask serious problems.
+
+### Proposed Solution
+Catch specific exceptions from `gitignore_parser`.
+
+### Acceptance Criteria
+- [ ] Specific exceptions caught
+- [ ] Serious errors not swallowed
+
+---
+
+---
+id: "CR-056@e2f4a6"
+title: "Installer function too long at 130+ lines"
+description: "install_canonical_prompts_by_environment handles multiple responsibilities"
+created: 2024-12-27
+section: "installer"
+tags: [code-quality, refactor]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/installer.py
+---
+
+### Problem
+`install_canonical_prompts_by_environment` (lines 1274-1415) is 140+ lines handling scanning, batch prompting, and installation. This exceeds the <15 lines guideline.
+
+### Affected Files
+- `src/dot_work/installer.py`
+
+### Importance
+Long functions are hard to test and maintain.
+
+### Proposed Solution
+Decompose into smaller functions:
+- `_scan_prompt_files()`
+- `_prompt_for_batch_choice()`
+- `_install_single_prompt()`
+
+### Acceptance Criteria
+- [ ] Function decomposed
+- [ ] Individual parts testable
+
+---
+
+---
+id: "CR-057@f3a5b7"
+title: "JSONL file I/O lacks atomicity in review/storage.py"
+description: "Crash mid-write could corrupt comment storage"
+created: 2024-12-27
+section: "review"
+tags: [reliability, data-integrity]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/review/storage.py
+---
+
+### Problem
+`append_comment` (lines 63-66) opens file, writes, and closes without atomic write semantics. A crash mid-write could corrupt the JSONL file.
+
+### Affected Files
+- `src/dot_work/review/storage.py`
+
+### Importance
+Data corruption risk during crashes.
+
+### Proposed Solution
+1. Write to temp file and rename, or
+2. Use file locking
+
+### Acceptance Criteria
+- [ ] Atomic writes implemented
+- [ ] No corruption on crash
+
+---
+
+---
+id: "CR-079@f4a0b8"
+title: "Subprocess Calls Without Explicit Shell=False"
+description: "Multiple subprocess.run() calls lack explicit shell parameter creating maintenance risk"
+created: 2024-12-27
+section: "cli"
+tags: [security, subprocess, maintainability, consistency]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/db_issues/cli.py
+  - src/dot_work/container/provision/core.py
+---
+
+### Problem
+Multiple `subprocess.run()` calls don't explicitly set `shell=False`:
+
+```python
+# src/dot_work/db_issues/cli.py:1300
+result = subprocess.run([editor_name, *editor_args, str(temp_path)])
+
+# src/dot_work/db_issues/cli.py:1376
+result = subprocess.run([editor_name, *editor_args, str(temp_path)])
+
+# src/dot_work/container/provision/core.py:429
+subprocess.run(build_cmd, check=True)
+```
+
+While `shell=False` is the default for list arguments, not being explicit:
+
+1. **Unclear intent** - Future readers may not understand security posture
+2. **Accidental shell=True** - Code reviews may miss missing shell parameter
+3. **Inconsistent patterns** - Some calls may set shell=True later causing bugs
+4. **Security review friction** - Need to verify default each time
+5. **Best practice violation** - Security guidelines recommend explicit parameters
+
+**Scope:**
+- 40+ subprocess.run() calls without explicit shell parameter identified
+- Inconsistent pattern across codebase modules
+
+### Affected Files
+- `src/dot_work/db_issues/cli.py` (multiple locations)
+- `src/dot_work/container/provision/core.py`
+- Other files using subprocess.run()
+
+### Importance
+**MEDIUM**: Missing explicit shell parameter creates:
+- Maintenance burden during security reviews
+- Risk of accidental shell invocation in future changes
+- Inconsistent code patterns causing confusion
+- Potential for subtle bugs if list arguments are converted to strings
+
+While not an immediate vulnerability (default is safe), it violates explicit-is-better-than-implicit principle.
+
+### Proposed Solution
+1. Add explicit `shell=False` to all subprocess.run() calls
+2. Create subprocess wrapper utility with security defaults
+3. Add linter rule or pre-commit hook for missing shell parameter
+4. Document subprocess security best practices in AGENTS.md
+5. Consider using `subprocess.check_call()` or `check_output()` for simpler cases
+
+### Acceptance Criteria
+- [ ] All subprocess.run() calls have explicit shell=False
+- [ ] Subprocess wrapper utility created with security defaults
+- [ ] Linter rule or pre-commit hook for subprocess validation
+- [ ] Subprocess security documented in AGENTS.md
+- [ ] Code review checklist includes subprocess security
 
 ### Notes
-- This is a documentation gap, not a functional issue
-- The code works perfectly - only docs are missing
-- Source README is 2,808 bytes of valuable content
-- See investigation: `.work/agent/issues/references/AUDIT-KG-001-investigation.md`
+This is related to CR-075 (EDITOR command injection). Both issues would benefit from a subprocess utility wrapper that enforces security defaults across the codebase.
 
+---
+
+---
+id: "CR-080@a5b1c9"
+title: "Temporary File Permissions Not Always Enforced"
+description: "Race condition between file creation and chmod exposes data"
+created: 2024-12-27
+section: "db_issues"
+tags: [security, file-permissions, race-condition]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/db_issues/cli.py
+---
+
+### Problem
+In `cli.py:1285-1295`, temporary file is created then permissions are set:
+
+```python
+# Create temp file with delete=False
+temp_file = tempfile.NamedTemporaryFile(
+    mode='w',
+    prefix=None,
+    suffix=None,
+    delete=False
+)
+temp_path = Path(temp_file.name)
+
+# Write content
+temp_path.write_text(issue_json)
+
+# Set restrictive permissions (owner read/write only) for security
+temp_path.chmod(0o600)
+```
+
+**Security issue:**
+1. File is created with default umask (world-readable on many systems)
+2. Race condition window between creation and chmod
+3. Not all temp file creation points enforce permissions
+4. If process crashes between creation and chmod, file remains with insecure permissions
+
+**Additional concerns:**
+- Inconsistent permission enforcement across codebase
+- Multiple tempfile creation sites without controls
+- No atomic permission setting mechanism
+
+### Affected Files
+- `src/dot_work/db_issues/cli.py` (lines 1285-1295)
+
+### Importance
+**MEDIUM**: Permission race condition creates:
+- Short window of file exposure to other users on multi-user systems
+- Potential data leakage if crash occurs before chmod
+- Security audit failures
+- Inconsistent security posture across codebase
+
+While unlikely to be exploited in typical single-user dev environment, it's a real risk in:
+- CI/CD environments with multiple users
+- Shared development servers
+- Production deployments
+
+### Proposed Solution
+1. Use `tempfile.NamedTemporaryFile` with `mode=0o600` on supported systems
+2. Set umask temporarily before file creation
+3. Create temp files with atomic permission setting (create, set permissions atomically)
+4. Audit all tempfile usage for permission enforcement
+5. Consider using file descriptor-based operations that close race window
+6. Add tests for permission security
+
+### Acceptance Criteria
+- [ ] Temp files created with atomic secure permissions
+- [ ] Race window eliminated or documented
+- [ ] All tempfile sites enforce secure permissions
+- [ ] Tests verify file permissions are secure
+- [ ] Permission enforcement documented
+
+### Notes
+Platform-specific behavior: Linux supports `mode` parameter, Windows may not. Need platform-specific implementation or cross-platform solution.
+
+---
+
+---
+id: "CR-081@b6c2d0"
+title: "Docker Image Regex Over-Permissive"
+description: "Image validation allows malformed formats causing Docker errors"
+created: 2024-12-27
+section: "container"
+tags: [validation, regex, docker]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/container/provision/core.py
+---
+
+### Problem
+In `core.py:48-55`, `DOCKER_IMAGE_PATTERN` regex is over-permissive:
+
+```python
+DOCKER_IMAGE_PATTERN = re.compile(
+    r'^('
+    r'(localhost/|[^/]+/|)'  # optional registry (localhost/ or registry.io/)
+    r'[a-z0-9]+([._-][a-z0-9]+)*'  # first component (namespace or image)
+    r'(/[a-z0-9]+([._-][a-z0-9]+)*)*'  # optional additional components
+    r'(:[a-zA-Z0-9]+([._-][a-zA-Z0-9]+)*)?'  # optional tag
+    r')$'
+)
+```
+
+**Issues:**
+1. **Inconsistent case** - Allows uppercase in tags but not namespaces
+2. **Unlimited nesting** - No limit on `/` components (could accept `a/b/c/d/e/f/g/h/i/j`)
+3. **Missing digest support** - Doesn't validate `@sha256:...` format
+4. **Over-permissive chars** - Allows `.` and `_` in all positions (Docker spec is more restrictive)
+5. **No length limits** - Could accept extremely long image names causing Docker errors
+6. **No semantic versioning** - Tags like `:v1.2.3` not explicitly supported
+
+**Evidence:**
+- Accepts malformed images like `a.b.c/d/e/f:tag` which cause Docker errors
+- Missing length limits could cause command-line truncation
+- No validation of actual Docker image reference spec
+
+### Affected Files
+- `src/dot_work/container/provision/core.py` (lines 48-55)
+
+### Importance
+**MEDIUM**: Over-permissive validation causes:
+- Poor user experience (image accepted then fails at Docker level)
+- Cryptic error messages from Docker CLI
+- Potential image spoofing via complex namespaces
+- Inconsistent behavior across tools
+
+While not a security issue, it creates friction and confusion for users.
+
+### Proposed Solution
+1. Add length limits (max 255 chars total, max 64 per component)
+2. Validate digest format separately: `@sha256:[a-f0-9]{64}`
+3. Limit nesting depth (max 4 path components)
+4. Use official Docker image reference specification
+5. Add explicit support for semantic versioning tags
+6. Add tests for edge cases and malformed images
+7. Improve error messages for rejected images
+
+### Acceptance Criteria
+- [ ] Length limits enforced (255 total, 64 per component)
+- [ ] Digest format validated correctly
+- [ ] Nesting depth limited to 4 components
+- [ ] Tests for edge cases (malformed, too long, etc.)
+- [ ] Clear error messages for rejected images
+- [ ] Compliance with Docker image reference spec
+
+### Notes
+Reference: Docker distribution spec https://github.com/distribution/distribution/blob/main/reference/reference.go
+
+---
+
+---
+id: "CR-082@c7d3e1"
+title: "Missing Input Validation for CLI File Paths"
+description: "CLI commands accept Path parameters with minimal validation enabling symlink attacks"
+created: 2024-12-27
+section: "cli"
+tags: [security, validation, symlink, path-traversal]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/cli.py
+---
+
+### Problem
+Multiple CLI commands accept `Path` parameters with only `.resolve()` and existence checks:
+
+```python
+# Line 98-101
+if not target.exists():
+    console.print(f"[red]❌ Target directory does not exist:[/red] {target}")
+    raise typer.Exit(1)
+
+# Line 416-420
+file = file.resolve()
+if not file.exists():
+    console.print(f"[red]❌ File not found:[/red] {file}")
+    raise typer.Exit(1)
+```
+
+**Missing validations:**
+1. No check for symlinks to sensitive locations
+2. No restriction on path traversal beyond project boundary
+3. No validation of file type (directory vs file)
+4. No size limits on file inputs
+5. No validation that resolved path is within allowed directory
+
+**Attack scenarios:**
+- Symlink to `/etc/passwd` or `/etc/shadow` for disclosure
+- Symlink to `/root/.ssh/` for SSH key theft
+- Path traversal via `../../../` sequences
+- Large file uploads causing DoS
+- Directory symlink causing confusion
+
+**Locations affected:**
+- Lines 98, 184, 250, 416, 487, 643, 773
+
+### Affected Files
+- `src/dot_work/cli.py` (multiple commands)
+
+### Importance
+**MEDIUM**: Insufficient path validation enables:
+- Information disclosure via symlink attacks
+- Path traversal to access files outside project
+- Confusion about actual file location
+- Potential DoS via large files
+
+While not critical in typical single-user development environment, it's a security concern in:
+- Multi-user systems
+- CI/CD with user-submitted files
+- Production deployments with CLI access
+
+### Proposed Solution
+1. Create path validation helper function with:
+   - Symlink detection and handling
+   - Path boundary checking (within project or allowed dirs)
+   - File type validation
+   - Size limits for file inputs
+2. Reject or validate paths with `..` sequences
+3. Check for symlinks and resolve real path before validation
+4. Validate path is within allowed directories
+5. Add file type and size validation for input files
+6. Add tests for symlink and path traversal attempts
+
+### Acceptance Criteria
+- [ ] Path validation helper created
+- [ ] Symlinks detected and handled
+- [ ] Path traversal prevented
+- [ ] File type and size validated
+- [ ] Tests for security scenarios
+- [ ] All CLI commands use validation
+
+### Notes
+Consider using `Path.resolve().is_relative_to()` (Python 3.9+) or manual relative path checking to enforce boundaries.
+
+---
+
+---
+id: "CR-083@d8e4f2"
+title: "Review Module File Lists Computed Once at Startup"
+description: "Stale file state shown in UI during long-running review sessions"
+created: 2024-12-27
+section: "review"
+tags: [state-management, reliability, user-experience]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/review/server.py
+---
+
+### Problem
+In `server.py:67-72`, file lists are computed once at app creation and captured in route closures:
+
+```python
+files = list_all_files(root)
+tracked = set(list_tracked_files(root))
+changed = changed_files(root, base=base_ref)
+untracked = {f for f in files if f not in tracked}
+all_changed = changed | untracked
+```
+
+These lists are captured in closure scope and never updated during the review session.
+
+**Issue:**
+If files change during a review session:
+1. New files created/committed won't appear in UI
+2. Deleted files still show in file tree
+3. Changed files show stale diff/old content
+4. User sees incorrect file state
+5. Comments may be added to already-removed files
+
+**User experience impact:**
+- Confusing UI showing wrong state
+- Wasted time reviewing files that no longer exist
+- Missed new files that should be reviewed
+- Invalid comments on deleted files
+
+### Affected Files
+- `src/dot_work/review/server.py` (lines 67-72)
+
+### Importance
+**MEDIUM**: Stale file state causes:
+- Confusing user experience during active development
+- Inaccurate review of changes
+- Wasted time on nonexistent files
+- Potential for invalid review comments
+
+This is documented in CR-050 but warrants a more detailed issue with specific user impact analysis and solution options.
+
+### Proposed Solution
+1. **Recompute on each request** - Simple but potentially slower
+2. **Add `/api/refresh` endpoint** - Manual refresh button in UI
+3. **Auto-refresh with polling** - Periodic recompute (e.g., every 30 seconds)
+4. **WebSocket-based updates** - Push notifications on file changes (most complex)
+5. **Document limitation** - Warn users to restart review after making changes
+
+**Recommended approach:**
+- Add `/api/refresh` endpoint for manual refresh
+- Add refresh button in UI
+- Document that sessions should be restarted after significant changes
+
+### Acceptance Criteria
+- [ ] `/api/refresh` endpoint added
+- [ ] Refresh button added to UI
+- [ ] File state accurately reflects changes
+- [ ] Limitation documented in help text
+- [ ] Tests for refresh functionality
+- [ ] Good user experience with manual refresh
+
+### Notes
+For production use, consider implementing file system watching (e.g., `watchdog` library) for automatic detection of changes. However, this adds complexity and should be evaluated against actual use patterns.
+
+---
+
+---
+id: "CR-084@e9f5a3"
+title: "Inconsistent Transaction Usage in db_issues Services"
+description: "Mixed transaction patterns across services cause unpredictable behavior"
+created: 2024-12-27
+section: "db_issues"
+tags: [consistency, transactions, database]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/db_issues/services/issue_service.py
+  - src/dot_work/db_issues/services/epic_service.py
+  - src/dot_work/db_issues/services/
+---
+
+### Problem
+Inconsistent transaction usage patterns across db_issues services:
+
+**Using context manager:**
+```python
+# issue_service.py:711-740
+def set_epic(self, issue_id: str, epic_id: str | None) -> None:
+    with self.uow:
+        # ... operations ...
+        self.uow.commit()
+
+# epic_service.py:143-209
+def create_epic(self, project_id: str, title: str) -> Epic:
+    with self.uow:
+        # ... operations ...
+        self.uow.commit()
+```
+
+**Not using context manager:**
+```python
+# epic_service.py: get_epic(), list_epics(), delete_epic()
+# issue_service.py: get_issue(), list_issues(), etc.
+# Most read operations don't use context
+```
+
+**Inconsistencies:**
+- Some write methods use `with self.uow:` and commit manually
+- Others rely on UnitOfWork auto-commit
+- Read operations vary in context manager usage
+- No clear pattern for when context manager should be used
+- CR-053 documents this partially but scope needs expansion
+
+### Affected Files
+- `src/dot_work/db_issues/services/issue_service.py`
+- `src/dot_work/db_issues/services/epic_service.py`
+- Other services in `db_issues/services/`
+
+### Importance
+**MEDIUM**: Inconsistent transaction handling causes:
+- Unpredictable transaction boundaries
+- Potential partial commits on errors
+- Inconsistent rollback behavior across operations
+- Developer confusion about transaction semantics
+- Risk of data corruption if patterns are inconsistent
+
+### Proposed Solution
+1. **Establish clear transaction pattern** documented in AGENTS.md:
+   - Write operations: always use `with self.uow:` context manager
+   - Read operations: never use context manager (use auto-commit)
+   - Multi-step operations: explicit context with manual commit
+2. **Refactor all services** to follow established pattern
+3. **Add unit tests** for transaction rollback behavior
+4. **Document transaction semantics** for each service method
+5. **Add linter or pre-commit check** for transaction usage patterns
+
+### Acceptance Criteria
+- [ ] Clear transaction pattern documented
+- [ ] All write operations use UnitOfWork context
+- [ ] All read operations avoid context manager
+- [ ] Tests for rollback behavior
+- [ ] Method-level transaction documentation
+- [ ] Linter check for pattern compliance
+
+### Notes
+This is an expansion of CR-053. Establishing a clear, consistent pattern is essential for maintainability and preventing data corruption bugs.
+
+---
+id: "PERF-007@l7m8n9"
+title: "Multiple Statistics Queries in StatsService"
+description: "Statistics aggregation executes 15+ separate queries instead of single GROUP BY"
+created: 2024-12-27
+section: "db_issues"
+tags: [performance, database, statistics, query-consolidation]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/db_issues/services/stats_service.py
+---
+
+### Problem
+In `stats_service.py:73-100`, `get_statistics()` executes multiple separate queries:
+
+```python
+def get_statistics(self) -> Statistics:
+    total = self._get_total_count()        # Query 1
+    by_status = self._get_by_status(total)  # Query 2, 3, 4, 5
+    by_priority = self._get_by_priority(total)  # Query 6, 7, 8, 9, 10
+    by_type = self._get_by_type(total)  # Query 11, 12, 13
+    metrics = self._get_metrics()  # Query 14, 15, 16...
+```
+
+Each metric group executes multiple separate database round-trips.
+
+**Performance issue:**
+- Each metric group executes multiple separate queries
+- Could be combined into single query with GROUP BY
+- Database round-trip latency multiplied by query count
+- Called frequently on dashboard/statistics pages
+- 15+ database queries per statistics refresh
+
+**Impact:**
+- Statistics page load time grows with query count
+- 15+ queries × 5ms latency each = 75ms minimum
+- Network overhead multiplies
+- Database connection underutilized
+
+### Affected Files
+- `src/dot_work/db_issues/services/stats_service.py` (lines 73-100)
+
+### Importance
+**MEDIUM**: Affects dashboard and statistics page performance:
+- Slower dashboard load times
+- Poor user experience on statistics pages
+- Wasted database round-trips
+- Latency accumulates across the application
+
+### Proposed Solution
+Combine into single GROUP BY query:
+
+```python
+def get_statistics(self) -> Statistics:
+    result = self.session.exec(text("""
+        SELECT
+            COUNT(*) as total,
+            COUNT(CASE WHEN status = 'proposed' THEN 1 END) as proposed,
+            COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress,
+            COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
+            COUNT(CASE WHEN status = 'blocked' THEN 1 END) as blocked,
+            COUNT(CASE WHEN priority = 0 THEN 1 END) as critical,
+            COUNT(CASE WHEN priority = 1 THEN 1 END) as high,
+            COUNT(CASE WHEN priority = 2 THEN 1 END) as medium,
+            COUNT(CASE WHEN priority = 3 THEN 1 END) as low,
+            COUNT(CASE WHEN type = 'task' THEN 1 END) as task,
+            COUNT(CASE WHEN type = 'bug' THEN 1 END) as bug,
+            COUNT(CASE WHEN type = 'enhancement' THEN 1 END) as enhancement,
+            COUNT(CASE WHEN type = 'refactor' THEN 1 END) as refactor,
+            COUNT(CASE WHEN type = 'test' THEN 1 END) as test,
+            COUNT(CASE WHEN type = 'docs' THEN 1 END) as docs
+        FROM issues
+        WHERE deleted_at IS NULL
+    """))
+
+    row = result.first()
+    return Statistics(
+        total=row.total,
+        by_status={
+            'proposed': row.proposed or 0,
+            'in_progress': row.in_progress or 0,
+            'completed': row.completed or 0,
+            'blocked': row.blocked or 0,
+        },
+        by_priority={
+            'critical': row.critical or 0,
+            'high': row.high or 0,
+            'medium': row.medium or 0,
+            'low': row.low or 0,
+        },
+        by_type={
+            'task': row.task or 0,
+            'bug': row.bug or 0,
+            'enhancement': row.enhancement or 0,
+            'refactor': row.refactor or 0,
+            'test': row.test or 0,
+            'docs': row.docs or 0,
+        }
+    )
+```
+
+### Acceptance Criteria
+- [ ] Single GROUP BY query for all statistics
+- [ ] All metrics calculated in database
+- [ ] Performance test: < 10ms vs current 75ms
+- [ ] Results match current implementation
+- [ ] Handles edge cases (zero issues, deleted issues)
+
+### Notes
+This optimization reduces database round-trips from 15+ to 1, providing 5-10x speedup. The single query is more maintainable and easier to understand.
+
+---
+id: "PERF-008@m8n9o0"
+title: "O(n²) Nested Loops in Tag Matching"
+description: "Tag list concatenated and iterated multiple times for same checks"
+created: 2024-12-27
+section: "git"
+tags: [performance, algorithm, tag-matching, optimization]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/services/git_service.py
+---
+
+### Problem
+In `git_service.py:843-849`, tag matching creates new lists repeatedly:
+
+```python
+# Called multiple times per comparison
+if any("migration" in tag for tag in a.tags + b.tags):
+    # Concatenate + iterate for each pattern
+if any("api" in tag for tag in a.tags + b.tags):
+    # Re-concatenate + iterate again
+if any("security" in tag for tag in a.tags + b.tags):
+    # Re-concatenate + iterate again
+```
+
+**Performance issue:**
+- List concatenation creates new list each time (O(N))
+- Iterates through concatenated list for each check (O(N))
+- Multiple checks cause redundant iterations
+- Called in `_find_common_themes()` for every commit pair
+
+**Impact:**
+- Commit comparison slows down with tag count
+- 100 tags × 3 checks × 100 comparisons = 30,000 redundant iterations
+- Noticeable latency in large repos with many tags
+- Wasted CPU cycles on repeated work
+
+### Affected Files
+- `src/dot_work/git/services/git_service.py` (lines 843-849)
+
+### Importance
+**MEDIUM**: Degrades git analysis performance with tagged commits:
+- Redundant work on every commit comparison
+- Linear slowdown with tag count
+- Makes tagged commits slower to analyze
+- Easy fix with large impact
+
+### Proposed Solution
+Cache concatenated list once or use sets for O(1) membership:
+
+```python
+def _find_common_themes(self, analysis_a, analysis_b):
+    # Concatenate once
+    all_tags = a.tags + b.tags
+
+    # Use cached list for all checks
+    if any("migration" in tag for tag in all_tags):
+        return True
+    if any("api" in tag for tag in all_tags):
+        return True
+    if any("security" in tag for tag in all_tags):
+        return True
+    if any("refactor" in tag for tag in all_tags):
+        return True
+    # ... other checks
+```
+
+Or use sets for O(1) membership:
+
+```python
+def _find_common_themes(self, analysis_a, analysis_b):
+    tags_set = set(a.tags + b.tags)
+
+    # O(1) membership checks
+    if "migration" in tags_set:
+        return True
+    if "api" in tags_set:
+        return True
+    if "security" in tags_set:
+        return True
+    if "refactor" in tags_set:
+        return True
+    # ... other checks
+```
+
+### Acceptance Criteria
+- [ ] Tag list computed once (not per check)
+- [ ] O(1) membership tests using sets preferred
+- [ ] Performance test: 100 tags < 1ms vs current 10ms
+- [ ] Results match current implementation
+
+### Notes
+Using sets provides O(1) membership and eliminates the need for iteration entirely. This is a simple fix with 2-3x speedup for tagged commits.
+
+---
+id: "PERF-009@n9o0p1"
+title: "CST Memory Leaks Despite Explicit Cleanup"
+description: "LibCST parsing creates massive memory overhead even with cleanup"
+created: 2024-12-27
+section: "overview"
+tags: [performance, memory, cst, parsing, code-analysis]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/overview/code_parser.py
+---
+
+### Problem
+In `code_parser.py:74-102`, CST parsing creates memory leaks despite cleanup:
+
+```python
+def parse_python_file(path: Path, code: str, module_path: str) -> dict[str, list[Any]]:
+    try:
+        module = cst.parse_module(code)  # CST tree: 10-50× file size in memory
+    except Exception:
+        return {"features": [], "models": []}
+
+    module.visit(collector)
+    result = {"features": collector.features, "models": collector.models}
+
+    # Explicit cleanup attempt
+    del module
+    del collector
+    gc.collect()  # Explicit GC call
+
+    return result
+```
+
+**Performance issue:**
+- LibCST trees consume massive memory (10-50× file size)
+- Explicit `del` doesn't break circular references in visitor patterns
+- `gc.collect()` helps but doesn't guarantee collection
+- Parsing multiple files in loop accumulates memory
+- Called for EVERY file in codebase during analysis
+
+**Impact:**
+- Code analysis becomes progressively slower
+- Large codebases (1000+ files) consume GBs of memory
+- OOM crashes during project analysis
+- Memory not released until process exit
+- Limits codebase size that can be analyzed
+
+### Affected Files
+- `src/dot_work/overview/code_parser.py` (lines 74-102)
+
+### Importance
+**MEDIUM**: Limits codebase size that can be analyzed:
+- Large projects cause OOM crashes
+- Progressive memory degradation during analysis
+- Makes overview feature unusable for large codebases
+- Forces users to break projects into smaller chunks
+
+### Proposed Solution
+Parse with tree-sitter instead (lower memory) or worker process isolation:
+
+```python
+# Use tree-sitter instead of libcst
+import tree_sitter_python as tsp
+
+def parse_python_file(path: Path, code: str, module_path: str):
+    parser = tsp.Parser()
+    tree = parser.parse(code)
+
+    # Tree-sitter uses less memory and doesn't create visitor objects
+    # Process tree directly without intermediate objects
+    root = tree.root_node
+    result = {"features": [], "models": []}
+
+    # Simple traversal
+    def find_nodes(node, node_types):
+        if node.type in node_types:
+            yield node
+        for child in node.children:
+            yield from find_nodes(child, node_types)
+
+    # Process nodes directly
+    for node in find_nodes(root, ["class_definition", "function_definition"]):
+        # Extract features...
+        pass
+
+    return result
+```
+
+Or implement worker process isolation:
+
+```python
+def parse_python_file(path: Path, code: str, module_path: str):
+    # Parse in subprocess to guarantee memory cleanup
+    with multiprocessing.Pool(1) as pool:
+        result = pool.apply(_parse_in_subprocess, (code, module_path))
+    return result
+
+def _parse_in_subprocess(code: str, module_path: str) -> dict:
+    # Worker process - memory freed on exit
+    module = cst.parse_module(code)
+    collector = _Collector(module_path)
+    module.visit(collector)
+    return {"features": collector.features, "models": collector.models}
+```
+
+### Acceptance Criteria
+- [ ] Memory usage < 5× file size (vs 10-50×)
+- [ ] No memory accumulation across file parsing
+- [ ] 1000+ file analysis succeeds without OOM
+- [ ] Performance test: memory < 500MB for 1000 files
+
+### Notes
+Tree-sitter is significantly more memory-efficient than LibCST. Worker process isolation guarantees memory cleanup even with LibCST. Both approaches enable analysis of larger codebases.
+
+---
+id: "PERF-010@o0p1q2"
+title: "Multiple fetchall() Without Size Limits"
+description: "Knowledge graph queries load unlimited results causing unbounded memory"
+created: 2024-12-27
+section: "knowledge_graph"
+tags: [performance, memory, database, fetchall, limits]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/db.py
+---
+
+### Problem
+In `db.py` (multiple locations), methods use `fetchall()` without LIMIT:
+
+```python
+# Line 528: Load all nodes
+node_pks = [row["node_pk"] for row in cur.fetchall()]
+
+# Line 584: Load all node counts
+nodes_by_kind = {row["kind"]: row["cnt"] for row in cur.fetchall()}
+
+# Line 799: Load all nodes for parent
+return [self._row_to_node(row) for row in cur.fetchall()]
+
+# Lines 859, 882, 904, 963, 1075, 1240, 1360, 1526, 1599, 1714, 1751:
+# 17+ total locations with fetchall() without limits
+```
+
+**Performance issue:**
+- 17+ methods use `fetchall()` without LIMIT
+- No memory bounding for large result sets
+- Knowledge graphs with 10k+ nodes cause issues
+- Called during graph building and search operations
+- Unbounded memory allocation
+
+**Impact:**
+- Graph operations consume unbounded memory
+- Large knowledge bases become unusable
+- Server crashes during peak usage
+- Memory pressure affects other operations
+- No predictable memory usage
+
+### Affected Files
+- `src/dot_work/knowledge_graph/db.py` (17+ locations)
+
+### Importance
+**MEDIUM**: Affects scalability of knowledge graph:
+- Prevents creation of large knowledge bases
+- Unpredictable memory usage
+- Server crashes under load
+- Makes feature unusable at scale
+
+### Proposed Solution
+Add DEFAULT_LIMIT constant and use streaming for large results:
+
+```python
+DEFAULT_QUERY_LIMIT = 10000
+
+def get_all_nodes(self, limit: int = DEFAULT_QUERY_LIMIT) -> list[Node]:
+    """Get nodes with optional limit.
+
+    Use iter_nodes() for unlimited results without memory issues.
+    """
+    cur = conn.execute("SELECT ... LIMIT ?", (limit,))
+    return [self._row_to_node(row) for row in cur.fetchall()]
+
+def iter_nodes(self, batch_size: int = 1000) -> Iterator[list[Node]]:
+    """Iterate over nodes in batches to avoid memory issues."""
+    offset = 0
+    while True:
+        cur = conn.execute("SELECT ... LIMIT ? OFFSET ?", (batch_size, offset))
+        batch = [self._row_to_node(row) for row in cur.fetchall()]
+        if not batch:
+            break
+        yield batch
+        offset += batch_size
+```
+
+Apply pattern to all 17+ methods:
+- `get_all_nodes()` → add limit, provide `iter_nodes()`
+- `get_edges_by_type()` → add limit, provide `iter_edges_by_type()`
+- `get_all_embeddings_for_model()` → add limit, provide `stream_embeddings_for_model()` (exists)
+- etc.
+
+### Acceptance Criteria
+- [ ] DEFAULT_QUERY_LIMIT constant defined
+- [ ] All fetchall() methods have limit parameter
+- [ ] Streaming methods provided for unlimited results
+- [ ] Documentation explains when to use limit vs streaming
+- [ ] Performance test: 100k nodes with limit succeeds
+
+### Notes
+Streaming methods already exist for embeddings (PERF-005). Apply same pattern consistently across all database methods to enable large-scale usage with bounded memory.
+
+---
+id: "PERF-011@p1q2r3"
+title: "Synchronous Cache File Operations"
+description: "Cache cleanup and stats use blocking file I/O"
+created: 2024-12-27
+section: "git"
+tags: [performance, io, async, cache, file-operations]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/services/cache.py
+---
+
+### Problem
+In `cache.py:195, 217, 258`, cache operations are synchronous and blocking:
+
+```python
+def clear(self) -> bool:
+    # Synchronous file iteration and deletion
+    for cache_file in self.cache_dir.glob("*.json"):  # Blocking I/O
+        cache_file.unlink()  # Blocking I/O
+
+def cleanup_expired(self) -> int:
+    # Synchronous file open/read/close for each file
+    for cache_file in self.cache_dir.glob("*.json"):  # Blocking
+        with open(cache_file, encoding="utf-8") as f:  # Blocking
+            cache_data = json.load(f)
+        cache_file.unlink()  # Blocking
+
+def get_cache_stats(self) -> dict[str, Any]:
+    # Synchronous stat() and read() for each file
+    for cache_file in cache_files:
+        total_size += f.stat().st_size  # Blocking I/O
+```
+
+**Performance issue:**
+- Cache operations are synchronous and blocking
+- Multiple file I/O operations without batching
+- Large cache directories (1000+ files) cause delays
+- Called during cleanup and maintenance operations
+- Single-threaded file operations
+
+**Impact:**
+- Cache cleanup blocks UI
+- Large caches (10,000+ files) take seconds to clean
+- Affects startup time and maintenance operations
+- Poor user experience during cache operations
+
+### Affected Files
+- `src/dot_work/git/services/cache.py` (lines 195, 217, 258)
+
+### Importance
+**MEDIUM**: Degrades user experience during maintenance:
+- Blocking operations freeze UI
+- Large cache cleanup takes noticeable time
+- Poor performance on networked filesystems
+- Affects perceived application responsiveness
+
+### Proposed Solution
+Use asyncio for concurrent I/O:
+
+```python
+import asyncio
+import aiofiles
+
+async def clear_async(self) -> bool:
+    """Clear cache asynchronously."""
+    try:
+        tasks = []
+        for cache_file in self.cache_dir.glob("*.json"):
+            tasks.append(asyncio.to_thread(cache_file.unlink))
+        await asyncio.gather(*tasks, return_exceptions=True)
+        self.logger.debug(f"Cache cleared: {len(tasks)} files deleted")
+        return True
+    except Exception as e:
+        self.logger.error(f"Failed to clear cache: {e}")
+        return False
+
+async def cleanup_expired_async(self) -> int:
+    """Clean up expired cache entries asynchronously."""
+    count = 0
+    tasks = []
+
+    for cache_file in self.cache_dir.glob("*.json"):
+        tasks.append(asyncio.to_thread(self._check_and_delete, cache_file))
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    count = sum(1 for r in results if r)
+    return count
+```
+
+Or limit concurrent operations with ThreadPoolExecutor:
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+def cleanup_expired(self, max_workers: int = 4) -> int:
+    """Clean up expired cache entries with concurrent I/O."""
+    files = list(self.cache_dir.glob("*.json"))
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(self._check_and_delete, f) for f in files]
+        count = 0
+        for future in futures:
+            if future.result():
+                count += 1
+
+    self.logger.debug(f"Cleaned up {count} expired cache files")
+    return count
+```
+
+### Acceptance Criteria
+- [ ] Async or concurrent I/O for cache operations
+- [ ] Performance test: 10k files < 2 seconds vs current 10+ seconds
+- [ ] Thread/concurrency limits to avoid overwhelming filesystem
+- [ ] Error handling for concurrent operations
+
+### Notes
+ThreadPoolExecutor approach is simpler and doesn't require async throughout. Should provide 4-10x speedup for cache operations on large directories.
+
+---
+id: "PERF-012@q2r3s4"
+title: "No Memoization for Git Branch/Tag Lookups"
+description: "Branch and tag lookups performed repeatedly for same commits"
+created: 2024-12-27
+section: "git"
+tags: [performance, memoization, caching, git, branch-tag]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/services/git_service.py
+---
+
+### Problem
+In `git_service.py:615-639`, branch and tag lookups have no caching:
+
+```python
+def _get_commit_branch(self, commit: gitpython.Commit) -> str:
+    # No caching - performs full traversal every time
+    for branch in self.repo.branches:
+        if commit.hexsha in [c.hexsha for c in self.repo.iter_commits(branch.name)]:
+            return branch.name
+    return "unknown"
+
+def _get_commit_tags(self, commit: gitpython.Commit) -> list[str]:
+    # No caching - iterates all tags every time
+    tags = []
+    for tag in self.repo.tags:
+        if tag.commit.hexsha == commit.hexsha:
+            tags.append(tag.name)
+    return tags
+```
+
+**Performance issue:**
+- Same commit queried multiple times during analysis
+- Branch lookup: Full branch traversal per commit
+- Tag lookup: Full tag iteration per commit
+- Called for EVERY commit in comparison (100-1000+ times)
+- Redundant work across analyses
+
+**Impact:**
+- Git comparison becomes progressively slower
+- Redundant work for same commits across analyses
+- Analysis time scales quadratically with commit count
+- 100 commits × full traversal each = massive waste
+
+### Affected Files
+- `src/dot_work/git/services/git_service.py` (lines 615-639)
+
+### Importance
+**MEDIUM**: Visible in multi-commit analyses:
+- Repeated full traversals for same commits
+- Wasted CPU cycles and I/O
+- Makes repeated analyses slower
+- Easy optimization with large impact
+
+### Proposed Solution
+Memoize branch/tag lookups once per comparison:
+
+```python
+def compare_refs(self, from_ref: str, to_ref: str) -> ComparisonResult:
+    # Clear and build caches once per comparison
+    self._commit_to_branch = {}
+    self._commit_to_tags = {}
+
+    commits = self._get_commits_between_refs(from_ref, to_ref)
+
+    # Pre-build commit → branch mapping
+    for branch in self.repo.branches:
+        for commit in self.repo.iter_commits(branch.name):
+            self._commit_to_branch[commit.hexsha] = branch.name
+
+    # Pre-build commit → tags mapping
+    for tag in self.repo.tags:
+        commit_hash = tag.commit.hexsha
+        if commit_hash not in self._commit_to_tags:
+            self._commit_to_tags[commit_hash] = []
+        self._commit_to_tags[commit_hash].append(tag.name)
+
+    # Now O(1) lookups in analyze_commit()
+    for commit in commits:
+        analysis = self.analyze_commit(commit)  # Uses cached maps
+
+def _get_commit_branch(self, commit: gitpython.Commit) -> str:
+    return self._commit_to_branch.get(commit.hexsha, "unknown")
+
+def _get_commit_tags(self, commit: gitpython.Commit) -> list[str]:
+    return self._commit_to_tags.get(commit.hexsha, [])
+```
+
+### Acceptance Criteria
+- [ ] Commit-to-branch mapping built once per comparison
+- [ ] Commit-to-tags mapping built once per comparison
+- [ ] O(1) lookups in `_get_commit_branch()` and `_get_commit_tags()`
+- [ ] Performance test: 1000 commits < 5 seconds vs current 30+ seconds
+- [ ] Caches cleared between comparisons
+
+### Notes
+This optimization should provide 10-100x speedup for multi-commit analyses. Memory overhead is minimal (dict with commit hash keys).
+
+---
+id: "PERF-013@r3s4t5"
+title: "Redundant Scope Set Computations"
+description: "Search scope sets recomputed for every search operation"
+created: 2024-12-27
+section: "knowledge_graph"
+tags: [performance, caching, search, scope, knowledge-graph]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/search_fts.py
+  - src/dot_work/knowledge_graph/search_semantic.py
+---
+
+### Problem
+In `search_fts.py:100-109` and `search_semantic.py:128-137`, scope sets computed for EVERY search:
+
+```python
+# search_fts.py - Called for EVERY search
+if scope:
+    scope_members, scope_topics, exclude_topic_ids, shared_topic_id = _build_scope_sets(
+        db, scope
+    )
+
+# _build_scope_sets() performs multiple queries:
+def _build_scope_sets(db, scope):
+    # Query 1: Get collection members
+    # Query 2: Get topic links
+    # Query 3: Build exclusion sets
+    # Query 4: Get shared topic
+```
+
+**Performance issue:**
+- Scope sets computed for EVERY search operation
+- Scope doesn't change between searches in same session
+- Multiple database queries for set building
+- Called in both FTS and semantic search (high frequency)
+- Repeated work for identical scope parameters
+
+**Impact:**
+- Repeated searches incur same overhead
+- 100 searches = 400 redundant database queries
+- Noticeable latency on search-heavy workflows
+- Wasted database round-trips
+
+### Affected Files
+- `src/dot_work/knowledge_graph/search_fts.py` (lines 100-109)
+- `src/dot_work/knowledge_graph/search_semantic.py` (lines 128-137)
+
+### Importance
+**MEDIUM**: Affects search performance:
+- Repeated searches slow down unnecessarily
+- Database overhead for each search
+- Poor user experience in search-heavy workflows
+- Easy optimization with caching
+
+### Proposed Solution
+Cache scope sets with TTL or session-level caching:
+
+```python
+from functools import lru_cache
+import hashlib
+import time
+
+@lru_cache(maxsize=32)
+def _build_scope_sets_cached(db_id: int, scope_hash: str, time_bucket: int):
+    """Cached version of _build_scope_sets."""
+    # This still needs to build real sets - just cached by parameters
+    # Need to pass actual db reference somehow
+    pass
+
+# Better: Scope object-level caching
+class SearchSession:
+    def __init__(self, db):
+        self.db = db
+        self._scope_cache = {}
+
+    def search(self, query, scope):
+        if scope is None:
+            return self._search_unscoped(query)
+
+        scope_key = (scope.project, tuple(scope.topics), tuple(scope.exclude_topics))
+        if scope_key not in self._scope_cache:
+            self._scope_cache[scope_key] = _build_scope_sets(self.db, scope)
+
+        # Use cached sets
+        scope_members, scope_topics, exclude_topic_ids, shared_topic_id = self._scope_cache[scope_key]
+
+        # ... rest of search
+```
+
+Or time-based caching with TTL:
+
+```python
+# In search functions
+_scope_cache = {}
+_cache_ttl = 300  # 5 minutes
+
+def search(db, query, scope, ttl_seconds=_cache_ttl):
+    if scope:
+        scope_hash = hashlib.sha256(repr(scope).encode()).hexdigest()
+        time_bucket = int(time.time() // ttl_seconds)
+
+        cache_key = (id(db), scope_hash, time_bucket)
+        if cache_key not in _scope_cache:
+            _scope_cache[cache_key] = _build_scope_sets(db, scope)
+
+        scope_members, scope_topics, exclude_topic_ids, shared_topic_id = _scope_cache[cache_key]
+```
+
+### Acceptance Criteria
+- [ ] Scope sets cached across searches
+- [ ] Cache invalidation when data changes
+- [ ] Performance test: 100 searches with same scope < 2 seconds vs current 5+ seconds
+- [ ] TTL or manual invalidation implemented
+
+### Notes
+Search scope rarely changes within a session. Caching should provide 3-5x speedup for repeated searches with identical scope parameters.
+
+---
+id: "PERF-014@s4t5u6"
+title: "Sequential Commit Processing"
+description: "Git commits analyzed sequentially without parallelization"
+created: 2024-12-27
+section: "git"
+tags: [performance, parallelism, git, commit-analysis, cpu]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/services/git_service.py
+---
+
+### Problem
+In `git_service.py:94-102`, commits analyzed sequentially:
+
+```python
+# compare_refs() - Process commits sequentially
+analyzed_commits = []
+for commit in tqdm(commits, desc="Analyzing commits"):
+    try:
+        analysis = self.analyze_commit(commit)  # Blocking per commit
+        analyzed_commits.append(analysis)
+    except Exception as e:
+        self.logger.error(f"Failed to analyze commit {commit.hexsha}: {e}")
+        continue
+```
+
+**Performance issue:**
+- Commits analyzed sequentially (one at a time)
+- Each commit requires file diff parsing, complexity calculation
+- CPU-bound operations not parallelized
+- Analysis time scales linearly with commit count
+- With LLM summarization: each commit = 1-2 seconds
+
+**Impact:**
+- Large comparisons (100+ commits) take minutes
+- CPU underutilized (single core at 100%, others idle)
+- Blocking UI during analysis
+- 8-core machine using only 12.5% of capacity
+
+### Affected Files
+- `src/dot_work/git/services/git_service.py` (lines 94-102)
+
+### Importance
+**MEDIUM**: Limits throughput of git analysis:
+- Makes large comparisons slow
+- Wastes CPU resources
+- Poor user experience on multi-core machines
+- Easy optimization with large speedup
+
+### Proposed Solution
+Parallelize commit analysis with ProcessPoolExecutor:
+
+```python
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import os
+
+def compare_refs(self, from_ref: str, to_ref: str) -> ComparisonResult:
+    commits = self._get_commits_between_refs(from_ref, to_ref)
+
+    # Parallelize CPU-bound commit analysis
+    analyzed_commits = []
+    with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
+        futures = {
+            executor.submit(_analyze_commit_impl, commit.hexsha, self.config.repo_path)
+            for commit in commits
+        }
+
+        for future in tqdm(as_completed(futures), total=len(commits), desc="Analyzing"):
+            try:
+                analysis = future.result()
+                analyzed_commits.append(analysis)
+            except Exception as e:
+                self.logger.error(f"Failed to analyze commit: {e}")
+
+    # Sort by original commit order
+    commit_order = {c.hexsha: i for i, c in enumerate(commits)}
+    analyzed_commits.sort(key=lambda a: commit_order.get(a.commit_hash, float('inf')))
+
+    # ... rest of comparison
+
+# Top-level function for picklability
+def _analyze_commit_impl(commit_hash: str, repo_path: str) -> ChangeAnalysis:
+    """Standalone function for parallel execution."""
+    config = AnalysisConfig(repo_path=repo_path, use_llm=False, cache_enabled=True)
+    service = GitAnalysisService(config)
+    return service.analyze_commit(commit_hash)
+```
+
+### Acceptance Criteria
+- [ ] Commit analysis parallelized with ProcessPoolExecutor
+- [ ] CPU utilization increased to 80%+ on multi-core
+- [ ] Performance test: 100 commits on 8-core < 30 seconds vs current 200+ seconds
+- [ ] Error handling preserves all successful analyses
+- [ ] Results sorted by original commit order
+
+### Notes
+This optimization should provide 4-8x speedup on multi-core machines (linear speedup with core count for CPU-bound analysis). Memory usage increases with worker count but is manageable.
+
+---

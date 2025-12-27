@@ -6,7 +6,9 @@ Provides high-level scanning API for Python projects.
 
 import fnmatch
 import os
+import re
 from pathlib import Path
+from typing import Pattern
 
 from dot_work.python.scan.ast_extractor import extract_entities
 from dot_work.python.scan.models import CodeIndex, FileEntity
@@ -32,6 +34,11 @@ class ASTScanner:
         self.root_path = root_path.resolve()
         self.ignore_patterns = ignore_patterns
         self.include_patterns = include_patterns or ["*.py"]
+        # Pre-compile patterns into regex objects for O(1) pattern matching
+        self._compiled_patterns: list[Pattern] = [
+            re.compile(fnmatch.translate(pattern))
+            for pattern in self.include_patterns
+        ]
 
     def scan(self, incremental: bool = False) -> CodeIndex:
         """Scan the codebase and build an index.
@@ -73,8 +80,8 @@ class ASTScanner:
                 if should_ignore(file_path, self.ignore_patterns):
                     continue
 
-                if self.include_patterns:
-                    if not any(fnmatch.fnmatch(file, pattern) for pattern in self.include_patterns):
+                if self._compiled_patterns:
+                    if not any(pattern.match(file) for pattern in self._compiled_patterns):
                         continue
 
                 python_files.append(file_path)

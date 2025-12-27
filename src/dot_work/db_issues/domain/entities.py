@@ -91,6 +91,94 @@ class CycleDetectedError(DomainError):
 
 
 # =============================================================================
+# Authorization & Audit Types
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class User:
+    """User context for operations.
+
+    Lightweight value object representing the user performing an operation.
+    Used for audit logging and optional authorization checks.
+
+    Attributes:
+        username: User identifier (typically from git config or system user)
+        email: Optional user email
+    """
+
+    username: str
+    email: str | None = None
+
+    @classmethod
+    def from_git_config(cls) -> "User | None":
+        """Create User from git configuration.
+
+        Returns:
+            User from git config, or None if git unavailable
+        """
+        try:
+            import subprocess
+
+            try:
+                username = subprocess.check_output(
+                    ["git", "config", "user.name"], stderr=subprocess.DEVNULL
+                ).decode().strip()
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                return None
+
+            try:
+                email = subprocess.check_output(
+                    ["git", "config", "user.email"], stderr=subprocess.DEVNULL
+                ).decode().strip() or None
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                email = None
+
+            return cls(username=username, email=email)
+        except Exception:
+            return None
+
+    @classmethod
+    def from_system(cls) -> "User":
+        """Create User from system environment.
+
+        Returns:
+            User with system username
+        """
+        import getpass
+        import os
+
+        username = os.environ.get("USER") or os.environ.get("USERNAME") or getpass.getuser()
+        return cls(username=username)
+
+
+@dataclass
+class AuditEntry:
+    """Audit log entry for tracking operations.
+
+    Records who did what, when, and to which entity.
+    Used for accountability and debugging.
+
+    Attributes:
+        id: Unique entry identifier
+        action: Action performed (create, update, delete, etc.)
+        entity_type: Type of entity affected (issue, comment, project, etc.)
+        entity_id: ID of affected entity
+        user: User who performed the action
+        timestamp: When the action occurred
+        details: Optional additional details (JSON string)
+    """
+
+    id: str
+    action: str
+    entity_type: str
+    entity_id: str
+    user: User
+    timestamp: datetime
+    details: str | None = None
+
+
+# =============================================================================
 # Service Protocols (Dependency Injection)
 # =============================================================================
 
@@ -562,6 +650,9 @@ __all__ = [
     "ValidationError",
     "DatabaseError",
     "CycleDetectedError",
+    # Authorization & Audit
+    "User",
+    "AuditEntry",
     # Protocols
     "Clock",
     "IdentifierService",

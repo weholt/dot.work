@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from dataclasses import dataclass
@@ -179,6 +180,9 @@ def list_tracked_files(cwd: str) -> list[str]:
 def list_all_files(root: str) -> list[str]:
     """List all files in the directory tree, excluding common ignore patterns.
 
+    Uses os.walk() with directory pruning to avoid creating Path objects
+    for files in ignored directories (e.g., node_modules, .git).
+
     Args:
         root: Root directory to scan.
 
@@ -202,24 +206,27 @@ def list_all_files(root: str) -> list[str]:
         ".nox",
         "dist",
         "build",
-        "*.egg-info",
         ".work",
         "htmlcov",
-        ".coverage",
     }
     ignore_files = {".DS_Store", "Thumbs.db"}
 
     result: list[str] = []
-    for item in root_path.rglob("*"):
-        if item.is_file():
-            # Check if any parent directory should be ignored
-            rel = item.relative_to(root_path)
-            parts = rel.parts
-            if any(part in ignore_dirs or part.endswith(".egg-info") for part in parts[:-1]):
+
+    # Use os.walk() with directory pruning for efficiency
+    for dirpath, dirnames, filenames in os.walk(root_path):
+        # Modify dirnames in-place to prune ignored directories
+        # This prevents os.walk() from recursing into them
+        dirnames[:] = [d for d in dirnames if d not in ignore_dirs and not d.endswith(".egg-info")]
+
+        for filename in filenames:
+            if filename in ignore_files:
                 continue
-            if parts[-1] in ignore_files:
-                continue
-            result.append(str(rel).replace("\\", "/"))
+
+            # Get relative path from root
+            full_path = Path(dirpath) / filename
+            rel_path = full_path.relative_to(root_path)
+            result.append(str(rel_path).replace("\\", "/"))
 
     return sorted(result)
 
@@ -272,8 +279,10 @@ def read_file_text(root: str, path: str) -> str:
     norm = full.resolve()
     root_norm = Path(root).resolve()
 
-    # Prevent path traversal
-    if not str(norm).startswith(str(root_norm)):
+    # Prevent path traversal using relative_to() for robust checking
+    try:
+        norm.relative_to(root_norm)
+    except ValueError:
         raise GitError("invalid path")
 
     return norm.read_text(encoding="utf-8", errors="replace")

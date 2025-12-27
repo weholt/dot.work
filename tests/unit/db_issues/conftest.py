@@ -226,6 +226,34 @@ def in_memory_db(db_engine: Engine) -> Generator[Session, None, None]:
 
 
 @pytest.fixture
+def uow(in_memory_db: Session) -> Generator["dot_work.db_issues.adapters.sqlite.UnitOfWork", None, None]:
+    """Create a shared UnitOfWork for all service fixtures.
+
+    Sharing a single UnitOfWork across services prevents memory leaks from
+    multiple repository instances caching the same data. The UnitOfWork
+    is properly closed after each test.
+
+    Args:
+        in_memory_db: In-memory database session
+
+    Returns:
+        UnitOfWork instance for test services to share
+    """
+    from dot_work.db_issues.adapters import UnitOfWork
+
+    uow = UnitOfWork(in_memory_db)
+    try:
+        yield uow
+    finally:
+        # CRITICAL: Close UnitOfWork to release repository cache references
+        try:
+            uow.close()
+        except Exception:
+            pass
+        del uow
+
+
+@pytest.fixture
 def sample_issue(fixed_clock: Clock) -> Issue:
     """Create a sample issue for testing.
 
@@ -253,90 +281,66 @@ def sample_issue(fixed_clock: Clock) -> Issue:
 
 @pytest.fixture
 def issue_service(
-    in_memory_db: Session, fixed_id_service: IdentifierService, fixed_clock: Clock
-) -> Generator[IssueService, None, None]:
+    uow: "dot_work.db_issues.adapters.sqlite.UnitOfWork",
+    fixed_id_service: IdentifierService,
+    fixed_clock: Clock,
+) -> IssueService:
     """Create an IssueService with test dependencies.
 
-    CRITICAL: Must properly close UnitOfWork to prevent memory leaks.
+    Uses the shared uow fixture to prevent memory leaks from multiple
+    UnitOfWork instances.
 
     Args:
-        in_memory_db: In-memory database session
+        uow: Shared UnitOfWork fixture
         fixed_id_service: Fixed identifier service
         fixed_clock: Fixed clock
 
     Returns:
         IssueService instance configured for testing
     """
-    from dot_work.db_issues.adapters import UnitOfWork
-
-    uow = UnitOfWork(in_memory_db)
-    try:
-        yield IssueService(uow, fixed_id_service, fixed_clock)
-    finally:
-        # CRITICAL: Close UnitOfWork to release session reference
-        try:
-            uow.close()
-        except Exception:
-            pass
-        # Clear reference to help garbage collection
-        del uow
+    return IssueService(uow, fixed_id_service, fixed_clock)
 
 
 @pytest.fixture
 def epic_service(
-    in_memory_db: Session, fixed_id_service: IdentifierService, fixed_clock: Clock
-) -> Generator[EpicService, None, None]:
+    uow: "dot_work.db_issues.adapters.sqlite.UnitOfWork",
+    fixed_id_service: IdentifierService,
+    fixed_clock: Clock,
+) -> EpicService:
     """Create an EpicService with test dependencies.
 
-    CRITICAL: Must properly close UnitOfWork to prevent memory leaks.
+    Uses the shared uow fixture to prevent memory leaks from multiple
+    UnitOfWork instances.
 
     Args:
-        in_memory_db: In-memory database session
+        uow: Shared UnitOfWork fixture
         fixed_id_service: Fixed identifier service
         fixed_clock: Fixed clock
 
     Returns:
         EpicService instance configured for testing
     """
-    from dot_work.db_issues.adapters import UnitOfWork
-
-    uow = UnitOfWork(in_memory_db)
-    try:
-        yield EpicService(uow, fixed_id_service, fixed_clock)
-    finally:
-        # CRITICAL: Close UnitOfWork to release session reference
-        try:
-            uow.close()
-        except Exception:
-            pass
-        del uow
+    return EpicService(uow, fixed_id_service, fixed_clock)
 
 
 @pytest.fixture
-def dependency_service(in_memory_db: Session) -> Generator["dot_work.db_issues.services.dependency_service.DependencyService", None, None]:
+def dependency_service(
+    uow: "dot_work.db_issues.adapters.sqlite.UnitOfWork",
+) -> "dot_work.db_issues.services.dependency_service.DependencyService":
     """Create a DependencyService with test dependencies.
 
-    CRITICAL: Must properly close UnitOfWork to prevent memory leaks.
+    Uses the shared uow fixture to prevent memory leaks from multiple
+    UnitOfWork instances.
 
     Args:
-        in_memory_db: In-memory database session
+        uow: Shared UnitOfWork fixture
 
     Returns:
         DependencyService instance configured for testing
     """
-    from dot_work.db_issues.adapters import UnitOfWork
     from dot_work.db_issues.services.dependency_service import DependencyService
 
-    uow = UnitOfWork(in_memory_db)
-    try:
-        yield DependencyService(uow)
-    finally:
-        # CRITICAL: Close UnitOfWork to release session reference
-        try:
-            uow.close()
-        except Exception:
-            pass
-        del uow
+    return DependencyService(uow)
 
 
 @pytest.fixture
@@ -375,29 +379,24 @@ def temp_db_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def label_service(in_memory_db: Session, fixed_id_service: IdentifierService, fixed_clock: Clock) -> Generator["LabelService", None, None]:
+def label_service(
+    uow: "dot_work.db_issues.adapters.sqlite.UnitOfWork",
+    fixed_id_service: IdentifierService,
+    fixed_clock: Clock,
+) -> "LabelService":
     """Create a LabelService for testing.
 
-    CRITICAL: Must properly close UnitOfWork to prevent memory leaks.
+    Uses the shared uow fixture to prevent memory leaks from multiple
+    UnitOfWork instances.
 
     Args:
-        in_memory_db: In-memory database session
+        uow: Shared UnitOfWork fixture
         fixed_id_service: Fixed identifier service
         fixed_clock: Fixed clock
 
     Returns:
         LabelService instance configured for testing
     """
-    from dot_work.db_issues.adapters import UnitOfWork
     from dot_work.db_issues.services import LabelService
 
-    uow = UnitOfWork(in_memory_db)
-    try:
-        yield LabelService(uow, fixed_id_service, fixed_clock)
-    finally:
-        # CRITICAL: Close UnitOfWork to release session reference
-        try:
-            uow.close()
-        except Exception:
-            pass
-        del uow
+    return LabelService(uow, fixed_id_service, fixed_clock)

@@ -30,6 +30,9 @@ class IndexRepository:
     def save(self, index: CodeIndex) -> None:
         """Save code index to disk.
 
+        Uses compact JSON formatting for efficient storage.
+        For debugging, use `jq .` on the file to pretty-print.
+
         Args:
             index: CodeIndex to save.
         """
@@ -49,7 +52,10 @@ class IndexRepository:
             },
         }
 
-        self.config.index_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        # Use compact JSON for efficient storage (saves ~30-40% space)
+        self.config.index_path.write_text(
+            json.dumps(data, separators=(",", ":")), encoding="utf-8"
+        )
 
     def load(self) -> CodeIndex | None:
         """Load code index from disk.

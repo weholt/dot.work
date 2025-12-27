@@ -71,7 +71,8 @@ class TestUploadZip:
         args, kwargs = mock_requests.post.call_args
         assert args[0] == "https://example.com/upload"
         assert "files" in kwargs
-        assert kwargs["timeout"] == 30
+        assert kwargs["timeout"] == (10, 30)  # (connect timeout, read timeout)
+        assert kwargs["verify"] is True  # Explicit SSL verification
 
     @patch("dot_work.zip.uploader.requests")
     def test_upload_zip_http_error(self, mock_requests: MagicMock, zip_output_dir: Path) -> None:
@@ -188,6 +189,35 @@ class TestUploadZip:
 
         upload_zip(test_zip, "https://example.com/upload")
 
-        # Verify timeout parameter
+        # Verify timeout and SSL verification parameters
         kwargs = mock_requests.post.call_args.kwargs
-        assert kwargs["timeout"] == 30
+        assert kwargs["timeout"] == (10, 30)  # (connect timeout, read timeout)
+        assert kwargs["verify"] is True  # Explicit SSL verification
+
+    def test_upload_zip_rejects_http_url(self, zip_output_dir: Path) -> None:
+        """Test that upload_zip rejects HTTP (non-HTTPS) URLs.
+
+        Args:
+            zip_output_dir: Fixture providing output directory
+        """
+        # Create a test zip file
+        test_zip = zip_output_dir / "test.zip"
+        test_zip.write_bytes(b"PK\x03\x04")
+
+        # HTTP URL should raise ValueError
+        with pytest.raises(ValueError, match="Only HTTPS URLs are supported"):
+            upload_zip(test_zip, "http://example.com/upload")
+
+    def test_upload_zip_rejects_non_http_url(self, zip_output_dir: Path) -> None:
+        """Test that upload_zip rejects non-HTTP URLs.
+
+        Args:
+            zip_output_dir: Fixture providing output directory
+        """
+        # Create a test zip file
+        test_zip = zip_output_dir / "test.zip"
+        test_zip.write_bytes(b"PK\x03\x04")
+
+        # FTP URL should raise ValueError
+        with pytest.raises(ValueError, match="Only HTTPS URLs are supported"):
+            upload_zip(test_zip, "ftp://example.com/upload")

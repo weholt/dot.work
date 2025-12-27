@@ -5,12 +5,16 @@ Provides full-text search using SQLite FTS5 with BM25 ranking.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from dot_work.knowledge_graph.db import Database, Node
+
+
+logger = logging.getLogger(__name__)
 
 
 # Whitelist pattern for simple queries (no FTS5 operators)
@@ -403,7 +407,8 @@ def _build_scope_sets(
     if scope.project:
         collection = db.get_collection_by_name(scope.project)
         if collection is None:
-            raise ValueError(f"Project not found: {scope.project}")
+            logger.debug(f"Project not found: {scope.project}")
+            raise ValueError("Project not found")
         members = db.list_collection_members(collection.collection_id, member_type="node")
         scope_members = {m.member_pk for m in members}
 
@@ -413,14 +418,16 @@ def _build_scope_sets(
         for topic_name in scope.topics:
             topic = db.get_topic_by_name(topic_name)
             if topic is None:
-                raise ValueError(f"Topic not found: {topic_name}")
+                logger.debug(f"Topic not found: {topic_name}")
+                raise ValueError("Topic not found")
             scope_topic_ids.add(topic.topic_id)
 
     # Build topic exclusion set
     for topic_name in scope.exclude_topics:
         topic = db.get_topic_by_name(topic_name)
         if topic is None:
-            raise ValueError(f"Topic not found: {topic_name}")
+            logger.debug(f"Topic not found: {topic_name}")
+            raise ValueError("Topic not found")
         exclude_topic_ids.add(topic.topic_id)
 
     # Get shared topic ID

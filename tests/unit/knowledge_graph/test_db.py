@@ -28,99 +28,84 @@ class TestDatabase:
     def test_init_creates_directory(self, tmp_path: Path) -> None:
         """Database creates parent directory if it doesn't exist."""
         db_path = tmp_path / "subdir" / "deep" / "db.sqlite"
-        db = Database(db_path)
-        db._get_connection()
-        assert db_path.parent.exists()
-        db.close()
+        with Database(db_path) as db:
+            db._get_connection()
+            assert db_path.parent.exists()
 
     def test_init_creates_tables(self, tmp_path: Path) -> None:
         """Database creates all required tables on first connection."""
         db_path = tmp_path / "test.sqlite"
-        db = Database(db_path)
-        conn = db._get_connection()
+        with Database(db_path) as db:
+            conn = db._get_connection()
 
-        # Check tables exist
-        cur = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        )
-        tables = {row[0] for row in cur.fetchall()}
+            # Check tables exist
+            cur = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+            )
+            tables = {row[0] for row in cur.fetchall()}
 
-        assert "documents" in tables
-        assert "nodes" in tables
-        assert "edges" in tables
-        assert "fts_nodes" in tables
-        assert "schema_version" in tables
-
-        db.close()
+            assert "documents" in tables
+            assert "nodes" in tables
+            assert "edges" in tables
+            assert "fts_nodes" in tables
+            assert "schema_version" in tables
 
     def test_pragmas_configured(self, tmp_path: Path) -> None:
         """Database configures WAL mode and other pragmas."""
         db_path = tmp_path / "test.sqlite"
-        db = Database(db_path)
-
-        assert db.get_pragma("journal_mode") == "wal"
-        assert db.get_pragma("synchronous") == "1"  # NORMAL
-        assert db.get_pragma("temp_store") == "2"  # MEMORY
-        assert db.get_pragma("foreign_keys") == "1"
-
-        db.close()
+        with Database(db_path) as db:
+            assert db.get_pragma("journal_mode") == "wal"
+            assert db.get_pragma("synchronous") == "1"  # NORMAL
+            assert db.get_pragma("temp_store") == "2"  # MEMORY
+            assert db.get_pragma("foreign_keys") == "1"
 
     def test_schema_version(self, tmp_path: Path) -> None:
         """Database records schema version."""
         db_path = tmp_path / "test.sqlite"
-        db = Database(db_path)
-
-        assert db.get_schema_version() == SCHEMA_VERSION
-
-        db.close()
+        with Database(db_path) as db:
+            assert db.get_schema_version() == SCHEMA_VERSION
 
     def test_close_and_reopen(self, tmp_path: Path) -> None:
         """Database can be closed and reopened."""
         db_path = tmp_path / "test.sqlite"
-        db = Database(db_path)
-        db._get_connection()
-        db.close()
+        with Database(db_path) as db:
+            db._get_connection()
 
         # Reopen
-        db2 = Database(db_path)
-        assert db2.get_schema_version() == SCHEMA_VERSION
-        db2.close()
+        with Database(db_path) as db2:
+            assert db2.get_schema_version() == SCHEMA_VERSION
 
     def test_transaction_commits_on_success(self, tmp_path: Path) -> None:
         """Transaction commits changes on success."""
         db_path = tmp_path / "test.sqlite"
-        db = Database(db_path)
-
-        with db.transaction() as conn:
-            conn.execute(
-                "INSERT INTO documents (doc_id, source_path, sha256, created_at, raw) "
-                "VALUES (?, ?, ?, ?, ?)",
-                ("doc1", "/test.md", "abc123", 1000, b"content"),
-            )
-
-        # Verify committed
-        doc = db.get_document("doc1")
-        assert doc is not None
-        db.close()
-
-    def test_transaction_rollback_on_error(self, tmp_path: Path) -> None:
-        """Transaction rolls back on exception."""
-        db_path = tmp_path / "test.sqlite"
-        db = Database(db_path)
-
-        with pytest.raises(ValueError):
+        with Database(db_path) as db:
             with db.transaction() as conn:
                 conn.execute(
                     "INSERT INTO documents (doc_id, source_path, sha256, created_at, raw) "
                     "VALUES (?, ?, ?, ?, ?)",
                     ("doc1", "/test.md", "abc123", 1000, b"content"),
                 )
-                raise ValueError("Simulated error")
 
-        # Verify rolled back
-        doc = db.get_document("doc1")
-        assert doc is None
-        db.close()
+            # Verify committed
+            doc = db.get_document("doc1")
+            assert doc is not None
+
+    def test_transaction_rollback_on_error(self, tmp_path: Path) -> None:
+        """Transaction rolls back on exception."""
+        db_path = tmp_path / "test.sqlite"
+        with Database(db_path) as db:
+            with pytest.raises(ValueError):
+                with db.transaction() as conn:
+                    conn.execute(
+                        "INSERT INTO documents (doc_id, source_path, sha256, created_at, raw) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        ("doc1", "/test.md", "abc123", 1000, b"content"),
+                    )
+                    raise ValueError("Simulated error")
+
+            # Verify rolled back
+            doc = db.get_document("doc1")
+            assert doc is None
 
 
 class TestDocumentOperations:
@@ -128,67 +113,56 @@ class TestDocumentOperations:
 
     def test_insert_document(self, tmp_path: Path) -> None:
         """Insert creates a document with correct fields."""
-        db = Database(tmp_path / "test.sqlite")
+        with Database(tmp_path / "test.sqlite") as db:
+            doc = db.insert_document(
+                doc_id="doc1",
+                source_path="/path/to/file.md",
+                raw=b"# Hello World",
+                created_at=1700000000,
+            )
 
-        doc = db.insert_document(
-            doc_id="doc1",
-            source_path="/path/to/file.md",
-            raw=b"# Hello World",
-            created_at=1700000000,
-        )
-
-        assert doc.doc_id == "doc1"
-        assert doc.source_path == "/path/to/file.md"
-        assert doc.created_at == 1700000000
-        assert doc.raw == b"# Hello World"
-        assert len(doc.sha256) == 64  # SHA256 hex digest
-
-        db.close()
+            assert doc.doc_id == "doc1"
+            assert doc.source_path == "/path/to/file.md"
+            assert doc.created_at == 1700000000
+            assert doc.raw == b"# Hello World"
+            assert len(doc.sha256) == 64  # SHA256 hex digest
 
     def test_insert_document_auto_timestamp(self, tmp_path: Path) -> None:
         """Insert uses current time if created_at not specified."""
-        db = Database(tmp_path / "test.sqlite")
+        with Database(tmp_path / "test.sqlite") as db:
+            doc = db.insert_document(
+                doc_id="doc1",
+                source_path="/file.md",
+                raw=b"content",
+            )
 
-        doc = db.insert_document(
-            doc_id="doc1",
-            source_path="/file.md",
-            raw=b"content",
-        )
-
-        assert doc.created_at > 0
-        db.close()
+            assert doc.created_at > 0
 
     def test_insert_document_duplicate_raises(self, tmp_path: Path) -> None:
         """Insert raises IntegrityError on duplicate doc_id."""
-        db = Database(tmp_path / "test.sqlite")
+        with Database(tmp_path / "test.sqlite") as db:
+            db.insert_document("doc1", "/a.md", b"a")
 
-        db.insert_document("doc1", "/a.md", b"a")
-
-        with pytest.raises(sqlite3.IntegrityError):
-            db.insert_document("doc1", "/b.md", b"b")
-
-        db.close()
+            with pytest.raises(sqlite3.IntegrityError):
+                db.insert_document("doc1", "/b.md", b"b")
 
     def test_get_document_exists(self, tmp_path: Path) -> None:
         """Get returns document when it exists."""
-        db = Database(tmp_path / "test.sqlite")
-        db.insert_document("doc1", "/test.md", b"content", 1000)
+        with Database(tmp_path / "test.sqlite") as db:
+            db.insert_document("doc1", "/test.md", b"content", 1000)
 
-        doc = db.get_document("doc1")
+            doc = db.get_document("doc1")
 
-        assert doc is not None
-        assert doc.doc_id == "doc1"
-        assert doc.source_path == "/test.md"
-        db.close()
+            assert doc is not None
+            assert doc.doc_id == "doc1"
+            assert doc.source_path == "/test.md"
 
     def test_get_document_not_found(self, tmp_path: Path) -> None:
         """Get returns None when document doesn't exist."""
-        db = Database(tmp_path / "test.sqlite")
+        with Database(tmp_path / "test.sqlite") as db:
+            doc = db.get_document("nonexistent")
 
-        doc = db.get_document("nonexistent")
-
-        assert doc is None
-        db.close()
+            assert doc is None
 
 
 class TestNodeOperations:
@@ -197,12 +171,9 @@ class TestNodeOperations:
     @pytest.fixture
     def db_with_doc(self, tmp_path: Path) -> Generator[Database, None, None]:
         """Create database with a document."""
-        db = Database(tmp_path / "test.sqlite")
-        db.insert_document("doc1", "/test.md", b"content")
-        try:
+        with Database(tmp_path / "test.sqlite") as db:
+            db.insert_document("doc1", "/test.md", b"content")
             yield db
-        finally:
-            db.close()
 
     def test_insert_node(self, db_with_doc: Database) -> None:
         """Insert creates a node with assigned pk."""
@@ -223,7 +194,6 @@ class TestNodeOperations:
         assert result.node_pk is not None
         assert result.node_pk > 0
         assert result.short_id == "abcd"
-        db_with_doc.close()
 
     def test_insert_node_with_meta(self, db_with_doc: Database) -> None:
         """Insert preserves metadata."""
@@ -241,7 +211,6 @@ class TestNodeOperations:
 
         assert fetched is not None
         assert fetched.meta == {"tags": ["important"], "priority": 1}
-        db_with_doc.close()
 
     def test_insert_node_duplicate_short_id_raises(self, db_with_doc: Database) -> None:
         """Insert raises on duplicate short_id."""
@@ -265,8 +234,6 @@ class TestNodeOperations:
         with pytest.raises(sqlite3.IntegrityError):
             db_with_doc.insert_node(node2)
 
-        db_with_doc.close()
-
     def test_insert_nodes_batch(self, db_with_doc: Database) -> None:
         """Batch insert creates multiple nodes."""
         nodes = [
@@ -287,7 +254,6 @@ class TestNodeOperations:
         assert len(result) == 5
         assert all(n.node_pk is not None for n in result)
         assert all(n.node_pk > 0 for n in result)
-        db_with_doc.close()
 
     def test_get_node_by_short_id(self, db_with_doc: Database) -> None:
         """Get by short_id returns correct node."""
@@ -305,14 +271,12 @@ class TestNodeOperations:
 
         assert result is not None
         assert result.title == "Found Me"
-        db_with_doc.close()
 
     def test_get_node_by_short_id_not_found(self, db_with_doc: Database) -> None:
         """Get returns None for nonexistent short_id."""
         result = db_with_doc.get_node_by_short_id("zzzz")
 
         assert result is None
-        db_with_doc.close()
 
     def test_get_nodes_by_doc_id(self, db_with_doc: Database) -> None:
         """Get by doc_id returns all nodes for document."""
@@ -337,7 +301,6 @@ class TestNodeOperations:
         assert result[0].short_id == "d0"
         assert result[1].short_id == "d1"
         assert result[2].short_id == "d2"
-        db_with_doc.close()
 
     def test_get_node_by_pk(self, db_with_doc: Database) -> None:
         """Get by pk returns correct node."""
@@ -357,14 +320,12 @@ class TestNodeOperations:
         assert result is not None
         assert result.title == "Found By PK"
         assert result.short_id == "pk01"
-        db_with_doc.close()
 
     def test_get_node_by_pk_not_found(self, db_with_doc: Database) -> None:
         """Get by pk returns None for nonexistent pk."""
         result = db_with_doc.get_node_by_pk(999999)
 
         assert result is None
-        db_with_doc.close()
 
     def test_update_node_parent(self, db_with_doc: Database) -> None:
         """Update sets parent_node_pk correctly."""
@@ -391,7 +352,6 @@ class TestNodeOperations:
         updated = db_with_doc.get_node_by_pk(child.node_pk)
         assert updated is not None
         assert updated.parent_node_pk == parent.node_pk
-        db_with_doc.close()
 
 
 class TestEdgeOperations:
@@ -400,24 +360,21 @@ class TestEdgeOperations:
     @pytest.fixture
     def db_with_nodes(self, tmp_path: Path) -> Generator[tuple[Database, list[Node]], None, None]:
         """Create database with document and nodes."""
-        db = Database(tmp_path / "test.sqlite")
-        db.insert_document("doc1", "/test.md", b"content")
+        with Database(tmp_path / "test.sqlite") as db:
+            db.insert_document("doc1", "/test.md", b"content")
 
-        nodes = db.insert_nodes_batch([
-            Node(
-                node_pk=None,
-                short_id=f"e{i}",
-                full_id=f"doc1/para/e{i}",
-                doc_id="doc1",
-                kind="para",
-            )
-            for i in range(5)
-        ])
+            nodes = db.insert_nodes_batch([
+                Node(
+                    node_pk=None,
+                    short_id=f"e{i}",
+                    full_id=f"doc1/para/e{i}",
+                    doc_id="doc1",
+                    kind="para",
+                )
+                for i in range(5)
+            ])
 
-        try:
             yield db, nodes
-        finally:
-            db.close()
 
     def test_insert_edge(self, db_with_nodes: tuple[Database, list[Node]]) -> None:
         """Insert creates an edge."""
@@ -435,7 +392,6 @@ class TestEdgeOperations:
         assert result.dst_node_pk == nodes[1].node_pk
         assert result.edge_type == "contains"
         assert result.weight == 1.0
-        db.close()
 
     def test_insert_edge_with_meta(self, db_with_nodes: tuple[Database, list[Node]]) -> None:
         """Insert preserves edge metadata."""
@@ -455,7 +411,6 @@ class TestEdgeOperations:
         assert len(edges) == 1
         assert edges[0].meta == {"label": "see also"}
         assert edges[0].weight == 0.5
-        db.close()
 
     def test_get_edges_by_type(self, db_with_nodes: tuple[Database, list[Node]]) -> None:
         """Get by type returns correct edges."""
@@ -473,8 +428,6 @@ class TestEdgeOperations:
         contains_edges = db.get_edges_by_type("contains")
         assert len(contains_edges) == 1
 
-        db.close()
-
     def test_get_children(self, db_with_nodes: tuple[Database, list[Node]]) -> None:
         """Get children returns nodes via 'contains' edges."""
         db, nodes = db_with_nodes
@@ -489,7 +442,6 @@ class TestEdgeOperations:
         short_ids = {c.short_id for c in children}
         assert "e1" in short_ids
         assert "e2" in short_ids
-        db.close()
 
     def test_get_siblings(self, db_with_nodes: tuple[Database, list[Node]]) -> None:
         """Get siblings returns nodes via 'next' edges."""
@@ -502,7 +454,6 @@ class TestEdgeOperations:
 
         assert len(siblings) == 1
         assert siblings[0].short_id == "e1"
-        db.close()
 
 
 class TestFTSOperations:
@@ -511,67 +462,62 @@ class TestFTSOperations:
     @pytest.fixture
     def db_with_indexed_nodes(self, tmp_path: Path) -> Generator[Database, None, None]:
         """Create database with indexed nodes."""
-        db = Database(tmp_path / "test.sqlite")
-        db.insert_document("doc1", "/test.md", b"content")
+        with Database(tmp_path / "test.sqlite") as db:
+            db.insert_document("doc1", "/test.md", b"content")
 
-        nodes = db.insert_nodes_batch([
-            Node(
-                node_pk=None,
-                short_id="head1",
-                full_id="doc1/h1/head1",
-                doc_id="doc1",
-                kind="heading",
-                title="Python Programming",
-            ),
-            Node(
-                node_pk=None,
-                short_id="para1",
-                full_id="doc1/para/para1",
-                doc_id="doc1",
-                kind="para",
-            ),
-            Node(
-                node_pk=None,
-                short_id="head2",
-                full_id="doc1/h2/head2",
-                doc_id="doc1",
-                kind="heading",
-                title="JavaScript Basics",
-            ),
-        ])
+            nodes = db.insert_nodes_batch([
+                Node(
+                    node_pk=None,
+                    short_id="head1",
+                    full_id="doc1/h1/head1",
+                    doc_id="doc1",
+                    kind="heading",
+                    title="Python Programming",
+                ),
+                Node(
+                    node_pk=None,
+                    short_id="para1",
+                    full_id="doc1/para/para1",
+                    doc_id="doc1",
+                    kind="para",
+                ),
+                Node(
+                    node_pk=None,
+                    short_id="head2",
+                    full_id="doc1/h2/head2",
+                    doc_id="doc1",
+                    kind="heading",
+                    title="JavaScript Basics",
+                ),
+            ])
 
-        # Index nodes
-        db.fts_index_node(nodes[0].node_pk, "Python Programming", "Learn Python language basics", "head1")  # type: ignore
-        db.fts_index_node(nodes[1].node_pk, None, "Variables and functions in Python", "para1")  # type: ignore
-        db.fts_index_node(nodes[2].node_pk, "JavaScript Basics", "Learn JavaScript for web", "head2")  # type: ignore
+            # Index nodes
+            db.fts_index_node(nodes[0].node_pk, "Python Programming", "Learn Python language basics", "head1")  # type: ignore
+            db.fts_index_node(nodes[1].node_pk, None, "Variables and functions in Python", "para1")  # type: ignore
+            db.fts_index_node(nodes[2].node_pk, "JavaScript Basics", "Learn JavaScript for web", "head2")  # type: ignore
 
-        try:
             yield db
-        finally:
-            db.close()
 
     def test_fts_index_node(self, tmp_path: Path) -> None:
         """FTS index stores node content."""
-        db = Database(tmp_path / "test.sqlite")
-        db.insert_document("doc1", "/test.md", b"content")
+        with Database(tmp_path / "test.sqlite") as db:
+            db.insert_document("doc1", "/test.md", b"content")
 
-        node = db.insert_node(Node(
-            node_pk=None,
-            short_id="test",
-            full_id="doc1/h1/test",
-            doc_id="doc1",
-            kind="heading",
-        ))
+            node = db.insert_node(Node(
+                node_pk=None,
+                short_id="test",
+                full_id="doc1/h1/test",
+                doc_id="doc1",
+                kind="heading",
+            ))
 
-        # Should not raise
-        db.fts_index_node(node.node_pk, "Title", "Content text", "test")  # type: ignore
+            # Should not raise
+            db.fts_index_node(node.node_pk, "Title", "Content text", "test")  # type: ignore
 
-        # Verify indexed
-        conn = db._get_connection()
-        cur = conn.execute("SELECT COUNT(*) FROM fts_nodes")
-        assert cur.fetchone()[0] == 1
-
-        db.close()
+            # Verify indexed
+            conn = db._get_connection()
+            cur = conn.execute("SELECT COUNT(*) FROM fts_nodes")
+            assert cur.fetchone()[0] == 1
 
     def test_fts_search_finds_match(self, db_with_indexed_nodes: Database) -> None:
         """FTS search finds matching nodes."""
@@ -581,8 +527,6 @@ class TestFTSOperations:
         titles = [node.title for node, _ in results if node.title]
         assert "Python Programming" in titles
 
-        db_with_indexed_nodes.close()
-
     def test_fts_search_returns_score(self, db_with_indexed_nodes: Database) -> None:
         """FTS search returns relevance score."""
         results = db_with_indexed_nodes.fts_search("Python")
@@ -591,23 +535,17 @@ class TestFTSOperations:
         node, score = results[0]
         assert isinstance(score, float)
 
-        db_with_indexed_nodes.close()
-
     def test_fts_search_no_match(self, db_with_indexed_nodes: Database) -> None:
         """FTS search returns empty list for no match."""
         results = db_with_indexed_nodes.fts_search("Rust programming")
 
         assert len(results) == 0
 
-        db_with_indexed_nodes.close()
-
     def test_fts_search_limit(self, db_with_indexed_nodes: Database) -> None:
         """FTS search respects limit parameter."""
         results = db_with_indexed_nodes.fts_search("Python", limit=1)
 
         assert len(results) <= 1
-
-        db_with_indexed_nodes.close()
 
 
 class TestDataclasses:
@@ -658,46 +596,43 @@ class TestDeleteDocument:
     @pytest.fixture
     def db_with_graph(self, tmp_path: Path) -> Generator[Database, None, None]:
         """Create database with a document, nodes, edges, and FTS entries."""
-        db = Database(tmp_path / "test.sqlite")
-        db.insert_document("doc1", "/test.md", b"# Hello\n\nWorld")
+        with Database(tmp_path / "test.sqlite") as db:
+            db.insert_document("doc1", "/test.md", b"# Hello\n\nWorld")
 
-        nodes = db.insert_nodes_batch([
-            Node(
-                node_pk=None,
-                short_id="doc0",
-                full_id="doc1/doc/doc0",
-                doc_id="doc1",
-                kind="doc",
-            ),
-            Node(
-                node_pk=None,
-                short_id="head",
-                full_id="doc1/heading/head",
-                doc_id="doc1",
-                kind="heading",
-                title="Hello",
-            ),
-            Node(
-                node_pk=None,
-                short_id="para",
-                full_id="doc1/para/para",
-                doc_id="doc1",
-                kind="paragraph",
-            ),
-        ])
+            nodes = db.insert_nodes_batch([
+                Node(
+                    node_pk=None,
+                    short_id="doc0",
+                    full_id="doc1/doc/doc0",
+                    doc_id="doc1",
+                    kind="doc",
+                ),
+                Node(
+                    node_pk=None,
+                    short_id="head",
+                    full_id="doc1/heading/head",
+                    doc_id="doc1",
+                    kind="heading",
+                    title="Hello",
+                ),
+                Node(
+                    node_pk=None,
+                    short_id="para",
+                    full_id="doc1/para/para",
+                    doc_id="doc1",
+                    kind="paragraph",
+                ),
+            ])
 
-        # Add edges
-        db.insert_edge(Edge(nodes[0].node_pk, nodes[1].node_pk, "contains"))  # type: ignore
-        db.insert_edge(Edge(nodes[1].node_pk, nodes[2].node_pk, "contains"))  # type: ignore
+            # Add edges
+            db.insert_edge(Edge(nodes[0].node_pk, nodes[1].node_pk, "contains"))  # type: ignore
+            db.insert_edge(Edge(nodes[1].node_pk, nodes[2].node_pk, "contains"))  # type: ignore
 
-        # Add FTS entries
-        for node in nodes:
-            db.fts_index_node(node.node_pk, node.title, "text", node.short_id)  # type: ignore
+            # Add FTS entries
+            for node in nodes:
+                db.fts_index_node(node.node_pk, node.title, "text", node.short_id)  # type: ignore
 
-        try:
             yield db
-        finally:
-            db.close()
 
     def test_delete_document_removes_document(self, db_with_graph: Database) -> None:
         """Delete removes the document record."""
@@ -705,7 +640,6 @@ class TestDeleteDocument:
 
         assert result is True
         assert db_with_graph.get_document("doc1") is None
-        db_with_graph.close()
 
     def test_delete_document_removes_nodes(self, db_with_graph: Database) -> None:
         """Delete removes all nodes for the document."""
@@ -713,7 +647,6 @@ class TestDeleteDocument:
 
         nodes = db_with_graph.get_nodes_by_doc_id("doc1")
         assert len(nodes) == 0
-        db_with_graph.close()
 
     def test_delete_document_removes_edges(self, db_with_graph: Database) -> None:
         """Delete removes all edges for the document."""
@@ -721,7 +654,6 @@ class TestDeleteDocument:
 
         edges = db_with_graph.get_edges_by_type("contains")
         assert len(edges) == 0
-        db_with_graph.close()
 
     def test_delete_document_removes_fts_entries(self, db_with_graph: Database) -> None:
         """Delete removes FTS index entries."""
@@ -729,29 +661,26 @@ class TestDeleteDocument:
 
         results = db_with_graph.fts_search("Hello")
         assert len(results) == 0
-        db_with_graph.close()
 
     def test_delete_document_not_found_returns_false(self, tmp_path: Path) -> None:
         """Delete returns False for nonexistent document."""
-        db = Database(tmp_path / "test.sqlite")
-        db._get_connection()
+        with Database(tmp_path / "test.sqlite") as db:
+            db._get_connection()
 
-        result = db.delete_document("nonexistent")
+            result = db.delete_document("nonexistent")
 
-        assert result is False
-        db.close()
+            assert result is False
 
     def test_delete_document_preserves_other_documents(self, tmp_path: Path) -> None:
         """Delete only removes specified document, not others."""
-        db = Database(tmp_path / "test.sqlite")
-        db.insert_document("doc1", "/a.md", b"content1")
-        db.insert_document("doc2", "/b.md", b"content2")
+        with Database(tmp_path / "test.sqlite") as db:
+            db.insert_document("doc1", "/a.md", b"content1")
+            db.insert_document("doc2", "/b.md", b"content2")
 
-        db.delete_document("doc1")
+            db.delete_document("doc1")
 
-        assert db.get_document("doc1") is None
-        assert db.get_document("doc2") is not None
-        db.close()
+            assert db.get_document("doc1") is None
+            assert db.get_document("doc2") is not None
 
 
 class TestDocumentExistsError:

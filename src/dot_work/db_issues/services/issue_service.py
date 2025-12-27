@@ -7,9 +7,12 @@ Source: /home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/src/is
 """
 
 import logging
+from dataclasses import dataclass, field
+from typing import Callable
 
 from dot_work.db_issues.adapters import UnitOfWork
 from dot_work.db_issues.domain.entities import (
+    AuditEntry,
     Clock,
     Comment,
     Dependency,
@@ -20,9 +23,73 @@ from dot_work.db_issues.domain.entities import (
     IssuePriority,
     IssueStatus,
     IssueType,
+    User,
 )
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Audit Log Support
+# =============================================================================
+
+
+@dataclass
+class AuditLog:
+    """In-memory audit log for tracking operations.
+
+    Provides thread-safe audit logging for accountability.
+    Entries can be exported to persistent storage if needed.
+
+    Attributes:
+        entries: List of audit entries
+        on_entry: Optional callback for each new entry
+    """
+
+    entries: list[AuditEntry] = field(default_factory=list)
+    on_entry: Callable[[AuditEntry], None] | None = None
+
+    def log(
+        self,
+        action: str,
+        entity_type: str,
+        entity_id: str,
+        user: User | None,
+        timestamp_field,
+        details: str | None = None,
+    ) -> None:
+        """Log an audit entry.
+
+        Args:
+            action: Action performed (create, update, delete, etc.)
+            entity_type: Type of entity affected
+            entity_id: ID of affected entity
+            user: User who performed the action (None if unknown)
+            timestamp_field: Callable to get current timestamp
+            details: Optional additional details
+        """
+        if user is None:
+            # Skip logging if no user context (backward compatible)
+            return
+
+        import uuid
+
+        entry = AuditEntry(
+            id=f"audit-{uuid.uuid4().hex[:8]}",
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            user=user,
+            timestamp=timestamp_field(),
+            details=details,
+        )
+        self.entries.append(entry)
+
+        if self.on_entry:
+            try:
+                self.on_entry(entry)
+            except Exception as e:
+                logger.warning("Audit log callback failed: %s", e)
 
 
 class IssueService:
@@ -30,6 +97,8 @@ class IssueService:
 
     Coordinates between repositories and enforces business rules.
     All operations use UnitOfWork for transaction management.
+
+    Supports optional user context for audit logging and authorization.
     """
 
     def __init__(
@@ -37,6 +106,8 @@ class IssueService:
         uow: UnitOfWork,
         id_service: IdentifierService,
         clock: Clock,
+        audit_log: AuditLog | None = None,
+        default_user: User | None = None,
     ) -> None:
         """Initialize issue service.
 
@@ -44,10 +115,14 @@ class IssueService:
             uow: Unit of work for transaction management
             id_service: Service for generating unique identifiers
             clock: Time provider for timestamps
+            audit_log: Optional audit log for tracking operations
+            default_user: Optional default user for operations (from git config)
         """
         self.uow = uow
         self.id_service = id_service
         self.clock = clock
+        self.audit_log = audit_log or AuditLog()
+        self.default_user = default_user
 
     def create_issue(
         self,
@@ -61,6 +136,7 @@ class IssueService:
         labels: list[str] | None = None,
         project_id: str = "default",
         custom_id: str | None = None,
+        user: User | None = None,
     ) -> Issue:
         """Create a new issue.
 
@@ -75,6 +151,7 @@ class IssueService:
             labels: Optional list of labels
             project_id: Project identifier (default: "default")
             custom_id: Optional custom issue ID (auto-generated if not provided)
+            user: Optional user context for audit logging
 
         Returns:
             Created issue entity
@@ -140,6 +217,18 @@ class IssueService:
             saved_issue.title,
             project_id,
         )
+
+        # Audit log
+        effective_user = user or self.default_user
+        self.audit_log.log(
+            action="create",
+            entity_type="issue",
+            entity_id=saved_issue.id,
+            user=effective_user,
+            timestamp_field=self.clock.now,
+            details=f"Created issue: {saved_issue.title}",
+        )
+
         return saved_issue
 
     def get_issue(self, issue_id: str) -> Issue | None:
@@ -662,9 +751,8 @@ class IssueService:
             List of issues in the epic
         """
         with self.uow:
-            # Get all issues with this epic_id
-            all_issues = self.uow.issues.list_all(limit=1000000)
-            epic_issues = [issue for issue in all_issues if issue.epic_id == epic_id]
+            # Use repository method that filters at SQL level
+            epic_issues = self.uow.issues.list_by_epic(epic_id, limit=100000)
 
             # Note: include_children functionality removed as IssueType.EPIC
             # no longer exists in the issue-tracker enum schema.
@@ -740,19 +828,14 @@ class IssueService:
         """
         logger.debug("Getting stale issues: days=%d", days)
 
-        # Get all issues (limit high to get all)
-        all_issues = self.list_issues(limit=100000)
-
         # Calculate cutoff time
         from datetime import timedelta
 
         cutoff = self.clock.now() - timedelta(days=days)
 
-        # Filter stale issues
-        stale_issues = [issue for issue in all_issues if issue.updated_at < cutoff]
-
-        # Sort by updated_at ascending (oldest first)
-        stale_issues.sort(key=lambda x: x.updated_at)
+        # Use repository method that filters at SQL level
+        with self.uow:
+            stale_issues = self.uow.issues.list_updated_before(cutoff, limit=100000)
 
         logger.info("Found %d stale issues (older than %d days)", len(stale_issues), days)
         return stale_issues

@@ -1291,6 +1291,9 @@ def _get_text_from_editor(template: str = "") -> str:
         f.write(template)
         temp_path = Path(f.name)
 
+    # Set restrictive permissions (owner read/write only) for security
+    temp_path.chmod(0o600)
+
     try:
         # Open editor
         console.print(f"Opening [cyan]{editor_name}[/cyan]...")
@@ -1363,6 +1366,9 @@ def edit(
         ) as f:
             f.write(template)
             temp_path = Path(f.name)
+
+        # Set restrictive permissions (owner read/write only) for security
+        temp_path.chmod(0o600)
 
         try:
             # Open editor
@@ -5478,6 +5484,9 @@ def edit(
             # Write YAML content
             yaml.dump(yaml_content, f, default_flow_style=False, sort_keys=False)
             temp_path = f.name
+
+        # Set restrictive permissions (owner read/write only) for security
+        Path(temp_path).chmod(0o600)
 
         # Calculate initial hash for change detection
         with open(temp_path, "rb") as f:

@@ -265,6 +265,22 @@ def force_garbage_collection() -> Generator[None, None, None]:
     gc.collect()
 
 
+@pytest.fixture(scope="module", autouse=True)
+def cleanup_connection_pools() -> Generator[None, None, None]:
+    """Auto-use fixture that cleans up SQLAlchemy connection pools between modules.
+
+    This prevents connection pool accumulation throughout the test session.
+    Without this, connection pools can grow unbounded, consuming 2-5GB of memory.
+    """
+    yield
+    # After module finishes, dispose all connection pools
+    try:
+        from sqlalchemy import pool
+        pool.dispose_all()
+    except Exception:
+        pass
+
+
 @pytest.fixture
 def temp_dir(tmp_path: Path) -> Path:
     """Create a temporary directory for tests.

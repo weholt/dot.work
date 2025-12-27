@@ -43,7 +43,17 @@ class ScanService:
 
         Returns:
             CodeIndex containing all scanned entities.
+
+        Raises:
+            FileNotFoundError: If root_path does not exist.
+            NotADirectoryError: If root_path is not a directory.
         """
+        # Validate path before scanning to provide clear error messages
+        if not root_path.exists():
+            raise FileNotFoundError(f"Scan path does not exist: {root_path}")
+        if not root_path.is_dir():
+            raise NotADirectoryError(f"Scan path is not a directory: {root_path}")
+
         scanner = ASTScanner(root_path)
         index = scanner.scan(incremental=incremental)
 
@@ -145,6 +155,9 @@ class ScanService:
     def _update_metrics(self, index: CodeIndex) -> None:
         """Update metrics in the index.
 
+        Calculates metrics incrementally to avoid O(N) memory usage
+        from storing all functions in an intermediate list.
+
         Args:
             index: CodeIndex to update.
         """
@@ -153,17 +166,29 @@ class ScanService:
         index.metrics.total_classes = sum(len(f.classes) for f in index.files.values())
         index.metrics.total_lines = sum(f.line_count for f in index.files.values())
 
-        all_functions: list[Any] = []
+        # Calculate complexity metrics incrementally (O(1) additional memory)
+        sum_complexity = 0
+        max_complexity = 0
+        high_complexity_functions: list[str] = []
+
         for file_entity in index.files.values():
-            all_functions.extend(file_entity.functions)
+            for func in file_entity.functions:
+                sum_complexity += func.complexity
+                max_complexity = max(max_complexity, func.complexity)
+                if func.complexity > 10:
+                    high_complexity_functions.append(
+                        f"{func.name} ({func.file_path}:{func.line_no})"
+                    )
             for cls in file_entity.classes:
-                all_functions.extend(cls.methods)
+                for method in cls.methods:
+                    sum_complexity += method.complexity
+                    max_complexity = max(max_complexity, method.complexity)
+                    if method.complexity > 10:
+                        high_complexity_functions.append(
+                            f"{method.name} ({method.file_path}:{method.line_no})"
+                        )
 
-        if all_functions:
-            complexities = [f.complexity for f in all_functions]
-            index.metrics.avg_complexity = sum(complexities) / len(complexities)
-            index.metrics.max_complexity = max(complexities)
-
-            index.metrics.high_complexity_functions = [
-                f"{f.name} ({f.file_path}:{f.line_no})" for f in all_functions if f.complexity > 10
-            ]
+        if index.metrics.total_functions > 0:
+            index.metrics.avg_complexity = sum_complexity / index.metrics.total_functions
+            index.metrics.max_complexity = max_complexity
+            index.metrics.high_complexity_functions = high_complexity_functions

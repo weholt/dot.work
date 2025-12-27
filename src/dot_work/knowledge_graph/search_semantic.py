@@ -7,13 +7,20 @@ processing to bound memory usage for large knowledge bases.
 from __future__ import annotations
 
 import heapq
+import logging
 import math
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+import numpy as np
+from numpy import typing as npt
+
 if TYPE_CHECKING:
     from dot_work.knowledge_graph.db import Database, Embedding, Node
     from dot_work.knowledge_graph.embed import Embedder
+
+
+logger = logging.getLogger(__name__)
 
 
 # Configuration for memory-bounded search
@@ -50,29 +57,30 @@ class SemanticResult:
     title: str | None
 
 
-def cosine_similarity(vec_a: list[float], vec_b: list[float]) -> float:
+def cosine_similarity(vec_a: npt.NDArray[np.float32], vec_b: npt.NDArray[np.float32]) -> float:
     """Compute cosine similarity between two vectors.
 
     Args:
-        vec_a: First vector.
-        vec_b: Second vector.
+        vec_a: First vector as numpy array.
+        vec_b: Second vector as numpy array.
 
     Returns:
         Cosine similarity in range [-1, 1].
         Returns 0.0 if either vector is zero-length.
     """
-    if len(vec_a) != len(vec_b):
-        raise ValueError(f"Vector dimensions must match: {len(vec_a)} != {len(vec_b)}")
+    if vec_a.shape != vec_b.shape:
+        raise ValueError(f"Vector dimensions must match: {vec_a.shape} != {vec_b.shape}")
 
-    dot_product = sum(a * b for a, b in zip(vec_a, vec_b, strict=True))
-    norm_a = math.sqrt(sum(a * a for a in vec_a))
-    norm_b = math.sqrt(sum(b * b for b in vec_b))
+    # Use numpy operations for efficiency
+    dot_product = np.dot(vec_a, vec_b)
+    norm_a = np.linalg.norm(vec_a)
+    norm_b = np.linalg.norm(vec_b)
 
     # Handle zero vectors
     if norm_a == 0.0 or norm_b == 0.0:
         return 0.0
 
-    return dot_product / (norm_a * norm_b)
+    return float(dot_product / (norm_a * norm_b))
 
 
 def semsearch(
@@ -354,7 +362,8 @@ def _build_scope_sets(
     if scope.project:
         collection = db.get_collection_by_name(scope.project)
         if collection is None:
-            raise ValueError(f"Project not found: {scope.project}")
+            logger.debug(f"Project not found: {scope.project}")
+            raise ValueError("Project not found")
         members = db.list_collection_members(collection.collection_id, member_type="node")
         scope_members = {m.member_pk for m in members}
 
@@ -364,14 +373,16 @@ def _build_scope_sets(
         for topic_name in scope.topics:
             topic = db.get_topic_by_name(topic_name)
             if topic is None:
-                raise ValueError(f"Topic not found: {topic_name}")
+                logger.debug(f"Topic not found: {topic_name}")
+                raise ValueError("Topic not found")
             scope_topic_ids.add(topic.topic_id)
 
     # Build topic exclusion set
     for topic_name in scope.exclude_topics:
         topic = db.get_topic_by_name(topic_name)
         if topic is None:
-            raise ValueError(f"Topic not found: {topic_name}")
+            logger.debug(f"Topic not found: {topic_name}")
+            raise ValueError("Topic not found")
         exclude_topic_ids.add(topic.topic_id)
 
     # Get shared topic ID

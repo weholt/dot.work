@@ -629,6 +629,30 @@ class IssueRepository:
         models = self.session.exec(statement).all()
         return self._models_to_entities(models)
 
+    def list_updated_before(
+        self, cutoff: datetime, limit: int = 100, offset: int = 0
+    ) -> list[Issue]:
+        """List issues updated before a cutoff date.
+
+        Args:
+            cutoff: Cutoff datetime - only return issues updated before this time
+            limit: Maximum number of issues to return
+            offset: Number of issues to skip
+
+        Returns:
+            List of issues updated before cutoff, sorted by updated_at ascending
+        """
+        statement = (
+            select(IssueModel)
+            .where(IssueModel.updated_at < str(cutoff))
+            .where(IssueModel.deleted_at.is_(None))  # type: ignore[union-attr]
+            .order_by(IssueModel.updated_at)
+            .limit(limit)
+            .offset(offset)
+        )
+        models = self.session.exec(statement).all()
+        return self._models_to_entities(models)
+
     def _entity_to_model(self, issue: Issue) -> IssueModel:
         """Convert Issue entity to database model.
 
@@ -1837,6 +1861,14 @@ class UnitOfWork:
             self.session.close()
         except Exception as e:
             logger.warning("Failed to close session: %s", e)
+
+        # Clear repository references to release cached data
+        self._issues = None
+        self._comments = None
+        self._graph = None
+        self._epics = None
+        self._labels = None
+        self._projects = None
 
     def __del__(self) -> None:
         """Ensure session cleanup on garbage collection."""

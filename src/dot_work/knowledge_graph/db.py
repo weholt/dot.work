@@ -15,6 +15,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+from numpy import typing as npt
+
 if TYPE_CHECKING:
     pass
 
@@ -88,7 +91,7 @@ class Embedding:
     full_id: str
     model: str
     dimensions: int
-    vector: list[float]
+    vector: npt.NDArray[np.float32]  # Use numpy array for memory efficiency
     created_at: int
 
 
@@ -970,7 +973,7 @@ class Database:
         self,
         full_id: str,
         model: str,
-        vector: list[float],
+        vector: list[float] | npt.NDArray[np.float32],
         created_at: int | None = None,
     ) -> Embedding:
         """Store or update an embedding for a node.
@@ -978,20 +981,24 @@ class Database:
         Args:
             full_id: Node full_id to associate embedding with.
             model: Embedding model name.
-            vector: Embedding vector.
+            vector: Embedding vector (list[float] or numpy array).
             created_at: Unix timestamp (defaults to now).
 
         Returns:
             The created/updated Embedding.
         """
-        import struct
-
         if created_at is None:
             created_at = int(time.time())
 
-        dimensions = len(vector)
+        # Convert to numpy array if list
+        if isinstance(vector, list):
+            vector_array = np.array(vector, dtype=np.float32)
+        else:
+            vector_array = vector
+
+        dimensions = len(vector_array)
         # Pack as little-endian floats for efficient storage
-        vector_blob = struct.pack(f"<{dimensions}f", *vector)
+        vector_blob = vector_array.tobytes()
 
         with self.transaction() as conn:
             # Use INSERT OR REPLACE for upsert
@@ -1017,7 +1024,7 @@ class Database:
             full_id=full_id,
             model=model,
             dimensions=dimensions,
-            vector=vector,
+            vector=vector_array,
             created_at=created_at,
         )
 
@@ -1126,11 +1133,10 @@ class Database:
 
     def _row_to_embedding(self, row: sqlite3.Row) -> Embedding:
         """Convert a database row to an Embedding object."""
-        import struct
-
         dimensions = row["dimensions"]
         vector_blob = row["vector"]
-        vector = list(struct.unpack(f"<{dimensions}f", vector_blob))
+        # Use numpy frombuffer for memory efficiency (4 bytes per float vs ~24 for Python float)
+        vector = np.frombuffer(vector_blob, dtype=np.float32)
 
         return Embedding(
             embedding_pk=row["embedding_pk"],

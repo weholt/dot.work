@@ -10,7 +10,8 @@ import pytest
 @pytest.mark.integration
 def test_build_script_runs_successfully() -> None:
     """Build script should complete without errors on clean project."""
-    project_root = Path(__file__).parent.parent.parent
+    # tests/integration/knowledge_graph/ -> tests/integration/ -> tests/ -> project_root
+    project_root = Path(__file__).parent.parent.parent.parent
     result = subprocess.run(
         [sys.executable, str(project_root / "scripts" / "build.py")],
         capture_output=True,
@@ -26,8 +27,8 @@ def test_package_importable_after_install() -> None:
     """Package should be importable after uv sync."""
     import dot_work.knowledge_graph
 
-    assert hasattr(kgshred, "__version__")
-    assert kgshred.__version__ == "0.1.0"
+    assert hasattr(dot_work.knowledge_graph, "__version__")
+    assert dot_work.knowledge_graph.__version__ == "0.1.0"
 
 
 @pytest.mark.integration
