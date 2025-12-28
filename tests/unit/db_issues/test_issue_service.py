@@ -1,6 +1,5 @@
 """Tests for IssueService."""
 
-
 import pytest
 
 from dot_work.db_issues.domain.entities import (

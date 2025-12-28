@@ -1018,7 +1018,9 @@ def show(
             console.print(f"[bold]Status:[/bold] {issue.status.value}")
             console.print(f"[bold]Priority:[/bold] {issue.priority.value}")
             console.print(f"[bold]Type:[/bold] {issue.type.value}")
-            console.print(f"[bold]Assignee:[/bold] {issue.assignees[0] if issue.assignees else 'Unassigned'}")
+            console.print(
+                f"[bold]Assignee:[/bold] {issue.assignees[0] if issue.assignees else 'Unassigned'}"
+            )
             if issue.labels:
                 console.print(f"[bold]Labels:[/bold] {', '.join(issue.labels)}")
             console.print("[bold]Description:[/bold]")
@@ -1586,7 +1588,8 @@ def stale(
             stale_issues = service.get_stale_issues(days=days)
 
             if format == "json":
-                from dot_work.db_issues.cli_utils import format_issues_json  # type: ignore[import-not-found]
+                # type: ignore[import-not-found]
+                from dot_work.db_issues.cli_utils import format_issues_json
 
                 json_output = format_issues_json(stale_issues)
                 console.print(json_output)
@@ -4865,13 +4868,17 @@ def _output_stats_table(stats: Statistics, console: Console, group_by: str | Non
         if stats.by_priority:
             console.print("\n[bold]By Priority:[/bold]")
             for priority_stat in stats.by_priority:
-                console.print(f"  {priority_stat.priority:15} {priority_stat.count:4} ({priority_stat.percentage:5.1f}%)")
+                console.print(
+                    f"  {priority_stat.priority:15} {priority_stat.count:4} ({priority_stat.percentage:5.1f}%)"
+                )
 
     if group_by == "type" or group_by is None:
         if stats.by_type:
             console.print("\n[bold]By Type:[/bold]")
             for type_stat in stats.by_type:
-                console.print(f"  {type_stat.type:15} {type_stat.count:4} ({type_stat.percentage:5.1f}%)")
+                console.print(
+                    f"  {type_stat.type:15} {type_stat.count:4} ({type_stat.percentage:5.1f}%)"
+                )
 
     console.print("\n[bold]Metrics:[/bold]")
     console.print(f"  Blocked issues:        {stats.metrics.blocked_count}")

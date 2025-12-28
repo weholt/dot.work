@@ -1,6 +1,5 @@
 """Tests for file analyzer service."""
 
-
 from dot_work.git.models import AnalysisConfig, FileCategory
 from dot_work.git.services.file_analyzer import FileAnalyzer
 

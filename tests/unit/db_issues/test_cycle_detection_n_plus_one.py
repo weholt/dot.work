@@ -1,7 +1,7 @@
 """Tests for N+1 query issue in cycle detection (PERF-001)."""
 
 from collections.abc import Generator
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
 from sqlmodel import Session
@@ -145,7 +145,7 @@ class TestCycleDetectionNPlusOne:
             dep = Dependency(
                 id=f"dep-{i:03d}",
                 from_issue_id=f"issue-{i:03d}",
-                to_issue_id=f"issue-{i+1:03d}",
+                to_issue_id=f"issue-{i + 1:03d}",
                 dependency_type=DependencyType.DEPENDS_ON,
                 created_at=now,
             )
@@ -256,7 +256,7 @@ class TestCycleDetectionNPlusOne:
             dep = Dependency(
                 id=f"dep-{i:03d}",
                 from_issue_id=f"issue-{i:03d}",
-                to_issue_id=f"issue-{i+1:03d}",
+                to_issue_id=f"issue-{i + 1:03d}",
                 dependency_type=DependencyType.DEPENDS_ON,
                 created_at=now,
             )

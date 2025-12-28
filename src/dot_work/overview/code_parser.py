@@ -7,7 +7,6 @@ import json
 import textwrap
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
 
 import libcst as cst
 from radon.complexity import cc_visit  # type: ignore[import-untyped]

@@ -1,4 +1,3 @@
-
 import pytest
 from repo_agent.core import RepoAgentError
 from repo_agent.validation import validate_instructions

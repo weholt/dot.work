@@ -3,7 +3,6 @@
 Source: MIGRATE-054 - Bulk Operations
 """
 
-
 import pytest
 from sqlmodel import Session
 

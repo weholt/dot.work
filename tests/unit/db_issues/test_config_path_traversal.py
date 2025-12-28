@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import os
-import tempfile
 from pathlib import Path
 
 import pytest
 
-from dot_work.db_issues.config import DbIssuesConfig, get_db_url, _is_subpath
+from dot_work.db_issues.config import DbIssuesConfig, _is_subpath, get_db_url
 
 
 class TestDbIssuesConfigPathTraversal:

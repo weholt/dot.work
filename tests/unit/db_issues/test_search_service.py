@@ -1,13 +1,13 @@
 """Unit tests for SearchService FTS5 injection vulnerability (CR-073)."""
 
 from collections.abc import Generator
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
 from sqlmodel import Session, text
 
 from dot_work.db_issues.adapters.sqlite import IssueModel
-from dot_work.db_issues.services.search_service import SearchService, SearchResult
+from dot_work.db_issues.services.search_service import SearchService
 
 
 @pytest.fixture

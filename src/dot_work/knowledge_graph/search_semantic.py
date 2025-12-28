@@ -56,7 +56,9 @@ class SemanticResult:
     title: str | None
 
 
-def cosine_similarity(vec_a: npt.NDArray[np.float32] | list[float], vec_b: npt.NDArray[np.float32] | list[float]) -> float:
+def cosine_similarity(
+    vec_a: npt.NDArray[np.float32] | list[float], vec_b: npt.NDArray[np.float32] | list[float]
+) -> float:
     """Compute cosine similarity between two vectors.
 
     Args:

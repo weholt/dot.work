@@ -1,6 +1,5 @@
 """Tests for EpicService business logic layer."""
 
-
 import pytest
 
 from dot_work.db_issues.domain.entities import Clock, EpicStatus
@@ -400,7 +399,6 @@ class TestEpicServiceGetEpicTree:
         # Try to create a child issue with parent_id
         # Note: This depends on whether the Issue entity supports parent_id
         try:
-
             child_issue = issue_service.create_issue("Child", epic_id=epic.id)
             # If parent_id is supported, set it
             if hasattr(child_issue, "parent_id"):
