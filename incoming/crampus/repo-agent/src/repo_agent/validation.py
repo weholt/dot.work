@@ -7,8 +7,9 @@ before running the agent.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import frontmatter
 
@@ -29,13 +30,13 @@ TOOL_REQUIRED_FIELDS = {
 
 def validate_instructions(path: Path) -> None:
     """Validate an instruction file's frontmatter configuration.
-    
+
     Checks that all required fields are present, tool configuration is valid,
     strategy is a recognized value, and authentication is configured.
-    
+
     Args:
         path: Path to the markdown instruction file to validate.
-        
+
     Raises:
         RepoAgentError: If validation fails due to missing required fields,
             invalid configuration, or other validation errors.

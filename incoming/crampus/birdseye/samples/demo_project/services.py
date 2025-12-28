@@ -1,5 +1,6 @@
 """Service layer for the sample project."""
 
+
 class GreetingService:
     """Coordinates greeting flows for user-facing surfaces."""
 

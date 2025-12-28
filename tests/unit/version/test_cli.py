@@ -3,7 +3,6 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from dot_work.version.cli import app
@@ -98,14 +97,14 @@ def test_version_history_command():
                 "version": "2025.01.002",
                 "date": "2025-01-02",
                 "commit": "def456",
-                "author": "Test Author"
+                "author": "Test Author",
             },
             {
                 "version": "2025.01.001",
                 "date": "2025-01-01",
                 "commit": "abc123",
-                "author": "Test Author"
-            }
+                "author": "Test Author",
+            },
         ]
 
         mock_manager.get_version_history.return_value = mock_versions
@@ -141,14 +140,9 @@ def test_version_commits_command():
                 commit_type="feat",
                 subject="add new feature",
                 author="Test Author",
-                short_hash="abc123"
+                short_hash="abc123",
             ),
-            Mock(
-                commit_type="fix",
-                subject="fix bug",
-                author="Test Author",
-                short_hash="def456"
-            )
+            Mock(commit_type="fix", subject="fix bug", author="Test Author", short_hash="def456"),
         ]
 
         mock_manager.get_commits_since.return_value = mock_commits
@@ -172,7 +166,7 @@ def test_version_commits_no_tag():
                 commit_type="feat",
                 subject="add new feature",
                 author="Test Author",
-                short_hash="abc123"
+                short_hash="abc123",
             ),
         ]
 
@@ -195,11 +189,7 @@ def test_version_config_command():
         config_data = {
             "format": "YYYY.MM.build-number",
             "tag_prefix": "version-",
-            "changelog": {
-                "file": "CHANGELOG.md",
-                "include_authors": True,
-                "group_by_type": True
-            }
+            "changelog": {"file": "CHANGELOG.md", "include_authors": True, "group_by_type": True},
         }
 
         mock_manager.load_config.return_value = config_data

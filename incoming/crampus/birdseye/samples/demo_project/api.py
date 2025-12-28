@@ -1,6 +1,7 @@
 """HTTP surface for the sample project."""
 
-from typing import Callable, TypeVar
+from collections.abc import Callable
+from typing import TypeVar
 
 F = TypeVar("F", bound=Callable[..., object])
 

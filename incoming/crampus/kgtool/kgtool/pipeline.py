@@ -2,22 +2,21 @@ import json
 import os
 import pathlib
 import re
-from typing import Dict, List, Tuple
 
 import networkx as nx
 import yake
+from networkx.readwrite import json_graph
 from rapidfuzz import fuzz
 from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from networkx.readwrite import json_graph
-
 
 # ----------------------------------------------------------
 # Chunking
 # ----------------------------------------------------------
 
-def extract_chunks(text: str) -> List[Tuple[str, str]]:
+
+def extract_chunks(text: str) -> list[tuple[str, str]]:
     """
     Split markdown text by headings (##) into (title, content) pairs.
     Returns a list of (section_title, section_body).
@@ -44,7 +43,8 @@ def extract_chunks(text: str) -> List[Tuple[str, str]]:
 # Keyword extraction from TF-IDF
 # ----------------------------------------------------------
 
-def tfidf_keywords_for_row(row, feature_names: List[str], top_n: int) -> List[str]:
+
+def tfidf_keywords_for_row(row, feature_names: list[str], top_n: int) -> list[str]:
     if row.nnz == 0:
         return []
     scores = row.toarray().flatten()
@@ -56,15 +56,16 @@ def tfidf_keywords_for_row(row, feature_names: List[str], top_n: int) -> List[st
 # Topic classification
 # ----------------------------------------------------------
 
-def load_topic_terms(path: str | None) -> Dict[str, List[str]] | None:
+
+def load_topic_terms(path: str | None) -> dict[str, list[str]] | None:
     if not path:
         return None
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
 def build_topic_vectors(
-    topic_terms: Dict[str, List[str]],
+    topic_terms: dict[str, list[str]],
     vectorizer: TfidfVectorizer,
 ):
     """
@@ -82,10 +83,10 @@ def build_topic_vectors(
 
 def classify_node_topics(
     node_vector,
-    topic_terms: Dict[str, List[str]],
+    topic_terms: dict[str, list[str]],
     topic_vecs,
     vectorizer: TfidfVectorizer,
-) -> List[str]:
+) -> list[str]:
     """
     Classify node into topics based on cosine similarity with topic vectors.
     Returns list of topic names with similarity > threshold.
@@ -102,16 +103,12 @@ def classify_node_topics(
     if not assigned:
         node_vec_array = node_vector.toarray().flatten()
         node_top_indices = node_vec_array.argsort()[-10:][::-1]
-        node_top_terms = [
-            vectorizer.get_feature_names_out()[i] for i in node_top_indices
-        ]
+        node_top_terms = [vectorizer.get_feature_names_out()[i] for i in node_top_indices]
 
         best_topic = None
         best_score = 0
         for topic_name, terms in topic_terms.items():
-            score = sum(
-                max(fuzz.ratio(nt, tt) for tt in terms) for nt in node_top_terms
-            )
+            score = sum(max(fuzz.ratio(nt, tt) for tt in terms) for nt in node_top_terms)
             if score > best_score:
                 best_score = score
                 best_topic = topic_name
@@ -125,6 +122,7 @@ def classify_node_topics(
 # ----------------------------------------------------------
 # Topic discovery
 # ----------------------------------------------------------
+
 
 def discover_topics(
     input_file: str,
@@ -140,9 +138,7 @@ def discover_topics(
     chunks = extract_chunks(text)
 
     docs = [body for _, body in chunks]
-    vectorizer = TfidfVectorizer(
-        max_features=200, stop_words="english", ngram_range=(1, 2)
-    )
+    vectorizer = TfidfVectorizer(max_features=200, stop_words="english", ngram_range=(1, 2))
     X = vectorizer.fit_transform(docs)
 
     if len(docs) < num_topics:
@@ -175,6 +171,7 @@ def discover_topics(
 # Graph building
 # ----------------------------------------------------------
 
+
 def build_graph(
     input_file: str,
     output_dir: str,
@@ -198,9 +195,7 @@ def build_graph(
 
     # TF-IDF vectorization
     docs = [body for _, body in chunks]
-    vectorizer = TfidfVectorizer(
-        max_features=500, stop_words="english", ngram_range=(1, 2)
-    )
+    vectorizer = TfidfVectorizer(max_features=500, stop_words="english", ngram_range=(1, 2))
     X = vectorizer.fit_transform(docs)
     feature_names = vectorizer.get_feature_names_out()
 
@@ -275,6 +270,7 @@ def build_graph(
 # Topic-based context extraction
 # ----------------------------------------------------------
 
+
 def extract_topic_context(
     topic: str,
     graph_path: str,
@@ -285,7 +281,7 @@ def extract_topic_context(
     Extract nodes related to a specific topic from the graph.
     If include_neighbors is True, also include connected nodes.
     """
-    with open(graph_path, "r", encoding="utf-8") as f:
+    with open(graph_path, encoding="utf-8") as f:
         graph_data = json.load(f)
 
     G = json_graph.node_link_graph(graph_data)

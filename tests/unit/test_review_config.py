@@ -66,3 +66,26 @@ class TestGetConfig:
         """Test that get_config returns a Config instance."""
         config = get_config()
         assert isinstance(config, Config)
+
+    def test_get_config_reflects_env_changes(self) -> None:
+        """Test that get_config reflects environment variable changes.
+
+        This test verifies the fix for CR-004: global mutable state.
+        After removing the global singleton, get_config() should read
+        environment variables at call time, not import time.
+        """
+        # First call with default env
+        with patch.dict(os.environ, {}, clear=True):
+            config1 = get_config()
+            assert config1.storage_dir == ".work/reviews"
+            assert config1.server_port == 0
+
+        # Second call with custom env - should reflect new values
+        with patch.dict(
+            os.environ,
+            {"DOT_WORK_REVIEW_STORAGE_DIR": ".custom-reviews", "DOT_WORK_REVIEW_PORT": "8080"},
+            clear=True,
+        ):
+            config2 = get_config()
+            assert config2.storage_dir == ".custom-reviews"
+            assert config2.server_port == 8080

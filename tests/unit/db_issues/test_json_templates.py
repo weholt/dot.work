@@ -8,10 +8,10 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from dot_work.db_issues.cli import app
 from dot_work.db_issues.domain.entities import IssuePriority, IssueType
 from dot_work.db_issues.domain.json_template import JsonTemplate
-from dot_work.db_issues.services import JsonTemplateService, TemplateInfo
-from dot_work.db_issues.cli import app
+from dot_work.db_issues.services import JsonTemplateService
 
 
 @pytest.fixture
@@ -396,9 +396,7 @@ class TestTemplateCLI:
         assert result.exit_code == 0
         assert "No templates found" in result.stdout
 
-    def test_template_list_with_templates(
-        self, runner: CliRunner, temp_templates_dir: str
-    ) -> None:
+    def test_template_list_with_templates(self, runner: CliRunner, temp_templates_dir: str) -> None:
         """Test template list with templates."""
         result = runner.invoke(
             app,

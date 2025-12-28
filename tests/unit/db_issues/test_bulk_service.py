@@ -3,21 +3,16 @@
 Source: MIGRATE-054 - Bulk Operations
 """
 
-from datetime import UTC, datetime
-from io import StringIO
-from pathlib import Path
 
 import pytest
 from sqlmodel import Session
 
 from dot_work.db_issues.domain.entities import (
-    Clock,
-    Issue,
     IssuePriority,
     IssueStatus,
     IssueType,
 )
-from dot_work.db_issues.services import BulkResult, BulkService, IssueInputData, IssueService
+from dot_work.db_issues.services import BulkService, IssueInputData, IssueService
 
 
 class TestIssueInputData:
@@ -148,10 +143,10 @@ class TestBulkServiceParseJson:
 
     def test_parse_json_basic(self, bulk_service: BulkService) -> None:
         """Test parsing basic JSON format."""
-        json_content = '''[
+        json_content = """[
     {"title": "Fix parser", "priority": "high", "type": "bug"},
     {"title": "Add feature", "priority": "medium"}
-]'''
+]"""
         issues = bulk_service.parse_json(json_content)
 
         assert len(issues) == 2
@@ -160,7 +155,7 @@ class TestBulkServiceParseJson:
 
     def test_parse_json_with_all_fields(self, bulk_service: BulkService) -> None:
         """Test parsing JSON with all optional fields."""
-        json_content = '''[
+        json_content = """[
     {
         "title": "Full Issue",
         "description": "Description",
@@ -170,7 +165,7 @@ class TestBulkServiceParseJson:
         "labels": ["bug", "urgent"],
         "epic_id": "epic-001"
     }
-]'''
+]"""
         issues = bulk_service.parse_json(json_content)
 
         assert len(issues) == 1
@@ -194,11 +189,11 @@ class TestBulkServiceParseJson:
 
     def test_parse_json_skips_items_without_title(self, bulk_service: BulkService) -> None:
         """Test that items without title are skipped."""
-        json_content = '''[
+        json_content = """[
     {"title": "Valid 1", "priority": "high"},
     {"priority": "high"},
     {"title": "Valid 2"}
-]'''
+]"""
         issues = bulk_service.parse_json(json_content)
 
         assert len(issues) == 2
@@ -293,9 +288,7 @@ class TestBulkServiceBulkClose:
                 issue_type=IssueType.TASK,
             )
             # Move to IN_PROGRESS so it can be closed
-            bulk_service.issue_service.update_issue(
-                issue.id, status=IssueStatus.IN_PROGRESS
-            )
+            bulk_service.issue_service.update_issue(issue.id, status=IssueStatus.IN_PROGRESS)
 
         result = bulk_service.bulk_close()
 
@@ -325,7 +318,9 @@ class TestBulkServiceBulkClose:
         assert result.succeeded == 1
         # Low priority issue should remain open
         remaining = bulk_service.issue_service.list_issues()
-        assert any(i.title == "Low Priority" for i in remaining if i.status != IssueStatus.COMPLETED)
+        assert any(
+            i.title == "Low Priority" for i in remaining if i.status != IssueStatus.COMPLETED
+        )
 
     def test_bulk_close_no_issues(self, bulk_service: BulkService) -> None:
         """Test bulk close when no issues match."""
@@ -450,9 +445,7 @@ class TestBulkResult:
 
 
 @pytest.fixture
-def bulk_service(
-    in_memory_db: Session, fixed_id_service, fixed_clock
-) -> BulkService:
+def bulk_service(in_memory_db: Session, fixed_id_service, fixed_clock) -> BulkService:
     """Create a BulkService with test dependencies.
 
     Args:
@@ -532,9 +525,7 @@ class TestBulkServiceBulkLabelAdd:
             title="Low Priority", priority=IssuePriority.LOW, issue_type=IssueType.TASK
         )
 
-        result = bulk_service.bulk_label_add(
-            labels=["critical"], priority=IssuePriority.HIGH
-        )
+        result = bulk_service.bulk_label_add(labels=["critical"], priority=IssuePriority.HIGH)
 
         assert result.succeeded == 1
         assert high_issue.id in result.issue_ids
@@ -562,9 +553,7 @@ class TestBulkServiceBulkLabelAdd:
             issue_type=IssueType.TASK,
         )
 
-        result = bulk_service.bulk_label_add(
-            labels=["urgent"], existing_label="bug"
-        )
+        result = bulk_service.bulk_label_add(labels=["urgent"], existing_label="bug")
 
         assert result.succeeded == 1
         assert issue_with_bug.id in result.issue_ids
@@ -614,9 +603,7 @@ class TestBulkServiceBulkLabelAdd:
         )
 
         # Filter for HIGH priority but issue is LOW
-        result = bulk_service.bulk_label_add(
-            labels=["urgent"], priority=IssuePriority.HIGH
-        )
+        result = bulk_service.bulk_label_add(labels=["urgent"], priority=IssuePriority.HIGH)
 
         assert result.total == 0
         assert result.succeeded == 0
@@ -684,9 +671,7 @@ class TestBulkServiceBulkLabelRemove:
             labels=["old-label"],
         )
 
-        result = bulk_service.bulk_label_remove(
-            labels=["old-label"], priority=IssuePriority.HIGH
-        )
+        result = bulk_service.bulk_label_remove(labels=["old-label"], priority=IssuePriority.HIGH)
 
         assert result.succeeded == 1
         assert high_issue.id in result.issue_ids
@@ -715,9 +700,7 @@ class TestBulkServiceBulkLabelRemove:
             labels=["other"],
         )
 
-        result = bulk_service.bulk_label_remove(
-            labels=["remove-me"], must_have_label=True
-        )
+        result = bulk_service.bulk_label_remove(labels=["remove-me"], must_have_label=True)
 
         assert result.succeeded == 1
         assert issue_with_label.id in result.issue_ids
@@ -764,9 +747,7 @@ class TestBulkServiceBulkLabelRemove:
         )
 
         # Filter for HIGH priority but issue is LOW
-        result = bulk_service.bulk_label_remove(
-            labels=["urgent"], priority=IssuePriority.HIGH
-        )
+        result = bulk_service.bulk_label_remove(labels=["urgent"], priority=IssuePriority.HIGH)
 
         assert result.total == 0
         assert result.succeeded == 0

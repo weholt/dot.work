@@ -473,3 +473,36 @@ cat test_logs/test_execution_log.txt
   - Readability and maintainability often outweigh micro-optimizations
   - Only optimize when profiling shows actual bottleneck, not theoretical concerns
   - Pattern: Document "won't fix unless profiling shows need" for micro-optimizations
+- [PERF-002@g2h3i4] 2025-12-27: **Pre-build lookups to avoid O(n²) nested loops**
+  - O(n²) nested loops occur when outer loop contains repeated work for inner iterations
+  - Git branch lookup was iterating all commits for each branch, for each commit analyzed
+  - Solution: Build lookup table (dict) once, use O(1) lookups in inner loop
+  - Pattern: `mapping = {key: value for key, value in expensive_generator()}` then `mapping.get(key)`
+  - Trade-off: O(N×M) memory for cache vs O(N×M×C) CPU where C = commits analyzed
+  - After fix: 83 git tests pass, branch lookup is O(1) cache.get() instead of nested loop
+  - Related: PERF-001 (N+1 queries), PERF-003 (SQL filtering), PERF-004 (streaming aggregations)
+- [CR-001@f8a2c1] 2025-12-27: **Never write secrets to disk, even in ephemeral containers**
+  - Writing credentials to ~/.git-credentials is a security risk even in temporary containers
+  - Image commits, container logs, debugging tools can all expose plaintext files
+  - Solution: Use GIT_ASKPASS environment variable with helper script that echoes token
+  - Pattern: `cat > /tmp/askpass.sh << 'EOF'` then `export GIT_ASKPASS=/tmp/askpass.sh`
+  - Git calls the askpass script when credentials needed instead of reading from disk
+  - After fix: 21 container tests pass, no credentials written to filesystem
+  - Related: SEC-001 (command injection), SEC-008 (temp file permissions), SEC-009 (audit logging)
+- [CR-002@b3d5e7] 2025-12-27: **Test coverage starts with validation functions (low-hanging fruit)**
+  - Complex modules often have simple validation functions that are easy to test
+  - Start with validation functions for quick coverage wins (100% possible)
+  - Pattern: Test valid cases, invalid cases, edge cases (empty, None, boundaries)
+  - For `validate_docker_image()`: 14 tests covering all format variations
+  - For `validate_dockerfile_path()`: 7 tests covering path traversal scenarios
+  - After fix: Coverage improved from ~0% to 33% for core.py (+13 percentage points)
+  - Remaining work: `_resolve_config()` (172 lines) needs extensive mocking/fixtures
+  - Related: CR-003 (logging), CR-004 (global state)
+- [CR-003@c4f8a2] 2025-12-27: **Logging is essential for production debugging**
+  - Start with module-level logger: `logger = logging.getLogger(__name__)`
+  - Log at appropriate levels: INFO for milestones, DEBUG for details, ERROR for failures
+  - Always mask sensitive values: show presence as boolean, not actual tokens
+  - Pattern: `logger.info()` for user-visible events, `logger.debug()` for diagnostics
+  - After fix: Logging added throughout core.py (INFO at milestones, DEBUG for details)
+  - Sensitive masking: `has_github_token={bool(token)}` not `github_token={token}`
+  - Related: CR-002 (testing), CR-004 (global state)

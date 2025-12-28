@@ -53,9 +53,7 @@ class IndexRepository:
         }
 
         # Use compact JSON for efficient storage (saves ~30-40% space)
-        self.config.index_path.write_text(
-            json.dumps(data, separators=(",", ":")), encoding="utf-8"
-        )
+        self.config.index_path.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
 
     def load(self) -> CodeIndex | None:
         """Load code index from disk.

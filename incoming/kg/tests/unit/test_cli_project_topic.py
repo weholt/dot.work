@@ -4,12 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from kgshred.cli import app
 from kgshred.db import Database
-
 
 runner = CliRunner()
 
@@ -78,9 +76,7 @@ class TestProjectAdd:
         db.close()
 
         runner.invoke(app, ["project", "create", "myproj", "--db", str(db_path)])
-        result = runner.invoke(
-            app, ["project", "add", "myproj", "doc-001", "--db", str(db_path)]
-        )
+        result = runner.invoke(app, ["project", "add", "myproj", "doc-001", "--db", str(db_path)])
 
         assert result.exit_code == 0
         assert "Added document: doc-001" in result.stdout
@@ -106,9 +102,7 @@ class TestProjectRm:
         db_path = tmp_path / "test.sqlite"
         runner.invoke(app, ["project", "create", "myproj", "--db", str(db_path)])
 
-        result = runner.invoke(
-            app, ["project", "rm", "myproj", "--force", "--db", str(db_path)]
-        )
+        result = runner.invoke(app, ["project", "rm", "myproj", "--force", "--db", str(db_path)])
 
         assert result.exit_code == 0
         assert "Deleted project: myproj" in result.stdout
@@ -152,9 +146,7 @@ class TestProjectShow:
         db.close()
 
         runner.invoke(app, ["project", "create", "myproj", "--db", str(db_path)])
-        runner.invoke(
-            app, ["project", "add", "myproj", "doc-001", "--db", str(db_path)]
-        )
+        runner.invoke(app, ["project", "add", "myproj", "doc-001", "--db", str(db_path)])
 
         result = runner.invoke(app, ["project", "show", "myproj", "--db", str(db_path)])
 
@@ -281,9 +273,7 @@ class TestTopicUntag:
         db.close()
 
         runner.invoke(app, ["topic", "create", "python", "--db", str(db_path)])
-        runner.invoke(
-            app, ["topic", "tag", "python", "--id", "doc-001", "--db", str(db_path)]
-        )
+        runner.invoke(app, ["topic", "tag", "python", "--id", "doc-001", "--db", str(db_path)])
 
         result = runner.invoke(
             app, ["topic", "untag", "python", "--id", "doc-001", "--db", str(db_path)]
@@ -316,9 +306,7 @@ class TestTopicRm:
         db_path = tmp_path / "test.sqlite"
         runner.invoke(app, ["topic", "create", "python", "--db", str(db_path)])
 
-        result = runner.invoke(
-            app, ["topic", "rm", "python", "--force", "--db", str(db_path)]
-        )
+        result = runner.invoke(app, ["topic", "rm", "python", "--force", "--db", str(db_path)])
 
         assert result.exit_code == 0
         assert "Deleted topic: python" in result.stdout
@@ -332,9 +320,7 @@ class TestTopicRm:
         db_path = tmp_path / "test.sqlite"
         Database(db_path).close()
 
-        result = runner.invoke(
-            app, ["topic", "rm", "nonexistent", "--force", "--db", str(db_path)]
-        )
+        result = runner.invoke(app, ["topic", "rm", "nonexistent", "--force", "--db", str(db_path)])
 
         assert result.exit_code == 1
         assert "not found" in result.stdout
@@ -362,9 +348,7 @@ class TestTopicShow:
         db.close()
 
         runner.invoke(app, ["topic", "create", "python", "--db", str(db_path)])
-        runner.invoke(
-            app, ["topic", "tag", "python", "--id", "doc-001", "--db", str(db_path)]
-        )
+        runner.invoke(app, ["topic", "tag", "python", "--id", "doc-001", "--db", str(db_path)])
 
         result = runner.invoke(app, ["topic", "show", "python", "--db", str(db_path)])
 

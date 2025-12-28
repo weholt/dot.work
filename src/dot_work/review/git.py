@@ -15,10 +15,10 @@ from dot_work.review.models import DiffHunk, DiffLine, FileDiff
 # Also allows full commit hashes (40+ hex characters)
 # Blocks: git options (starting with --), shell metacharacters, path traversal
 _REF_PATTERN = re.compile(
-    r'^[a-zA-Z0-9_\-./~^:@]+$'   # Standard ref characters
-    r'|^[a-fA-F0-9]{40,64}$'     # Full commit hash
-    r'|^HEAD$'                   # HEAD reference
-    r'|^@\{-[0-9]+\}$'           # @annotation syntax (e.g., @{-1})
+    r"^[a-zA-Z0-9_\-./~^:@]+$"  # Standard ref characters
+    r"|^[a-fA-F0-9]{40,64}$"  # Full commit hash
+    r"|^HEAD$"  # HEAD reference
+    r"|^@\{-[0-9]+\}$"  # @annotation syntax (e.g., @{-1})
 )
 
 
@@ -55,22 +55,17 @@ def _validate_git_ref(ref: str) -> str:
     # Block git options (most dangerous attack vector)
     if ref.startswith("--"):
         raise GitRefValidationError(
-            f"Git options are not allowed: '{ref}'. "
-            "Only valid git references are permitted."
+            f"Git options are not allowed: '{ref}'. Only valid git references are permitted."
         )
 
     # Block shell metacharacters that could enable command injection
     dangerous_chars = ["|", "&", ";", "$", "`", "(", ")", "<", ">", "\n", "\r"]
     if any(char in ref for char in dangerous_chars):
-        raise GitRefValidationError(
-            f"Git reference contains dangerous characters: '{ref}'"
-        )
+        raise GitRefValidationError(f"Git reference contains dangerous characters: '{ref}'")
 
     # Block path traversal attempts
     if ".." in ref:
-        raise GitRefValidationError(
-            f"Git reference contains path traversal sequence: '{ref}'"
-        )
+        raise GitRefValidationError(f"Git reference contains path traversal sequence: '{ref}'")
 
     # Validate against whitelist pattern
     if not _REF_PATTERN.match(ref):
@@ -101,16 +96,12 @@ def _validate_git_path(path: str) -> str:
 
     # Block git options
     if path.startswith("--"):
-        raise GitRefValidationError(
-            f"Git options are not allowed in paths: '{path}'"
-        )
+        raise GitRefValidationError(f"Git options are not allowed in paths: '{path}'")
 
     # Block shell metacharacters
     dangerous_chars = ["|", "&", ";", "$", "`", "\n", "\r"]
     if any(char in path for char in dangerous_chars):
-        raise GitRefValidationError(
-            f"Path contains dangerous characters: '{path}'"
-        )
+        raise GitRefValidationError(f"Path contains dangerous characters: '{path}'")
 
     return path
 

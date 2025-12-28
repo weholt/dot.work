@@ -116,9 +116,7 @@ class TestReviewComment:
         """Test that generated IDs are unique."""
         ids = set()
         for _ in range(100):
-            comment = ReviewComment(
-                review_id="test", path="test.py", line=1, message="test"
-            )
+            comment = ReviewComment(review_id="test", path="test.py", line=1, message="test")
             ids.add(comment.id)
         assert len(ids) == 100
 

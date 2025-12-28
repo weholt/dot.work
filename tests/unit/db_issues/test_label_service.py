@@ -2,7 +2,6 @@
 
 import pytest
 
-from dot_work.db_issues.domain.entities import IssueStatus, IssuePriority
 from dot_work.db_issues.services import LabelService
 
 
@@ -109,9 +108,7 @@ class TestLabelServiceGetAllLabelsWithCounts:
 class TestLabelServiceCreate:
     """Tests for label creation."""
 
-    def test_create_label_generates_id(
-        self, label_service: "LabelService"
-    ) -> None:
+    def test_create_label_generates_id(self, label_service: "LabelService") -> None:
         """Test that creating a label generates an ID."""
         label = label_service.create_label("Test Label")
 
@@ -126,9 +123,7 @@ class TestLabelServiceCreate:
         assert label.name == "Bug"
         assert label.color == "#ff0000"
 
-    def test_create_label_duplicate_name_raises(
-        self, label_service: "LabelService"
-    ) -> None:
+    def test_create_label_duplicate_name_raises(self, label_service: "LabelService") -> None:
         """Test that creating a label with duplicate name raises ValueError."""
         label_service.create_label("Test Label")
 
@@ -143,9 +138,7 @@ class TestLabelServiceUpdate:
     # LabelModel not having updated_at field. This needs to be fixed
     # in the label entity/repo layer separately.
 
-    def test_update_nonexistent_label_raises(
-        self, label_service: "LabelService"
-    ) -> None:
+    def test_update_nonexistent_label_raises(self, label_service: "LabelService") -> None:
         """Test that updating a nonexistent label raises ValueError."""
         with pytest.raises(ValueError, match="not found"):
             label_service.update_label("nonexistent", color="red")
@@ -162,9 +155,7 @@ class TestLabelServiceRename:
         assert renamed is not None
         assert renamed.name == "New Name"
 
-    def test_rename_label_duplicate_name_raises(
-        self, label_service: "LabelService"
-    ) -> None:
+    def test_rename_label_duplicate_name_raises(self, label_service: "LabelService") -> None:
         """Test that renaming to existing name raises ValueError."""
         label_service.create_label("Existing")
         label2 = label_service.create_label("To Rename")
@@ -183,9 +174,7 @@ class TestLabelServiceDelete:
 
         assert deleted is True
 
-    def test_delete_nonexistent_label_returns_false(
-        self, label_service: "LabelService"
-    ) -> None:
+    def test_delete_nonexistent_label_returns_false(self, label_service: "LabelService") -> None:
         """Test that deleting a nonexistent label returns False."""
         deleted = label_service.delete_label("nonexistent")
         assert deleted is False
@@ -194,9 +183,7 @@ class TestLabelServiceDelete:
 class TestLabelServiceList:
     """Tests for label listing."""
 
-    def test_list_labels_returns_all(
-        self, label_service: "LabelService"
-    ) -> None:
+    def test_list_labels_returns_all(self, label_service: "LabelService") -> None:
         """Test that list_labels returns all created labels."""
         label_service.create_label("Label 1")
         label_service.create_label("Label 2")

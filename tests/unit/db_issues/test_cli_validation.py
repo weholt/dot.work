@@ -6,8 +6,6 @@ via unvalidated editor commands (SEC-001@94eb69).
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from dot_work.db_issues.cli import _ALLOWED_EDITORS, _validate_editor
@@ -111,7 +109,9 @@ class TestValidateEditor:
         assert "Allowed editors" in error_msg
         assert "vi" in error_msg  # Should list some allowed editors
 
-    def test_disallowed_editor_with_args_raises_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_disallowed_editor_with_args_raises_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Disallowed editor with args should also raise ValueError."""
         monkeypatch.delenv("EDITOR", raising=False)
 
@@ -145,7 +145,9 @@ class TestValidateEditor:
         monkeypatch.delenv("EDITOR", raising=False)
 
         # Only test editors that don't auto-get --wait flag
-        non_code_editors = [e for e in _ALLOWED_EDITORS if e not in ("code", "code-server", "codium")]
+        non_code_editors = [
+            e for e in _ALLOWED_EDITORS if e not in ("code", "code-server", "codium")
+        ]
 
         for editor in non_code_editors:
             name, args = _validate_editor(editor)

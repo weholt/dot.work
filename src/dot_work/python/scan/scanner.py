@@ -8,7 +8,7 @@ import fnmatch
 import os
 import re
 from pathlib import Path
-from typing import Pattern
+from re import Pattern
 
 from dot_work.python.scan.ast_extractor import extract_entities
 from dot_work.python.scan.models import CodeIndex, FileEntity
@@ -36,8 +36,7 @@ class ASTScanner:
         self.include_patterns = include_patterns or ["*.py"]
         # Pre-compile patterns into regex objects for O(1) pattern matching
         self._compiled_patterns: list[Pattern] = [
-            re.compile(fnmatch.translate(pattern))
-            for pattern in self.include_patterns
+            re.compile(fnmatch.translate(pattern)) for pattern in self.include_patterns
         ]
 
     def scan(self, incremental: bool = False) -> CodeIndex:

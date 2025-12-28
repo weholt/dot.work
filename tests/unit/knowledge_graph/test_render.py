@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
@@ -112,7 +112,7 @@ class TestRenderFull:
 
     def test_render_full_preserves_encoding(self, db: Database) -> None:
         """UTF-8 content should be preserved exactly."""
-        raw = "# Café ☕\n\nUnicode: 日本語\n".encode("utf-8")
+        raw = "# Café ☕\n\nUnicode: 日本語\n".encode()
         db.insert_document("utf8", "utf8.md", raw)
         result = render_full(db, "utf8")
         assert result == raw
@@ -244,9 +244,7 @@ class TestRenderFiltered:
         # Should contain placeholders
         assert b"[@" in result
 
-    def test_render_filtered_headings_always_shown(
-        self, populated_db: Database
-    ) -> None:
+    def test_render_filtered_headings_always_shown(self, populated_db: Database) -> None:
         """Headings should be visible by default."""
         result = render_filtered(populated_db, "doc1", set())
         # Headings should be present
@@ -264,9 +262,7 @@ class TestExpansionPolicies:
 
     def test_policy_direct_only_matches(self, populated_db: Database) -> None:
         """Direct policy should only expand matches."""
-        options = RenderOptions(
-            policy=ExpansionPolicy.DIRECT, show_headings=False
-        )
+        options = RenderOptions(policy=ExpansionPolicy.DIRECT, show_headings=False)
         result = render_filtered(populated_db, "doc1", {"BBBB"}, options)
         # BBBB should be expanded
         assert b"Paragraph one." in result

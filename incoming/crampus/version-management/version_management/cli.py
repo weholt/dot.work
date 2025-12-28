@@ -127,12 +127,7 @@ def history(
         table.add_column("Author", style="green")
 
         for v in versions:
-            table.add_row(
-                v["version"],
-                v["date"],
-                v["commit"][:12],
-                v["author"]
-            )
+            table.add_row(v["version"], v["date"], v["commit"][:12], v["author"])
 
         console.print(table)
 
@@ -170,12 +165,7 @@ def commits(
         table.add_column("Hash", style="dim")
 
         for commit in commit_list:
-            table.add_row(
-                commit.commit_type,
-                commit.subject[:60],
-                commit.author,
-                commit.short_hash
-            )
+            table.add_row(commit.commit_type, commit.subject[:60], commit.author, commit.short_hash)
 
         console.print(table)
         console.print(f"\n[dim]Total commits: {len(commit_list)}[/dim]")

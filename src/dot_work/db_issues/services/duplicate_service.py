@@ -74,9 +74,7 @@ class DuplicateDetector(Protocol):
         """
         ...
 
-    def find_duplicates(
-        self, issues: Sequence[Issue], threshold: float
-    ) -> list[DuplicateGroup]:
+    def find_duplicates(self, issues: Sequence[Issue], threshold: float) -> list[DuplicateGroup]:
         """Find duplicate groups from a list of issues.
 
         Args:
@@ -141,9 +139,7 @@ class JaccardDuplicateDetector:
 
         return intersection / union if union > 0 else 0.0
 
-    def find_duplicates(
-        self, issues: Sequence[Issue], threshold: float
-    ) -> list[DuplicateGroup]:
+    def find_duplicates(self, issues: Sequence[Issue], threshold: float) -> list[DuplicateGroup]:
         """Find duplicate groups from a list of issues.
 
         Args:
@@ -176,9 +172,7 @@ class JaccardDuplicateDetector:
             if similar_issues:
                 # Create a duplicate group
                 all_similar = [issue1.id] + [sid for sid, _ in similar_issues]
-                avg_similarity = sum(sim for _, sim in similar_issues) / len(
-                    similar_issues
-                )
+                avg_similarity = sum(sim for _, sim in similar_issues) / len(similar_issues)
 
                 # Choose representative (shortest ID = likely oldest)
                 representative = min(all_similar, key=lambda x: (len(x), x))
@@ -235,9 +229,7 @@ class DuplicateService:
         """
         start_time = datetime.now(UTC).timestamp()
 
-        logger.debug(
-            "Finding duplicates: issues=%d, threshold=%s", len(issues), threshold
-        )
+        logger.debug("Finding duplicates: issues=%d, threshold=%s", len(issues), threshold)
 
         # Use detector to find duplicate groups
         groups = self.detector.find_duplicates(issues, threshold)

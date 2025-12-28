@@ -1,9 +1,8 @@
 """Pytest fixtures for db-issues tests."""
 
-import uuid
+from collections.abc import Generator
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Generator
 
 import pytest
 import sqlmodel
@@ -11,12 +10,8 @@ from sqlalchemy import Engine
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
-from dot_work.db_issues.config import DbIssuesConfig
 from dot_work.db_issues.domain.entities import (
     Clock,
-    Comment,
-    Dependency,
-    DependencyType,
     Epic,
     EpicStatus,
     IdentifierService,
@@ -27,10 +22,10 @@ from dot_work.db_issues.domain.entities import (
 )
 from dot_work.db_issues.services import EpicService, IssueService
 
-
 # =============================================================================
 # Session-Scoped Database Engine
 # =============================================================================
+
 
 @pytest.fixture(scope="session")
 def db_engine() -> Generator[Engine, None, None]:
@@ -83,6 +78,7 @@ def _reset_database_state(db_engine: Engine) -> None:
     Args:
         db_engine: The session-scoped database engine
     """
+
     def _delete_all_data(session: Session) -> None:
         """Delete all data from all tables, ignoring errors for missing tables."""
         tables = [
@@ -226,7 +222,9 @@ def in_memory_db(db_engine: Engine) -> Generator[Session, None, None]:
 
 
 @pytest.fixture
-def uow(in_memory_db: Session) -> Generator["dot_work.db_issues.adapters.sqlite.UnitOfWork", None, None]:
+def uow(
+    in_memory_db: Session,
+) -> Generator["dot_work.db_issues.adapters.sqlite.UnitOfWork", None, None]:
     """Create a shared UnitOfWork for all service fixtures.
 
     Sharing a single UnitOfWork across services prevents memory leaks from

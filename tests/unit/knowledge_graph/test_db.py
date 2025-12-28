@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
+from collections.abc import Generator
 from pathlib import Path
-from typing import TYPE_CHECKING, Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -39,9 +39,7 @@ class TestDatabase:
             conn = db._get_connection()
 
             # Check tables exist
-            cur = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-            )
+            cur = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
             tables = {row[0] for row in cur.fetchall()}
 
             assert "documents" in tables
@@ -329,20 +327,24 @@ class TestNodeOperations:
 
     def test_update_node_parent(self, db_with_doc: Database) -> None:
         """Update sets parent_node_pk correctly."""
-        parent = db_with_doc.insert_node(Node(
-            node_pk=None,
-            short_id="prnt",
-            full_id="doc1/heading/prnt",
-            doc_id="doc1",
-            kind="heading",
-        ))
-        child = db_with_doc.insert_node(Node(
-            node_pk=None,
-            short_id="chld",
-            full_id="doc1/para/chld",
-            doc_id="doc1",
-            kind="para",
-        ))
+        parent = db_with_doc.insert_node(
+            Node(
+                node_pk=None,
+                short_id="prnt",
+                full_id="doc1/heading/prnt",
+                doc_id="doc1",
+                kind="heading",
+            )
+        )
+        child = db_with_doc.insert_node(
+            Node(
+                node_pk=None,
+                short_id="chld",
+                full_id="doc1/para/chld",
+                doc_id="doc1",
+                kind="para",
+            )
+        )
         assert child.parent_node_pk is None
         assert parent.node_pk is not None
         assert child.node_pk is not None
@@ -363,16 +365,18 @@ class TestEdgeOperations:
         with Database(tmp_path / "test.sqlite") as db:
             db.insert_document("doc1", "/test.md", b"content")
 
-            nodes = db.insert_nodes_batch([
-                Node(
-                    node_pk=None,
-                    short_id=f"e{i}",
-                    full_id=f"doc1/para/e{i}",
-                    doc_id="doc1",
-                    kind="para",
-                )
-                for i in range(5)
-            ])
+            nodes = db.insert_nodes_batch(
+                [
+                    Node(
+                        node_pk=None,
+                        short_id=f"e{i}",
+                        full_id=f"doc1/para/e{i}",
+                        doc_id="doc1",
+                        kind="para",
+                    )
+                    for i in range(5)
+                ]
+            )
 
             yield db, nodes
 
@@ -465,36 +469,42 @@ class TestFTSOperations:
         with Database(tmp_path / "test.sqlite") as db:
             db.insert_document("doc1", "/test.md", b"content")
 
-            nodes = db.insert_nodes_batch([
-                Node(
-                    node_pk=None,
-                    short_id="head1",
-                    full_id="doc1/h1/head1",
-                    doc_id="doc1",
-                    kind="heading",
-                    title="Python Programming",
-                ),
-                Node(
-                    node_pk=None,
-                    short_id="para1",
-                    full_id="doc1/para/para1",
-                    doc_id="doc1",
-                    kind="para",
-                ),
-                Node(
-                    node_pk=None,
-                    short_id="head2",
-                    full_id="doc1/h2/head2",
-                    doc_id="doc1",
-                    kind="heading",
-                    title="JavaScript Basics",
-                ),
-            ])
+            nodes = db.insert_nodes_batch(
+                [
+                    Node(
+                        node_pk=None,
+                        short_id="head1",
+                        full_id="doc1/h1/head1",
+                        doc_id="doc1",
+                        kind="heading",
+                        title="Python Programming",
+                    ),
+                    Node(
+                        node_pk=None,
+                        short_id="para1",
+                        full_id="doc1/para/para1",
+                        doc_id="doc1",
+                        kind="para",
+                    ),
+                    Node(
+                        node_pk=None,
+                        short_id="head2",
+                        full_id="doc1/h2/head2",
+                        doc_id="doc1",
+                        kind="heading",
+                        title="JavaScript Basics",
+                    ),
+                ]
+            )
 
             # Index nodes
-            db.fts_index_node(nodes[0].node_pk, "Python Programming", "Learn Python language basics", "head1")  # type: ignore
+            db.fts_index_node(
+                nodes[0].node_pk, "Python Programming", "Learn Python language basics", "head1"
+            )  # type: ignore
             db.fts_index_node(nodes[1].node_pk, None, "Variables and functions in Python", "para1")  # type: ignore
-            db.fts_index_node(nodes[2].node_pk, "JavaScript Basics", "Learn JavaScript for web", "head2")  # type: ignore
+            db.fts_index_node(
+                nodes[2].node_pk, "JavaScript Basics", "Learn JavaScript for web", "head2"
+            )  # type: ignore
 
             yield db
 
@@ -503,13 +513,15 @@ class TestFTSOperations:
         with Database(tmp_path / "test.sqlite") as db:
             db.insert_document("doc1", "/test.md", b"content")
 
-            node = db.insert_node(Node(
-                node_pk=None,
-                short_id="test",
-                full_id="doc1/h1/test",
-                doc_id="doc1",
-                kind="heading",
-            ))
+            node = db.insert_node(
+                Node(
+                    node_pk=None,
+                    short_id="test",
+                    full_id="doc1/h1/test",
+                    doc_id="doc1",
+                    kind="heading",
+                )
+            )
 
             # Should not raise
             db.fts_index_node(node.node_pk, "Title", "Content text", "test")  # type: ignore
@@ -599,30 +611,32 @@ class TestDeleteDocument:
         with Database(tmp_path / "test.sqlite") as db:
             db.insert_document("doc1", "/test.md", b"# Hello\n\nWorld")
 
-            nodes = db.insert_nodes_batch([
-                Node(
-                    node_pk=None,
-                    short_id="doc0",
-                    full_id="doc1/doc/doc0",
-                    doc_id="doc1",
-                    kind="doc",
-                ),
-                Node(
-                    node_pk=None,
-                    short_id="head",
-                    full_id="doc1/heading/head",
-                    doc_id="doc1",
-                    kind="heading",
-                    title="Hello",
-                ),
-                Node(
-                    node_pk=None,
-                    short_id="para",
-                    full_id="doc1/para/para",
-                    doc_id="doc1",
-                    kind="paragraph",
-                ),
-            ])
+            nodes = db.insert_nodes_batch(
+                [
+                    Node(
+                        node_pk=None,
+                        short_id="doc0",
+                        full_id="doc1/doc/doc0",
+                        doc_id="doc1",
+                        kind="doc",
+                    ),
+                    Node(
+                        node_pk=None,
+                        short_id="head",
+                        full_id="doc1/heading/head",
+                        doc_id="doc1",
+                        kind="heading",
+                        title="Hello",
+                    ),
+                    Node(
+                        node_pk=None,
+                        short_id="para",
+                        full_id="doc1/para/para",
+                        doc_id="doc1",
+                        kind="paragraph",
+                    ),
+                ]
+            )
 
             # Add edges
             db.insert_edge(Edge(nodes[0].node_pk, nodes[1].node_pk, "contains"))  # type: ignore

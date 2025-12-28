@@ -1,20 +1,14 @@
 """Tests for IssueService."""
 
-from datetime import UTC, datetime
 
 import pytest
-from sqlmodel import Session
 
 from dot_work.db_issues.domain.entities import (
-    Clock,
-    Comment,
-    Dependency,
     DependencyType,
     Issue,
     IssuePriority,
     IssueStatus,
     IssueType,
-    NotFoundError,
 )
 from dot_work.db_issues.services import IssueService
 
@@ -107,10 +101,16 @@ class TestListIssues:
     def test_list_issues_returns_all(self, issue_service: IssueService) -> None:
         """Test listing issues returns all issues."""
         issue_service.create_issue(
-            title="Issue 1", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Issue 1",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
         issue_service.create_issue(
-            title="Issue 2", description="Test", priority=IssuePriority.HIGH, issue_type=IssueType.BUG
+            title="Issue 2",
+            description="Test",
+            priority=IssuePriority.HIGH,
+            issue_type=IssueType.BUG,
         )
 
         issues = issue_service.list_issues()
@@ -122,10 +122,16 @@ class TestListIssues:
     def test_list_issues_with_status_filter(self, issue_service: IssueService) -> None:
         """Test listing issues filtered by status."""
         issue_service.create_issue(
-            title="Proposed Issue", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Proposed Issue",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
         closed = issue_service.create_issue(
-            title="Completed Issue", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Completed Issue",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
         # First start, then close (follows proper workflow)
         issue_service.transition_issue(closed.id, IssueStatus.IN_PROGRESS)
@@ -143,7 +149,10 @@ class TestListIssues:
         """Test listing issues with a limit."""
         for i in range(5):
             issue_service.create_issue(
-                title=f"Issue {i}", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+                title=f"Issue {i}",
+                description="Test",
+                priority=IssuePriority.MEDIUM,
+                issue_type=IssueType.TASK,
             )
 
         issues = issue_service.list_issues(limit=3)
@@ -156,7 +165,10 @@ class TestUpdateIssue:
     def test_update_issue_modifies_title(self, issue_service: IssueService) -> None:
         """Test updating an issue's title."""
         issue = issue_service.create_issue(
-            title="Original", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Original",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
 
         updated = issue_service.update_issue(issue.id, title="Updated")
@@ -165,7 +177,10 @@ class TestUpdateIssue:
     def test_update_issue_modifies_description(self, issue_service: IssueService) -> None:
         """Test updating an issue's description."""
         issue = issue_service.create_issue(
-            title="Test", description="Original", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Test",
+            description="Original",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
 
         updated = issue_service.update_issue(issue.id, description="Updated")
@@ -183,7 +198,10 @@ class TestUpdateIssue:
     def test_update_issue_modifies_assignee(self, issue_service: IssueService) -> None:
         """Test updating an issue's assignee."""
         issue = issue_service.create_issue(
-            title="Test", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Test",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
 
         updated = issue_service.update_issue(issue.id, assignees=["newuser"])
@@ -201,7 +219,10 @@ class TestTransitionIssue:
     def test_transition_issue_changes_status(self, issue_service: IssueService) -> None:
         """Test transitioning an issue changes its status."""
         issue = issue_service.create_issue(
-            title="Test", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Test",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
 
         transitioned = issue_service.transition_issue(issue.id, IssueStatus.IN_PROGRESS)
@@ -210,7 +231,10 @@ class TestTransitionIssue:
     def test_transition_completed_sets_closed_at(self, issue_service: IssueService) -> None:
         """Test transitioning to COMPLETED sets closed_at timestamp."""
         issue = issue_service.create_issue(
-            title="Test", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Test",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
 
         assert issue.closed_at is None
@@ -228,7 +252,10 @@ class TestTransitionIssue:
         from dot_work.db_issues.domain.entities import InvalidTransitionError
 
         issue = issue_service.create_issue(
-            title="Test", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Test",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
 
         # First mark as won't fix
@@ -245,7 +272,10 @@ class TestCloseIssue:
     def test_close_issue_sets_completed_status(self, issue_service: IssueService) -> None:
         """Test closing an issue sets status to COMPLETED."""
         issue = issue_service.create_issue(
-            title="Test", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Test",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
 
         # First start the issue (proposed → in_progress) to enable closing
@@ -257,7 +287,10 @@ class TestCloseIssue:
     def test_close_issue_sets_closed_at(self, issue_service: IssueService) -> None:
         """Test closing an issue sets closed_at timestamp."""
         issue = issue_service.create_issue(
-            title="Test", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Test",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
 
         assert issue.closed_at is None
@@ -275,7 +308,10 @@ class TestDeleteIssue:
     def test_delete_issue_removes_issue(self, issue_service: IssueService) -> None:
         """Test deleting an issue removes it from storage."""
         issue = issue_service.create_issue(
-            title="Test", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Test",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
 
         result = issue_service.delete_issue(issue.id)
@@ -297,7 +333,10 @@ class TestAddComment:
     def test_add_comment_to_issue(self, issue_service: IssueService) -> None:
         """Test adding a comment to an issue."""
         issue = issue_service.create_issue(
-            title="Test", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Test",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
 
         comment = issue_service.add_comment(issue.id, "testuser", "This is a comment")
@@ -306,7 +345,9 @@ class TestAddComment:
         assert comment.author == "testuser"
         assert comment.text == "This is a comment"
 
-    def test_add_comment_to_nonexistent_issue_returns_none(self, issue_service: IssueService) -> None:
+    def test_add_comment_to_nonexistent_issue_returns_none(
+        self, issue_service: IssueService
+    ) -> None:
         """Test adding a comment to non-existent issue returns None."""
         comment = issue_service.add_comment("nonexistent", "testuser", "Test comment")
         assert comment is None
@@ -318,10 +359,16 @@ class TestAddDependency:
     def test_add_dependency_links_issues(self, issue_service: IssueService) -> None:
         """Test adding a dependency links two issues."""
         issue1 = issue_service.create_issue(
-            title="Issue 1", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Issue 1",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
         issue2 = issue_service.create_issue(
-            title="Issue 2", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Issue 2",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
 
         dep = issue_service.add_dependency(
@@ -335,7 +382,10 @@ class TestAddDependency:
     def test_add_dependency_self_referencing_fails(self, issue_service: IssueService) -> None:
         """Test that self-referencing dependencies fail."""
         issue = issue_service.create_issue(
-            title="Test", description="Test", priority=IssuePriority.MEDIUM, issue_type=IssueType.TASK
+            title="Test",
+            description="Test",
+            priority=IssuePriority.MEDIUM,
+            issue_type=IssueType.TASK,
         )
 
         result = issue_service.add_dependency(
@@ -452,7 +502,6 @@ class TestGetStaleIssues:
 
     def test_get_stale_issues_empty(self, issue_service: IssueService) -> None:
         """Test get_stale_issues returns empty list when no issues."""
-        from datetime import timedelta
 
         stale = issue_service.get_stale_issues(days=30)
         assert stale == []

@@ -357,48 +357,68 @@ class BuildRunner:
             ("lint-imports", "lint-imports"),
             ("bandit", "bandit"),
         ]:
-            check_cmd = prefix + [cmd_base, "--version"] if cmd_base != "lint-imports" else prefix + [cmd_base]
+            check_cmd = (
+                prefix + [cmd_base, "--version"]
+                if cmd_base != "lint-imports"
+                else prefix + [cmd_base]
+            )
             success, _, _ = self.run_command(check_cmd, f"Check {tool_name}", check=False)
 
             if success:
                 if tool_name == "radon":
-                    tools.append((
-                        "Radon Complexity",
-                        prefix + ["radon", "cc"] + self.source_dirs + ["-s", "-a", "-j"],
-                        analysis_dir / "complexity.json",
-                    ))
-                    tools.append((
-                        "Radon Maintainability",
-                        prefix + ["radon", "mi"] + self.source_dirs + ["-j"],
-                        analysis_dir / "maintainability.json",
-                    ))
+                    tools.append(
+                        (
+                            "Radon Complexity",
+                            prefix + ["radon", "cc"] + self.source_dirs + ["-s", "-a", "-j"],
+                            analysis_dir / "complexity.json",
+                        )
+                    )
+                    tools.append(
+                        (
+                            "Radon Maintainability",
+                            prefix + ["radon", "mi"] + self.source_dirs + ["-j"],
+                            analysis_dir / "maintainability.json",
+                        )
+                    )
                 elif tool_name == "vulture":
-                    tools.append((
-                        "Vulture Dead Code",
-                        prefix + ["vulture"] + self.source_dirs,
-                        analysis_dir / "deadcode.txt",
-                    ))
+                    tools.append(
+                        (
+                            "Vulture Dead Code",
+                            prefix + ["vulture"] + self.source_dirs,
+                            analysis_dir / "deadcode.txt",
+                        )
+                    )
                 elif tool_name == "jscpd":
-                    tools.append((
-                        "jscpd Duplication",
-                        prefix + ["jscpd", "--reporters", "json", "--languages", "python"] + self.source_dirs,
-                        analysis_dir / "duplication.json",
-                    ))
+                    tools.append(
+                        (
+                            "jscpd Duplication",
+                            prefix
+                            + ["jscpd", "--reporters", "json", "--languages", "python"]
+                            + self.source_dirs,
+                            analysis_dir / "duplication.json",
+                        )
+                    )
                 elif tool_name == "lint-imports":
-                    tools.append((
-                        "Import-Linter Dependencies",
-                        prefix + ["lint-imports"],
-                        analysis_dir / "dependencies.txt",
-                    ))
+                    tools.append(
+                        (
+                            "Import-Linter Dependencies",
+                            prefix + ["lint-imports"],
+                            analysis_dir / "dependencies.txt",
+                        )
+                    )
                 elif tool_name == "bandit":
-                    tools.append((
-                        "Bandit Security Scan",
-                        prefix + ["bandit", "-r"] + self.source_dirs + ["-f", "json"],
-                        analysis_dir / "bandit.json",
-                    ))
+                    tools.append(
+                        (
+                            "Bandit Security Scan",
+                            prefix + ["bandit", "-r"] + self.source_dirs + ["-f", "json"],
+                            analysis_dir / "bandit.json",
+                        )
+                    )
 
         if not tools:
-            print("[i] No static analysis tools available (install with 'pip install python-project-builder[analysis]')")
+            print(
+                "[i] No static analysis tools available (install with 'pip install python-project-builder[analysis]')"
+            )
             return True  # Not a failure if tools aren't installed
 
         all_ok = True
@@ -471,13 +491,15 @@ class BuildRunner:
             cmd.append(f"--cov={source_dir}")
 
         # Add coverage reporting
-        cmd.extend([
-            "--cov-report=term",
-            "--cov-report=html",
-            "--cov-report=xml",
-            "--timeout=5",
-            "-vv" if self.verbose else "-v",
-        ])
+        cmd.extend(
+            [
+                "--cov-report=term",
+                "--cov-report=html",
+                "--cov-report=xml",
+                "--timeout=5",
+                "-vv" if self.verbose else "-v",
+            ]
+        )
 
         # Apply memory enforcement for pytest
         if self.enforce_memory_limit:
@@ -515,7 +537,9 @@ class BuildRunner:
                             coverage_pct = int(coverage)
                             print(f"[i] Code Coverage: {coverage_pct}%")
                             if coverage_pct < self.coverage_threshold:
-                                print(f"[!] WARNING: Coverage below {self.coverage_threshold}% threshold!")
+                                print(
+                                    f"[!] WARNING: Coverage below {self.coverage_threshold}% threshold!"
+                                )
                                 return False
                         except ValueError:
                             # Ignore non-numeric coverage values - continue processing
@@ -691,7 +715,9 @@ class BuildRunner:
             print("[✓] Ready for deployment")
             return True
         elif success_count >= total_steps - 1:
-            print(f"\n[WARNING] BUILD MOSTLY SUCCESSFUL - {total_steps - success_count} minor issues")
+            print(
+                f"\n[WARNING] BUILD MOSTLY SUCCESSFUL - {total_steps - success_count} minor issues"
+            )
             print("[i] Consider addressing failed steps before deployment")
             return True
         else:

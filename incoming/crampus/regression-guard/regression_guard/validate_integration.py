@@ -75,10 +75,7 @@ Failed to load baseline or manifest.
             }
 
             # Determine overall success
-            all_passed = (
-                results["unit_tests"]["passed"]
-                and results["build_check"]["passed"]
-            )
+            all_passed = results["unit_tests"]["passed"] and results["build_check"]["passed"]
             results["success"] = all_passed
 
             # Save results
@@ -154,7 +151,9 @@ Validation crashed with error: {e}
             return {
                 "passed": passed,
                 "output": output[:2000],
-                "message": "Smoke tests passed (run full suite with: uv run pytest tests/)" if passed else "Smoke tests failed",
+                "message": "Smoke tests passed (run full suite with: uv run pytest tests/)"
+                if passed
+                else "Smoke tests failed",
             }
 
         except subprocess.TimeoutExpired:
@@ -210,32 +209,30 @@ Validation crashed with error: {e}
                 "message": "Build check timed out",
             }
 
-    def _generate_final_report(
-        self, results: dict, manifest: dict, baseline: dict
-    ) -> None:
+    def _generate_final_report(self, results: dict, manifest: dict, baseline: dict) -> None:
         """Generate final validation report."""
         status_icon = "✅" if results["success"] else "❌"
 
         report = f"""# Final Validation Report: {self.task_id}
 
-## Status: {status_icon} {'PASSED' if results['success'] else 'FAILED'}
+## Status: {status_icon} {"PASSED" if results["success"] else "FAILED"}
 
 ## Task Description
-{manifest['description']}
+{manifest["description"]}
 
 ## Validation Summary
 
 ### Unit Tests
-- Status: {'✅ PASSED' if results['unit_tests']['passed'] else '❌ FAILED'}
-- Message: {results['unit_tests']['message']}
+- Status: {"✅ PASSED" if results["unit_tests"]["passed"] else "❌ FAILED"}
+- Message: {results["unit_tests"]["message"]}
 
 ### Integration Tests
-- Status: {'⏭️ SKIPPED' if results['integration_tests'].get('passed') else '❌ FAILED'}
-- Message: {results['integration_tests']['message']}
+- Status: {"⏭️ SKIPPED" if results["integration_tests"].get("passed") else "❌ FAILED"}
+- Message: {results["integration_tests"]["message"]}
 
 ### Build Validation
-- Status: {'✅ PASSED' if results['build_check']['passed'] else '❌ FAILED'}
-- Message: {results['build_check']['message']}
+- Status: {"✅ PASSED" if results["build_check"]["passed"] else "❌ FAILED"}
+- Message: {results["build_check"]["message"]}
 
 ## Subtask Completion
 
@@ -283,7 +280,7 @@ Validation crashed with error: {e}
 
         report += f"""
 ## Validation Timestamp
-{results['timestamp']}
+{results["timestamp"]}
 
 ## Task ID
 {self.task_id}

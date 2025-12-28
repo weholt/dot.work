@@ -1,11 +1,32 @@
 """Configuration management for db-issues module.
 
 Handles database path configuration and environment-based settings.
+
+Security: Environment variable paths are validated to prevent directory
+traversal attacks. Only paths within the current working directory or
+home directory (~/) are allowed.
 """
 
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+
+
+def _is_subpath(path: Path, base: Path) -> bool:
+    """Check if a path is a subdirectory of another path.
+
+    Args:
+        path: The path to check.
+        base: The base directory.
+
+    Returns:
+        True if path is a subdirectory of base, False otherwise.
+    """
+    try:
+        path.resolve().relative_to(base.resolve())
+        return True
+    except ValueError:
+        return False
 
 
 @dataclass
@@ -27,11 +48,53 @@ class DbIssuesConfig:
         Reads DOT_WORK_DB_ISSUES_PATH environment variable to override
         the default base path.
 
+        The path is validated to prevent directory traversal attacks:
+        - Paths with .. are resolved and must stay within allowed directories
+        - Relative paths (without ~) must stay within current working directory
+        - Paths starting with ~/ must stay within home directory
+
         Returns:
             DbIssuesConfig instance with environment overrides applied
+
+        Raises:
+            ValueError: If path escapes allowed directories.
         """
         base = os.getenv("DOT_WORK_DB_ISSUES_PATH")
-        return cls(base_path=Path(base) if base else Path(".work/db-issues"))
+
+        if not base:
+            return cls(base_path=Path(".work/db-issues").resolve())
+
+        # Check if path explicitly uses home directory (~)
+        uses_home = base.startswith("~")
+
+        # Expand ~ for home directory
+        input_path = Path(base).expanduser()
+
+        # Resolve to absolute path (this normalizes .. and symlinks)
+        resolved_path = input_path.resolve()
+
+        # Validate based on whether user explicitly requested home directory
+        cwd = Path.cwd().resolve()
+
+        if uses_home:
+            # For ~ paths, require they stay within home directory
+            home = Path.home().resolve()
+            if not _is_subpath(resolved_path, home):
+                raise ValueError(
+                    f"Invalid DOT_WORK_DB_ISSUES_PATH: '{base}' resolves to "
+                    f"'{resolved_path}' which is outside the home directory. "
+                    f"Paths starting with ~/ must stay within home directory."
+                )
+        else:
+            # For relative paths, require they stay within current working directory
+            if not _is_subpath(resolved_path, cwd):
+                raise ValueError(
+                    f"Invalid DOT_WORK_DB_ISSUES_PATH: '{base}' resolves to "
+                    f"'{resolved_path}' which is outside the current working "
+                    f"directory. Use ~/ prefix for home directory paths."
+                )
+
+        return cls(base_path=resolved_path)
 
     @property
     def db_path(self) -> Path:

@@ -1,19 +1,16 @@
 """Tests for EpicService business logic layer."""
 
-from datetime import UTC, datetime
 
 import pytest
 
-from dot_work.db_issues.domain.entities import Clock, Epic, EpicStatus
+from dot_work.db_issues.domain.entities import Clock, EpicStatus
 from dot_work.db_issues.services import EpicService
 
 
 class TestEpicServiceCreate:
     """Tests for epic creation."""
 
-    def test_create_epic_generates_id(
-        self, epic_service: EpicService, fixed_clock: Clock
-    ) -> None:
+    def test_create_epic_generates_id(self, epic_service: EpicService, fixed_clock: Clock) -> None:
         """Test that creating an epic generates an ID."""
         epic = epic_service.create_epic("Test Epic")
 
@@ -29,18 +26,14 @@ class TestEpicServiceCreate:
         assert epic.id == "CUSTOM-001"
         assert epic.title == "Custom Epic"
 
-    def test_create_epic_with_parent(
-        self, epic_service: EpicService, fixed_clock: Clock
-    ) -> None:
+    def test_create_epic_with_parent(self, epic_service: EpicService, fixed_clock: Clock) -> None:
         """Test creating an epic with a parent."""
         parent = epic_service.create_epic("Parent Epic")
         child = epic_service.create_epic("Child Epic", parent_epic_id=parent.id)
 
         assert child.parent_epic_id == parent.id
 
-    def test_create_epic_with_nonexistent_parent_raises(
-        self, epic_service: EpicService
-    ) -> None:
+    def test_create_epic_with_nonexistent_parent_raises(self, epic_service: EpicService) -> None:
         """Test that creating an epic with nonexistent parent raises ValueError."""
         with pytest.raises(ValueError, match="Parent epic"):
             epic_service.create_epic("Child Epic", parent_epic_id="nonexistent")
@@ -60,9 +53,7 @@ class TestEpicServiceCreate:
 class TestEpicServiceGet:
     """Tests for epic retrieval."""
 
-    def test_get_epic_returns_epic(
-        self, epic_service: EpicService, fixed_clock: Clock
-    ) -> None:
+    def test_get_epic_returns_epic(self, epic_service: EpicService, fixed_clock: Clock) -> None:
         """Test that get_epic returns the epic."""
         created = epic_service.create_epic("Test Epic")
         retrieved = epic_service.get_epic(created.id)
@@ -71,9 +62,7 @@ class TestEpicServiceGet:
         assert retrieved.id == created.id
         assert retrieved.title == "Test Epic"
 
-    def test_get_epic_returns_none_for_nonexistent(
-        self, epic_service: EpicService
-    ) -> None:
+    def test_get_epic_returns_none_for_nonexistent(self, epic_service: EpicService) -> None:
         """Test that get_epic returns None for nonexistent ID."""
         result = epic_service.get_epic("nonexistent-id")
         assert result is None
@@ -82,9 +71,7 @@ class TestEpicServiceGet:
 class TestEpicServiceList:
     """Tests for epic listing."""
 
-    def test_list_epics_returns_all(
-        self, epic_service: EpicService, fixed_clock: Clock
-    ) -> None:
+    def test_list_epics_returns_all(self, epic_service: EpicService, fixed_clock: Clock) -> None:
         """Test that list_epics returns all created epics."""
         epic_service.create_epic("Epic 1")
         epic_service.create_epic("Epic 2")
@@ -140,9 +127,7 @@ class TestEpicServiceUpdate:
         assert updated is not None
         assert updated.status == EpicStatus.IN_PROGRESS
 
-    def test_update_epic_sets_closed_at_on_completion(
-        self, epic_service: EpicService
-    ) -> None:
+    def test_update_epic_sets_closed_at_on_completion(self, epic_service: EpicService) -> None:
         """Test that closing an epic sets closed_at timestamp."""
         epic = epic_service.create_epic("Test Epic")
         assert epic.closed_at is None
@@ -151,9 +136,7 @@ class TestEpicServiceUpdate:
         assert updated is not None
         assert updated.closed_at is not None
 
-    def test_update_nonexistent_epic_returns_none(
-        self, epic_service: EpicService
-    ) -> None:
+    def test_update_nonexistent_epic_returns_none(self, epic_service: EpicService) -> None:
         """Test that updating a nonexistent epic returns None."""
         result = epic_service.update_epic("nonexistent", title="New Title")
         assert result is None
@@ -171,9 +154,7 @@ class TestEpicServiceDelete:
         retrieved = epic_service.get_epic(epic.id)
         assert retrieved is None
 
-    def test_delete_nonexistent_epic_returns_false(
-        self, epic_service: EpicService
-    ) -> None:
+    def test_delete_nonexistent_epic_returns_false(self, epic_service: EpicService) -> None:
         """Test that deleting a nonexistent epic returns False."""
         deleted = epic_service.delete_epic("nonexistent")
         assert deleted is False
@@ -244,9 +225,7 @@ class TestEpicServiceChildRelationships:
         success = epic_service.remove_child_epic(child.id)
         assert success is False
 
-    def test_remove_nonexistent_child_epic_returns_false(
-        self, epic_service: EpicService
-    ) -> None:
+    def test_remove_nonexistent_child_epic_returns_false(self, epic_service: EpicService) -> None:
         """Test removing a nonexistent child epic returns False."""
         success = epic_service.remove_child_epic("nonexistent")
         assert success is False
@@ -421,13 +400,11 @@ class TestEpicServiceGetEpicTree:
         # Try to create a child issue with parent_id
         # Note: This depends on whether the Issue entity supports parent_id
         try:
-            from dot_work.db_issues.domain.entities import IssueStatus
 
             child_issue = issue_service.create_issue("Child", epic_id=epic.id)
             # If parent_id is supported, set it
             if hasattr(child_issue, "parent_id"):
                 child_issue.parent_id = parent_issue.id
-                from dot_work.db_issues.adapters import UnitOfWork
 
                 with epic_service.uow:
                     epic_service.uow.issues.save(child_issue)
@@ -476,4 +453,3 @@ class TestEpicServiceGetAllEpicTrees:
         assert epic2.id in trees
         assert len(trees[epic1.id]) == 1
         assert len(trees[epic2.id]) == 1
-

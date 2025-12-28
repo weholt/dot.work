@@ -1,10 +1,11 @@
 """Utility functions for the prompt-builder package."""
 
 import logging
-import sys
 import os
+import sys
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any
+
 import toml
 
 
@@ -22,8 +23,8 @@ def setup_logging(verbose: bool = False):
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[
             logging.FileHandler(logs_dir / "prompt-builder.log"),
-            logging.StreamHandler(sys.stdout) if verbose else logging.NullHandler()
-        ]
+            logging.StreamHandler(sys.stdout) if verbose else logging.NullHandler(),
+        ],
     )
 
     # Set specific logger levels
@@ -33,7 +34,7 @@ def setup_logging(verbose: bool = False):
         logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
-def load_config(config_file: str = "prompt-builder.toml") -> Dict[str, Any]:
+def load_config(config_file: str = "prompt-builder.toml") -> dict[str, Any]:
     """Load configuration from file."""
     config_path = Path(config_file)
 
@@ -41,76 +42,44 @@ def load_config(config_file: str = "prompt-builder.toml") -> Dict[str, Any]:
         return get_default_config()
 
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path) as f:
             return toml.load(f)
     except Exception as e:
         logging.warning(f"Failed to load config from {config_path}: {e}")
         return get_default_config()
 
 
-def save_config(config: Dict[str, Any], config_file: str = "prompt-builder.toml"):
+def save_config(config: dict[str, Any], config_file: str = "prompt-builder.toml"):
     """Save configuration to file."""
     config_path = Path(config_file)
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             toml.dump(config, f)
     except Exception as e:
         logging.error(f"Failed to save config to {config_path}: {e}")
 
 
-def get_default_config() -> Dict[str, Any]:
+def get_default_config() -> dict[str, Any]:
     """Get default configuration."""
     return {
         "agents": {
-            "planner": {
-                "enabled": True,
-                "timeout": 300,
-                "max_retries": 3
-            },
-            "static_validator": {
-                "enabled": True,
-                "timeout": 180,
-                "max_retries": 3
-            },
-            "behavior_validator": {
-                "enabled": True,
-                "timeout": 600,
-                "max_retries": 3
-            },
-            "regression_sentinel": {
-                "enabled": True,
-                "timeout": 240,
-                "max_retries": 3
-            },
-            "synthetic_test": {
-                "enabled": True,
-                "timeout": 300,
-                "max_retries": 3
-            },
-            "pr_generator": {
-                "enabled": True,
-                "timeout": 120,
-                "max_retries": 3
-            }
+            "planner": {"enabled": True, "timeout": 300, "max_retries": 3},
+            "static_validator": {"enabled": True, "timeout": 180, "max_retries": 3},
+            "behavior_validator": {"enabled": True, "timeout": 600, "max_retries": 3},
+            "regression_sentinel": {"enabled": True, "timeout": 240, "max_retries": 3},
+            "synthetic_test": {"enabled": True, "timeout": 300, "max_retries": 3},
+            "pr_generator": {"enabled": True, "timeout": 120, "max_retries": 3},
         },
-        "git": {
-            "auto_push": False,
-            "pr_auto_merge": False,
-            "default_base": "main"
-        },
-        "notifications": {
-            "on_failure": True,
-            "on_success": False,
-            "webhook_url": None
-        },
+        "git": {"auto_push": False, "pr_auto_merge": False, "default_base": "main"},
+        "notifications": {"on_failure": True, "on_success": False, "webhook_url": None},
         "paths": {
             "tasks_dir": ".prompt-builder/tasks",
             "snapshots_dir": ".prompt-builder/snapshots",
             "synthetic_tests_dir": "tests/synthetic",
-            "logs_dir": ".prompt-builder/logs"
-        }
+            "logs_dir": ".prompt-builder/logs",
+        },
     }
 
 
@@ -128,13 +97,7 @@ def get_project_root() -> Path:
     current = Path.cwd()
 
     # Look for common project indicators
-    indicators = [
-        ".git",
-        "pyproject.toml",
-        "setup.py",
-        "requirements.txt",
-        "prompt-builder.toml"
-    ]
+    indicators = [".git", "pyproject.toml", "setup.py", "requirements.txt", "prompt-builder.toml"]
 
     while current != current.parent:
         for indicator in indicators:
@@ -150,12 +113,8 @@ def is_git_repository() -> bool:
     """Check if current directory is a git repository."""
     try:
         import subprocess
-        result = subprocess.run(
-            ["git", "rev-parse", "--git-dir"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
+
+        result = subprocess.run(["git", "rev-parse", "--git-dir"], capture_output=True, text=True, check=True)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
@@ -165,12 +124,8 @@ def get_current_branch() -> str:
     """Get the current git branch name."""
     try:
         import subprocess
-        result = subprocess.run(
-            ["git", "branch", "--show-current"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
+
+        result = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True, check=True)
         return result.stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return "unknown"
@@ -180,18 +135,16 @@ def get_changed_files(base_ref: str = "HEAD~1", head_ref: str = "HEAD") -> list[
     """Get list of files changed between git references."""
     try:
         import subprocess
+
         result = subprocess.run(
-            ["git", "diff", "--name-only", f"{base_ref}..{head_ref}"],
-            capture_output=True,
-            text=True,
-            check=True
+            ["git", "diff", "--name-only", f"{base_ref}..{head_ref}"], capture_output=True, text=True, check=True
         )
-        return result.stdout.strip().split('\n') if result.stdout.strip() else []
+        return result.stdout.strip().split("\n") if result.stdout.strip() else []
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []
 
 
-def validate_agent_config(agent_name: str, config: Dict[str, Any]) -> bool:
+def validate_agent_config(agent_name: str, config: dict[str, Any]) -> bool:
     """Validate agent configuration."""
     required_fields = ["enabled", "timeout", "max_retries"]
 
@@ -219,7 +172,7 @@ def validate_agent_config(agent_name: str, config: Dict[str, Any]) -> bool:
 def format_duration(seconds: float) -> str:
     """Format duration in human-readable format."""
     if seconds < 1:
-        return f"{seconds*1000:.0f}ms"
+        return f"{seconds * 1000:.0f}ms"
     elif seconds < 60:
         return f"{seconds:.1f}s"
     elif seconds < 3600:
@@ -233,12 +186,13 @@ def format_duration(seconds: float) -> str:
 def safe_filename(filename: str) -> str:
     """Convert string to safe filename."""
     import re
+
     # Remove invalid characters
-    safe_name = re.sub(r'[<>:"/\\|?*]', '_', filename)
+    safe_name = re.sub(r'[<>:"/\\|?*]', "_", filename)
     # Replace spaces with underscores
-    safe_name = re.sub(r'\s+', '_', safe_name)
+    safe_name = re.sub(r"\s+", "_", safe_name)
     # Remove leading/trailing underscores
-    safe_name = safe_name.strip('_')
+    safe_name = safe_name.strip("_")
     # Limit length
     if len(safe_name) > 255:
         safe_name = safe_name[:255]
@@ -249,10 +203,10 @@ def truncate_string(text: str, max_length: int = 100, suffix: str = "...") -> st
     """Truncate string to maximum length."""
     if len(text) <= max_length:
         return text
-    return text[:max_length - len(suffix)] + suffix
+    return text[: max_length - len(suffix)] + suffix
 
 
-def merge_dicts(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
+def merge_dicts(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
     """Recursively merge two dictionaries."""
     result = dict1.copy()
 
@@ -274,13 +228,13 @@ def get_env_var(key: str, default: Any = None, var_type: type = str) -> Any:
 
     try:
         if var_type == bool:
-            return value.lower() in ('true', '1', 'yes', 'on')
+            return value.lower() in ("true", "1", "yes", "on")
         elif var_type == int:
             return int(value)
         elif var_type == float:
             return float(value)
         elif var_type == list:
-            return [item.strip() for item in value.split(',')]
+            return [item.strip() for item in value.split(",")]
         else:
             return var_type(value)
     except (ValueError, TypeError):
@@ -294,19 +248,19 @@ def sanitize_log_message(message: str) -> str:
 
     # Remove common sensitive patterns
     patterns = [
-        r'password[=:]\s*[^\s]+',
-        r'token[=:]\s*[^\s]+',
-        r'key[=:]\s*[^\s]+',
-        r'secret[=:]\s*[^\s]+',
-        r'api[_-]?key[=:]\s*[^\s]+',
-        r'auth[=:]\s*[^\s]+',
-        r'ghp_[a-zA-Z0-9]{36}',  # GitHub personal access tokens
-        r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}',  # Email addresses
+        r"password[=:]\s*[^\s]+",
+        r"token[=:]\s*[^\s]+",
+        r"key[=:]\s*[^\s]+",
+        r"secret[=:]\s*[^\s]+",
+        r"api[_-]?key[=:]\s*[^\s]+",
+        r"auth[=:]\s*[^\s]+",
+        r"ghp_[a-zA-Z0-9]{36}",  # GitHub personal access tokens
+        r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",  # Email addresses
     ]
 
     sanitized = message
     for pattern in patterns:
-        sanitized = re.sub(pattern, lambda m: m.group(0).split('=')[0] + "=***", sanitized, flags=re.IGNORECASE)
+        sanitized = re.sub(pattern, lambda m: m.group(0).split("=")[0] + "=***", sanitized, flags=re.IGNORECASE)
 
     return sanitized
 

@@ -1,23 +1,19 @@
 """Command-line interface for git analysis."""
 
-import asyncio
 import json
 import sys
 from pathlib import Path
-from typing import Optional, List
+
 import typer
+import yaml
 from rich.console import Console
+from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
-from rich.panel import Panel
-from rich.tree import Tree
-from rich.syntax import Syntax
-import yaml
 
 from .models import AnalysisConfig
 from .services import GitAnalysisService
-from .utils import setup_logging, format_duration
-
+from .utils import setup_logging
 
 # Create Typer app
 app = typer.Typer(
@@ -35,7 +31,7 @@ def compare(
     to_ref: str = typer.Argument(..., help="Target git reference (branch, tag, or commit)"),
     repo_path: str = typer.Option(".", "--repo", "-r", help="Path to git repository"),
     output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, yaml"),
-    output_file: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path"),
+    output_file: str | None = typer.Option(None, "--output", "-o", help="Output file path"),
     use_llm: bool = typer.Option(False, "--llm", help="Use LLM for enhanced summaries"),
     llm_provider: str = typer.Option("openai", "--llm-provider", help="LLM provider: openai, anthropic"),
     max_commits: int = typer.Option(100, "--max-commits", help="Maximum number of commits to analyze"),
@@ -47,10 +43,7 @@ def compare(
     try:
         # Create configuration
         config = AnalysisConfig(
-            repo_path=Path(repo_path),
-            use_llm=use_llm,
-            llm_provider=llm_provider,
-            max_commits=max_commits
+            repo_path=Path(repo_path), use_llm=use_llm, llm_provider=llm_provider, max_commits=max_commits
         )
 
         # Create service
@@ -62,10 +55,7 @@ def compare(
 
         # Perform comparison
         with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-            transient=True
+            SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console, transient=True
         ) as progress:
             task = progress.add_task("Analyzing git history...", total=None)
 
@@ -75,7 +65,7 @@ def compare(
         if output_format == "json":
             output_data = _result_to_dict(result)
             if output_file:
-                with open(output_file, 'w') as f:
+                with open(output_file, "w") as f:
                     json.dump(output_data, f, indent=2, default=str)
                 console.print(f"[green]Results saved to:[/green] {output_file}")
             else:
@@ -84,7 +74,7 @@ def compare(
             output_data = _result_to_dict(result)
             yaml_output = yaml.dump(output_data, default_flow_style=False, sort_keys=False)
             if output_file:
-                with open(output_file, 'w') as f:
+                with open(output_file, "w") as f:
                     f.write(yaml_output)
                 console.print(f"[green]Results saved to:[/green] {output_file}")
             else:
@@ -99,6 +89,7 @@ def compare(
         console.print(f"[red]Error:[/red] {e}")
         if verbose:
             import traceback
+
             console.print(traceback.format_exc())
         sys.exit(1)
 
@@ -115,10 +106,7 @@ def analyze(
     setup_logging(verbose)
 
     try:
-        config = AnalysisConfig(
-            repo_path=Path(repo_path),
-            use_llm=use_llm
-        )
+        config = AnalysisConfig(repo_path=Path(repo_path), use_llm=use_llm)
 
         service = GitAnalysisService(config)
         analysis = service.analyze_commit(commit_hash)
@@ -137,6 +125,7 @@ def analyze(
         console.print(f"[red]Error:[/red] {e}")
         if verbose:
             import traceback
+
             console.print(traceback.format_exc())
         sys.exit(1)
 
@@ -163,6 +152,7 @@ def diff_commits(
         console.print(f"[red]Error:[/red] {e}")
         if verbose:
             import traceback
+
             console.print(traceback.format_exc())
         sys.exit(1)
 
@@ -188,6 +178,7 @@ def contributors(
         console.print(f"[red]Error:[/red] {e}")
         if verbose:
             import traceback
+
             console.print(traceback.format_exc())
         sys.exit(1)
 
@@ -214,6 +205,7 @@ def complexity(
         console.print(f"[red]Error:[/red] {e}")
         if verbose:
             import traceback
+
             console.print(traceback.format_exc())
         sys.exit(1)
 
@@ -234,7 +226,7 @@ def releases(
 
         # Get tags (releases)
         repo = service.repo
-        tags = sorted(repo.tags, key=lambda t: t.commit.committed_date, reverse=True)[:count+1]
+        tags = sorted(repo.tags, key=lambda t: t.commit.committed_date, reverse=True)[: count + 1]
 
         if len(tags) < 2:
             console.print("[yellow]Not enough tags found for release comparison[/yellow]")
@@ -246,6 +238,7 @@ def releases(
         console.print(f"[red]Error:[/red] {e}")
         if verbose:
             import traceback
+
             console.print(traceback.format_exc())
         sys.exit(1)
 
@@ -293,7 +286,7 @@ def _display_table_results(result):
                 commit.short_message[:50] + "..." if len(commit.short_message) > 50 else commit.short_message,
                 str(len(commit.files_changed)),
                 f"+{commit.lines_added} -{commit.lines_deleted}",
-                f"{commit.complexity_score:.1f}"
+                f"{commit.complexity_score:.1f}",
             )
 
         console.print(table)
@@ -317,18 +310,18 @@ def _display_commit_analysis(analysis):
     info_text = f"""
 [bold]Commit:[/bold] {analysis.commit_hash}
 [bold]Author:[/bold] {analysis.author} <{analysis.email}>
-[bold]Date:[/bold] {analysis.timestamp.strftime('%Y-%m-%d %H:%M:%S')}
+[bold]Date:[/bold] {analysis.timestamp.strftime("%Y-%m-%d %H:%M:%S")}
 [bold]Branch:[/bold] {analysis.branch}
 """
     console.print(Panel(info_text, title="📋 Commit Information", border_style="blue"))
 
     # Message
-    console.print(f"\n[bold]📝 Message:[/bold]")
+    console.print("\n[bold]📝 Message:[/bold]")
     console.print(analysis.message)
 
     # Summary
     if analysis.summary:
-        console.print(f"\n[bold]📄 Summary:[/bold]")
+        console.print("\n[bold]📄 Summary:[/bold]")
         console.print(analysis.summary)
 
     # Metrics
@@ -359,7 +352,7 @@ def _display_commit_analysis(analysis):
 
     # Files table
     if analysis.files_changed:
-        console.print(f"\n[bold]📁 Files Changed:[/bold]")
+        console.print("\n[bold]📁 Files Changed:[/bold]")
         table = Table()
         table.add_column("Path", style="cyan")
         table.add_column("Type", style="green")
@@ -371,7 +364,7 @@ def _display_commit_analysis(analysis):
                 file_change.path,
                 file_change.change_type.value,
                 file_change.category.value,
-                f"+{file_change.lines_added} -{file_change.lines_deleted}"
+                f"+{file_change.lines_added} -{file_change.lines_deleted}",
             )
 
         console.print(table)
@@ -383,12 +376,12 @@ def _display_commit_comparison(comparison):
     console.print(f"[bold]Similarity Score:[/bold] {comparison.similarity_score:.2f}")
 
     if comparison.differences:
-        console.print(f"\n[bold]🔍 Differences:[/bold]")
+        console.print("\n[bold]🔍 Differences:[/bold]")
         for diff in comparison.differences:
             console.print(f"  • {diff}")
 
     if comparison.common_themes:
-        console.print(f"\n[bold]🎯 Common Themes:[/bold]")
+        console.print("\n[bold]🎯 Common Themes:[/bold]")
         for theme in comparison.common_themes:
             console.print(f"  • {theme}")
 
@@ -396,7 +389,7 @@ def _display_commit_comparison(comparison):
     console.print(f"[bold]⚠️  Regression Risk:[/bold] {comparison.regression_risk}")
 
     if comparison.migration_notes:
-        console.print(f"\n[bold]📋 Migration Notes:[/bold]")
+        console.print("\n[bold]📋 Migration Notes:[/bold]")
         for note in comparison.migration_notes:
             console.print(f"  • {note}")
 
@@ -425,8 +418,8 @@ def _display_contributor_stats(contributors):
             str(stats.lines_deleted),
             str(stats.files_touched),
             f"{stats.complexity_contribution:.1f}",
-            stats.first_commit.strftime('%Y-%m-%d'),
-            stats.last_commit.strftime('%Y-%m-%d')
+            stats.first_commit.strftime("%Y-%m-%d"),
+            stats.last_commit.strftime("%Y-%m-%d"),
         )
 
     console.print(table)
@@ -437,7 +430,7 @@ def _display_complexity_analysis(result, threshold):
     # Complexity distribution
     console.print("[bold]📊 Complexity Distribution:[/bold]")
     for range_name, count in result.complexity_distribution.items():
-        color = "red" if int(range_name.split('-')[0]) >= threshold else "green"
+        color = "red" if int(range_name.split("-")[0]) >= threshold else "green"
         console.print(f"  {range_name}: {count} commits", style=color)
 
     # High complexity commits
@@ -465,14 +458,14 @@ def _display_complexity_analysis(result, threshold):
                 commit.author,
                 commit.short_message[:40] + "..." if len(commit.short_message) > 40 else commit.short_message,
                 f"{commit.complexity_score:.1f}",
-                ", ".join(risk_factors) if risk_factors else "Low"
+                ", ".join(risk_factors) if risk_factors else "Low",
             )
 
         console.print(table)
 
     # Top complex files
     if result.top_complex_files:
-        console.print(f"\n[bold]📁 Most Complex Files:[/bold]")
+        console.print("\n[bold]📁 Most Complex Files:[/bold]")
         table = Table()
         table.add_column("File", style="cyan")
         table.add_column("Category", style="green")
@@ -482,11 +475,11 @@ def _display_complexity_analysis(result, threshold):
 
         for file_info in result.top_complex_files[:10]:
             table.add_row(
-                file_info['path'],
-                file_info['category'].value,
+                file_info["path"],
+                file_info["category"].value,
                 f"{file_info['complexity_score']:.1f}",
-                str(file_info['commits']),
-                f"+{file_info['total_lines_added']} -{file_info['total_lines_deleted']}"
+                str(file_info["commits"]),
+                f"+{file_info['total_lines_added']} -{file_info['total_lines_deleted']}",
             )
 
         console.print(table)
@@ -496,8 +489,8 @@ def _display_release_analysis(service, tags):
     """Display release analysis."""
     console.print("[bold]📦 Recent Releases Analysis:[/bold]")
 
-    for i in range(min(len(tags)-1, 10)):
-        from_tag = tags[i+1]
+    for i in range(min(len(tags) - 1, 10)):
+        from_tag = tags[i + 1]
         to_tag = tags[i]
 
         try:
@@ -541,14 +534,17 @@ def _result_to_dict(result):
         "file_categories": {cat.value: count for cat, count in result.file_categories.items()},
         "complexity_distribution": result.complexity_distribution,
         "commits": [_analysis_to_dict(c) for c in result.commits[:20]],  # Limit to 20 commits
-        "contributors": {name: {
-            "name": stats.name,
-            "commits": stats.commits,
-            "lines_added": stats.lines_added,
-            "lines_deleted": stats.lines_deleted,
-            "files_touched": stats.files_touched,
-            "complexity_contribution": stats.complexity_contribution,
-        } for name, stats in result.contributors.items()},
+        "contributors": {
+            name: {
+                "name": stats.name,
+                "commits": stats.commits,
+                "lines_added": stats.lines_added,
+                "lines_deleted": stats.lines_deleted,
+                "files_touched": stats.files_touched,
+                "complexity_contribution": stats.complexity_contribution,
+            }
+            for name, stats in result.contributors.items()
+        },
     }
 
 

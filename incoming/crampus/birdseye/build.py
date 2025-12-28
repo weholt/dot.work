@@ -8,8 +8,8 @@ import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Iterable, List, Sequence, Tuple
 
 PROJECT_PACKAGE = "birdseye"
 SRC_DIR = Path("src") / PROJECT_PACKAGE
@@ -24,7 +24,7 @@ class BuildRunner:
     def __init__(self, verbose: bool = False, fix: bool = False) -> None:
         self.verbose = verbose
         self.fix = fix
-        self.failed_steps: List[str] = []
+        self.failed_steps: list[str] = []
 
     # ------------------------------- helpers ------------------------------- #
     def _run(
@@ -33,7 +33,7 @@ class BuildRunner:
         *,
         description: str,
         check: bool = True,
-    ) -> Tuple[bool, str, str]:
+    ) -> tuple[bool, str, str]:
         if self.verbose:
             print(f"Running: {' '.join(cmd)}")
 
@@ -71,7 +71,7 @@ class BuildRunner:
     # --------------------------- build operations -------------------------- #
     def check_dependencies(self) -> bool:
         self._print_step("Checking toolchain")
-        checks: Iterable[Tuple[str, Sequence[str]]] = (
+        checks: Iterable[tuple[str, Sequence[str]]] = (
             ("uv", ["uv", "--version"]),
             ("ruff", ["uv", "run", "ruff", "--version"]),
             ("mypy", ["uv", "run", "mypy", "--version"]),
@@ -127,7 +127,11 @@ class BuildRunner:
         ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
 
         cmds = [
-            ("radon cc", ["uv", "run", "radon", "cc", str(SRC_DIR), "-s", "-a", "-j"], ANALYSIS_DIR / "complexity.json"),
+            (
+                "radon cc",
+                ["uv", "run", "radon", "cc", str(SRC_DIR), "-s", "-a", "-j"],
+                ANALYSIS_DIR / "complexity.json",
+            ),
             ("radon mi", ["uv", "run", "radon", "mi", str(SRC_DIR), "-j"], ANALYSIS_DIR / "maintainability.json"),
         ]
 

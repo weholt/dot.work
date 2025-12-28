@@ -1,15 +1,14 @@
 """Tests for tag generator service."""
 
-import pytest
 from datetime import datetime
 
-from dot_work.git.services.tag_generator import TagGenerator
 from dot_work.git.models import (
     ChangeAnalysis,
-    FileChange,
-    FileCategory,
     ChangeType,
+    FileCategory,
+    FileChange,
 )
+from dot_work.git.services.tag_generator import TagGenerator
 
 
 class TestTagGenerator:
@@ -20,9 +19,9 @@ class TestTagGenerator:
         generator = TagGenerator()
 
         assert generator is not None
-        assert hasattr(generator, 'tag_patterns')
-        assert hasattr(generator, 'category_tags')
-        assert hasattr(generator, 'impact_patterns')
+        assert hasattr(generator, "tag_patterns")
+        assert hasattr(generator, "category_tags")
+        assert hasattr(generator, "impact_patterns")
 
     def test_generate_tags_for_feature_commit(self):
         """Test generating tags for a feature commit."""
@@ -45,7 +44,7 @@ class TestTagGenerator:
             complexity_score=30.0,
             summary="Add authentication feature",
             tags=[],
-            impact_areas=[]
+            impact_areas=[],
         )
 
         tags = generator.generate_tags(analysis)
@@ -73,7 +72,7 @@ class TestTagGenerator:
             complexity_score=10.0,
             summary="Fix null pointer bug",
             tags=[],
-            impact_areas=[]
+            impact_areas=[],
         )
 
         tags = generator.generate_tags(analysis)
@@ -101,7 +100,7 @@ class TestTagGenerator:
             complexity_score=25.0,
             summary="Refactor payment module",
             tags=[],
-            impact_areas=[]
+            impact_areas=[],
         )
 
         tags = generator.generate_tags(analysis)
@@ -117,7 +116,7 @@ class TestTagGenerator:
             change_type=ChangeType.MODIFIED,
             category=FileCategory.DOCUMENTATION,
             lines_added=20,
-            lines_deleted=5
+            lines_deleted=5,
         )
 
         analysis = ChangeAnalysis(
@@ -137,7 +136,7 @@ class TestTagGenerator:
             complexity_score=5.0,
             summary="Update documentation",
             tags=[],
-            impact_areas=[]
+            impact_areas=[],
         )
 
         tags = generator.generate_tags(analysis)
@@ -166,7 +165,7 @@ class TestTagGenerator:
             summary="Fix security issue",
             tags=[],
             impact_areas=[],
-            security_relevant=True
+            security_relevant=True,
         )
 
         tags = generator.generate_tags(analysis)
@@ -195,7 +194,7 @@ class TestTagGenerator:
             summary="Remove deprecated code",
             tags=[],
             impact_areas=[],
-            breaking_change=True
+            breaking_change=True,
         )
 
         tags = generator.generate_tags(analysis)
@@ -224,7 +223,7 @@ class TestTagGenerator:
             complexity_score=25.0,
             summary="Add dashboard",
             tags=[],
-            impact_areas=[]
+            impact_areas=[],
         )
 
         tags = generator.generate_tags(analysis)
@@ -263,7 +262,7 @@ class TestTagGenerator:
             complexity_score=15.0,
             summary="Add feature",
             tags=[],
-            impact_areas=[]
+            impact_areas=[],
         )
 
         tags = generator.generate_tags(analysis)
@@ -290,15 +289,15 @@ class TestTagGenerator:
                     change_type=ChangeType.MODIFIED,
                     category=FileCategory.CODE,
                     lines_added=100,
-                    lines_deleted=50
+                    lines_deleted=50,
                 ),
                 FileChange(
                     path="config.yaml",
                     change_type=ChangeType.MODIFIED,
                     category=FileCategory.CONFIG,
                     lines_added=10,
-                    lines_deleted=5
-                )
+                    lines_deleted=5,
+                ),
             ],
             lines_added=110,
             lines_deleted=55,
@@ -310,7 +309,7 @@ class TestTagGenerator:
             tags=[],
             impact_areas=["core", "config"],
             breaking_change=True,
-            security_relevant=True
+            security_relevant=True,
         )
 
         tags = generator.generate_tags(analysis)
@@ -345,7 +344,7 @@ class TestTagGenerator:
                 complexity_score=10.0,
                 summary="Add feature",
                 tags=["feature", "add"],
-                impact_areas=[]
+                impact_areas=[],
             ),
             ChangeAnalysis(
                 commit_hash="def456",
@@ -364,8 +363,8 @@ class TestTagGenerator:
                 complexity_score=5.0,
                 summary="Fix bug",
                 tags=["fix"],
-                impact_areas=[]
-            )
+                impact_areas=[],
+            ),
         ]
 
         stats = generator.get_tag_statistics(analyses)
@@ -406,7 +405,7 @@ class TestTagGenerator:
             complexity_score=1.0,
             summary="Update",
             tags=[],
-            impact_areas=[]
+            impact_areas=[],
         )
 
         tags = generator.generate_tags(analysis)

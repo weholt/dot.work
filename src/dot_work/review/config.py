@@ -26,10 +26,14 @@ class Config:
         )
 
 
-# Global config instance for convenience
-settings = Config.from_env()
-
-
 def get_config() -> Config:
-    """Get the application configuration."""
-    return settings
+    """Get the application configuration.
+
+    Reads environment variables at call time, not import time.
+    This allows configuration to be overridden for testing and
+    reflects environment changes without requiring module reload.
+
+    Returns:
+        Config instance loaded from environment variables.
+    """
+    return Config.from_env()

@@ -1,22 +1,21 @@
 """PR Generator Agent for creating pull requests."""
 
-import json
-import os
-import subprocess
-from typing import Any, Dict, List, Optional
-from pathlib import Path
-import logging
 import asyncio
+import json
+import logging
+import subprocess
+from pathlib import Path
+from typing import Any
 
-from .base import BaseAgent, measure_execution_time
 from ..models import (
-    Task,
-    Subtask,
-    ValidationResult,
-    ValidationType,
     PRInfo,
+    Subtask,
+    Task,
+    ValidationResult,
     ValidationResultSummary,
+    ValidationType,
 )
+from .base import BaseAgent, measure_execution_time
 
 
 class PRGeneratorAgent(BaseAgent):
@@ -32,10 +31,7 @@ class PRGeneratorAgent(BaseAgent):
 
     @measure_execution_time
     async def execute(
-        self,
-        task: Task,
-        subtask: Optional[Subtask] = None,
-        context: Optional[Dict[str, Any]] = None
+        self, task: Task, subtask: Subtask | None = None, context: dict[str, Any] | None = None
     ) -> ValidationResult:
         """Generate a pull request if all validations pass."""
         self._log_start(subtask)
@@ -46,14 +42,10 @@ class PRGeneratorAgent(BaseAgent):
             metrics = {}
 
             # Check if we have validation results
-            validation_summary = context.get('validation_summary') if context else None
+            validation_summary = context.get("validation_summary") if context else None
             if not validation_summary:
                 issues.append("No validation summary provided - cannot determine if PR should be created")
-                result = self._create_validation_result(
-                    subtask_id=task.id,
-                    passed=False,
-                    issues=issues
-                )
+                result = self._create_validation_result(subtask_id=task.id, passed=False, issues=issues)
                 return result
 
             # Verify all validations passed
@@ -61,11 +53,7 @@ class PRGeneratorAgent(BaseAgent):
                 issues.append("Cannot create PR: some validations failed")
                 for issue in validation_summary.critical_issues:
                     issues.append(f"Critical issue: {issue}")
-                result = self._create_validation_result(
-                    subtask_id=task.id,
-                    passed=False,
-                    issues=issues
-                )
+                result = self._create_validation_result(subtask_id=task.id, passed=False, issues=issues)
                 return result
 
             # Generate PR information
@@ -73,19 +61,15 @@ class PRGeneratorAgent(BaseAgent):
 
             # Create the pull request
             pr_result = await self._create_pull_request(pr_info)
-            metrics.update(pr_result['metrics'])
-            issues.extend(pr_result['issues'])
-            warnings.extend(pr_result['warnings'])
+            metrics.update(pr_result["metrics"])
+            issues.extend(pr_result["issues"])
+            warnings.extend(pr_result["warnings"])
 
             # Determine overall success
-            passed = len(pr_result['issues']) == 0
+            passed = len(pr_result["issues"]) == 0
 
             result = self._create_validation_result(
-                subtask_id=task.id,
-                passed=passed,
-                issues=issues,
-                warnings=warnings,
-                metrics=metrics
+                subtask_id=task.id, passed=passed, issues=issues, warnings=warnings, metrics=metrics
             )
 
             self._log_success(result, subtask)
@@ -94,9 +78,7 @@ class PRGeneratorAgent(BaseAgent):
         except Exception as e:
             self._log_error(e, subtask)
             result = self._create_validation_result(
-                subtask_id=task.id if subtask else task.id,
-                passed=False,
-                issues=[f"PR generation failed: {str(e)}"]
+                subtask_id=task.id if subtask else task.id, passed=False, issues=[f"PR generation failed: {str(e)}"]
             )
             return result
 
@@ -131,27 +113,27 @@ class PRGeneratorAgent(BaseAgent):
             reviewers=reviewers,
             draft=False,  # Create as ready for review
             metadata={
-                'task_id': task.id,
-                'validation_summary': validation_summary.__dict__,
-                'created_at': task.created_at.isoformat() if task.created_at else None
-            }
+                "task_id": task.id,
+                "validation_summary": validation_summary.__dict__,
+                "created_at": task.created_at.isoformat() if task.created_at else None,
+            },
         )
 
-    async def _create_pull_request(self, pr_info: PRInfo) -> Dict[str, Any]:
+    async def _create_pull_request(self, pr_info: PRInfo) -> dict[str, Any]:
         """Create the actual pull request."""
         issues = []
         warnings = []
         metrics = {
-            'pr_created': False,
-            'files_included': len(pr_info.files_changed),
-            'labels_added': len(pr_info.labels)
+            "pr_created": False,
+            "files_included": len(pr_info.files_changed),
+            "labels_added": len(pr_info.labels),
         }
 
         try:
             # Check if we're in a git repository
             if not await self._is_git_repository():
                 issues.append("Not in a git repository - cannot create PR")
-                return {'issues': issues, 'warnings': warnings, 'metrics': metrics}
+                return {"issues": issues, "warnings": warnings, "metrics": metrics}
 
             # Check if there are uncommitted changes
             if await self._has_uncommitted_changes():
@@ -160,27 +142,23 @@ class PRGeneratorAgent(BaseAgent):
             # Create PR using GitHub CLI if available
             if await self._is_gh_cli_available():
                 pr_result = await self._create_pr_with_gh_cli(pr_info)
-                metrics.update(pr_result['metrics'])
-                issues.extend(pr_result['issues'])
-                warnings.extend(pr_result['warnings'])
-                if not pr_result['issues']:
-                    metrics['pr_created'] = True
+                metrics.update(pr_result["metrics"])
+                issues.extend(pr_result["issues"])
+                warnings.extend(pr_result["warnings"])
+                if not pr_result["issues"]:
+                    metrics["pr_created"] = True
             else:
                 # Fallback: create PR manually or provide instructions
                 pr_result = await self._create_pr_manually(pr_info)
-                metrics.update(pr_result['metrics'])
-                warnings.extend(pr_result['warnings'])
-                if 'pr_url' in pr_result:
-                    metrics['pr_created'] = True
+                metrics.update(pr_result["metrics"])
+                warnings.extend(pr_result["warnings"])
+                if "pr_url" in pr_result:
+                    metrics["pr_created"] = True
 
         except Exception as e:
             issues.append(f"Failed to create PR: {str(e)}")
 
-        return {
-            'issues': issues,
-            'warnings': warnings,
-            'metrics': metrics
-        }
+        return {"issues": issues, "warnings": warnings, "metrics": metrics}
 
     def _generate_pr_title(self, task: Task) -> str:
         """Generate a PR title from the task."""
@@ -188,10 +166,10 @@ class PRGeneratorAgent(BaseAgent):
         title = task.title.strip()
 
         # Remove common prefixes
-        prefixes_to_remove = ['implement ', 'add ', 'create ', 'fix ', 'update ']
+        prefixes_to_remove = ["implement ", "add ", "create ", "fix ", "update "]
         for prefix in prefixes_to_remove:
             if title.lower().startswith(prefix):
-                title = title[len(prefix):]
+                title = title[len(prefix) :]
                 break
 
         # Capitalize first letter
@@ -199,15 +177,15 @@ class PRGeneratorAgent(BaseAgent):
 
         # Add emoji based on task type
         title_lower = title.lower()
-        if any(word in title_lower for word in ['fix', 'bug', 'error']):
+        if any(word in title_lower for word in ["fix", "bug", "error"]):
             title = f"🐛 {title}"
-        elif any(word in title_lower for word in ['feature', 'implement', 'add']):
+        elif any(word in title_lower for word in ["feature", "implement", "add"]):
             title = f"✨ {title}"
-        elif any(word in title_lower for word in ['update', 'improve', 'enhance']):
+        elif any(word in title_lower for word in ["update", "improve", "enhance"]):
             title = f"🔧 {title}"
-        elif any(word in title_lower for word in ['test', 'testing']):
+        elif any(word in title_lower for word in ["test", "testing"]):
             title = f"🧪 {title}"
-        elif any(word in title_lower for word in ['doc', 'documentation']):
+        elif any(word in title_lower for word in ["doc", "documentation"]):
             title = f"📚 {title}"
         else:
             title = f"🔄 {title}"
@@ -251,11 +229,11 @@ All automated checks have passed:
         validation_counts = {}
         for result in validation_summary.validation_results:
             vtype = result.validator_type.value
-            validation_counts[vtype] = validation_counts.get(vtype, {'passed': 0, 'failed': 0})
+            validation_counts[vtype] = validation_counts.get(vtype, {"passed": 0, "failed": 0})
             if result.passed:
-                validation_counts[vtype]['passed'] += 1
+                validation_counts[vtype]["passed"] += 1
             else:
-                validation_counts[vtype]['failed'] += 1
+                validation_counts[vtype]["failed"] += 1
 
         for vtype, counts in validation_counts.items():
             description += f"- **{vtype.title()}**: {counts['passed']} passed, {counts['failed']} failed\n"
@@ -291,42 +269,42 @@ All automated checks have passed:
 
         return description
 
-    def _generate_labels(self, task: Task) -> List[str]:
+    def _generate_labels(self, task: Task) -> list[str]:
         """Generate appropriate labels for the PR."""
         labels = []
         title_lower = task.title.lower()
         desc_lower = task.description.lower()
 
         # Type-based labels
-        if any(word in title_lower + desc_lower for word in ['fix', 'bug', 'error']):
-            labels.append('bug')
-        if any(word in title_lower + desc_lower for word in ['feature', 'implement', 'add']):
-            labels.append('enhancement')
-        if any(word in title_lower + desc_lower for word in ['update', 'improve', 'enhance']):
-            labels.append('improvement')
-        if any(word in title_lower + desc_lower for word in ['test', 'testing']):
-            labels.append('testing')
-        if any(word in title_lower + desc_lower for word in ['doc', 'documentation']):
-            labels.append('documentation')
-        if any(word in title_lower + desc_lower for word in ['refactor', 'clean', 'optimize']):
-            labels.append('refactoring')
+        if any(word in title_lower + desc_lower for word in ["fix", "bug", "error"]):
+            labels.append("bug")
+        if any(word in title_lower + desc_lower for word in ["feature", "implement", "add"]):
+            labels.append("enhancement")
+        if any(word in title_lower + desc_lower for word in ["update", "improve", "enhance"]):
+            labels.append("improvement")
+        if any(word in title_lower + desc_lower for word in ["test", "testing"]):
+            labels.append("testing")
+        if any(word in title_lower + desc_lower for word in ["doc", "documentation"]):
+            labels.append("documentation")
+        if any(word in title_lower + desc_lower for word in ["refactor", "clean", "optimize"]):
+            labels.append("refactoring")
 
         # Process labels
-        if any(word in title_lower + desc_lower for word in ['ci', 'cd', 'pipeline']):
-            labels.append('ci/cd')
+        if any(word in title_lower + desc_lower for word in ["ci", "cd", "pipeline"]):
+            labels.append("ci/cd")
 
         # Size-based label (heuristic)
         estimated_size = len(task.subtasks) if task.subtasks else 1
         if estimated_size <= 2:
-            labels.append('size/S')
+            labels.append("size/S")
         elif estimated_size <= 5:
-            labels.append('size/M')
+            labels.append("size/M")
         else:
-            labels.append('size/L')
+            labels.append("size/L")
 
         return list(set(labels))  # Remove duplicates
 
-    def _suggest_reviewers(self, task: Task, changed_files: List[str]) -> List[str]:
+    def _suggest_reviewers(self, task: Task, changed_files: list[str]) -> list[str]:
         """Suggest appropriate reviewers based on changed files."""
         reviewers = []
 
@@ -338,30 +316,28 @@ All automated checks have passed:
         # - Team expertise areas
 
         # Example heuristic suggestions
-        if any('frontend' in f.lower() or 'ui' in f.lower() for f in changed_files):
-            reviewers.extend(['frontend-team', 'ui-reviewers'])
+        if any("frontend" in f.lower() or "ui" in f.lower() for f in changed_files):
+            reviewers.extend(["frontend-team", "ui-reviewers"])
 
-        if any('backend' in f.lower() or 'api' in f.lower() for f in changed_files):
-            reviewers.extend(['backend-team', 'api-reviewers'])
+        if any("backend" in f.lower() or "api" in f.lower() for f in changed_files):
+            reviewers.extend(["backend-team", "api-reviewers"])
 
-        if any('test' in f.lower() for f in changed_files):
-            reviewers.append('qa-team')
+        if any("test" in f.lower() for f in changed_files):
+            reviewers.append("qa-team")
 
         return list(set(reviewers))  # Remove duplicates
 
-    async def _get_changed_files(self) -> List[str]:
+    async def _get_changed_files(self) -> list[str]:
         """Get list of files changed in the current branch."""
         try:
-            cmd = ['git', 'diff', '--name-only', 'HEAD~1', 'HEAD']
+            cmd = ["git", "diff", "--name-only", "HEAD~1", "HEAD"]
             process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
             stdout, stderr = await process.communicate()
 
             if process.returncode == 0:
-                return stdout.decode('utf-8').strip().split('\n')
+                return stdout.decode("utf-8").strip().split("\n")
             else:
                 return []
         except Exception:
@@ -370,12 +346,7 @@ All automated checks have passed:
     def _get_current_branch(self) -> str:
         """Get the current git branch name."""
         try:
-            result = subprocess.run(
-                ['git', 'branch', '--show-current'],
-                capture_output=True,
-                text=True,
-                check=True
-            )
+            result = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True, check=True)
             return result.stdout.strip()
         except subprocess.CalledProcessError:
             return "feature-branch"
@@ -383,11 +354,9 @@ All automated checks have passed:
     async def _is_git_repository(self) -> bool:
         """Check if current directory is a git repository."""
         try:
-            cmd = ['git', 'rev-parse', '--git-dir']
+            cmd = ["git", "rev-parse", "--git-dir"]
             process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
             await process.communicate()
             return process.returncode == 0
@@ -397,32 +366,28 @@ All automated checks have passed:
     async def _has_uncommitted_changes(self) -> bool:
         """Check if there are uncommitted changes."""
         try:
-            cmd = ['git', 'status', '--porcelain']
+            cmd = ["git", "status", "--porcelain"]
             process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
             stdout, stderr = await process.communicate()
-            return len(stdout.decode('utf-8').strip()) > 0
+            return len(stdout.decode("utf-8").strip()) > 0
         except Exception:
             return False
 
     async def _is_gh_cli_available(self) -> bool:
         """Check if GitHub CLI is available."""
         try:
-            cmd = ['gh', '--version']
+            cmd = ["gh", "--version"]
             process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
             await process.communicate()
             return process.returncode == 0
         except Exception:
             return False
 
-    async def _create_pr_with_gh_cli(self, pr_info: PRInfo) -> Dict[str, Any]:
+    async def _create_pr_with_gh_cli(self, pr_info: PRInfo) -> dict[str, Any]:
         """Create PR using GitHub CLI."""
         issues = []
         warnings = []
@@ -430,69 +395,59 @@ All automated checks have passed:
 
         try:
             # Build gh CLI command
-            cmd = ['gh', 'pr', 'create']
-            cmd.extend(['--title', pr_info.title])
-            cmd.extend(['--body', pr_info.description])
-            cmd.extend(['--base', pr_info.base_branch])
-            cmd.extend(['--head', pr_info.head_branch])
+            cmd = ["gh", "pr", "create"]
+            cmd.extend(["--title", pr_info.title])
+            cmd.extend(["--body", pr_info.description])
+            cmd.extend(["--base", pr_info.base_branch])
+            cmd.extend(["--head", pr_info.head_branch])
 
             if pr_info.labels:
                 for label in pr_info.labels:
-                    cmd.extend(['--label', label])
+                    cmd.extend(["--label", label])
 
             if pr_info.reviewers:
-                cmd.extend(['--reviewer', ','.join(pr_info.reviewers)])
+                cmd.extend(["--reviewer", ",".join(pr_info.reviewers)])
 
             if pr_info.draft:
-                cmd.append('--draft')
+                cmd.append("--draft")
 
             # Execute the command
             process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
             stdout, stderr = await process.communicate()
 
             if process.returncode == 0:
-                pr_url = stdout.decode('utf-8').strip()
-                metrics['pr_url'] = pr_url
+                pr_url = stdout.decode("utf-8").strip()
+                metrics["pr_url"] = pr_url
                 self.logger.info(f"PR created successfully: {pr_url}")
             else:
-                error_msg = stderr.decode('utf-8').strip()
+                error_msg = stderr.decode("utf-8").strip()
                 issues.append(f"Failed to create PR with gh CLI: {error_msg}")
 
         except Exception as e:
             issues.append(f"Error running gh CLI: {str(e)}")
 
-        return {
-            'issues': issues,
-            'warnings': warnings,
-            'metrics': metrics
-        }
+        return {"issues": issues, "warnings": warnings, "metrics": metrics}
 
-    async def _create_pr_manually(self, pr_info: PRInfo) -> Dict[str, Any]:
+    async def _create_pr_manually(self, pr_info: PRInfo) -> dict[str, Any]:
         """Provide instructions for manual PR creation."""
         warnings = []
         metrics = {}
 
         # Save PR info to a file
-        pr_file = Path('.prompt-builder/pr_info.json')
+        pr_file = Path(".prompt-builder/pr_info.json")
         pr_file.parent.mkdir(exist_ok=True)
 
         try:
-            with open(pr_file, 'w') as f:
+            with open(pr_file, "w") as f:
                 json.dump(pr_info.__dict__, f, indent=2, default=str)
 
             warnings.append(f"PR information saved to {pr_file}")
             warnings.append("Create PR manually using the saved information")
 
-            metrics['pr_info_saved'] = True
+            metrics["pr_info_saved"] = True
         except Exception as e:
             warnings.append(f"Failed to save PR information: {str(e)}")
 
-        return {
-            'issues': [],
-            'warnings': warnings,
-            'metrics': metrics
-        }
+        return {"issues": [], "warnings": warnings, "metrics": metrics}

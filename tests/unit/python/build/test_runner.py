@@ -222,7 +222,7 @@ VmSize: 524288 kB
         wrapped = runner._wrap_with_cgroup(cmd, 4096)
         assert wrapped[0] == "systemd-run"
         assert "--scope" in wrapped
-        assert f"--property=MemoryMax=4096M" in wrapped
+        assert "--property=MemoryMax=4096M" in wrapped
         assert "pytest" in wrapped
 
     def test_wrap_with_ulimit(self, project_root: Path) -> None:
@@ -264,7 +264,8 @@ VmSize: 524288 kB
         assert wrapped[0] == "sh"  # ulimit wrapper
 
     def test_runner_initialization_with_memory_params(
-        self, project_root: Path,
+        self,
+        project_root: Path,
     ) -> None:
         """Test BuildRunner initialization with memory parameters."""
         runner = BuildRunner(
@@ -278,4 +279,3 @@ VmSize: 524288 kB
     def test_default_memory_limit_constant(self) -> None:
         """Test DEFAULT_MEMORY_LIMIT_MB constant is 4096."""
         assert BuildRunner.DEFAULT_MEMORY_LIMIT_MB == 4096
-

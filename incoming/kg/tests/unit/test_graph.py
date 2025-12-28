@@ -6,8 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from kgshred.db import Database
-from kgshred.db import DocumentExistsError
+from kgshred.db import Database, DocumentExistsError
 from kgshred.graph import (
     GraphResult,
     build_graph,
@@ -106,7 +105,8 @@ class TestBuildGraph:
 
         # Paragraph contained by heading
         para_contains = next(
-            e for e in result.edges
+            e
+            for e in result.edges
             if e.edge_type == "contains" and e.dst_node_pk == para_node.node_pk
         )
         assert para_contains.src_node_pk == h1_node.node_pk
@@ -162,9 +162,7 @@ Para under H2-A.
 
         # Check hierarchy via contains edges
         contains_edges = {
-            (e.src_node_pk, e.dst_node_pk): e
-            for e in result.edges
-            if e.edge_type == "contains"
+            (e.src_node_pk, e.dst_node_pk): e for e in result.edges if e.edge_type == "contains"
         }
 
         # H1-A and H1-B under doc
@@ -190,9 +188,7 @@ Para under H2-A.
         h2_b = result.nodes[3]
 
         next_edges = [e for e in result.edges if e.edge_type == "next"]
-        h2_next = next(
-            (e for e in next_edges if e.src_node_pk == h2_a.node_pk), None
-        )
+        h2_next = next((e for e in next_edges if e.src_node_pk == h2_a.node_pk), None)
         assert h2_next is not None
         assert h2_next.dst_node_pk == h2_b.node_pk
 

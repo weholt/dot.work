@@ -341,9 +341,7 @@ class BuildRunner:
             print("[PKG] Ready for deployment")
             return True
         elif success_count >= total_steps - 1:
-            print(
-                f"\n[WARN]  BUILD MOSTLY SUCCESSFUL - {total_steps - success_count} minor issues"
-            )
+            print(f"\n[WARN]  BUILD MOSTLY SUCCESSFUL - {total_steps - success_count} minor issues")
             print("[TOOL] Consider addressing failed steps before deployment")
             return True
         else:

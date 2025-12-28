@@ -10,17 +10,13 @@ import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 
 from dot_work.prompts.canonical import (
-    CanonicalPrompt,
     CanonicalPromptValidator,
-    EnvironmentConfig,
-    ValidationError,
 )
 
 
@@ -128,7 +124,9 @@ class PromptWizard:
 
         # Step 3: Version (default suggestion)
         version = "0.1.0"
-        self.console.print(f"[cyan]Version:[/cyan] {version} (use [dim]--version[/dim] to override)")
+        self.console.print(
+            f"[cyan]Version:[/cyan] {version} (use [dim]--version[/dim] to override)"
+        )
 
         # Step 4: Prompt type
         if prompt_type is None:
@@ -264,7 +262,9 @@ class PromptWizard:
                 return selected
 
             except (ValueError, IndexError):
-                self.console.print("[red]Invalid selection. Please enter numbers separated by commas.[/red]")
+                self.console.print(
+                    "[red]Invalid selection. Please enter numbers separated by commas.[/red]"
+                )
 
     def _show_summary(
         self,

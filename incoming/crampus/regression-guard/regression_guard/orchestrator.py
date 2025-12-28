@@ -8,8 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from regression_guard.decompose import TaskDecomposer
 from regression_guard.capture_baseline import BaselineCapture
+from regression_guard.decompose import TaskDecomposer
 from regression_guard.validate_incremental import IncrementalValidator
 from regression_guard.validate_integration import IntegrationValidator
 
@@ -20,12 +20,12 @@ class RegressionOrchestrator:
     def __init__(self, verbose: bool = False, work_dir: str | None = None):
         self.verbose = verbose
         self.project_root = Path.cwd()
-        
+
         if work_dir:
             self.work_dir = Path(work_dir)
         else:
             self.work_dir = self.project_root / ".work" / "tasks"
-        
+
         self.work_dir.mkdir(parents=True, exist_ok=True)
 
     def log(self, message: str, level: str = "INFO") -> None:
@@ -81,8 +81,8 @@ class RegressionOrchestrator:
         self.print_manifest(manifest)
 
         self.log(f"\nTask {task_id} ready for implementation", "SUCCESS")
-        self.log(f"Next: Implement subtasks and validate with:")
-        self.log(f"  regression-guard validate <subtask-id>")
+        self.log("Next: Implement subtasks and validate with:")
+        self.log("  regression-guard validate <subtask-id>")
 
         return task_id
 
@@ -233,11 +233,13 @@ class RegressionOrchestrator:
             manifest_path = task_dir / "manifest.json"
             if manifest_path.exists():
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-                tasks.append({
-                    "id": task_dir.name,
-                    "description": manifest["description"],
-                    "timestamp": manifest.get("timestamp", "unknown"),
-                })
+                tasks.append(
+                    {
+                        "id": task_dir.name,
+                        "description": manifest["description"],
+                        "timestamp": manifest.get("timestamp", "unknown"),
+                    }
+                )
 
         if not tasks:
             self.log("No tasks found")

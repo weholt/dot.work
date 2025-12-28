@@ -379,8 +379,9 @@ Deterministic prompt content for testing reproducibility."""
 
     def test_generated_frontmatter_is_stable(self, canonical_content: str) -> None:
         """Test that frontmatter is consistent across multiple generations."""
-        from dot_work.prompts.canonical import CanonicalPromptParser, generate_environment_prompt
         import yaml
+
+        from dot_work.prompts.canonical import CanonicalPromptParser, generate_environment_prompt
 
         parser = CanonicalPromptParser()
         prompt = parser.parse_content(canonical_content)
@@ -416,8 +417,9 @@ Deterministic prompt content for testing reproducibility."""
 
     def test_output_contains_only_selected_environment(self, canonical_content: str) -> None:
         """Test that output only contains selected environment, not others."""
-        from dot_work.prompts.canonical import CanonicalPromptParser, generate_environment_prompt
         import yaml
+
+        from dot_work.prompts.canonical import CanonicalPromptParser, generate_environment_prompt
 
         parser = CanonicalPromptParser()
         prompt = parser.parse_content(canonical_content)

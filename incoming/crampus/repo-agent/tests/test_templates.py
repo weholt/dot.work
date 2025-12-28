@@ -1,5 +1,3 @@
-import pytest
-from pathlib import Path
 from repo_agent.templates import DEFAULT_INSTRUCTIONS_TEMPLATE
 
 
@@ -15,7 +13,7 @@ class TestDefaultTemplate:
 
     def test_template_contains_required_fields(self):
         template = DEFAULT_INSTRUCTIONS_TEMPLATE
-        
+
         # Required fields
         assert "repo_url:" in template
         assert "model:" in template
@@ -25,7 +23,7 @@ class TestDefaultTemplate:
 
     def test_template_contains_optional_fields(self):
         template = DEFAULT_INSTRUCTIONS_TEMPLATE
-        
+
         # Optional fields
         assert "base_branch:" in template
         assert "branch:" in template
@@ -37,19 +35,19 @@ class TestDefaultTemplate:
 
     def test_template_contains_authentication_options(self):
         template = DEFAULT_INSTRUCTIONS_TEMPLATE
-        
+
         assert "github_token:" in template or "github_token_env:" in template
         assert "use_ssh:" in template
 
     def test_template_contains_pr_configuration(self):
         template = DEFAULT_INSTRUCTIONS_TEMPLATE
-        
+
         assert "pr_title:" in template
         assert "pr_body:" in template
 
     def test_template_contains_git_config(self):
         template = DEFAULT_INSTRUCTIONS_TEMPLATE
-        
+
         assert "git_user_name:" in template
         assert "git_user_email:" in template
 
@@ -66,11 +64,12 @@ class TestDefaultTemplate:
 
     def test_template_is_valid_yaml_frontmatter(self):
         """Test that the template can be parsed."""
-        import frontmatter
         from io import StringIO
-        
+
+        import frontmatter
+
         # This will raise an exception if invalid
         post = frontmatter.load(StringIO(DEFAULT_INSTRUCTIONS_TEMPLATE))
-        
+
         assert post.metadata is not None
         assert post.content is not None

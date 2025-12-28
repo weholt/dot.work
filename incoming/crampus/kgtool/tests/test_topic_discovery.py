@@ -1,7 +1,5 @@
-from pathlib import Path
-
 import json
-import pytest
+from pathlib import Path
 
 from kgtool.pipeline import discover_topics
 
@@ -20,7 +18,9 @@ def test_discover_topics_creates_json(sample_doc: Path, tmp_output_dir: Path):
     assert "topic_0" in data
 
 
-def test_discover_topics_enterprise_has_reasonable_topics(enterprise_doc: Path, tmp_output_dir: Path):
+def test_discover_topics_enterprise_has_reasonable_topics(
+    enterprise_doc: Path, tmp_output_dir: Path
+):
     out = tmp_output_dir / "topics_enterprise.json"
     discover_topics(
         input_file=str(enterprise_doc),

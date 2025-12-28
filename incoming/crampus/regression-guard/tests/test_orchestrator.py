@@ -37,7 +37,7 @@ def test_generate_task_id(orchestrator):
 def test_start_task_creates_directory(orchestrator, temp_work_dir):
     """Test that starting a task creates necessary directories."""
     task_id = orchestrator.start_task("Test task")
-    
+
     if task_id:  # May fail due to missing pytest in target project
         task_dir = temp_work_dir / task_id
         assert task_dir.exists()

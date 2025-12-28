@@ -1,12 +1,12 @@
 """Agent implementations for the multi-agent validation system."""
 
 from .base import BaseAgent
-from .planner import PlannerAgent
-from .static_validator import StaticValidatorAgent
 from .behavior_validator import BehaviorValidatorAgent
-from .regression_sentinel import RegressionSentinelAgent
-from .synthetic_test import SyntheticTestAgent
+from .planner import PlannerAgent
 from .pr_generator import PRGeneratorAgent
+from .regression_sentinel import RegressionSentinelAgent
+from .static_validator import StaticValidatorAgent
+from .synthetic_test import SyntheticTestAgent
 
 __all__ = [
     "BaseAgent",

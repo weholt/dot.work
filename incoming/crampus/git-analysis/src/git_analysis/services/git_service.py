@@ -1,33 +1,29 @@
 """Main Git Analysis Service for comparing and analyzing git history."""
 
-import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Set
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import re
 
 import git
 from tqdm import tqdm
 
 from ..models import (
-    ChangeAnalysis,
-    ComparisonResult,
-    ComparisonDiff,
-    ComparisonMetadata,
-    ContributorStats,
-    FileChange,
-    FileCategory,
-    ChangeType,
-    CommitInfo,
     AnalysisConfig,
     AnalysisProgress,
+    ChangeAnalysis,
+    ChangeType,
+    CommitInfo,
+    ComparisonDiff,
+    ComparisonMetadata,
+    ComparisonResult,
+    ContributorStats,
+    FileCategory,
+    FileChange,
 )
-from .complexity import ComplexityCalculator
-from .llm_summarizer import LLMSummarizer
 from .cache import AnalysisCache
+from .complexity import ComplexityCalculator
 from .file_analyzer import FileAnalyzer
+from .llm_summarizer import LLMSummarizer
 from .tag_generator import TagGenerator
 
 
@@ -87,7 +83,7 @@ class GitAnalysisService:
             processed_commits=0,
             current_step="Analyzing commits",
             estimated_remaining_seconds=len(commits) * 2,
-            stage="processing"
+            stage="processing",
         )
 
         analyzed_commits = []
@@ -122,9 +118,7 @@ class GitAnalysisService:
         file_categories = self._calculate_file_categories(analyzed_commits)
 
         # Complexity distribution
-        complexity_distribution = self.complexity_calculator.analyze_commit_complexity_distribution(
-            analyzed_commits
-        )
+        complexity_distribution = self.complexity_calculator.analyze_commit_complexity_distribution(analyzed_commits)
 
         # Top complex files
         top_complex_files = self.complexity_calculator.get_top_complex_files(analyzed_commits)
@@ -140,7 +134,7 @@ class GitAnalysisService:
             recommendations=recommendations,
             file_categories=file_categories,
             complexity_distribution=complexity_distribution,
-            top_complex_files=top_complex_files
+            top_complex_files=top_complex_files,
         )
 
         # Cache the result
@@ -178,7 +172,7 @@ class GitAnalysisService:
             timestamp=datetime.fromtimestamp(commit.committed_date),
             message=commit.message.strip(),
             branch=self._get_commit_branch(commit),
-            tags=self._get_commit_tags(commit)
+            tags=self._get_commit_tags(commit),
         )
 
         # Analyze file changes
@@ -284,10 +278,10 @@ class GitAnalysisService:
             common_themes=common_themes,
             impact_description=impact_description,
             regression_risk=regression_risk,
-            migration_notes=migration_notes
+            migration_notes=migration_notes,
         )
 
-    def _get_commits_between_refs(self, from_ref: str, to_ref: str) -> List[git.Commit]:
+    def _get_commits_between_refs(self, from_ref: str, to_ref: str) -> list[git.Commit]:
         """Get commits between two git references."""
         try:
             # Resolve references
@@ -299,14 +293,14 @@ class GitAnalysisService:
 
             # Limit number of commits if specified
             if self.config.max_commits and len(commits) > self.config.max_commits:
-                commits = commits[-self.config.max_commits:]
+                commits = commits[-self.config.max_commits :]
 
             return commits
 
         except Exception as e:
             raise ValueError(f"Failed to get commits between {from_ref} and {to_ref}: {e}")
 
-    def _analyze_commit_files(self, commit: git.Commit) -> List[FileChange]:
+    def _analyze_commit_files(self, commit: git.Commit) -> list[FileChange]:
         """Analyze file changes in a commit."""
         files_changed = []
 
@@ -317,7 +311,7 @@ class GitAnalysisService:
                 diffs = parent.diff(commit, create_patch=True)
             else:
                 # First commit - diff against empty tree
-                empty_tree = self.repo.git.hash_object('-t', 'tree', '/dev/null')
+                empty_tree = self.repo.git.hash_object("-t", "tree", "/dev/null")
                 diffs = commit.diff(empty_tree, create_patch=True)
 
             for diff in diffs:
@@ -354,17 +348,17 @@ class GitAnalysisService:
         lines_added = 0
         lines_deleted = 0
 
-        if hasattr(diff, 'diff') and diff.diff:
+        if hasattr(diff, "diff") and diff.diff:
             # Parse diff for line counts
-            diff_text = diff.diff.decode('utf-8', errors='ignore')
-            for line in diff_text.split('\n'):
-                if line.startswith('+') and not line.startswith('+++'):
+            diff_text = diff.diff.decode("utf-8", errors="ignore")
+            for line in diff_text.split("\n"):
+                if line.startswith("+") and not line.startswith("+++"):
                     lines_added += 1
-                elif line.startswith('-') and not line.startswith('---'):
+                elif line.startswith("-") and not line.startswith("---"):
                     lines_deleted += 1
 
         # Check if binary file
-        binary_file = hasattr(diff, 'diff') and diff.diff is None
+        binary_file = hasattr(diff, "diff") and diff.diff is None
 
         return FileChange(
             path=path,
@@ -373,11 +367,11 @@ class GitAnalysisService:
             category=category,
             lines_added=lines_added,
             lines_deleted=lines_deleted,
-            binary_file=binary_file
+            binary_file=binary_file,
         )
 
     def _calculate_comparison_metadata(
-        self, from_ref: str, to_ref: str, commits: List[ChangeAnalysis]
+        self, from_ref: str, to_ref: str, commits: list[ChangeAnalysis]
     ) -> ComparisonMetadata:
         """Calculate metadata for the comparison."""
         if not commits:
@@ -391,9 +385,7 @@ class GitAnalysisService:
         date_range = (min(dates), max(dates))
 
         # Calculate totals
-        total_files_changed = len(set(
-            file.path for commit in commits for file in commit.files_changed
-        ))
+        total_files_changed = len(set(file.path for commit in commits for file in commit.files_changed))
         total_lines_added = sum(commit.lines_added for commit in commits)
         total_lines_deleted = sum(commit.lines_deleted for commit in commits)
         total_complexity = sum(commit.complexity_score for commit in commits)
@@ -416,12 +408,10 @@ class GitAnalysisService:
             total_lines_deleted=total_lines_deleted,
             total_complexity=total_complexity,
             time_span_days=time_span_days,
-            branches_involved=branches_involved
+            branches_involved=branches_involved,
         )
 
-    def _calculate_contributor_stats(
-        self, commits: List[ChangeAnalysis]
-    ) -> Dict[str, ContributorStats]:
+    def _calculate_contributor_stats(self, commits: list[ChangeAnalysis]) -> dict[str, ContributorStats]:
         """Calculate statistics for each contributor."""
         contributors = {}
 
@@ -437,7 +427,7 @@ class GitAnalysisService:
                     files_touched=0,
                     complexity_contribution=0.0,
                     first_commit=commit.timestamp,
-                    last_commit=commit.timestamp
+                    last_commit=commit.timestamp,
                 )
 
             stats = contributors[key]
@@ -455,7 +445,7 @@ class GitAnalysisService:
 
         return contributors
 
-    def _generate_aggregate_summary(self, commits: List[ChangeAnalysis]) -> str:
+    def _generate_aggregate_summary(self, commits: list[ChangeAnalysis]) -> str:
         """Generate aggregate summary for all commits."""
         if not commits:
             return "No commits to summarize"
@@ -477,13 +467,11 @@ class GitAnalysisService:
         summary_parts = [
             f"Analyzed {len(commits)} commits with average complexity of {avg_complexity:.1f}.",
             f"Total changes: {sum(c.lines_added for c in commits)} lines added, "
-            f"{sum(c.lines_deleted for c in commits)} lines deleted."
+            f"{sum(c.lines_deleted for c in commits)} lines deleted.",
         ]
 
         if top_tags:
-            summary_parts.append(
-                f"Main themes: {', '.join(f'{tag} ({count})' for tag, count in top_tags)}"
-            )
+            summary_parts.append(f"Main themes: {', '.join(f'{tag} ({count})' for tag, count in top_tags)}")
 
         # Check for breaking changes
         breaking_changes = [c for c in commits if c.breaking_change]
@@ -492,7 +480,7 @@ class GitAnalysisService:
 
         return " ".join(summary_parts)
 
-    def _generate_highlights(self, commits: List[ChangeAnalysis]) -> List[str]:
+    def _generate_highlights(self, commits: list[ChangeAnalysis]) -> list[str]:
         """Generate highlights from commits."""
         highlights = []
 
@@ -512,16 +500,13 @@ class GitAnalysisService:
             highlights.append(f"🔒 Security: {commit.short_message}")
 
         # Large file changes
-        large_file_commits = [
-            c for c in commits
-            if len(c.files_changed) > 20 or c.lines_added + c.lines_deleted > 500
-        ]
+        large_file_commits = [c for c in commits if len(c.files_changed) > 20 or c.lines_added + c.lines_deleted > 500]
         for commit in large_file_commits:
             highlights.append(f"📊 Large changes: {commit.short_message}")
 
         return highlights[:10]  # Limit to 10 highlights
 
-    def _assess_risk(self, commits: List[ChangeAnalysis]) -> str:
+    def _assess_risk(self, commits: list[ChangeAnalysis]) -> str:
         """Assess overall risk of the changes."""
         if not commits:
             return "No risk assessment available"
@@ -549,32 +534,28 @@ class GitAnalysisService:
         else:
             return f"High risk - {', '.join(risk_factors)}"
 
-    def _generate_recommendations(self, commits: List[ChangeAnalysis]) -> List[str]:
+    def _generate_recommendations(self, commits: list[ChangeAnalysis]) -> list[str]:
         """Generate recommendations based on analysis."""
         recommendations = []
 
         # Check for missing tests
-        test_commits = sum(1 for c in commits if any(
-            f.category == FileCategory.TESTS for f in c.files_changed
-        ))
-        code_commits = sum(1 for c in commits if any(
-            f.category == FileCategory.CODE for f in c.files_changed
-        ))
+        test_commits = sum(1 for c in commits if any(f.category == FileCategory.TESTS for f in c.files_changed))
+        code_commits = sum(1 for c in commits if any(f.category == FileCategory.CODE for f in c.files_changed))
 
         if code_commits > test_commits * 2:
             recommendations.append("Consider adding more tests - many code changes without corresponding test updates")
 
         # Check for documentation
-        doc_commits = sum(1 for c in commits if any(
-            f.category == FileCategory.DOCUMENTATION for f in c.files_changed
-        ))
+        doc_commits = sum(1 for c in commits if any(f.category == FileCategory.DOCUMENTATION for f in c.files_changed))
         if doc_commits == 0 and code_commits > 5:
             recommendations.append("Consider updating documentation for the new features")
 
         # High complexity warnings
         high_complexity = [c for c in commits if c.complexity_score > 70]
         if high_complexity:
-            recommendations.append(f"Consider breaking down the {len(high_complexity)} high-complexity commits into smaller changes")
+            recommendations.append(
+                f"Consider breaking down the {len(high_complexity)} high-complexity commits into smaller changes"
+            )
 
         # Breaking change recommendations
         breaking_commits = [c for c in commits if c.breaking_change]
@@ -583,9 +564,7 @@ class GitAnalysisService:
 
         return recommendations
 
-    def _calculate_file_categories(
-        self, commits: List[ChangeAnalysis]
-    ) -> Dict[FileCategory, int]:
+    def _calculate_file_categories(self, commits: list[ChangeAnalysis]) -> dict[FileCategory, int]:
         """Calculate distribution of file categories."""
         categories = {}
         for commit in commits:
@@ -605,7 +584,7 @@ class GitAnalysisService:
         except:
             return "main"  # Default fallback
 
-    def _get_commit_tags(self, commit: git.Commit) -> List[str]:
+    def _get_commit_tags(self, commit: git.Commit) -> list[str]:
         """Get tags pointing to this commit."""
         try:
             tags = []
@@ -618,44 +597,43 @@ class GitAnalysisService:
 
     def _extract_short_message(self, message: str) -> str:
         """Extract short message from full commit message."""
-        lines = message.strip().split('\n')
+        lines = message.strip().split("\n")
         return lines[0] if lines else ""
 
-    def _identify_impact_areas(self, files_changed: List[FileChange]) -> List[str]:
+    def _identify_impact_areas(self, files_changed: list[FileChange]) -> list[str]:
         """Identify areas of impact based on file changes."""
         areas = set()
         for file_change in files_changed:
             # Extract area from file path
-            path_parts = file_change.path.split('/')
+            path_parts = file_change.path.split("/")
             if len(path_parts) > 1:
                 areas.add(path_parts[0])
 
             # Check for specific patterns
-            if any(pattern in file_change.path.lower() for pattern in [
-                'auth', 'security', 'permission', 'role'
-            ]):
-                areas.add('security')
-            elif any(pattern in file_change.path.lower() for pattern in [
-                'api', 'endpoint', 'route', 'controller'
-            ]):
-                areas.add('api')
-            elif any(pattern in file_change.path.lower() for pattern in [
-                'ui', 'frontend', 'component', 'view'
-            ]):
-                areas.add('frontend')
-            elif any(pattern in file_change.path.lower() for pattern in [
-                'model', 'schema', 'database', 'migration'
-            ]):
-                areas.add('data')
+            if any(pattern in file_change.path.lower() for pattern in ["auth", "security", "permission", "role"]):
+                areas.add("security")
+            elif any(pattern in file_change.path.lower() for pattern in ["api", "endpoint", "route", "controller"]):
+                areas.add("api")
+            elif any(pattern in file_change.path.lower() for pattern in ["ui", "frontend", "component", "view"]):
+                areas.add("frontend")
+            elif any(pattern in file_change.path.lower() for pattern in ["model", "schema", "database", "migration"]):
+                areas.add("data")
 
         return list(areas)
 
-    def _is_breaking_change(self, message: str, files_changed: List[FileChange]) -> bool:
+    def _is_breaking_change(self, message: str, files_changed: list[FileChange]) -> bool:
         """Check if commit represents a breaking change."""
         message_lower = message.lower()
         breaking_indicators = [
-            'breaking', 'breaking change', 'break:', '⚠️',
-            'deprecat', 'remove', 'delete', 'replace', 'migration'
+            "breaking",
+            "breaking change",
+            "break:",
+            "⚠️",
+            "deprecat",
+            "remove",
+            "delete",
+            "replace",
+            "migration",
         ]
 
         if any(indicator in message_lower for indicator in breaking_indicators):
@@ -663,19 +641,28 @@ class GitAnalysisService:
 
         # Check file patterns
         for file_change in files_changed:
-            if any(pattern in file_change.path.lower() for pattern in [
-                'migration', 'schema', 'proto', 'interface', 'api'
-            ]):
+            if any(
+                pattern in file_change.path.lower() for pattern in ["migration", "schema", "proto", "interface", "api"]
+            ):
                 return True
 
         return False
 
-    def _is_security_relevant(self, message: str, files_changed: List[FileChange]) -> bool:
+    def _is_security_relevant(self, message: str, files_changed: list[FileChange]) -> bool:
         """Check if commit is security-relevant."""
         message_lower = message.lower()
         security_indicators = [
-            'security', 'vulnerability', 'cve', 'exploit', 'patch',
-            'auth', 'permission', 'access', 'token', 'secret', 'key'
+            "security",
+            "vulnerability",
+            "cve",
+            "exploit",
+            "patch",
+            "auth",
+            "permission",
+            "access",
+            "token",
+            "secret",
+            "key",
         ]
 
         if any(indicator in message_lower for indicator in security_indicators):
@@ -683,9 +670,10 @@ class GitAnalysisService:
 
         # Check file patterns
         for file_change in files_changed:
-            if any(pattern in file_change.path.lower() for pattern in [
-                'auth', 'security', 'permission', 'cert', 'key', 'secret'
-            ]):
+            if any(
+                pattern in file_change.path.lower()
+                for pattern in ["auth", "security", "permission", "cert", "key", "secret"]
+            ):
                 return True
 
         return False
@@ -694,7 +682,7 @@ class GitAnalysisService:
         """Generate basic summary without LLM."""
         parts = [
             f"Changed {len(analysis.files_changed)} files",
-            f"added {analysis.lines_added} lines, deleted {analysis.lines_deleted} lines"
+            f"added {analysis.lines_added} lines, deleted {analysis.lines_deleted} lines",
         ]
 
         if analysis.impact_areas:
@@ -718,14 +706,18 @@ class GitAnalysisService:
 
         return (tag_similarity + file_similarity) / 2
 
-    def _find_commit_differences(self, a: ChangeAnalysis, b: ChangeAnalysis) -> List[str]:
+    def _find_commit_differences(self, a: ChangeAnalysis, b: ChangeAnalysis) -> list[str]:
         """Find differences between two commits."""
         differences = []
 
         if a.complexity_score > b.complexity_score + 20:
-            differences.append(f"First commit is significantly more complex ({a.complexity_score:.1f} vs {b.complexity_score:.1f})")
+            differences.append(
+                f"First commit is significantly more complex ({a.complexity_score:.1f} vs {b.complexity_score:.1f})"
+            )
         elif b.complexity_score > a.complexity_score + 20:
-            differences.append(f"Second commit is significantly more complex ({b.complexity_score:.1f} vs {a.complexity_score:.1f})")
+            differences.append(
+                f"Second commit is significantly more complex ({b.complexity_score:.1f} vs {a.complexity_score:.1f})"
+            )
 
         tags_a = set(a.tags)
         tags_b = set(b.tags)
@@ -739,7 +731,7 @@ class GitAnalysisService:
 
         return differences
 
-    def _find_common_themes(self, a: ChangeAnalysis, b: ChangeAnalysis) -> List[str]:
+    def _find_common_themes(self, a: ChangeAnalysis, b: ChangeAnalysis) -> list[str]:
         """Find common themes between two commits."""
         common_tags = set(a.tags) & set(b.tags)
         common_areas = set(a.impact_areas) & set(b.impact_areas)
@@ -783,7 +775,7 @@ class GitAnalysisService:
         else:
             return f"High regression risk ({', '.join(risk_factors)})"
 
-    def _generate_migration_notes(self, a: ChangeAnalysis, b: ChangeAnalysis) -> List[str]:
+    def _generate_migration_notes(self, a: ChangeAnalysis, b: ChangeAnalysis) -> list[str]:
         """Generate migration notes for transitioning between commits."""
         notes = []
 

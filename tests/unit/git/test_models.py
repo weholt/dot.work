@@ -1,21 +1,20 @@
 """Tests for data models."""
 
-import pytest
 from datetime import datetime
 
 from dot_work.git.models import (
-    ChangeAnalysis,
-    ComparisonResult,
-    ComparisonDiff,
-    CommitInfo,
-    ContributorStats,
     AnalysisConfig,
-    FileChange,
-    FileCategory,
-    ChangeType,
-    ComparisonMetadata,
-    CacheEntry,
     AnalysisError,
+    CacheEntry,
+    ChangeAnalysis,
+    ChangeType,
+    CommitInfo,
+    ComparisonDiff,
+    ComparisonMetadata,
+    ComparisonResult,
+    ContributorStats,
+    FileCategory,
+    FileChange,
 )
 
 
@@ -29,7 +28,7 @@ class TestFileChange:
             change_type=ChangeType.MODIFIED,
             category=FileCategory.CODE,
             lines_added=10,
-            lines_deleted=5
+            lines_deleted=5,
         )
 
         assert file_change.path == "src/main.py"
@@ -45,7 +44,7 @@ class TestFileChange:
             path="src/new_main.py",
             old_path="src/old_main.py",
             change_type=ChangeType.RENAMED,
-            category=FileCategory.CODE
+            category=FileCategory.CODE,
         )
 
         assert file_change.path == "src/new_main.py"
@@ -55,9 +54,7 @@ class TestFileChange:
     def test_file_change_binary(self):
         """Test binary file change."""
         file_change = FileChange(
-            path="data/image.png",
-            change_type=ChangeType.ADDED,
-            binary_file=True
+            path="data/image.png", change_type=ChangeType.ADDED, binary_file=True
         )
 
         assert file_change.binary_file is True
@@ -77,7 +74,7 @@ class TestCommitInfo:
             timestamp=timestamp,
             message="Add new feature",
             branch="main",
-            tags=["v1.0.0", "release"]
+            tags=["v1.0.0", "release"],
         )
 
         assert commit_info.hash == "abc123def456"
@@ -101,7 +98,7 @@ class TestChangeAnalysis:
             change_type=ChangeType.MODIFIED,
             category=FileCategory.CODE,
             lines_added=10,
-            lines_deleted=5
+            lines_deleted=5,
         )
 
         analysis = ChangeAnalysis(
@@ -121,7 +118,7 @@ class TestChangeAnalysis:
             complexity_score=25.5,
             summary="Adds a new feature to the application",
             tags=["feature", "enhancement"],
-            impact_areas=["core", "ui"]
+            impact_areas=["core", "ui"],
         )
 
         assert analysis.commit_hash == "abc123def456"
@@ -153,7 +150,7 @@ class TestChangeAnalysis:
             summary="Removes deprecated API endpoints",
             tags=["breaking", "cleanup"],
             impact_areas=["api"],
-            breaking_change=True
+            breaking_change=True,
         )
 
         assert analysis.breaking_change is True
@@ -177,7 +174,7 @@ class TestContributorStats:
             files_touched=100,
             complexity_contribution=250.5,
             first_commit=first_commit,
-            last_commit=last_commit
+            last_commit=last_commit,
         )
 
         assert stats.name == "John Doe"
@@ -216,7 +213,7 @@ class TestAnalysisConfig:
             llm_provider="anthropic",
             complexity_threshold=30.0,
             max_commits=500,
-            output_format="yaml"
+            output_format="yaml",
         )
 
         assert str(config.repo_path) == "/custom/repo"
@@ -247,7 +244,7 @@ class TestComparisonMetadata:
             total_lines_deleted=200,
             total_complexity=125.5,
             time_span_days=30,
-            branches_involved=["main", "feature-branch"]
+            branches_involved=["main", "feature-branch"],
         )
 
         assert metadata.from_ref == "main"
@@ -281,7 +278,7 @@ class TestComparisonResult:
             total_lines_deleted=20,
             total_complexity=50.0,
             time_span_days=5,
-            branches_involved=["main", "feature-branch"]
+            branches_involved=["main", "feature-branch"],
         )
 
         analysis = ChangeAnalysis(
@@ -301,7 +298,7 @@ class TestComparisonResult:
             complexity_score=15.0,
             summary="Test commit summary",
             tags=["test"],
-            impact_areas=["core"]
+            impact_areas=["core"],
         )
 
         result = ComparisonResult(
@@ -314,7 +311,7 @@ class TestComparisonResult:
             recommendations=["Test recommendation"],
             file_categories={FileCategory.CODE: 5},
             complexity_distribution={"0-20": 2, "20-40": 3},
-            top_complex_files=[]
+            top_complex_files=[],
         )
 
         assert result.metadata == metadata
@@ -342,7 +339,7 @@ class TestComparisonDiff:
             common_themes=["Both modify core functionality"],
             impact_description="Medium impact changes",
             regression_risk="Low regression risk",
-            migration_notes=["Update dependent code"]
+            migration_notes=["Update dependent code"],
         )
 
         assert diff.commit_a_hash == "abc123"
@@ -361,12 +358,7 @@ class TestCacheEntry:
     def test_cache_entry_creation(self):
         """Test basic cache entry creation."""
         timestamp = datetime.now()
-        entry = CacheEntry(
-            key="test_key",
-            data={"test": "data"},
-            timestamp=timestamp,
-            ttl_hours=24
-        )
+        entry = CacheEntry(key="test_key", data={"test": "data"}, timestamp=timestamp, ttl_hours=24)
 
         assert entry.key == "test_key"
         assert entry.data == {"test": "data"}
@@ -380,19 +372,13 @@ class TestCacheEntry:
         # Non-expired entry
         recent_timestamp = datetime.now() - timedelta(hours=12)
         recent_entry = CacheEntry(
-            key="recent_key",
-            data={"test": "data"},
-            timestamp=recent_timestamp
+            key="recent_key", data={"test": "data"}, timestamp=recent_timestamp
         )
         assert recent_entry.is_expired() is False
 
         # Expired entry
         old_timestamp = datetime.now() - timedelta(hours=25)
-        old_entry = CacheEntry(
-            key="old_key",
-            data={"test": "data"},
-            timestamp=old_timestamp
-        )
+        old_entry = CacheEntry(key="old_key", data={"test": "data"}, timestamp=old_timestamp)
         assert old_entry.is_expired() is True
 
 
@@ -408,7 +394,7 @@ class TestAnalysisError:
             commit_hash="abc123",
             file_path="src/main.py",
             timestamp=timestamp,
-            stack_trace="Traceback..."
+            stack_trace="Traceback...",
         )
 
         assert error.error_type == "ParseError"
@@ -420,10 +406,7 @@ class TestAnalysisError:
 
     def test_analysis_error_minimal(self):
         """Test analysis error with minimal data."""
-        error = AnalysisError(
-            error_type="ValidationError",
-            message="Invalid data"
-        )
+        error = AnalysisError(error_type="ValidationError", message="Invalid data")
 
         assert error.error_type == "ValidationError"
         assert error.message == "Invalid data"

@@ -10,6 +10,6 @@ Main features:
 - Support for multiple LLM providers
 """
 
-from .core import run_from_markdown, RepoAgentError
+from .core import RepoAgentError, run_from_markdown
 
 __all__ = ["run_from_markdown", "RepoAgentError"]

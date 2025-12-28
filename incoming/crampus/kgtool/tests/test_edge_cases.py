@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from kgtool.pipeline import build_graph, discover_topics
 
 

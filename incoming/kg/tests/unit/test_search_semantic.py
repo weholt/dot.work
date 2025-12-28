@@ -169,9 +169,7 @@ class TestSemsearch:
         assert semsearch(indexed_db, embedder, "") == []
         assert semsearch(indexed_db, embedder, "   ") == []
 
-    def test_finds_similar_nodes(
-        self, indexed_db: Database, embedder: MockEmbedder
-    ) -> None:
+    def test_finds_similar_nodes(self, indexed_db: Database, embedder: MockEmbedder) -> None:
         """Search finds nodes with similar embeddings."""
         results = semsearch(indexed_db, embedder, "python programming")
 
@@ -195,9 +193,7 @@ class TestSemsearch:
         assert result.title == "Python Guide"
         assert -1.0 <= result.score <= 1.0
 
-    def test_respects_k_limit(
-        self, indexed_db: Database, embedder: MockEmbedder
-    ) -> None:
+    def test_respects_k_limit(self, indexed_db: Database, embedder: MockEmbedder) -> None:
         """Search respects the k limit."""
         results = semsearch(indexed_db, embedder, "programming", k=2)
         assert len(results) <= 2
@@ -269,9 +265,7 @@ class TestEmbedNode:
         assert emb is not None
         assert emb.vector == [1.0, 0.0, 0.0]  # MockEmbedder returns this for "python"
 
-    def test_empty_text_returns_false(
-        self, db: Database, embedder: MockEmbedder
-    ) -> None:
+    def test_empty_text_returns_false(self, db: Database, embedder: MockEmbedder) -> None:
         """Empty text returns False without storing."""
         result = embed_node(db, embedder, "x" * 32, "")
         assert result is False
@@ -289,9 +283,7 @@ class TestEmbedNode:
 class TestEmbedNodesBatch:
     """Tests for embed_nodes_batch function."""
 
-    def test_embeds_multiple_nodes(
-        self, db: Database, embedder: MockEmbedder
-    ) -> None:
+    def test_embeds_multiple_nodes(self, db: Database, embedder: MockEmbedder) -> None:
         """Batch embed creates embeddings for all nodes."""
         # Create document
         raw = b"# Python\n\n# JavaScript\n\n# Rust"
@@ -311,9 +303,7 @@ class TestEmbedNodesBatch:
         assert db.get_embedding("b" * 32, embedder.model) is not None
         assert db.get_embedding("c" * 32, embedder.model) is not None
 
-    def test_skips_existing_embeddings(
-        self, db: Database, embedder: MockEmbedder
-    ) -> None:
+    def test_skips_existing_embeddings(self, db: Database, embedder: MockEmbedder) -> None:
         """Batch embed skips nodes that already have embeddings."""
         # Pre-store one embedding
         db.store_embedding("a" * 32, embedder.model, [0.5, 0.5, 0.0])
@@ -347,9 +337,7 @@ class TestEmbedNodesBatch:
         count = embed_nodes_batch(db, embedder, [])
         assert count == 0
 
-    def test_all_skipped_returns_zero(
-        self, db: Database, embedder: MockEmbedder
-    ) -> None:
+    def test_all_skipped_returns_zero(self, db: Database, embedder: MockEmbedder) -> None:
         """All nodes skipped returns 0."""
         # All empty texts
         nodes = [

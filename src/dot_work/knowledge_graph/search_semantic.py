@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import heapq
 import logging
-import math
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 

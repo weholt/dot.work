@@ -1198,8 +1198,7 @@ class Database:
 
         if len(query_vector) != dimensions:
             raise ValueError(
-                f"Query vector dimension mismatch: "
-                f"expected {dimensions}, got {len(query_vector)}"
+                f"Query vector dimension mismatch: expected {dimensions}, got {len(query_vector)}"
             )
 
         # Create a unique table name for this model
@@ -1235,10 +1234,7 @@ class Database:
         )
 
         # Convert distance to cosine similarity (distance = 1 - similarity)
-        results = [
-            (row["full_id"], 1.0 - row["distance"])
-            for row in cur.fetchall()
-        ]
+        results = [(row["full_id"], 1.0 - row["distance"]) for row in cur.fetchall()]
 
         return results
 

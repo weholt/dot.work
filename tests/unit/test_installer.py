@@ -685,7 +685,6 @@ class TestInstallState:
 
     def test_has_existing_files_returns_true_when_files_exist(self) -> None:
         """Test that has_existing_files returns True when existing_files is not empty."""
-        from dot_work.installer import InstallState
         from pathlib import Path
 
         state = InstallState(existing_files=[Path("existing.md")])
@@ -693,14 +692,12 @@ class TestInstallState:
 
     def test_has_existing_files_returns_false_when_no_existing_files(self) -> None:
         """Test that has_existing_files returns False when existing_files is empty."""
-        from dot_work.installer import InstallState
 
         state = InstallState(existing_files=[])
         assert state.has_existing_files is False
 
     def test_total_files_counts_all_files(self) -> None:
         """Test that total_files returns sum of existing and new files."""
-        from dot_work.installer import InstallState
         from pathlib import Path
 
         state = InstallState(
@@ -721,7 +718,9 @@ class TestShouldWriteFileWithBatchChoice:
         dest_path.write_text("existing content", encoding="utf-8")
         console = MagicMock()
 
-        result = should_write_file(dest_path, force=False, console=console, batch_choice=BatchChoice.ALL)
+        result = should_write_file(
+            dest_path, force=False, console=console, batch_choice=BatchChoice.ALL
+        )
 
         assert result is True
         console.input.assert_not_called()
@@ -734,7 +733,9 @@ class TestShouldWriteFileWithBatchChoice:
         dest_path.write_text("existing content", encoding="utf-8")
         console = MagicMock()
 
-        result = should_write_file(dest_path, force=False, console=console, batch_choice=BatchChoice.SKIP)
+        result = should_write_file(
+            dest_path, force=False, console=console, batch_choice=BatchChoice.SKIP
+        )
 
         assert result is False
         console.input.assert_not_called()
@@ -747,7 +748,9 @@ class TestShouldWriteFileWithBatchChoice:
         dest_path.write_text("existing content", encoding="utf-8")
         console = MagicMock()
 
-        result = should_write_file(dest_path, force=False, console=console, batch_choice=BatchChoice.CANCEL)
+        result = should_write_file(
+            dest_path, force=False, console=console, batch_choice=BatchChoice.CANCEL
+        )
 
         assert result is False
         console.input.assert_not_called()
@@ -761,7 +764,9 @@ class TestShouldWriteFileWithBatchChoice:
         console = MagicMock()
         console.input.return_value = "y"
 
-        result = should_write_file(dest_path, force=False, console=console, batch_choice=BatchChoice.PROMPT)
+        result = should_write_file(
+            dest_path, force=False, console=console, batch_choice=BatchChoice.PROMPT
+        )
 
         assert result is True
         console.input.assert_called_once()
@@ -773,7 +778,9 @@ class TestShouldWriteFileWithBatchChoice:
         dest_path = tmp_path / "new.md"
         console = MagicMock()
 
-        result = should_write_file(dest_path, force=False, console=console, batch_choice=BatchChoice.ALL)
+        result = should_write_file(
+            dest_path, force=False, console=console, batch_choice=BatchChoice.ALL
+        )
 
         assert result is True
         console.input.assert_not_called()
@@ -1052,7 +1059,6 @@ class TestBatchOverwrite:
         self, temp_project_dir: Path, sample_prompts_dir: Path
     ) -> None:
         """Test that _prompt_batch_choice displays file status summary."""
-        from dot_work.installer import InstallState, _prompt_batch_choice
         from pathlib import Path
 
         # Create existing files to simulate state
@@ -1079,7 +1085,7 @@ class TestBatchOverwrite:
         self, temp_project_dir: Path, sample_prompts_dir: Path
     ) -> None:
         """Test that _prompt_batch_choice accepts 'all', 'skip', 'prompt', 'cancel'."""
-        from dot_work.installer import BatchChoice, InstallState, _prompt_batch_choice
+        from dot_work.installer import BatchChoice
 
         state = InstallState(existing_files=[Path("existing.md")], new_files=[])
 
@@ -1107,7 +1113,7 @@ class TestBatchOverwrite:
         self, temp_project_dir: Path, sample_prompts_dir: Path
     ) -> None:
         """Test that _prompt_batch_choice validates and re-prompts on invalid input."""
-        from dot_work.installer import BatchChoice, InstallState, _prompt_batch_choice
+        from dot_work.installer import BatchChoice
 
         state = InstallState(existing_files=[Path("existing.md")], new_files=[])
 
@@ -1123,7 +1129,6 @@ class TestBatchOverwrite:
         self, temp_project_dir: Path, sample_prompts_dir: Path
     ) -> None:
         """Test that _prompt_batch_choice shows the complete menu."""
-        from dot_work.installer import BatchChoice, InstallState, _prompt_batch_choice
 
         state = InstallState(existing_files=[Path("existing.md")], new_files=[Path("new.md")])
 
@@ -1134,6 +1139,8 @@ class TestBatchOverwrite:
 
         # Verify menu options were shown
         print_calls = [str(call) for call in console.print.call_args_list]
-        menu_shown = any("ALL" in call or "SKIP" in call or "PROMPT" in call or "CANCEL" in call for call in print_calls)
+        menu_shown = any(
+            "ALL" in call or "SKIP" in call or "PROMPT" in call or "CANCEL" in call
+            for call in print_calls
+        )
         assert menu_shown
-

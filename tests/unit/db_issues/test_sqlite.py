@@ -1,13 +1,11 @@
 """Tests for SQLite adapter (models, repositories)."""
 
-from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from sqlmodel import SQLModel, Session, create_engine, text
+from sqlmodel import Session, SQLModel, text
 
 from dot_work.db_issues.adapters import (
-    IssueModel,
     IssueRepository,
     UnitOfWork,
     create_db_engine,
@@ -43,14 +41,6 @@ class TestDatabaseInitialization:
         engine = create_db_engine(f"sqlite:///{db_path}")
 
         # Create tables using SQLAlchemy
-        from dot_work.db_issues.adapters.sqlite import (
-            CommentModel,
-            DependencyModel,
-            EpicModel,
-            IssueLabelModel,
-            IssueModel,
-            LabelModel,
-        )
 
         SQLModel.metadata.create_all(engine)
 

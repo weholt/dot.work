@@ -97,19 +97,23 @@ class StatsService:
 
     def _get_total_count(self) -> int:
         """Get total issue count."""
-        result = self.session.exec(text("SELECT COUNT(*) as cnt FROM issues WHERE deleted_at IS NULL;"))  # type: ignore[call-overload]
+        result = self.session.exec(
+            text("SELECT COUNT(*) as cnt FROM issues WHERE deleted_at IS NULL;")
+        )  # type: ignore[call-overload]
         row = result.first()
         return row.cnt if row else 0
 
     def _get_by_status(self, total: int) -> list[StatusStats]:
         """Get statistics grouped by status."""
-        result = self.session.exec(text("""
+        result = self.session.exec(
+            text("""
             SELECT status, COUNT(*) as cnt
             FROM issues
             WHERE deleted_at IS NULL
             GROUP BY status
             ORDER BY cnt DESC;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
 
         return [
             StatusStats(
@@ -122,13 +126,15 @@ class StatsService:
 
     def _get_by_priority(self, total: int) -> list[PriorityStats]:
         """Get statistics grouped by priority."""
-        result = self.session.exec(text("""
+        result = self.session.exec(
+            text("""
             SELECT priority, COUNT(*) as cnt
             FROM issues
             WHERE deleted_at IS NULL
             GROUP BY priority
             ORDER BY priority ASC;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
 
         return [
             PriorityStats(
@@ -141,13 +147,15 @@ class StatsService:
 
     def _get_by_type(self, total: int) -> list[TypeStats]:
         """Get statistics grouped by type."""
-        result = self.session.exec(text("""
+        result = self.session.exec(
+            text("""
             SELECT type, COUNT(*) as cnt
             FROM issues
             WHERE deleted_at IS NULL
             GROUP BY type
             ORDER BY cnt DESC;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
 
         return [
             TypeStats(
@@ -163,43 +171,51 @@ class StatsService:
         total = self._get_total_count()
 
         # Average resolution time (for completed issues)
-        avg_result = self.session.exec(text("""
+        avg_result = self.session.exec(
+            text("""
             SELECT AVG(julianday(closed_at) - julianday(created_at)) as avg_days
             FROM issues
             WHERE closed_at IS NOT NULL AND deleted_at IS NULL;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
         avg_row = avg_result.first()
         avg_resolution = round(avg_row.avg_days, 1) if avg_row and avg_row.avg_days else None
 
         # Longest dependency chain (simplified - just count dependencies for now)
         # A proper implementation would use graph traversal
-        chain_result = self.session.exec(text("""
+        chain_result = self.session.exec(
+            text("""
             SELECT MAX(deps.chain_length) as max_chain
             FROM (
                 SELECT COUNT(*) as chain_length
                 FROM dependencies
                 GROUP BY from_issue_id
             ) deps;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
         chain_row = chain_result.first()
         longest_chain = chain_row.max_chain if chain_row and chain_row.max_chain else 0
 
         # Blocked issues count
-        blocked_result = self.session.exec(text("""
+        blocked_result = self.session.exec(
+            text("""
             SELECT COUNT(*) as cnt
             FROM issues
             WHERE status = 'blocked' AND deleted_at IS NULL;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
         blocked_row = blocked_result.first()
         blocked_count = blocked_row.cnt if blocked_row else 0
 
         # Ready to work count (proposed or in-progress, not blocked)
-        ready_result = self.session.exec(text("""
+        ready_result = self.session.exec(
+            text("""
             SELECT COUNT(*) as cnt
             FROM issues
             WHERE status IN ('proposed', 'in_progress')
             AND deleted_at IS NULL;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
         ready_row = ready_result.first()
         ready_count = ready_row.cnt if ready_row else 0
 

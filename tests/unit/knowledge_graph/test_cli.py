@@ -4,12 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from dot_work.knowledge_graph.cli import app
 from dot_work.knowledge_graph.db import Database
-
 
 runner = CliRunner()
 

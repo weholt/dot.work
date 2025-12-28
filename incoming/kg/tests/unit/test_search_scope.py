@@ -80,18 +80,10 @@ def db(tmp_path: Path) -> Database:
     )
 
     # Index nodes for FTS
-    database.fts_index_node(
-        node1.node_pk, "Python Guide", "Python programming tutorial", "N001"
-    )
-    database.fts_index_node(
-        node2.node_pk, None, "Python is a great language", "N002"
-    )
-    database.fts_index_node(
-        node3.node_pk, "Rust Guide", "Rust programming tutorial", "N003"
-    )
-    database.fts_index_node(
-        node4.node_pk, "Shared Content", "Shared programming knowledge", "N004"
-    )
+    database.fts_index_node(node1.node_pk, "Python Guide", "Python programming tutorial", "N001")
+    database.fts_index_node(node2.node_pk, None, "Python is a great language", "N002")
+    database.fts_index_node(node3.node_pk, "Rust Guide", "Rust programming tutorial", "N003")
+    database.fts_index_node(node4.node_pk, "Shared Content", "Shared programming knowledge", "N004")
 
     # Create collections (projects)
     database.create_collection("proj-a", "project", "Project A")

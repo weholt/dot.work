@@ -1,10 +1,8 @@
 """Tests for file analyzer service."""
 
-import pytest
-from pathlib import Path
 
+from dot_work.git.models import AnalysisConfig, FileCategory
 from dot_work.git.services.file_analyzer import FileAnalyzer
-from dot_work.git.models import FileCategory, AnalysisConfig
 
 
 class TestFileAnalyzer:
@@ -16,8 +14,8 @@ class TestFileAnalyzer:
         analyzer = FileAnalyzer(config)
 
         assert analyzer is not None
-        assert hasattr(analyzer, 'categorize_file')
-        assert hasattr(analyzer, 'detect_file_type')
+        assert hasattr(analyzer, "categorize_file")
+        assert hasattr(analyzer, "detect_file_type")
 
     def test_categorize_python_code_file(self):
         """Test categorizing a Python code file."""
@@ -53,11 +51,17 @@ class TestFileAnalyzer:
 
         # Python test in tests/ directory matches CODE patterns (^tests/) but also .py extension
         # The CODE pattern includes .py, so it matches first
-        assert analyzer.categorize_file("tests/test_main.py") == FileCategory.CODE  # .py matches CODE pattern
+        assert (
+            analyzer.categorize_file("tests/test_main.py") == FileCategory.CODE
+        )  # .py matches CODE pattern
         # Test in src directory - .py matches CODE pattern first
-        assert analyzer.categorize_file("src/test_utils.py") == FileCategory.CODE  # .py matches CODE pattern
+        assert (
+            analyzer.categorize_file("src/test_utils.py") == FileCategory.CODE
+        )  # .py matches CODE pattern
         # Spec file - .rb matches CODE pattern first before ^spec/ TESTS pattern
-        assert analyzer.categorize_file("spec/main_spec.rb") == FileCategory.CODE  # .rb matches CODE pattern first
+        assert (
+            analyzer.categorize_file("spec/main_spec.rb") == FileCategory.CODE
+        )  # .rb matches CODE pattern first
 
     def test_categorize_config_file(self):
         """Test categorizing configuration files."""
@@ -102,9 +106,13 @@ class TestFileAnalyzer:
         analyzer = FileAnalyzer(config)
 
         # YAML files match CONFIG pattern (.yml) before DEPLOYMENT patterns
-        assert analyzer.categorize_file("docker-compose.yml") == FileCategory.CONFIG  # .yml matches CONFIG
+        assert (
+            analyzer.categorize_file("docker-compose.yml") == FileCategory.CONFIG
+        )  # .yml matches CONFIG
         # k8s/deployment.yaml - .yaml matches CONFIG pattern before ^k8s/ DEPLOYMENT pattern
-        assert analyzer.categorize_file("k8s/deployment.yaml") == FileCategory.CONFIG  # .yaml matches CONFIG first
+        assert (
+            analyzer.categorize_file("k8s/deployment.yaml") == FileCategory.CONFIG
+        )  # .yaml matches CONFIG first
         # Terraform files have their own DEPLOYMENT pattern (.tf) that matches
         assert analyzer.categorize_file("terraform/main.tf") == FileCategory.DEPLOYMENT
 
@@ -168,12 +176,14 @@ class TestFileAnalyzer:
 
         # Same filename, different directories
         assert analyzer.categorize_file("src/utils.py") == FileCategory.CODE
-        assert analyzer.categorize_file("tests/test_utils.py") == FileCategory.CODE  # .py extension matches code first
+        assert (
+            analyzer.categorize_file("tests/test_utils.py") == FileCategory.CODE
+        )  # .py extension matches code first
         assert analyzer.categorize_file("docs/utils.md") == FileCategory.DOCUMENTATION
 
     def test_calculate_file_importance(self):
         """Test calculating file importance score."""
-        from dot_work.git.models import FileChange, ChangeType
+        from dot_work.git.models import ChangeType, FileChange
 
         config = AnalysisConfig()
         analyzer = FileAnalyzer(config)
@@ -184,7 +194,7 @@ class TestFileAnalyzer:
             change_type=ChangeType.MODIFIED,
             category=FileCategory.CODE,
             lines_added=50,
-            lines_deleted=25
+            lines_deleted=25,
         )
 
         importance = analyzer.calculate_file_importance(file_change)

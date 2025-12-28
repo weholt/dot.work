@@ -141,7 +141,7 @@ class BuildRunner:
         self.print_step("Deprecated Config Check")
 
         deprecated_tokens = ["docs_dir", "prompts_dir", "resources_dir", "templates_dir"]
-        
+
         # Allowlist: files that can mention these for backward compatibility or documentation
         allowlist = [
             "solace/env_config.py",  # Backward compatibility warning
@@ -157,7 +157,7 @@ class BuildRunner:
                 f"Search for config.{token}",
                 check=False,
             )
-            
+
             if success and output:
                 for line in output.strip().split("\n"):
                     if line:

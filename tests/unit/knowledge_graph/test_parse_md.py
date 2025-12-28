@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import io
 
-import pytest
-
 from dot_work.knowledge_graph.parse_md import (
     Block,
     BlockKind,
@@ -67,7 +65,7 @@ class TestHeadingParsing:
 
     def test_heading_with_unicode(self) -> None:
         """Heading with unicode should parse correctly."""
-        content = "# Hello 世界\n".encode("utf-8")
+        content = "# Hello 世界\n".encode()
         blocks = list(parse_markdown(content))
 
         assert blocks[0].title == "Hello 世界"
@@ -197,7 +195,7 @@ class TestByteOffsetAccuracy:
 
     def test_byte_offsets_with_utf8(self) -> None:
         """Offsets correct for UTF-8 multi-byte characters."""
-        content = "# 日本語\nテキスト\n".encode("utf-8")
+        content = "# 日本語\nテキスト\n".encode()
         blocks = list(parse_markdown(content))
 
         assert len(blocks) == 2

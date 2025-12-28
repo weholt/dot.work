@@ -1,13 +1,14 @@
 """MCP tools for Git Analysis integration."""
 
 import json
-from typing import Any, Dict, List, Optional
 from pathlib import Path
+from typing import Any
 
 try:
     from mcp.server import Server
     from mcp.server.stdio import stdio_server
-    from mcp.types import Tool, TextContent
+    from mcp.types import TextContent, Tool
+
     MCP_AVAILABLE = True
 except ImportError:
     MCP_AVAILABLE = False
@@ -18,10 +19,9 @@ except ImportError:
 
 from ..models import AnalysisConfig
 from ..services import GitAnalysisService
-from ..utils import setup_logging
 
 
-def create_git_analysis_tools() -> List[Tool]:
+def create_git_analysis_tools() -> list[Tool]:
     """Create MCP tools for git analysis."""
     if not MCP_AVAILABLE:
         return []
@@ -33,37 +33,31 @@ def create_git_analysis_tools() -> List[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "from_ref": {
-                        "type": "string",
-                        "description": "Source git reference (branch, tag, or commit hash)"
-                    },
-                    "to_ref": {
-                        "type": "string",
-                        "description": "Target git reference (branch, tag, or commit hash)"
-                    },
+                    "from_ref": {"type": "string", "description": "Source git reference (branch, tag, or commit hash)"},
+                    "to_ref": {"type": "string", "description": "Target git reference (branch, tag, or commit hash)"},
                     "repo_path": {
                         "type": "string",
                         "description": "Path to git repository (default: current directory)",
-                        "default": "."
+                        "default": ".",
                     },
                     "use_llm": {
                         "type": "boolean",
                         "description": "Use LLM for enhanced summaries (requires API keys)",
-                        "default": False
+                        "default": False,
                     },
                     "max_commits": {
                         "type": "integer",
                         "description": "Maximum number of commits to analyze",
-                        "default": 100
+                        "default": 100,
                     },
                     "include_detailed_files": {
                         "type": "boolean",
                         "description": "Include detailed file analysis in results",
-                        "default": False
-                    }
+                        "default": False,
+                    },
                 },
-                "required": ["from_ref", "to_ref"]
-            }
+                "required": ["from_ref", "to_ref"],
+            },
         ),
         Tool(
             name="compare_git_branches",
@@ -71,32 +65,22 @@ def create_git_analysis_tools() -> List[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "branch_a": {
-                        "type": "string",
-                        "description": "First branch name"
-                    },
-                    "branch_b": {
-                        "type": "string",
-                        "description": "Second branch name"
-                    },
-                    "repo_path": {
-                        "type": "string",
-                        "description": "Path to git repository",
-                        "default": "."
-                    },
+                    "branch_a": {"type": "string", "description": "First branch name"},
+                    "branch_b": {"type": "string", "description": "Second branch name"},
+                    "repo_path": {"type": "string", "description": "Path to git repository", "default": "."},
                     "risk_threshold": {
                         "type": "number",
                         "description": "Complexity threshold for risk assessment",
-                        "default": 50.0
+                        "default": 50.0,
                     },
                     "include_contributors": {
                         "type": "boolean",
                         "description": "Include contributor statistics",
-                        "default": True
-                    }
+                        "default": True,
+                    },
                 },
-                "required": ["branch_a", "branch_b"]
-            }
+                "required": ["branch_a", "branch_b"],
+            },
         ),
         Tool(
             name="get_commit_analysis",
@@ -104,28 +88,21 @@ def create_git_analysis_tools() -> List[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "commit_hash": {
-                        "type": "string",
-                        "description": "Git commit hash to analyze"
-                    },
-                    "repo_path": {
-                        "type": "string",
-                        "description": "Path to git repository",
-                        "default": "."
-                    },
+                    "commit_hash": {"type": "string", "description": "Git commit hash to analyze"},
+                    "repo_path": {"type": "string", "description": "Path to git repository", "default": "."},
                     "include_file_details": {
                         "type": "boolean",
                         "description": "Include detailed file change analysis",
-                        "default": True
+                        "default": True,
                     },
                     "generate_summary": {
                         "type": "boolean",
                         "description": "Generate AI-powered summary (requires LLM)",
-                        "default": False
-                    }
+                        "default": False,
+                    },
                 },
-                "required": ["commit_hash"]
-            }
+                "required": ["commit_hash"],
+            },
         ),
         Tool(
             name="get_complexity_report",
@@ -133,32 +110,22 @@ def create_git_analysis_tools() -> List[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "from_ref": {
-                        "type": "string",
-                        "description": "Source reference"
-                    },
-                    "to_ref": {
-                        "type": "string",
-                        "description": "Target reference"
-                    },
-                    "repo_path": {
-                        "type": "string",
-                        "description": "Path to git repository",
-                        "default": "."
-                    },
+                    "from_ref": {"type": "string", "description": "Source reference"},
+                    "to_ref": {"type": "string", "description": "Target reference"},
+                    "repo_path": {"type": "string", "description": "Path to git repository", "default": "."},
                     "complexity_threshold": {
                         "type": "number",
                         "description": "Complexity threshold for highlighting",
-                        "default": 50.0
+                        "default": 50.0,
                     },
                     "include_file_analysis": {
                         "type": "boolean",
                         "description": "Include per-file complexity analysis",
-                        "default": True
-                    }
+                        "default": True,
+                    },
                 },
-                "required": ["from_ref", "to_ref"]
-            }
+                "required": ["from_ref", "to_ref"],
+            },
         ),
         Tool(
             name="list_repository_tags",
@@ -166,25 +133,17 @@ def create_git_analysis_tools() -> List[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "repo_path": {
-                        "type": "string",
-                        "description": "Path to git repository",
-                        "default": "."
-                    },
+                    "repo_path": {"type": "string", "description": "Path to git repository", "default": "."},
                     "sort_by_date": {
                         "type": "boolean",
                         "description": "Sort tags by commit date (newest first)",
-                        "default": True
+                        "default": True,
                     },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum number of tags to return",
-                        "default": 50
-                    }
+                    "limit": {"type": "integer", "description": "Maximum number of tags to return", "default": 50},
                 },
-                "required": []
-            }
-        )
+                "required": [],
+            },
+        ),
     ]
 
 
@@ -202,12 +161,12 @@ class GitAnalysisMCPServer:
         """Set up MCP tool handlers."""
 
         @self.server.list_tools()
-        async def list_tools() -> List[Tool]:
+        async def list_tools() -> list[Tool]:
             """List available tools."""
             return create_git_analysis_tools()
 
         @self.server.call_tool()
-        async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
+        async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             """Handle tool calls."""
             try:
                 if name == "analyze_git_history":
@@ -226,14 +185,10 @@ class GitAnalysisMCPServer:
                 return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
 
             except Exception as e:
-                error_result = {
-                    "error": str(e),
-                    "tool": name,
-                    "arguments": arguments
-                }
+                error_result = {"error": str(e), "tool": name, "arguments": arguments}
                 return [TextContent(type="text", text=json.dumps(error_result, indent=2))]
 
-    async def _analyze_git_history(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    async def _analyze_git_history(self, args: dict[str, Any]) -> dict[str, Any]:
         """Analyze git history between two references."""
         from_ref = args["from_ref"]
         to_ref = args["to_ref"]
@@ -243,11 +198,7 @@ class GitAnalysisMCPServer:
         include_detailed_files = args.get("include_detailed_files", False)
 
         # Create configuration
-        config = AnalysisConfig(
-            repo_path=repo_path,
-            use_llm=use_llm,
-            max_commits=max_commits
-        )
+        config = AnalysisConfig(repo_path=repo_path, use_llm=use_llm, max_commits=max_commits)
 
         # Create service and analyze
         service = GitAnalysisService(config)
@@ -264,7 +215,7 @@ class GitAnalysisMCPServer:
                 "total_lines_deleted": result.metadata.total_lines_deleted,
                 "total_complexity": result.metadata.total_complexity,
                 "time_span_days": result.metadata.time_span_days,
-                "branches_involved": result.metadata.branches_involved
+                "branches_involved": result.metadata.branches_involved,
             },
             "aggregate_summary": result.aggregate_summary,
             "highlights": result.highlights,
@@ -282,7 +233,7 @@ class GitAnalysisMCPServer:
                     "complexity_contribution": stats.complexity_contribution,
                 }
                 for name, stats in result.contributors.items()
-            }
+            },
         }
 
         # Include commits (limited)
@@ -308,10 +259,10 @@ class GitAnalysisMCPServer:
                             "change_type": file.change_type.value,
                             "category": file.category.value,
                             "lines_added": file.lines_added,
-                            "lines_deleted": file.lines_deleted
+                            "lines_deleted": file.lines_deleted,
                         }
                         for file in commit.files_changed
-                    ]
+                    ],
                 }
                 for commit in result.commits[:20]  # Limit to 20 commits
             ]
@@ -322,14 +273,14 @@ class GitAnalysisMCPServer:
                     "author": commit.author,
                     "message": commit.short_message,
                     "complexity_score": commit.complexity_score,
-                    "tags": commit.tags
+                    "tags": commit.tags,
                 }
                 for commit in result.commits
             ]
 
         return mcp_result
 
-    async def _compare_git_branches(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    async def _compare_git_branches(self, args: dict[str, Any]) -> dict[str, Any]:
         """Compare two git branches."""
         branch_a = args["branch_a"]
         branch_b = args["branch_b"]
@@ -338,20 +289,14 @@ class GitAnalysisMCPServer:
         include_contributors = args.get("include_contributors", True)
 
         # Create configuration
-        config = AnalysisConfig(
-            repo_path=repo_path,
-            complexity_threshold=risk_threshold,
-            max_commits=200
-        )
+        config = AnalysisConfig(repo_path=repo_path, complexity_threshold=risk_threshold, max_commits=200)
 
         # Analyze
         service = GitAnalysisService(config)
         result = service.compare_refs(branch_a, branch_b)
 
         # Branch-specific analysis
-        high_complexity_commits = [
-            c for c in result.commits if c.complexity_score >= risk_threshold
-        ]
+        high_complexity_commits = [c for c in result.commits if c.complexity_score >= risk_threshold]
 
         breaking_changes = [c for c in result.commits if c.breaking_change]
         security_changes = [c for c in result.commits if c.security_relevant]
@@ -364,14 +309,14 @@ class GitAnalysisMCPServer:
                 "files_changed": result.metadata.total_files_changed,
                 "lines_added": result.metadata.total_lines_added,
                 "lines_deleted": result.metadata.total_lines_deleted,
-                "time_span_days": result.metadata.time_span_days
+                "time_span_days": result.metadata.time_span_days,
             },
             "risk_assessment": {
                 "overall_risk": result.risk_assessment,
                 "high_complexity_commits": len(high_complexity_commits),
                 "breaking_changes": len(breaking_changes),
                 "security_changes": len(security_changes),
-                "average_complexity": result.metadata.total_complexity / len(result.commits)
+                "average_complexity": result.metadata.total_complexity / len(result.commits),
             },
             "key_changes": {
                 "high_complexity": [
@@ -379,30 +324,22 @@ class GitAnalysisMCPServer:
                         "hash": c.commit_hash[:8],
                         "message": c.short_message,
                         "complexity": c.complexity_score,
-                        "author": c.author
+                        "author": c.author,
                     }
                     for c in sorted(high_complexity_commits, key=lambda x: x.complexity_score, reverse=True)[:5]
                 ],
                 "breaking": [
-                    {
-                        "hash": c.commit_hash[:8],
-                        "message": c.short_message,
-                        "author": c.author
-                    }
+                    {"hash": c.commit_hash[:8], "message": c.short_message, "author": c.author}
                     for c in breaking_changes
                 ],
                 "security": [
-                    {
-                        "hash": c.commit_hash[:8],
-                        "message": c.short_message,
-                        "author": c.author
-                    }
+                    {"hash": c.commit_hash[:8], "message": c.short_message, "author": c.author}
                     for c in security_changes
-                ]
+                ],
             },
             "summary": result.aggregate_summary,
             "highlights": result.highlights,
-            "recommendations": result.recommendations
+            "recommendations": result.recommendations,
         }
 
         if include_contributors:
@@ -410,14 +347,14 @@ class GitAnalysisMCPServer:
                 name: {
                     "commits": stats.commits,
                     "complexity": stats.complexity_contribution,
-                    "lines_changed": stats.lines_added + stats.lines_deleted
+                    "lines_changed": stats.lines_added + stats.lines_deleted,
                 }
                 for name, stats in result.contributors.items()
             }
 
         return comparison_result
 
-    async def _get_commit_analysis(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    async def _get_commit_analysis(self, args: dict[str, Any]) -> dict[str, Any]:
         """Get detailed analysis of a single commit."""
         commit_hash = args["commit_hash"]
         repo_path = Path(args.get("repo_path", "."))
@@ -426,9 +363,7 @@ class GitAnalysisMCPServer:
 
         # Create configuration
         config = AnalysisConfig(
-            repo_path=repo_path,
-            use_llm=generate_summary,
-            detailed_file_analysis=include_file_details
+            repo_path=repo_path, use_llm=generate_summary, detailed_file_analysis=include_file_details
         )
 
         # Analyze commit
@@ -446,7 +381,7 @@ class GitAnalysisMCPServer:
                 "message": analysis.message,
                 "short_message": analysis.short_message,
                 "branch": analysis.branch,
-                "tags": analysis.tags
+                "tags": analysis.tags,
             },
             "changes": {
                 "files_changed": len(analysis.files_changed),
@@ -454,7 +389,7 @@ class GitAnalysisMCPServer:
                 "files_deleted": analysis.files_deleted,
                 "files_modified": analysis.files_modified,
                 "lines_added": analysis.lines_added,
-                "lines_deleted": analysis.lines_deleted
+                "lines_deleted": analysis.lines_deleted,
             },
             "analysis": {
                 "complexity_score": analysis.complexity_score,
@@ -462,8 +397,8 @@ class GitAnalysisMCPServer:
                 "summary": analysis.summary,
                 "breaking_change": analysis.breaking_change,
                 "security_relevant": analysis.security_relevant,
-                "risk_factors": []  # Would be populated by complexity calculator
-            }
+                "risk_factors": [],  # Would be populated by complexity calculator
+            },
         }
 
         if include_file_details:
@@ -475,7 +410,7 @@ class GitAnalysisMCPServer:
                     "category": file_change.category.value,
                     "lines_added": file_change.lines_added,
                     "lines_deleted": file_change.lines_deleted,
-                    "binary_file": file_change.binary_file
+                    "binary_file": file_change.binary_file,
                 }
                 if file_change.old_path:
                     file_info["old_path"] = file_change.old_path
@@ -483,7 +418,7 @@ class GitAnalysisMCPServer:
 
         return result
 
-    async def _get_complexity_report(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    async def _get_complexity_report(self, args: dict[str, Any]) -> dict[str, Any]:
         """Generate complexity analysis and identify high-risk changes."""
         from_ref = args["from_ref"]
         to_ref = args["to_ref"]
@@ -492,27 +427,17 @@ class GitAnalysisMCPServer:
         include_file_analysis = args.get("include_file_analysis", True)
 
         # Create configuration
-        config = AnalysisConfig(
-            repo_path=repo_path,
-            complexity_threshold=complexity_threshold
-        )
+        config = AnalysisConfig(repo_path=repo_path, complexity_threshold=complexity_threshold)
 
         # Analyze
         service = GitAnalysisService(config)
         result = service.compare_refs(from_ref, to_ref)
 
         # Generate complexity report
-        high_complexity_commits = [
-            c for c in result.commits if c.complexity_score >= complexity_threshold
-        ]
+        high_complexity_commits = [c for c in result.commits if c.complexity_score >= complexity_threshold]
 
         # Risk assessment
-        risk_levels = {
-            "low": 0,
-            "medium": 0,
-            "high": 0,
-            "critical": 0
-        }
+        risk_levels = {"low": 0, "medium": 0, "high": 0, "critical": 0}
 
         for commit in result.commits:
             if commit.complexity_score < 20:
@@ -530,7 +455,7 @@ class GitAnalysisMCPServer:
                 "average_complexity": result.metadata.total_complexity / len(result.commits),
                 "max_complexity": max(c.complexity_score for c in result.commits),
                 "high_complexity_count": len(high_complexity_commits),
-                "complexity_threshold": complexity_threshold
+                "complexity_threshold": complexity_threshold,
             },
             "risk_distribution": risk_levels,
             "high_complexity_commits": [
@@ -544,15 +469,21 @@ class GitAnalysisMCPServer:
                     "tags": c.tags,
                     "impact_areas": c.impact_areas,
                     "breaking_change": c.breaking_change,
-                    "security_relevant": c.security_relevant
+                    "security_relevant": c.security_relevant,
                 }
                 for c in sorted(high_complexity_commits, key=lambda x: x.complexity_score, reverse=True)
             ],
             "recommendations": [
-                f"Consider breaking down {len(high_complexity_commits)} high-complexity commits" if high_complexity_commits else "Complexity levels are acceptable",
-                "Review breaking changes for migration requirements" if any(c.breaking_change for c in result.commits) else "No breaking changes detected",
-                "Consider additional testing for security-related changes" if any(c.security_relevant for c in result.commits) else "No security concerns detected"
-            ]
+                f"Consider breaking down {len(high_complexity_commits)} high-complexity commits"
+                if high_complexity_commits
+                else "Complexity levels are acceptable",
+                "Review breaking changes for migration requirements"
+                if any(c.breaking_change for c in result.commits)
+                else "No breaking changes detected",
+                "Consider additional testing for security-related changes"
+                if any(c.security_relevant for c in result.commits)
+                else "No security concerns detected",
+            ],
         }
 
         if include_file_analysis:
@@ -562,17 +493,17 @@ class GitAnalysisMCPServer:
                         "path": file_info["path"],
                         "complexity_score": file_info["complexity_score"],
                         "commits": file_info["commits"],
-                        "lines_changed": file_info["total_lines_added"] + file_info["total_lines_deleted"]
+                        "lines_changed": file_info["total_lines_added"] + file_info["total_lines_deleted"],
                     }
                     for file_info in result.top_complex_files[:10]
                 ],
                 "file_categories": {cat.value: count for cat, count in result.file_categories.items()},
-                "complexity_distribution": result.complexity_distribution
+                "complexity_distribution": result.complexity_distribution,
             }
 
         return complexity_report
 
-    async def _list_repository_tags(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    async def _list_repository_tags(self, args: dict[str, Any]) -> dict[str, Any]:
         """List all tags in the repository."""
         repo_path = Path(args.get("repo_path", "."))
         sort_by_date = args.get("sort_by_date", True)
@@ -580,6 +511,7 @@ class GitAnalysisMCPServer:
 
         try:
             import git
+
             repo = git.Repo(repo_path)
             tags = list(repo.tags)
 
@@ -594,7 +526,7 @@ class GitAnalysisMCPServer:
                         "short_hash": commit.hexsha[:8],
                         "author": commit.author.name,
                         "date": commit.committed_date.isoformat(),
-                        "message": commit.message.strip().split('\n')[0] if commit.message else ""
+                        "message": commit.message.strip().split("\n")[0] if commit.message else "",
                     }
                     tag_info.append(tag_data)
                 except:
@@ -616,17 +548,14 @@ class GitAnalysisMCPServer:
                 "total_tags": len(tag_info),
                 "tags": tag_info,
                 "sort_by_date": sort_by_date,
-                "limit_applied": limit
+                "limit_applied": limit,
             }
 
         except Exception as e:
-            return {
-                "error": f"Failed to list tags: {str(e)}",
-                "repository": str(repo_path)
-            }
+            return {"error": f"Failed to list tags: {str(e)}", "repository": str(repo_path)}
 
 
-def create_server() -> Optional[GitAnalysisMCPServer]:
+def create_server() -> GitAnalysisMCPServer | None:
     """Create and return the MCP server instance."""
     if not MCP_AVAILABLE:
         return None

@@ -13,9 +13,10 @@ import shlex
 import subprocess
 import tempfile
 import textwrap
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any
 
 import frontmatter
 
@@ -25,7 +26,9 @@ DEFAULT_GIT_USER_NAME = "repo-agent"
 DEFAULT_GIT_USER_EMAIL = "repo-agent@example.com"
 DEFAULT_BRANCH_PREFIX = "auto/repo-agent-"
 DEFAULT_PR_TITLE = "Automated changes via repo-agent"
-DEFAULT_PR_BODY = "This PR was generated automatically by repo-agent using a configurable code tool."
+DEFAULT_PR_BODY = (
+    "This PR was generated automatically by repo-agent using a configurable code tool."
+)
 DEFAULT_COMMIT_MESSAGE = "chore: automated changes via repo-agent"
 
 # OpenCode configuration paths
@@ -40,7 +43,7 @@ BOOL_FALSE = "0"
 
 class RepoAgentError(Exception):
     """Base exception for repo-agent failures.
-    
+
     This exception is raised for any configuration errors, validation failures,
     or runtime errors specific to repo-agent operations.
     """
@@ -49,12 +52,12 @@ class RepoAgentError(Exception):
 @dataclass
 class RunConfig:
     """Configuration for a repo-agent run.
-    
+
     This dataclass holds all configuration values needed to execute a repo-agent
     workflow, including repository settings, Docker configuration, authentication,
     LLM parameters, and tool settings. Values are resolved from frontmatter and
     CLI overrides.
-    
+
     Attributes:
         instructions_path: Path to the markdown instructions file.
         repo_url: Git repository URL (HTTPS or SSH).
@@ -83,7 +86,7 @@ class RunConfig:
         prompt_header_direct: Prompt header for direct strategy.
         dry_run: If True, print Docker command instead of executing.
     """
-    
+
     # Core
     instructions_path: Path
     repo_url: str
@@ -127,16 +130,16 @@ class RunConfig:
 
 def _bool_meta(meta: Mapping[str, Any], key: str, default: bool) -> bool:
     """Parse a boolean value from frontmatter metadata.
-    
+
     Handles multiple boolean representations: native bools, numeric strings
     ('1', '0'), and text values ('true', 'false', 'yes', 'no', 'on', 'off').
     Case-insensitive for string values.
-    
+
     Args:
         meta: Metadata dictionary from frontmatter.
         key: Key to look up in metadata.
         default: Default value if key is missing.
-        
+
     Returns:
         Boolean value parsed from metadata, or default if key not found.
     """
@@ -152,10 +155,10 @@ def _bool_meta(meta: Mapping[str, Any], key: str, default: bool) -> bool:
 
 def _load_frontmatter(path: Path) -> tuple[dict[str, Any], str]:
     """Load and parse a markdown file with YAML frontmatter.
-    
+
     Args:
         path: Path to the markdown file.
-        
+
     Returns:
         A tuple of (metadata dict, content string). The content is stripped
         of leading/trailing whitespace. If metadata is None, returns empty dict.
@@ -171,20 +174,20 @@ def _resolve_config(
     cli_overrides: Mapping[str, Any],
 ) -> tuple[RunConfig, str]:
     """Resolve final configuration by merging frontmatter and CLI overrides.
-    
+
     Loads the instruction file frontmatter, applies CLI overrides, resolves
     environment variables, validates required fields, and constructs a complete
     RunConfig object with all necessary defaults filled in.
-    
+
     CLI overrides take precedence over frontmatter values when both are provided.
-    
+
     Args:
         instructions_path: Path to the markdown instructions file.
         cli_overrides: Dictionary of command-line parameter overrides.
-        
+
     Returns:
         A tuple of (RunConfig object, instructions body text).
-        
+
     Raises:
         RepoAgentError: If required fields (repo_url, model) are missing,
             strategy is invalid, or other configuration errors occur.
@@ -229,7 +232,9 @@ def _resolve_config(
         raise RepoAgentError("model must be provided via frontmatter or --model")
 
     # Strategy (generic, but we support legacy opencode_strategy key)
-    strategy_val = cli_overrides.get("strategy") or meta.get("strategy") or meta.get("opencode_strategy")
+    strategy_val = (
+        cli_overrides.get("strategy") or meta.get("strategy") or meta.get("opencode_strategy")
+    )
     strategy = (strategy_val or "agentic").lower()
     if strategy not in {"agentic", "direct"}:
         raise RepoAgentError("strategy must be 'agentic' or 'direct'")
@@ -266,7 +271,7 @@ def _resolve_config(
     git_user_email = get("git_user_email", DEFAULT_GIT_USER_EMAIL)
 
     # GitHub token resolution (frontmatter + env indirection)
-    github_token: Optional[str] = None
+    github_token: str | None = None
     raw_token = get("github_token")
     token_env_name = get("github_token_env")
     if raw_token:
@@ -279,7 +284,7 @@ def _resolve_config(
         github_token = os.getenv("GH_TOKEN")
 
     # API key resolution (for LLM providers like OpenRouter)
-    api_key: Optional[str] = None
+    api_key: str | None = None
     raw_api_key = get("api_key")
     api_key_env_name = get("api_key_env")
     if raw_api_key:
@@ -290,7 +295,9 @@ def _resolve_config(
     # Tool config
     tool_meta = meta.get("tool", {}) or {}
     tool_name = tool_meta.get("name") or "opencode"
-    tool_entrypoint = cli_overrides.get("tool_entrypoint") or tool_meta.get("entrypoint") or "opencode run"
+    tool_entrypoint = (
+        cli_overrides.get("tool_entrypoint") or tool_meta.get("entrypoint") or "opencode run"
+    )
     tool_args = tool_meta.get("args") or {}
 
     header_agentic = tool_meta.get("prompt_header_agentic") or (
@@ -338,13 +345,13 @@ def _resolve_config(
 
 def _docker_build_if_needed(cfg: RunConfig) -> None:
     """Build a Docker image from a Dockerfile if one is specified.
-    
+
     If cfg.dockerfile is set, executes `docker build` to create the image
     tagged with cfg.docker_image. If dockerfile is None, this is a no-op.
-    
+
     Args:
         cfg: Configuration object containing dockerfile path and image tag.
-        
+
     Raises:
         subprocess.CalledProcessError: If docker build command fails.
     """
@@ -364,13 +371,13 @@ def _docker_build_if_needed(cfg: RunConfig) -> None:
 
 def _build_env_args(cfg: RunConfig) -> list[str]:
     """Build Docker environment variable arguments from configuration.
-    
+
     Creates environment variables for repository, model, strategy, git config,
     tool settings, and authentication tokens.
-    
+
     Args:
         cfg: Configuration object with all settings.
-        
+
     Returns:
         List of Docker CLI arguments in format ['-e', 'KEY=value', '-e', 'KEY2=value2', ...].
     """
@@ -417,7 +424,7 @@ def _build_env_args(cfg: RunConfig) -> list[str]:
     env_args: list[str] = []
     for k, v in env_map.items():
         env_args.extend(["-e", f"{k}={v}"])
-    
+
     return env_args
 
 
@@ -427,15 +434,15 @@ def _build_volume_args(
     instructions_body_path: Path,
 ) -> list[str]:
     """Build Docker volume mount arguments.
-    
+
     Creates volume mounts for workspace, instruction files, optional SSH keys,
     and optional OpenCode configuration.
-    
+
     Args:
         cfg: Configuration object with all settings.
         workdir: Temporary directory for the workspace.
         instructions_body_path: Path to the instructions content file.
-        
+
     Returns:
         List of Docker CLI volume arguments in format ['-v', 'host:container', ...].
     """
@@ -449,23 +456,25 @@ def _build_volume_args(
     # Mount opencode.json config if it exists
     opencode_config = cfg.instructions_path.parent / OPENCODE_CONFIG_FILENAME
     if opencode_config.exists():
-        volume_args.extend([
-            "-v",
-            f"{opencode_config}:{OPENCODE_CONFIG_CONTAINER_PATH}:ro",
-        ])
+        volume_args.extend(
+            [
+                "-v",
+                f"{opencode_config}:{OPENCODE_CONFIG_CONTAINER_PATH}:ro",
+            ]
+        )
 
     if cfg.use_ssh:
         ssh_dir = cfg.ssh_key_dir or Path.home() / ".ssh"
         volume_args.extend(
             ["-v", f"{ssh_dir}:/root/.ssh:ro"],
         )
-    
+
     return volume_args
 
 
 def _generate_inner_script() -> str:
     """Generate the bash script that runs inside the Docker container.
-    
+
     This script handles the complete workflow:
     1. Validates required environment variables
     2. Optionally creates the GitHub repository if it doesn't exist
@@ -475,7 +484,7 @@ def _generate_inner_script() -> str:
     6. Constructs and runs the tool prompt
     7. Commits and pushes changes if auto_commit is enabled
     8. Creates a pull request if create_pr is enabled
-    
+
     Returns:
         Complete bash script as a string.
     """
@@ -663,30 +672,30 @@ def _build_docker_run_cmd(
     instructions_body_path: Path,
 ) -> list[str]:
     """Build the complete Docker run command with all environment variables and volumes.
-    
+
     Constructs a Docker run command that:
     - Sets up environment variables for the tool
     - Mounts workspace and instruction files
     - Optionally mounts SSH keys and OpenCode config
     - Executes a bash script that clones the repo, runs the tool, and creates a PR
-    
+
     Args:
         cfg: Configuration object with all settings.
         workdir: Temporary directory for the workspace.
         instructions_body_path: Path to the instructions content file.
-        
+
     Returns:
         Complete Docker run command as a list of strings.
     """
     env_args = _build_env_args(cfg)
     volume_args = _build_volume_args(cfg, workdir, instructions_body_path)
     inner_script = _generate_inner_script()
-    
+
     # Add OpenCode config environment variable if the config file exists
     opencode_config = cfg.instructions_path.parent / OPENCODE_CONFIG_FILENAME
     if opencode_config.exists():
         env_args.extend(["-e", f"OPENCODE_CONFIG={OPENCODE_CONFIG_CONTAINER_PATH}"])
-    
+
     cmd = [
         "docker",
         "run",
@@ -704,38 +713,38 @@ def _build_docker_run_cmd(
 def run_from_markdown(
     instructions_path: Path,
     *,
-    repo_url: Optional[str] = None,
-    branch: Optional[str] = None,
-    base_branch: Optional[str] = None,
-    docker_image: Optional[str] = None,
-    dockerfile: Optional[Path] = None,
-    use_ssh: Optional[bool] = None,
-    ssh_key_dir: Optional[Path] = None,
-    model: Optional[str] = None,
-    strategy: Optional[str] = None,
-    pr_title: Optional[str] = None,
-    pr_body: Optional[str] = None,
-    github_token: Optional[str] = None,
-    auto_commit: Optional[bool] = None,
-    create_pr: Optional[bool] = None,
-    create_repo_if_missing: Optional[bool] = None,
-    commit_message: Optional[str] = None,
-    git_user_name: Optional[str] = None,
-    git_user_email: Optional[str] = None,
-    tool_entrypoint: Optional[str] = None,
+    repo_url: str | None = None,
+    branch: str | None = None,
+    base_branch: str | None = None,
+    docker_image: str | None = None,
+    dockerfile: Path | None = None,
+    use_ssh: bool | None = None,
+    ssh_key_dir: Path | None = None,
+    model: str | None = None,
+    strategy: str | None = None,
+    pr_title: str | None = None,
+    pr_body: str | None = None,
+    github_token: str | None = None,
+    auto_commit: bool | None = None,
+    create_pr: bool | None = None,
+    create_repo_if_missing: bool | None = None,
+    commit_message: str | None = None,
+    git_user_name: str | None = None,
+    git_user_email: str | None = None,
+    tool_entrypoint: str | None = None,
     dry_run: bool = False,
 ) -> None:
     """Execute the full repo-agent workflow from a markdown instruction file.
-    
+
     This is the main entry point for running repo-agent. It:
     1. Loads and parses the instruction file with frontmatter
     2. Merges configuration from frontmatter and CLI overrides
     3. Builds Docker image if needed
     4. Constructs and executes Docker run command
     5. The Docker container handles: cloning, running the tool, committing, and creating PR
-    
+
     All parameters are optional and override corresponding frontmatter values when provided.
-    
+
     Args:
         instructions_path: Path to markdown file with YAML frontmatter and instructions.
         repo_url: Override repository URL.
@@ -758,7 +767,7 @@ def run_from_markdown(
         git_user_email: Override git user.email.
         tool_entrypoint: Override tool entrypoint command.
         dry_run: If True, prints Docker command without executing.
-        
+
     Raises:
         RepoAgentError: If instructions file is not found, required configuration
             is missing, or validation fails.

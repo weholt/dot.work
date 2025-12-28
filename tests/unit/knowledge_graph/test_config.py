@@ -6,7 +6,12 @@ from unittest.mock import patch
 
 import pytest
 
-from dot_work.knowledge_graph.config import ConfigError, ensure_db_directory, get_db_path, validate_path
+from dot_work.knowledge_graph.config import (
+    ConfigError,
+    ensure_db_directory,
+    get_db_path,
+    validate_path,
+)
 
 
 class TestGetDbPath:

@@ -121,9 +121,7 @@ class TestSearch:
 
         assert len(results) <= 2
 
-    def test_search_returns_results_sorted_by_score(
-        self, indexed_db: Database
-    ) -> None:
+    def test_search_returns_results_sorted_by_score(self, indexed_db: Database) -> None:
         """Results should be sorted by relevance."""
         results = search(indexed_db, "Python")
 

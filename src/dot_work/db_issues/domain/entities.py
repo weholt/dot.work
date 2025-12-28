@@ -121,16 +121,25 @@ class User:
             import subprocess
 
             try:
-                username = subprocess.check_output(
-                    ["git", "config", "user.name"], stderr=subprocess.DEVNULL
-                ).decode().strip()
+                username = (
+                    subprocess.check_output(
+                        ["git", "config", "user.name"], stderr=subprocess.DEVNULL
+                    )
+                    .decode()
+                    .strip()
+                )
             except (subprocess.CalledProcessError, FileNotFoundError):
                 return None
 
             try:
-                email = subprocess.check_output(
-                    ["git", "config", "user.email"], stderr=subprocess.DEVNULL
-                ).decode().strip() or None
+                email = (
+                    subprocess.check_output(
+                        ["git", "config", "user.email"], stderr=subprocess.DEVNULL
+                    )
+                    .decode()
+                    .strip()
+                    or None
+                )
             except (subprocess.CalledProcessError, FileNotFoundError):
                 email = None
 

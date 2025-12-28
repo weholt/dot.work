@@ -5,13 +5,11 @@ from dataclasses import dataclass, field
 from datetime import UTC
 from enum import Enum, auto
 from pathlib import Path
-from typing import Callable
 
 from jinja2 import Environment as JinjaEnvironment
 from jinja2 import FileSystemLoader
 from rich.console import Console
 from rich.table import Table
-import typer
 
 from dot_work.environments import ENVIRONMENTS, Environment
 
@@ -281,7 +279,9 @@ def install_prompts(
     except ValueError as e:
         # If no canonical prompts found, fall back to legacy installer
         if "not found in any prompt files" in str(e):
-            console.print("[dim]⚠ No canonical prompts found, trying legacy installation...[/dim]\n")
+            console.print(
+                "[dim]⚠ No canonical prompts found, trying legacy installation...[/dim]\n"
+            )
         else:
             raise
 
@@ -330,7 +330,9 @@ def install_prompts_generic(
         sections = [_build_combined_header(config)]
 
         # Get prompt files
-        prompt_files = sorted(prompts_dir.glob("*.md")) if config.sort_files else prompts_dir.glob("*.md")
+        prompt_files = (
+            sorted(prompts_dir.glob("*.md")) if config.sort_files else prompts_dir.glob("*.md")
+        )
 
         for prompt_file in prompt_files:
             content = render_prompt(prompts_dir, prompt_file, env_config)
@@ -1235,6 +1237,7 @@ def install_canonical_prompt_directory(
 # Canonical Prompt Frontmatter Discovery
 # =============================================================================
 
+
 def discover_available_environments(prompts_dir: Path) -> dict[str, set[str]]:
     """Discover available environments from prompt file frontmatter.
 
@@ -1406,7 +1409,9 @@ def install_canonical_prompts_by_environment(
             installed_count += 1
 
     if dry_run:
-        console.print(f"\n[cyan]📁 Dry-run complete: {len(install_plan)} file(s) would be installed[/cyan]")
+        console.print(
+            f"\n[cyan]📁 Dry-run complete: {len(install_plan)} file(s) would be installed[/cyan]"
+        )
     else:
         console.print(f"\n[cyan]📁 Installed {installed_count} prompt(s) for {env_name}[/cyan]")
 

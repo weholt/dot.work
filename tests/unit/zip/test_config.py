@@ -2,8 +2,6 @@
 
 import os
 
-import pytest
-
 from dot_work.zip.config import ZipConfig
 
 

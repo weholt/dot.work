@@ -7,8 +7,8 @@ Source: /home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/src/is
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 from dot_work.db_issues.adapters import UnitOfWork
 from dot_work.db_issues.domain.entities import (

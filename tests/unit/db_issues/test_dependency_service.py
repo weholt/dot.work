@@ -14,20 +14,16 @@ from sqlmodel import Session
 
 from dot_work.db_issues.adapters import UnitOfWork
 from dot_work.db_issues.domain.entities import (
-    Clock,
     Dependency,
     DependencyType,
     IdentifierService,
-    Issue,
     IssuePriority,
     IssueStatus,
     IssueType,
 )
 from dot_work.db_issues.services.dependency_service import (
-    BlockedIssue,
     CycleResult,
     DependencyService,
-    ReadyResult,
 )
 from dot_work.db_issues.services.issue_service import IssueService
 
@@ -101,7 +97,9 @@ class TestDependencyServiceGetAllDependencies:
             Dependency(from_issue_id=a.id, to_issue_id=b.id, dependency_type=DependencyType.BLOCKS)
         )
         dependency_service.uow.graph.add_dependency(
-            Dependency(from_issue_id=b.id, to_issue_id=c.id, dependency_type=DependencyType.DEPENDS_ON)
+            Dependency(
+                from_issue_id=b.id, to_issue_id=c.id, dependency_type=DependencyType.DEPENDS_ON
+            )
         )
 
         blocks_only = dependency_service.get_all_dependencies(DependencyType.BLOCKS)
@@ -173,7 +171,9 @@ class TestDependencyServiceGenerateMermaid:
             Dependency(from_issue_id=a.id, to_issue_id=b.id, dependency_type=DependencyType.BLOCKS)
         )
         local_dependency_service.uow.graph.add_dependency(
-            Dependency(from_issue_id=b.id, to_issue_id=c.id, dependency_type=DependencyType.DEPENDS_ON)
+            Dependency(
+                from_issue_id=b.id, to_issue_id=c.id, dependency_type=DependencyType.DEPENDS_ON
+            )
         )
 
         mermaid_deep = local_dependency_service.generate_mermaid(a.id, max_depth=10)
@@ -188,26 +188,18 @@ class TestDependencyServiceGenerateMermaid:
 class TestDependencyServiceSuggestCycleFixes:
     """Tests for suggest_cycle_fixes method."""
 
-    def test_suggest_cycle_fixes_empty_list(
-        self, dependency_service: DependencyService
-    ) -> None:
+    def test_suggest_cycle_fixes_empty_list(self, dependency_service: DependencyService) -> None:
         """Test with empty cycles list."""
         fixes = dependency_service.suggest_cycle_fixes([])
         assert fixes == []
 
-    def test_suggest_cycle_fixes_no_cycle(
-        self, dependency_service: DependencyService
-    ) -> None:
+    def test_suggest_cycle_fixes_no_cycle(self, dependency_service: DependencyService) -> None:
         """Test with cycle results that have no cycles."""
-        no_cycle = CycleResult(
-            has_cycle=False, cycle_path=[], message="No cycle"
-        )
+        no_cycle = CycleResult(has_cycle=False, cycle_path=[], message="No cycle")
         fixes = dependency_service.suggest_cycle_fixes([no_cycle])
         assert fixes == []
 
-    def test_suggest_cycle_fixes_with_cycle(
-        self, dependency_service: DependencyService
-    ) -> None:
+    def test_suggest_cycle_fixes_with_cycle(self, dependency_service: DependencyService) -> None:
         """Test fix suggestions for actual cycles."""
         cycle = CycleResult(
             has_cycle=True,
@@ -259,11 +251,15 @@ class TestDependencyServiceIntegration:
         )
         # B depends-on C
         dependency_service.uow.graph.add_dependency(
-            Dependency(from_issue_id=b.id, to_issue_id=c.id, dependency_type=DependencyType.DEPENDS_ON)
+            Dependency(
+                from_issue_id=b.id, to_issue_id=c.id, dependency_type=DependencyType.DEPENDS_ON
+            )
         )
         # Bug related-to A
         dependency_service.uow.graph.add_dependency(
-            Dependency(from_issue_id=bug.id, to_issue_id=a.id, dependency_type=DependencyType.RELATED_TO)
+            Dependency(
+                from_issue_id=bug.id, to_issue_id=a.id, dependency_type=DependencyType.RELATED_TO
+            )
         )
 
         # Get all blocks dependencies
@@ -323,9 +319,7 @@ class TestDependencyServiceIntegration:
 class TestDependencyServiceGetReadyQueue:
     """Tests for get_ready_queue method."""
 
-    def test_ready_queue_with_no_issues(
-        self, dependency_service: DependencyService
-    ) -> None:
+    def test_ready_queue_with_no_issues(self, dependency_service: DependencyService) -> None:
         """Test ready queue with no issues."""
         result = dependency_service.get_ready_queue()
         assert result.ready_issues == []
@@ -447,7 +441,9 @@ class TestDependencyServiceGetReadyQueue:
             Dependency(from_issue_id=a.id, to_issue_id=c.id, dependency_type=DependencyType.BLOCKS)
         )
         dependency_service.uow.graph.add_dependency(
-            Dependency(from_issue_id=b.id, to_issue_id=c.id, dependency_type=DependencyType.DEPENDS_ON)
+            Dependency(
+                from_issue_id=b.id, to_issue_id=c.id, dependency_type=DependencyType.DEPENDS_ON
+            )
         )
 
         result = dependency_service.get_ready_queue()
@@ -487,7 +483,9 @@ class TestDependencyServiceReadyQueueIntegration:
             Dependency(from_issue_id=a.id, to_issue_id=b.id, dependency_type=DependencyType.BLOCKS)
         )
         dependency_service.uow.graph.add_dependency(
-            Dependency(from_issue_id=b.id, to_issue_id=c.id, dependency_type=DependencyType.DEPENDS_ON)
+            Dependency(
+                from_issue_id=b.id, to_issue_id=c.id, dependency_type=DependencyType.DEPENDS_ON
+            )
         )
 
         result = dependency_service.get_ready_queue()
@@ -508,10 +506,18 @@ class TestDependencyServiceReadyQueueIntegration:
 
         # Both ready issues block the third - use different types
         dependency_service.uow.graph.add_dependency(
-            Dependency(from_issue_id=ready1.id, to_issue_id=blocked.id, dependency_type=DependencyType.BLOCKS)
+            Dependency(
+                from_issue_id=ready1.id,
+                to_issue_id=blocked.id,
+                dependency_type=DependencyType.BLOCKS,
+            )
         )
         dependency_service.uow.graph.add_dependency(
-            Dependency(from_issue_id=ready2.id, to_issue_id=blocked.id, dependency_type=DependencyType.DEPENDS_ON)
+            Dependency(
+                from_issue_id=ready2.id,
+                to_issue_id=blocked.id,
+                dependency_type=DependencyType.DEPENDS_ON,
+            )
         )
 
         result = dependency_service.get_ready_queue()
@@ -520,7 +526,9 @@ class TestDependencyServiceReadyQueueIntegration:
         assert ready1.id in result.ready_issues
         assert ready2.id in result.ready_issues
         # Blocked issue has blocker (only BLOCKS type counts)
-        blocked_entry = next((bi for bi in result.blocked_issues if bi.issue_id == blocked.id), None)
+        blocked_entry = next(
+            (bi for bi in result.blocked_issues if bi.issue_id == blocked.id), None
+        )
         assert blocked_entry is not None
         assert ready1.id in blocked_entry.blockers
 
@@ -533,7 +541,9 @@ class TestDependencyServiceReadyQueueIntegration:
 
         # Use non-blocking dependency type
         dependency_service.uow.graph.add_dependency(
-            Dependency(from_issue_id=a.id, to_issue_id=b.id, dependency_type=DependencyType.DEPENDS_ON)
+            Dependency(
+                from_issue_id=a.id, to_issue_id=b.id, dependency_type=DependencyType.DEPENDS_ON
+            )
         )
 
         result = dependency_service.get_ready_queue()

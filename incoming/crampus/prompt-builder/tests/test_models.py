@@ -1,20 +1,21 @@
 """Tests for data models."""
 
-import pytest
 from datetime import datetime
 
+import pytest
+
 from prompt_builder.models import (
-    Task,
+    AgentConfig,
+    ChangeImpactResult,
+    PRInfo,
+    Snapshot,
     Subtask,
+    SyntheticTestResult,
+    Task,
     TaskStatus,
     ValidationContract,
     ValidationResult,
     ValidationType,
-    Snapshot,
-    ChangeImpactResult,
-    SyntheticTestResult,
-    AgentConfig,
-    PRInfo,
 )
 
 
@@ -23,11 +24,7 @@ class TestTask:
 
     def test_task_creation(self):
         """Test basic task creation."""
-        task = Task(
-            id="TASK-001",
-            title="Test Task",
-            description="A test task description"
-        )
+        task = Task(id="TASK-001", title="Test Task", description="A test task description")
 
         assert task.id == "TASK-001"
         assert task.title == "Test Task"
@@ -39,29 +36,16 @@ class TestTask:
 
     def test_task_with_subtasks(self):
         """Test task with subtasks."""
-        subtask = Subtask(
-            id="ST-001",
-            summary="Test subtask",
-            description="A test subtask"
-        )
+        subtask = Subtask(id="ST-001", summary="Test subtask", description="A test subtask")
 
-        task = Task(
-            id="TASK-001",
-            title="Test Task",
-            description="A test task description",
-            subtasks=[subtask]
-        )
+        task = Task(id="TASK-001", title="Test Task", description="A test task description", subtasks=[subtask])
 
         assert len(task.subtasks) == 1
         assert task.subtasks[0] == subtask
 
     def test_task_status_transitions(self):
         """Test task status changes."""
-        task = Task(
-            id="TASK-001",
-            title="Test Task",
-            description="A test task description"
-        )
+        task = Task(id="TASK-001", title="Test Task", description="A test task description")
 
         assert task.status == TaskStatus.PENDING
 
@@ -78,17 +62,10 @@ class TestSubtask:
     def test_subtask_creation(self):
         """Test basic subtask creation."""
         contract = ValidationContract(
-            preconditions=["Code compiles"],
-            postconditions=["Functionality works"],
-            test_cases=["Test basic case"]
+            preconditions=["Code compiles"], postconditions=["Functionality works"], test_cases=["Test basic case"]
         )
 
-        subtask = Subtask(
-            id="ST-001",
-            summary="Test subtask",
-            description="A test subtask",
-            contract=contract
-        )
+        subtask = Subtask(id="ST-001", summary="Test subtask", description="A test subtask", contract=contract)
 
         assert subtask.id == "ST-001"
         assert subtask.summary == "Test subtask"
@@ -104,7 +81,7 @@ class TestSubtask:
             id="ST-002",
             summary="Test subtask with deps",
             description="A test subtask with dependencies",
-            dependencies=["ST-001"]
+            dependencies=["ST-001"],
         )
 
         assert len(subtask.dependencies) == 1
@@ -120,7 +97,7 @@ class TestValidationContract:
             preconditions=["Precondition 1"],
             postconditions=["Postcondition 1"],
             invariants=["Invariant 1"],
-            test_cases=["Test case 1"]
+            test_cases=["Test case 1"],
         )
 
         assert len(contract.preconditions) == 1
@@ -151,7 +128,7 @@ class TestValidationResult:
             issues=[],
             warnings=["Warning 1"],
             metrics={"files_checked": 5},
-            execution_time=1.5
+            execution_time=1.5,
         )
 
         assert result.validator_type == ValidationType.STATIC
@@ -169,7 +146,7 @@ class TestValidationResult:
             validator_type=ValidationType.BEHAVIOR,
             subtask_id="ST-002",
             passed=False,
-            issues=["Test failed", "Coverage low"]
+            issues=["Test failed", "Coverage low"],
         )
 
         assert result.passed is False
@@ -191,7 +168,7 @@ class TestSnapshot:
             outputs={"status": "success"},
             side_effects={"db_updated": True},
             call_graph_nodes=["login_handler", "auth_service"],
-            invariants={"session_created": True}
+            invariants={"session_created": True},
         )
 
         assert snapshot.id == "SNAP-001"
@@ -217,7 +194,7 @@ class TestChangeImpactResult:
             summary="Authentication system modified",
             warnings=["Breaking change detected"],
             risk_score=0.7,
-            estimated_effort="Medium (1-2 hours)"
+            estimated_effort="Medium (1-2 hours)",
         )
 
         assert len(result.touched_files) == 2
@@ -240,7 +217,7 @@ class TestSyntheticTestResult:
             failing_cases=[],
             coverage_increase=15.5,
             execution_time=2.3,
-            test_framework="pytest"
+            test_framework="pytest",
         )
 
         assert len(result.created_tests) == 1
@@ -257,11 +234,7 @@ class TestAgentConfig:
     def test_agent_config_creation(self):
         """Test basic agent config creation."""
         config = AgentConfig(
-            name="TestAgent",
-            enabled=True,
-            timeout=300.0,
-            max_retries=3,
-            parameters={"strict_mode": True}
+            name="TestAgent", enabled=True, timeout=300.0, max_retries=3, parameters={"strict_mode": True}
         )
 
         assert config.name == "TestAgent"
@@ -294,7 +267,7 @@ class TestPRInfo:
             files_changed=["src/feature.py", "tests/test_feature.py"],
             labels=["enhancement", "needs-review"],
             reviewers=["team-lead", "senior-dev"],
-            draft=False
+            draft=False,
         )
 
         assert pr_info.title == "Add new feature"

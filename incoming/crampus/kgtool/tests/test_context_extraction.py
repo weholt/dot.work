@@ -27,7 +27,9 @@ def test_extract_frontend_context_from_sample(sample_doc: Path, tmp_output_dir: 
     text = output_file.read_text(encoding="utf-8")
     assert "frontend" in text.lower()
     # Should not heavily include backend content
-    assert "backend architecture" not in text or text.count("backend architecture") < text.count("frontend architecture")
+    assert "backend architecture" not in text or text.count("backend architecture") < text.count(
+        "frontend architecture"
+    )
 
 
 def test_extract_frontend_context_with_topics(

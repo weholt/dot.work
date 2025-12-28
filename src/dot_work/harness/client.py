@@ -5,7 +5,7 @@ Provides async interface to Claude Agent SDK with proper configuration.
 """
 
 from pathlib import Path
-from typing import Literal, NotRequired, TypedDict
+from typing import Literal
 
 try:
     from claude_agent_sdk import (
@@ -14,6 +14,7 @@ try:
         ClaudeSDKClient,
         TextBlock,
     )
+
     CLAUDE_AGENT_SDK_AVAILABLE = True
 except ImportError:
     CLAUDE_AGENT_SDK_AVAILABLE = False
@@ -175,7 +176,9 @@ async def run_harness_async(
             if after_done > before_done:
                 continue
 
-            print("STOP: no task was marked done in this iteration. Check tasks.md for a BLOCKED note.")
+            print(
+                "STOP: no task was marked done in this iteration. Check tasks.md for a BLOCKED note."
+            )
             return
 
         print("STOP: reached --max-iterations without completing all tasks.")
@@ -201,8 +204,7 @@ def run_harness(
         import anyio
     except ImportError:
         raise ImportError(
-            "anyio is required for harness functionality. "
-            "Install with: pip install anyio"
+            "anyio is required for harness functionality. Install with: pip install anyio"
         ) from None
 
     anyio.run(run_harness_async, cwd, tasks_path, max_iterations, max_turns, permission_mode)

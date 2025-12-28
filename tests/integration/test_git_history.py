@@ -21,13 +21,17 @@ class TestGitHistoryIntegration:
 
     def test_compare_refs_json_format(self):
         """Test comparing refs with JSON output format."""
-        result = runner.invoke(app, ["git", "history", "compare", "HEAD~3", "HEAD", "--format", "json"])
+        result = runner.invoke(
+            app, ["git", "history", "compare", "HEAD~3", "HEAD", "--format", "json"]
+        )
         # Command should not error (format option accepted)
         assert result.exit_code != 2
 
     def test_compare_refs_yaml_format(self):
         """Test comparing refs with YAML output format."""
-        result = runner.invoke(app, ["git", "history", "compare", "HEAD~3", "HEAD", "--format", "yaml"])
+        result = runner.invoke(
+            app, ["git", "history", "compare", "HEAD~3", "HEAD", "--format", "yaml"]
+        )
         # Command should not error (format option accepted)
         assert result.exit_code != 2
 
@@ -68,7 +72,9 @@ class TestGitHistoryIntegration:
 
     def test_complexity_analysis_with_threshold(self):
         """Test complexity analysis with threshold option."""
-        result = runner.invoke(app, ["git", "history", "complexity", "HEAD~10", "HEAD", "--threshold", "30.0"])
+        result = runner.invoke(
+            app, ["git", "history", "complexity", "HEAD~10", "HEAD", "--threshold", "30.0"]
+        )
         # Should accept threshold option
         assert result.exit_code != 2
 
@@ -110,7 +116,10 @@ class TestGitHistoryIntegration:
 
     def test_output_flag(self):
         """Test that output flag is accepted."""
-        result = runner.invoke(app, ["git", "history", "compare", "HEAD~3", "HEAD", "--output", "/tmp/test_output.json"])
+        result = runner.invoke(
+            app,
+            ["git", "history", "compare", "HEAD~3", "HEAD", "--output", "/tmp/test_output.json"],
+        )
         # Should accept output flag (may fail if file can't be written, but flag should be recognized)
         assert result.exit_code != 2
 

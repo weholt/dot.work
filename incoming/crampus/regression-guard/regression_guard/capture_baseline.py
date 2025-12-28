@@ -167,10 +167,12 @@ class BaselineCapture:
         for test_path in critical_tests:
             full_path = self.project_root / test_path
             if full_path.exists():
-                results.append({
-                    "path": test_path,
-                    "status": "exists",
-                })
+                results.append(
+                    {
+                        "path": test_path,
+                        "status": "exists",
+                    }
+                )
 
         return results
 

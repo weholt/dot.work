@@ -133,15 +133,21 @@ def install(
 
     # Check if environment is supported by any prompts
     if env_key not in discovered_envs:
-        console.print(f"[yellow]⚠ Environment '{env_key}' not found in any prompt frontmatter.[/yellow]")
-        console.print(f"[dim]Available environments: {', '.join(sorted(discovered_envs.keys()))}[/dim]")
+        console.print(
+            f"[yellow]⚠ Environment '{env_key}' not found in any prompt frontmatter.[/yellow]"
+        )
+        console.print(
+            f"[dim]Available environments: {', '.join(sorted(discovered_envs.keys()))}[/dim]"
+        )
         if not typer.confirm("Continue with legacy installation?", default=False):
             raise typer.Exit(0)
 
     # Install
     env_config = ENVIRONMENTS[env_key]
     if dry_run:
-        console.print(f"\n[bold yellow]🔍 Dry run: Previewing installation for {env_config.name}...[/bold yellow]\n")
+        console.print(
+            f"\n[bold yellow]🔍 Dry run: Previewing installation for {env_config.name}...[/bold yellow]\n"
+        )
     else:
         console.print(f"\n[bold blue]📦 Installing prompts for {env_config.name}...[/bold blue]\n")
 
@@ -323,11 +329,15 @@ def prompt_for_environment(discovered_envs: dict[str, set[str]] | None = None) -
             env = ENVIRONMENTS.get(key)
             if env:
                 prompt_count = len(discovered_envs[key])
-                console.print(f"  [cyan][{i}][/cyan] {env.name} [dim]({prompt_count} prompts)[/dim]")
+                console.print(
+                    f"  [cyan][{i}][/cyan] {env.name} [dim]({prompt_count} prompts)[/dim]"
+                )
                 if env.notes:
                     console.print(f"      [dim]└─ {env.notes}[/dim]")
             else:
-                console.print(f"  [cyan][{i}][/cyan] {key} [dim]({len(discovered_envs[key])} prompts)[/dim]")
+                console.print(
+                    f"  [cyan][{i}][/cyan] {key} [dim]({len(discovered_envs[key])} prompts)[/dim]"
+                )
     else:
         # Show all registered environments
         options = list(ENVIRONMENTS.keys())

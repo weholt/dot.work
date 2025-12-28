@@ -273,7 +273,9 @@ class TestInstallCommand:
 
     def test_install_with_force_succeeds(self, tmp_path: Path) -> None:
         """install with --force should complete successfully."""
-        result = runner.invoke(app, ["install", "--target", str(tmp_path), "--env", "copilot", "--force"])
+        result = runner.invoke(
+            app, ["install", "--target", str(tmp_path), "--env", "copilot", "--force"]
+        )
         assert result.exit_code == 0
         assert "complete" in result.stdout.lower()
 
@@ -309,7 +311,9 @@ class TestInitCommand:
 
     def test_init_with_env_succeeds(self, tmp_path: Path) -> None:
         """init with env should complete successfully."""
-        result = runner.invoke(app, ["init", "--target", str(tmp_path), "--env", "copilot"], input="y\n")
+        result = runner.invoke(
+            app, ["init", "--target", str(tmp_path), "--env", "copilot"], input="y\n"
+        )
         # May prompt for confirmation, handle that
         assert result.exit_code == 0 or "complete" in result.stdout.lower()
 
@@ -334,7 +338,7 @@ class TestValidateJsonCommand:
     def test_validate_json_invalid_file(self, tmp_path: Path) -> None:
         """validate json should fail for invalid JSON."""
         json_file = tmp_path / "test.json"
-        json_file.write_text('{key: value}')  # Invalid JSON
+        json_file.write_text("{key: value}")  # Invalid JSON
 
         result = runner.invoke(app, ["validate", "json", str(json_file)])
         assert result.exit_code == 1
@@ -367,7 +371,7 @@ class TestValidateJsonCommand:
         json_file.write_text('{"name": "test"}')
 
         schema_file = tmp_path / "schema.json"
-        schema_file.write_text('not valid json')
+        schema_file.write_text("not valid json")
 
         result = runner.invoke(
             app, ["validate", "json", str(json_file), "--schema", str(schema_file)]
@@ -557,7 +561,9 @@ class TestReviewExportCommand:
         output = result.stdout.lower()
         assert "git" in output or "repository" in output or "no review" in output
 
-    def test_review_export_no_reviews(self, git_repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_review_export_no_reviews(
+        self, git_repo: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """review export should fail when no reviews exist."""
         monkeypatch.chdir(git_repo)
 
@@ -600,4 +606,3 @@ class TestReviewClearCommand:
         assert result.exit_code == 1
         output = result.stdout.lower()
         assert "not found" in output or "nonexistent" in output
-

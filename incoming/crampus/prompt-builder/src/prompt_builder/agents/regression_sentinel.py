@@ -1,23 +1,19 @@
 """Regression Sentinel Agent for detecting regressions."""
 
 import json
-import os
-import subprocess
-from typing import Any, Dict, List, Optional, Set
-from pathlib import Path
 import logging
-import difflib
-import asyncio
+import subprocess
+from pathlib import Path
+from typing import Any
 
-from .base import BaseAgent, measure_execution_time
 from ..models import (
-    Task,
+    ChangeImpactResult,
     Subtask,
+    Task,
     ValidationResult,
     ValidationType,
-    Snapshot,
-    ChangeImpactResult,
 )
+from .base import BaseAgent, measure_execution_time
 
 
 class RegressionSentinelAgent(BaseAgent):
@@ -35,10 +31,7 @@ class RegressionSentinelAgent(BaseAgent):
 
     @measure_execution_time
     async def execute(
-        self,
-        task: Task,
-        subtask: Optional[Subtask] = None,
-        context: Optional[Dict[str, Any]] = None
+        self, task: Task, subtask: Subtask | None = None, context: dict[str, Any] | None = None
     ) -> ValidationResult:
         """Detect regressions by comparing with previous behavior."""
         self._log_start(subtask)
@@ -46,9 +39,7 @@ class RegressionSentinelAgent(BaseAgent):
         try:
             if not subtask:
                 return self._create_validation_result(
-                    subtask_id=task.id,
-                    passed=False,
-                    issues=["Regression detection requires a specific subtask"]
+                    subtask_id=task.id, passed=False, issues=["Regression detection requires a specific subtask"]
                 )
 
             issues = []
@@ -57,30 +48,26 @@ class RegressionSentinelAgent(BaseAgent):
 
             # Analyze changes
             change_impact = await self._analyze_changes(task, subtask)
-            metrics['affected_snapshots'] = len(change_impact.affected_snapshots)
-            metrics['risk_score'] = change_impact.risk_score
+            metrics["affected_snapshots"] = len(change_impact.affected_snapshots)
+            metrics["risk_score"] = change_impact.risk_score
 
             # Compare with existing snapshots
             regression_results = await self._compare_with_snapshots(change_impact)
-            issues.extend(regression_results['issues'])
-            warnings.extend(regression_results['warnings'])
-            metrics.update(regression_results['metrics'])
+            issues.extend(regression_results["issues"])
+            warnings.extend(regression_results["warnings"])
+            metrics.update(regression_results["metrics"])
 
             # Check for semantic regressions
             semantic_results = await self._check_semantic_regressions(change_impact)
-            issues.extend(semantic_results['issues'])
-            warnings.extend(semantic_results['warnings'])
-            metrics.update(semantic_results['metrics'])
+            issues.extend(semantic_results["issues"])
+            warnings.extend(semantic_results["warnings"])
+            metrics.update(semantic_results["metrics"])
 
             # Determine overall pass/fail
             passed = len(issues) == 0
 
             result = self._create_validation_result(
-                subtask_id=subtask.id,
-                passed=passed,
-                issues=issues,
-                warnings=warnings,
-                metrics=metrics
+                subtask_id=subtask.id, passed=passed, issues=issues, warnings=warnings, metrics=metrics
             )
 
             self._log_success(result, subtask)
@@ -91,7 +78,7 @@ class RegressionSentinelAgent(BaseAgent):
             result = self._create_validation_result(
                 subtask_id=subtask.id if subtask else task.id,
                 passed=False,
-                issues=[f"Regression detection failed: {str(e)}"]
+                issues=[f"Regression detection failed: {str(e)}"],
             )
             return result
 
@@ -107,7 +94,8 @@ class RegressionSentinelAgent(BaseAgent):
 
             # Filter by subtask's affected files
             relevant_files = [
-                f for f in changed_files
+                f
+                for f in changed_files
                 if any(self._file_matches_pattern(f, pattern) for pattern in subtask.affected_files)
             ]
 
@@ -135,7 +123,7 @@ class RegressionSentinelAgent(BaseAgent):
                 summary=f"Changes affect {len(relevant_files)} files and {len(affected_snapshots)} snapshots",
                 warnings=warnings,
                 risk_score=risk_score,
-                estimated_effort=self._estimate_effort(relevant_files, risk_score)
+                estimated_effort=self._estimate_effort(relevant_files, risk_score),
             )
 
         except Exception as e:
@@ -147,18 +135,14 @@ class RegressionSentinelAgent(BaseAgent):
                 affected_subtasks=[subtask.id],
                 summary="Change analysis failed",
                 warnings=[f"Could not analyze changes: {str(e)}"],
-                risk_score=1.0  # Assume high risk when analysis fails
+                risk_score=1.0,  # Assume high risk when analysis fails
             )
 
-    async def _compare_with_snapshots(self, change_impact: ChangeImpactResult) -> Dict[str, Any]:
+    async def _compare_with_snapshots(self, change_impact: ChangeImpactResult) -> dict[str, Any]:
         """Compare current behavior with stored snapshots."""
         issues = []
         warnings = []
-        metrics = {
-            'snapshots_compared': 0,
-            'regressions_found': 0,
-            'improvements_found': 0
-        }
+        metrics = {"snapshots_compared": 0, "regressions_found": 0, "improvements_found": 0}
 
         for snapshot_id in change_impact.affected_snapshots:
             try:
@@ -167,38 +151,31 @@ class RegressionSentinelAgent(BaseAgent):
                     warnings.append(f"Snapshot {snapshot_id} not found - cannot compare")
                     continue
 
-                with open(snapshot_path, 'r') as f:
+                with open(snapshot_path) as f:
                     snapshot = json.load(f)
 
                 # Compare current behavior with snapshot
                 comparison_result = await self._compare_snapshot_behavior(snapshot)
-                metrics['snapshots_compared'] += 1
+                metrics["snapshots_compared"] += 1
 
-                if comparison_result['regression_detected']:
-                    metrics['regressions_found'] += 1
-                    issues.extend(comparison_result['issues'])
+                if comparison_result["regression_detected"]:
+                    metrics["regressions_found"] += 1
+                    issues.extend(comparison_result["issues"])
 
-                if comparison_result['improvement_detected']:
-                    metrics['improvements_found'] += 1
-                    warnings.extend(comparison_result['improvements'])
+                if comparison_result["improvement_detected"]:
+                    metrics["improvements_found"] += 1
+                    warnings.extend(comparison_result["improvements"])
 
             except Exception as e:
                 warnings.append(f"Could not compare with snapshot {snapshot_id}: {str(e)}")
 
-        return {
-            'issues': issues,
-            'warnings': warnings,
-            'metrics': metrics
-        }
+        return {"issues": issues, "warnings": warnings, "metrics": metrics}
 
-    async def _check_semantic_regressions(self, change_impact: ChangeImpactResult) -> Dict[str, Any]:
+    async def _check_semantic_regressions(self, change_impact: ChangeImpactResult) -> dict[str, Any]:
         """Check for semantic regressions that might not be caught by snapshot comparison."""
         issues = []
         warnings = []
-        metrics = {
-            'semantic_checks': 0,
-            'semantic_regressions': 0
-        }
+        metrics = {"semantic_checks": 0, "semantic_regressions": 0}
 
         # Common semantic regressions to check
         semantic_checks = [
@@ -210,58 +187,54 @@ class RegressionSentinelAgent(BaseAgent):
         ]
 
         for check in semantic_checks:
-            metrics['semantic_checks'] += 1
+            metrics["semantic_checks"] += 1
             try:
                 if await self._check_semantic_invariant(check, change_impact):
                     # Check passed
                     pass
                 else:
-                    metrics['semantic_regressions'] += 1
+                    metrics["semantic_regressions"] += 1
                     issues.append(f"Semantic regression detected: {check}")
             except Exception as e:
                 warnings.append(f"Could not check semantic invariant '{check}': {str(e)}")
 
-        return {
-            'issues': issues,
-            'warnings': warnings,
-            'metrics': metrics
-        }
+        return {"issues": issues, "warnings": warnings, "metrics": metrics}
 
-    async def _get_changed_files(self, base_ref: str, head_ref: str) -> List[str]:
+    async def _get_changed_files(self, base_ref: str, head_ref: str) -> list[str]:
         """Get list of files changed between git references."""
         try:
-            cmd = ['git', 'diff', '--name-only', f'{base_ref}..{head_ref}']
+            cmd = ["git", "diff", "--name-only", f"{base_ref}..{head_ref}"]
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            return result.stdout.strip().split('\n') if result.stdout.strip() else []
+            return result.stdout.strip().split("\n") if result.stdout.strip() else []
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Git diff failed: {e}")
             return []
 
-    async def _get_changed_symbols(self, files: List[str], base_ref: str, head_ref: str) -> List[str]:
+    async def _get_changed_symbols(self, files: list[str], base_ref: str, head_ref: str) -> list[str]:
         """Get list of symbols (functions, classes) that changed."""
         changed_symbols = []
 
         for file_path in files:
-            if not file_path.endswith('.py'):
+            if not file_path.endswith(".py"):
                 continue
 
             try:
                 # Get the diff for this file
-                cmd = ['git', 'diff', f'{base_ref}..{head_ref}', '--', file_path]
+                cmd = ["git", "diff", f"{base_ref}..{head_ref}", "--", file_path]
                 result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-                diff_lines = result.stdout.split('\n')
+                diff_lines = result.stdout.split("\n")
 
                 # Look for function/class definitions in the diff
                 for line in diff_lines:
-                    if line.startswith(('+', '-')):
+                    if line.startswith(("+", "-")):
                         stripped = line[1:].strip()
-                        if stripped.startswith(('def ', 'class ')):
+                        if stripped.startswith(("def ", "class ")):
                             # Extract symbol name
-                            if stripped.startswith('def '):
-                                symbol_name = stripped[4:].split('(')[0].strip()
+                            if stripped.startswith("def "):
+                                symbol_name = stripped[4:].split("(")[0].strip()
                                 changed_symbols.append(f"{file_path}:{symbol_name}()")
-                            elif stripped.startswith('class '):
-                                symbol_name = stripped[6:].split('(')[0].split(':')[0].strip()
+                            elif stripped.startswith("class "):
+                                symbol_name = stripped[6:].split("(")[0].split(":")[0].strip()
                                 changed_symbols.append(f"{file_path}:{symbol_name}")
 
             except subprocess.CalledProcessError:
@@ -272,16 +245,18 @@ class RegressionSentinelAgent(BaseAgent):
     def _file_matches_pattern(self, file_path: str, pattern: str) -> bool:
         """Check if a file path matches a glob pattern."""
         import fnmatch
+
         # Simple pattern matching
-        if '**' in pattern:
+        if "**" in pattern:
             # Convert glob to regex for better matching
-            regex_pattern = pattern.replace('**/', '.*').replace('*', '[^/]*')
+            regex_pattern = pattern.replace("**/", ".*").replace("*", "[^/]*")
             import re
+
             return re.match(regex_pattern, file_path) is not None
         else:
             return fnmatch.fnmatch(file_path, pattern)
 
-    async def _find_affected_snapshots(self, changed_files: List[str], changed_symbols: List[str]) -> List[str]:
+    async def _find_affected_snapshots(self, changed_files: list[str], changed_symbols: list[str]) -> list[str]:
         """Find snapshots that might be affected by the changes."""
         affected_snapshots = []
 
@@ -291,23 +266,24 @@ class RegressionSentinelAgent(BaseAgent):
         # Look through all snapshot files
         for snapshot_file in self.snapshots_dir.glob("*.json"):
             try:
-                with open(snapshot_file, 'r') as f:
+                with open(snapshot_file) as f:
                     snapshot = json.load(f)
 
                 # Check if this snapshot references any changed files or symbols
-                snapshot_files = snapshot.get('files', [])
-                snapshot_symbols = snapshot.get('call_graph_nodes', [])
+                snapshot_files = snapshot.get("files", [])
+                snapshot_symbols = snapshot.get("call_graph_nodes", [])
 
-                if (any(af in snapshot_files for af in changed_files) or
-                    any(any(cs in ss for ss in snapshot_symbols) for cs in changed_symbols)):
-                    affected_snapshots.append(snapshot['id'])
+                if any(af in snapshot_files for af in changed_files) or any(
+                    any(cs in ss for ss in snapshot_symbols) for cs in changed_symbols
+                ):
+                    affected_snapshots.append(snapshot["id"])
 
             except (json.JSONDecodeError, KeyError):
                 continue
 
         return affected_snapshots
 
-    def _calculate_risk_score(self, files: List[str], symbols: List[str], snapshots: List[str]) -> float:
+    def _calculate_risk_score(self, files: list[str], symbols: list[str], snapshots: list[str]) -> float:
         """Calculate risk score based on scope of changes."""
         # Base risk from number of changed files
         file_risk = min(len(files) / 10.0, 1.0)
@@ -319,11 +295,11 @@ class RegressionSentinelAgent(BaseAgent):
         snapshot_risk = min(len(snapshots) / 15.0, 1.0)
 
         # Combine risks with weights
-        total_risk = (file_risk * 0.3 + symbol_risk * 0.3 + snapshot_risk * 0.4)
+        total_risk = file_risk * 0.3 + symbol_risk * 0.3 + snapshot_risk * 0.4
 
         return min(total_risk, 1.0)
 
-    def _estimate_effort(self, files: List[str], risk_score: float) -> str:
+    def _estimate_effort(self, files: list[str], risk_score: float) -> str:
         """Estimate validation effort based on changes."""
         if risk_score < 0.2:
             return "Low (< 30 minutes)"
@@ -334,14 +310,14 @@ class RegressionSentinelAgent(BaseAgent):
         else:
             return "Critical (6+ hours)"
 
-    async def _compare_snapshot_behavior(self, snapshot: Dict[str, Any]) -> Dict[str, Any]:
+    async def _compare_snapshot_behavior(self, snapshot: dict[str, Any]) -> dict[str, Any]:
         """Compare current behavior with a stored snapshot."""
         # This is a simplified implementation
         # In a real system, this would re-run the behavior and compare results
 
-        snapshot_id = snapshot.get('id', 'unknown')
-        expected_outputs = snapshot.get('outputs', {})
-        expected_invariants = snapshot.get('invariants', {})
+        snapshot_id = snapshot.get("id", "unknown")
+        expected_outputs = snapshot.get("outputs", {})
+        expected_invariants = snapshot.get("invariants", {})
 
         issues = []
         improvements = []
@@ -356,10 +332,10 @@ class RegressionSentinelAgent(BaseAgent):
         improvement_detected = False
 
         return {
-            'regression_detected': regression_detected,
-            'improvement_detected': improvement_detected,
-            'issues': issues,
-            'improvements': improvements
+            "regression_detected": regression_detected,
+            "improvement_detected": improvement_detected,
+            "issues": issues,
+            "improvements": improvements,
         }
 
     async def _check_semantic_invariant(self, invariant: str, change_impact: ChangeImpactResult) -> bool:
@@ -369,23 +345,23 @@ class RegressionSentinelAgent(BaseAgent):
 
         invariant_lower = invariant.lower()
 
-        if 'api' in invariant_lower and 'response' in invariant_lower:
+        if "api" in invariant_lower and "response" in invariant_lower:
             # Check API response format consistency
             return True  # Simplified
 
-        elif 'error' in invariant_lower:
+        elif "error" in invariant_lower:
             # Check error handling patterns
             return True  # Simplified
 
-        elif 'logging' in invariant_lower:
+        elif "logging" in invariant_lower:
             # Check logging consistency
             return True  # Simplified
 
-        elif 'performance' in invariant_lower:
+        elif "performance" in invariant_lower:
             # Check performance characteristics
             return True  # Simplified
 
-        elif 'security' in invariant_lower:
+        elif "security" in invariant_lower:
             # Check security boundaries
             return True  # Simplified
 

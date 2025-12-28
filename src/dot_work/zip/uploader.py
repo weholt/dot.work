@@ -41,9 +41,7 @@ def upload_zip(zip_path: Path, api_url: str) -> None:
 
     # Validate URL scheme - require HTTPS for secure uploads
     if not api_url.startswith("https://"):
-        raise ValueError(
-            f"Only HTTPS URLs are supported for secure uploads. Got: {api_url}"
-        )
+        raise ValueError(f"Only HTTPS URLs are supported for secure uploads. Got: {api_url}")
 
     # Upload the file with explicit SSL verification
     # timeout=(10, 30) = 10s for connection, 30s for read

@@ -1,31 +1,31 @@
 """Tests for CLI functionality."""
 
-import pytest
 import json
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
+
+import pytest
 import typer
 
 from prompt_builder.cli import (
     app,
+    display_results,
     run_validation_workflow,
     save_task_state,
-    display_results,
 )
 from prompt_builder.models import (
     Task,
     TaskStatus,
     ValidationResult,
-    ValidationType,
     ValidationResultSummary,
+    ValidationType,
 )
 
 
 class TestCLICommands:
     """Test CLI command functions."""
 
-    @patch('prompt_builder.cli.run_validation_workflow')
-    @patch('prompt_builder.cli.setup_logging')
+    @patch("prompt_builder.cli.run_validation_workflow")
+    @patch("prompt_builder.cli.setup_logging")
     def test_start_command_success(self, mock_logging, mock_workflow, tmp_path):
         """Test successful start command."""
         # Mock successful validation
@@ -36,18 +36,13 @@ class TestCLICommands:
             failed_validations=0,
             validation_results=[],
             overall_passed=True,
-            execution_time=10.5
+            execution_time=10.5,
         )
         mock_workflow.return_value = mock_summary
 
         # Test command invocation
         runner = typer.testing.CliRunner()
-        result = runner.invoke(app, [
-            'start',
-            'Test task description',
-            '--title', 'Test Task',
-            '--dry-run'
-        ])
+        result = runner.invoke(app, ["start", "Test task description", "--title", "Test Task", "--dry-run"])
 
         assert result.exit_code == 0
         mock_logging.assert_called_once()
@@ -56,22 +51,22 @@ class TestCLICommands:
         """Test init command."""
         runner = typer.testing.CliRunner()
 
-        with patch('pathlib.Path.cwd', return_value=tmp_path):
-            result = runner.invoke(app, ['init', '--force'])
+        with patch("pathlib.Path.cwd", return_value=tmp_path):
+            result = runner.invoke(app, ["init", "--force"])
 
         assert result.exit_code == 0
-        assert '✅' in result.stdout
+        assert "✅" in result.stdout
 
-    @patch('pathlib.Path.exists')
+    @patch("pathlib.Path.exists")
     def test_init_command_exists_no_force(self, mock_exists):
         """Test init command when config exists and no force flag."""
         mock_exists.return_value = True
 
         runner = typer.testing.CliRunner()
-        result = runner.invoke(app, ['init'])
+        result = runner.invoke(app, ["init"])
 
         assert result.exit_code == 0
-        assert 'already exists' in result.stdout
+        assert "already exists" in result.stdout
 
 
 class TestValidationWorkflow:
@@ -80,39 +75,27 @@ class TestValidationWorkflow:
     @pytest.mark.asyncio
     async def test_run_validation_workflow_success(self, tmp_path):
         """Test successful validation workflow."""
-        task = Task(
-            id="TASK-001",
-            title="Test Task",
-            description="Test description"
-        )
+        task = Task(id="TASK-001", title="Test Task", description="Test description")
 
-        with patch('prompt_builder.agents.PlannerAgent') as mock_planner, \
-             patch('prompt_builder.agents.StaticValidatorAgent') as mock_static, \
-             patch('prompt_builder.agents.BehaviorValidatorAgent') as mock_behavior:
-
+        with (
+            patch("prompt_builder.agents.PlannerAgent") as mock_planner,
+            patch("prompt_builder.agents.StaticValidatorAgent") as mock_static,
+            patch("prompt_builder.agents.BehaviorValidatorAgent") as mock_behavior,
+        ):
             # Mock agent responses
             mock_planner.return_value.execute.return_value = ValidationResult(
-                validator_type=ValidationType.STATIC,
-                subtask_id="TASK-001",
-                passed=True,
-                issues=[]
+                validator_type=ValidationType.STATIC, subtask_id="TASK-001", passed=True, issues=[]
             )
 
             mock_static.return_value.execute.return_value = ValidationResult(
-                validator_type=ValidationType.STATIC,
-                subtask_id="ST-001",
-                passed=True,
-                issues=[]
+                validator_type=ValidationType.STATIC, subtask_id="ST-001", passed=True, issues=[]
             )
 
             mock_behavior.return_value.execute.return_value = ValidationResult(
-                validator_type=ValidationType.BEHAVIOR,
-                subtask_id="ST-001",
-                passed=True,
-                issues=[]
+                validator_type=ValidationType.BEHAVIOR, subtask_id="ST-001", passed=True, issues=[]
             )
 
-            with patch('prompt_builder.cli.save_task_state'):
+            with patch("prompt_builder.cli.save_task_state"):
                 summary = await run_validation_workflow(task)
 
                 assert summary.task_id == "TASK-001"
@@ -122,25 +105,15 @@ class TestValidationWorkflow:
     @pytest.mark.asyncio
     async def test_run_validation_workflow_with_specific_agents(self, tmp_path):
         """Test validation workflow with specific agents only."""
-        task = Task(
-            id="TASK-002",
-            title="Test Task",
-            description="Test description"
-        )
+        task = Task(id="TASK-002", title="Test Task", description="Test description")
 
-        with patch('prompt_builder.agents.PlannerAgent') as mock_planner:
+        with patch("prompt_builder.agents.PlannerAgent") as mock_planner:
             mock_planner.return_value.execute.return_value = ValidationResult(
-                validator_type=ValidationType.STATIC,
-                subtask_id="TASK-002",
-                passed=True,
-                issues=[]
+                validator_type=ValidationType.STATIC, subtask_id="TASK-002", passed=True, issues=[]
             )
 
-            with patch('prompt_builder.cli.save_task_state'):
-                summary = await run_validation_workflow(
-                    task,
-                    specific_agents=["planner"]
-                )
+            with patch("prompt_builder.cli.save_task_state"):
+                summary = await run_validation_workflow(task, specific_agents=["planner"])
 
                 assert summary.task_id == "TASK-002"
                 assert summary.overall_passed is True
@@ -153,27 +126,20 @@ class TestTaskState:
 
     def test_save_task_state(self, tmp_path):
         """Test saving task state to file."""
-        task = Task(
-            id="TASK-001",
-            title="Test Task",
-            description="Test description",
-            status=TaskStatus.COMPLETED
-        )
+        task = Task(id="TASK-001", title="Test Task", description="Test description", status=TaskStatus.COMPLETED)
 
         # Create subtask
         from prompt_builder.models import Subtask, ValidationContract
+
         subtask = Subtask(
-            id="ST-001",
-            summary="Test subtask",
-            description="Test subtask description",
-            contract=ValidationContract()
+            id="ST-001", summary="Test subtask", description="Test subtask description", contract=ValidationContract()
         )
         task.subtasks = [subtask]
 
         tasks_dir = tmp_path / ".prompt-builder" / "tasks"
         tasks_dir.mkdir(parents=True, exist_ok=True)
 
-        with patch('pathlib.Path') as mock_path:
+        with patch("pathlib.Path") as mock_path:
             mock_path.return_value = tasks_dir / f"{task.id}.json"
 
             save_task_state(task)
@@ -182,14 +148,14 @@ class TestTaskState:
             task_file = tasks_dir / f"{task.id}.json"
             assert task_file.exists()
 
-            with open(task_file, 'r') as f:
+            with open(task_file) as f:
                 saved_data = json.load(f)
 
-            assert saved_data['id'] == task.id
-            assert saved_data['title'] == task.title
-            assert saved_data['status'] == TaskStatus.COMPLETED.value
-            assert len(saved_data['subtasks']) == 1
-            assert saved_data['subtasks'][0]['id'] == subtask.id
+            assert saved_data["id"] == task.id
+            assert saved_data["title"] == task.title
+            assert saved_data["status"] == TaskStatus.COMPLETED.value
+            assert len(saved_data["subtasks"]) == 1
+            assert saved_data["subtasks"][0]["id"] == subtask.id
 
 
 class TestDisplayFunctions:
@@ -197,11 +163,7 @@ class TestDisplayFunctions:
 
     def test_display_results(self):
         """Test results display function."""
-        task = Task(
-            id="TASK-001",
-            title="Test Task",
-            description="Test description"
-        )
+        task = Task(id="TASK-001", title="Test Task", description="Test description")
 
         validation_result = ValidationResult(
             validator_type=ValidationType.STATIC,
@@ -209,7 +171,7 @@ class TestDisplayFunctions:
             passed=True,
             issues=["Minor issue"],
             warnings=["Warning"],
-            execution_time=1.5
+            execution_time=1.5,
         )
 
         summary = ValidationResultSummary(
@@ -220,11 +182,11 @@ class TestDisplayFunctions:
             warnings=["Warning"],
             validation_results=[validation_result],
             overall_passed=True,
-            execution_time=1.5
+            execution_time=1.5,
         )
 
         # Mock console to capture output
-        with patch('prompt_builder.cli.console') as mock_console:
+        with patch("prompt_builder.cli.console") as mock_console:
             display_results(task, summary)
 
             # Should have called console methods
@@ -232,11 +194,7 @@ class TestDisplayFunctions:
 
     def test_display_results_with_failures(self):
         """Test displaying results with validation failures."""
-        task = Task(
-            id="TASK-002",
-            title="Failed Task",
-            description="Test description"
-        )
+        task = Task(id="TASK-002", title="Failed Task", description="Test description")
 
         validation_result = ValidationResult(
             validator_type=ValidationType.BEHAVIOR,
@@ -244,7 +202,7 @@ class TestDisplayFunctions:
             passed=False,
             issues=["Test failed"],
             warnings=[],
-            execution_time=2.0
+            execution_time=2.0,
         )
 
         summary = ValidationResultSummary(
@@ -255,10 +213,10 @@ class TestDisplayFunctions:
             critical_issues=["Critical issue"],
             validation_results=[validation_result],
             overall_passed=False,
-            execution_time=2.0
+            execution_time=2.0,
         )
 
-        with patch('prompt_builder.cli.console') as mock_console:
+        with patch("prompt_builder.cli.console") as mock_console:
             display_results(task, summary)
 
             # Should display failures
@@ -279,11 +237,12 @@ class TestUtilityFunctions:
             status=TaskStatus.COMPLETED,
             created_at=datetime.now(),
             started_at=datetime.now(),
-            completed_at=datetime.now() + timedelta(hours=1)
+            completed_at=datetime.now() + timedelta(hours=1),
         )
 
-        with patch('prompt_builder.cli.console') as mock_console:
+        with patch("prompt_builder.cli.console") as mock_console:
             from prompt_builder.cli import display_task_status
+
             display_task_status(task, verbose=True)
 
             assert mock_console.print.called
@@ -299,11 +258,12 @@ class TestUtilityFunctions:
             status=TaskStatus.COMPLETED,
             created_at=datetime.now(),
             started_at=datetime.now(),
-            completed_at=datetime.now() + timedelta(hours=1)
+            completed_at=datetime.now() + timedelta(hours=1),
         )
 
-        with patch('prompt_builder.cli.console') as mock_console:
+        with patch("prompt_builder.cli.console") as mock_console:
             from prompt_builder.cli import display_task_list
+
             display_task_list([task], verbose=True)
 
             assert mock_console.print.called

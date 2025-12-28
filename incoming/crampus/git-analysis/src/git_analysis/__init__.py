@@ -9,19 +9,18 @@ __version__ = "0.1.0"
 __author__ = "Git Analysis Team"
 
 from .models import (
-    ChangeAnalysis,
-    ComparisonResult,
-    ComparisonDiff,
-    CommitInfo,
-    ContributorStats,
     AnalysisConfig,
+    ChangeAnalysis,
+    CommitInfo,
+    ComparisonDiff,
+    ComparisonResult,
+    ContributorStats,
 )
-
 from .services import (
-    GitAnalysisService,
-    ComplexityCalculator,
-    LLMSummarizer,
     AnalysisCache,
+    ComplexityCalculator,
+    GitAnalysisService,
+    LLMSummarizer,
 )
 
 __all__ = [

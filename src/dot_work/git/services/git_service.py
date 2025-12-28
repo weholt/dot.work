@@ -44,6 +44,7 @@ class GitAnalysisService:
         self.file_analyzer = FileAnalyzer(config)
         self.tag_generator = TagGenerator()
         self.logger = logging.getLogger(__name__)
+        self._commit_to_branch_cache: dict[str, str] = {}
 
         # Initialize git repository
         self._initialize_repo()
@@ -75,6 +76,9 @@ class GitAnalysisService:
         if cached_result and not self.config.force_refresh:
             self.logger.info("Using cached comparison result")
             return cached_result
+
+        # Build commit-to-branch mapping cache once for all commits
+        self._commit_to_branch_cache = self._build_commit_branch_mapping()
 
         # Get commits between references
         commits = self._get_commits_between_refs(from_ref, to_ref)
@@ -314,6 +318,30 @@ class GitAnalysisService:
 
         except Exception as e:
             raise ValueError(f"Failed to get commits between {from_ref} and {to_ref}: {e}") from e
+
+    def _build_commit_branch_mapping(self) -> dict[str, str]:
+        """Build a mapping of commit SHAs to branch names.
+
+        This pre-computes the mapping once, avoiding O(n²) repeated lookups.
+        For a repo with B branches and C commits per branch, this is O(B*C) once,
+        versus O(B*C) per commit without caching.
+
+        Returns:
+            Dictionary mapping commit SHA to branch name
+        """
+        if self.repo is None:
+            return {}
+
+        mapping: dict[str, str] = {}
+        try:
+            for branch in self.repo.branches:
+                for commit in self.repo.iter_commits(branch.name):
+                    mapping[commit.hexsha] = branch.name
+            self.logger.debug(f"Built commit-to-branch mapping with {len(mapping)} entries")
+        except Exception as e:
+            self.logger.warning(f"Failed to build commit-to-branch mapping: {e}")
+
+        return mapping
 
     def _analyze_commit_files(self, commit: gitpython.Commit) -> list[FileChange]:
         """Analyze file changes in a commit."""
@@ -613,17 +641,14 @@ class GitAnalysisService:
 
     # Helper methods
     def _get_commit_branch(self, commit: gitpython.Commit) -> str:
-        """Get the branch name for a commit."""
+        """Get the branch name for a commit using pre-built cache.
+
+        This is O(1) lookup instead of O(n*m) nested loop through branches and commits.
+        The cache is built once per comparison in compare_refs().
+        """
         if self.repo is None:
             return "unknown"
-        try:
-            # Try to find the branch containing this commit
-            for branch in self.repo.branches:
-                if commit.hexsha in [c.hexsha for c in self.repo.iter_commits(branch.name)]:
-                    return branch.name
-            return "unknown"
-        except Exception:
-            return "main"  # Default fallback
+        return self._commit_to_branch_cache.get(commit.hexsha, "unknown")
 
     def _get_commit_tags(self, commit: gitpython.Commit) -> list[str]:
         """Get tags pointing to this commit."""

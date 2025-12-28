@@ -356,8 +356,12 @@ class EpicService:
 
             total_count = len(epic_issues)
             proposed_count = sum(1 for issue in epic_issues if issue.status == IssueStatus.PROPOSED)
-            in_progress_count = sum(1 for issue in epic_issues if issue.status == IssueStatus.IN_PROGRESS)
-            completed_count = sum(1 for issue in epic_issues if issue.status == IssueStatus.COMPLETED)
+            in_progress_count = sum(
+                1 for issue in epic_issues if issue.status == IssueStatus.IN_PROGRESS
+            )
+            completed_count = sum(
+                1 for issue in epic_issues if issue.status == IssueStatus.COMPLETED
+            )
 
             results.append(
                 EpicInfo(

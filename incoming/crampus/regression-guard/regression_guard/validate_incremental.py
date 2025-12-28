@@ -120,18 +120,22 @@ class IncrementalValidator:
             baseline_test_paths = ["tests/unittests/test_01_smoke.py"]
 
         # Run tests with increased timeout for CI/full runs
-        cmd = [
-            "uv",
-            "run",
-            "pytest",
-        ] + baseline_test_paths + [
-            "-m",
-            "not integration and not playwright and not e2e",
-            "-v",
-            "--tb=short",
-            "--timeout=5",
-            "-x",  # Stop on first failure
-        ]
+        cmd = (
+            [
+                "uv",
+                "run",
+                "pytest",
+            ]
+            + baseline_test_paths
+            + [
+                "-m",
+                "not integration and not playwright and not e2e",
+                "-v",
+                "--tb=short",
+                "--timeout=5",
+                "-x",  # Stop on first failure
+            ]
+        )
 
         try:
             result = subprocess.run(
@@ -230,30 +234,30 @@ class IncrementalValidator:
 
         report = f"""# Validation Report: {self.subtask_id}
 
-## Status: {status_icon} {'PASSED' if results['success'] else 'FAILED'}
+## Status: {status_icon} {"PASSED" if results["success"] else "FAILED"}
 
 ## Subtask Description
-{subtask['description']}
+{subtask["description"]}
 
 ## Validation Results
 
 ### Baseline Regression Tests
-- Status: {'✅ PASSED' if results['baseline_tests']['passed'] else '❌ FAILED'}
-- Message: {results['baseline_tests']['message']}
+- Status: {"✅ PASSED" if results["baseline_tests"]["passed"] else "❌ FAILED"}
+- Message: {results["baseline_tests"]["message"]}
 
 ### New Tests
-- Status: {'✅ PASSED' if results['new_tests']['passed'] else '❌ FAILED'}
-- Message: {results['new_tests']['message']}
+- Status: {"✅ PASSED" if results["new_tests"]["passed"] else "❌ FAILED"}
+- Message: {results["new_tests"]["message"]}
 
 ### Coverage Change
-- Baseline: {results['coverage_change']['baseline']:.2f}%
-- Current: {results['coverage_change']['current']:.2f}%
-- Change: {results['coverage_change']['change']:+.2f}%
+- Baseline: {results["coverage_change"]["baseline"]:.2f}%
+- Current: {results["coverage_change"]["current"]:.2f}%
+- Change: {results["coverage_change"]["change"]:+.2f}%
 
-## Risk Assessment: {subtask['estimated_risk'].upper()}
+## Risk Assessment: {subtask["estimated_risk"].upper()}
 
 ## Files Affected
-{chr(10).join(f"- {f}" for f in subtask['files_affected'])}
+{chr(10).join(f"- {f}" for f in subtask["files_affected"])}
 
 ## Next Steps
 """

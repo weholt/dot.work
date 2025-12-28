@@ -84,6 +84,7 @@ def get_process_memory_mb() -> float:
     """
     try:
         import psutil
+
         process = psutil.Process()
         return process.memory_info().rss / 1024 / 1024
     except ImportError:
@@ -246,6 +247,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     # Close any remaining SQLAlchemy connections
     try:
         from sqlalchemy import pool
+
         pool.dispose_all()
     except Exception:
         pass
@@ -276,6 +278,7 @@ def cleanup_connection_pools() -> Generator[None, None, None]:
     # After module finishes, dispose all connection pools
     try:
         from sqlalchemy import pool
+
         pool.dispose_all()
     except Exception:
         pass

@@ -1,9 +1,11 @@
 import os
 import zipfile
-import requests
 from pathlib import Path
+
+import requests
 from dotenv import dotenv_values
 from gitignore_parser import parse_gitignore
+
 
 def load_api_url():
     config_path = Path.home() / ".zipparu"
@@ -15,6 +17,7 @@ def load_api_url():
         raise ValueError("API_URL missing in .zipparu")
     return url
 
+
 def should_include(filepath, ignore_matcher):
     if ignore_matcher:
         try:
@@ -22,6 +25,7 @@ def should_include(filepath, ignore_matcher):
         except Exception:
             return True
     return True
+
 
 def zip_folder(folder_path, output_path):
     gitignore_path = Path(folder_path) / ".gitignore"
@@ -35,14 +39,17 @@ def zip_folder(folder_path, output_path):
                 if should_include(str(file_path), ignore_matcher):
                     zipf.write(file_path, rel_path)
 
+
 def upload_zip(zip_path, api_url):
     with open(zip_path, "rb") as f:
         resp = requests.post(api_url, files={"file": (zip_path.name, f, "application/zip")})
     resp.raise_for_status()
     print(f"Uploaded successfully: {resp.status_code}")
 
+
 def main():
     import sys
+
     if len(sys.argv) < 2:
         print("Usage: zipparu <folder_path>")
         return

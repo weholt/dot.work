@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
@@ -125,9 +125,7 @@ class TestSearch:
 
         assert len(results) <= 2
 
-    def test_search_returns_results_sorted_by_score(
-        self, indexed_db: Database
-    ) -> None:
+    def test_search_returns_results_sorted_by_score(self, indexed_db: Database) -> None:
         """Results should be sorted by relevance."""
         results = search(indexed_db, "Python")
 
@@ -312,18 +310,18 @@ class TestSecurityInjectionPrevention:
 
         # Even with allow_advanced, column filters blocked
         with pytest.raises(ValueError, match="prohibited syntax"):
-            _prepare_query('email: test', allow_advanced=True)
+            _prepare_query("email: test", allow_advanced=True)
 
     def test_injection_parenthesis_breakout_blocked(self) -> None:
         """Parenthesis breakout attempts are blocked."""
         # Operators are rejected without allow_advanced
         with pytest.raises(ValueError, match="Advanced search syntax"):
-            _prepare_query('term) OR (1=1')
+            _prepare_query("term) OR (1=1")
 
         # With allow_advanced, unbalanced parens are caught
         # Note: 'term) OR (1=1' has balanced parens (1 each), use truly unbalanced
         with pytest.raises(ValueError, match="Unbalanced parentheses"):
-            _prepare_query('(term OR 1=1', allow_advanced=True)
+            _prepare_query("(term OR 1=1", allow_advanced=True)
 
     def test_injection_quote_breakout_blocked(self) -> None:
         """Quote breakout attempts are blocked."""

@@ -130,9 +130,7 @@ class ProjectService:
             logger.info("Auto-created default project: %s", project.id)
         return project
 
-    def list_projects(
-        self, status: ProjectStatus | None = None
-    ) -> list[Project]:
+    def list_projects(self, status: ProjectStatus | None = None) -> list[Project]:
         """List all projects or filter by status.
 
         Args:

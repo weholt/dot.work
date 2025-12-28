@@ -1,16 +1,17 @@
 """Tests for git operations with security validation."""
 
+from unittest.mock import patch
+
 import pytest
+
 from dot_work.review.git import (
-    GitError,
     GitRefValidationError,
-    _validate_git_ref,
     _validate_git_path,
+    _validate_git_ref,
     changed_files,
     get_unified_diff,
     parse_unified_diff,
 )
-from unittest.mock import Mock, patch
 
 
 class TestValidateGitRef:

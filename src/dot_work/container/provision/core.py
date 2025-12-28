@@ -8,6 +8,7 @@ to creating pull requests.
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import shlex
@@ -20,6 +21,9 @@ from pathlib import Path
 from typing import Any
 
 import frontmatter  # type: ignore[import-untyped]
+
+# Module logger
+logger = logging.getLogger(__name__)
 
 # Default values for configuration
 DEFAULT_DOCKER_IMAGE = "repo-agent:latest"
@@ -46,12 +50,12 @@ BOOL_FALSE = "0"
 # Pattern: [registry/][namespace/]name[:tag|@digest]
 # Simplified for common cases: registry.io/namespace/image:tag
 DOCKER_IMAGE_PATTERN = re.compile(
-    r'^('
-    r'(localhost/|[^/]+/|)'  # optional registry (localhost/ or registry.io/)
-    r'[a-z0-9]+([._-][a-z0-9]+)*'  # first component (namespace or image)
-    r'(/[a-z0-9]+([._-][a-z0-9]+)*)*'  # optional additional components
-    r'(:[a-zA-Z0-9]+([._-][a-zA-Z0-9]+)*)?'  # optional tag
-    r')$'
+    r"^("
+    r"(localhost/|[^/]+/|)"  # optional registry (localhost/ or registry.io/)
+    r"[a-z0-9]+([._-][a-z0-9]+)*"  # first component (namespace or image)
+    r"(/[a-z0-9]+([._-][a-z0-9]+)*)*"  # optional additional components
+    r"(:[a-zA-Z0-9]+([._-][a-zA-Z0-9]+)*)?"  # optional tag
+    r")$"
 )
 
 
@@ -64,11 +68,13 @@ def validate_docker_image(image: str) -> None:
     Raises:
         ValueError: If image name is invalid.
     """
+    logger.debug(f"Validating Docker image: {image}")
     if not DOCKER_IMAGE_PATTERN.match(image):
+        logger.error(f"Invalid Docker image name: {image}")
         raise ValueError(
-            f"Invalid docker image name: {image}. "
-            f"Expected format: [registry/]namespace/image[:tag]"
+            f"Invalid docker image name: {image}. Expected format: [registry/]namespace/image[:tag]"
         )
+    logger.debug(f"Docker image validation passed: {image}")
 
 
 def validate_dockerfile_path(dockerfile: Path | None, project_root: Path) -> None:
@@ -82,14 +88,16 @@ def validate_dockerfile_path(dockerfile: Path | None, project_root: Path) -> Non
         ValueError: If dockerfile path escapes project directory.
     """
     if dockerfile is None:
+        logger.debug("No Dockerfile specified, using default")
         return
 
+    logger.debug(f"Validating Dockerfile path: {dockerfile} within {project_root}")
     try:
-        dockerfile.resolve().relative_to(project_root.resolve())
+        resolved = dockerfile.resolve().relative_to(project_root.resolve())
+        logger.debug(f"Dockerfile path validation passed: {resolved}")
     except ValueError:
-        raise ValueError(
-            f"Dockerfile must be within project directory: {dockerfile}"
-        )
+        logger.error(f"Dockerfile outside project directory: {dockerfile}")
+        raise ValueError(f"Dockerfile must be within project directory: {dockerfile}")
 
 
 class RepoAgentError(Exception):
@@ -243,7 +251,10 @@ def _resolve_config(
         RepoAgentError: If required fields (repo_url, model) are missing,
             strategy is invalid, or other configuration errors occur.
     """
+    logger.info(f"Resolving configuration from: {instructions_path}")
+    logger.debug(f"CLI overrides: {list(cli_overrides.keys())}")
     meta, content = _load_frontmatter(instructions_path)
+    logger.debug(f"Loaded frontmatter with keys: {list(meta.keys())}")
 
     def get(key: str, default: Any = None) -> Any:
         if key in cli_overrides and cli_overrides[key] is not None:
@@ -391,6 +402,11 @@ def _resolve_config(
         prompt_header_direct=str(header_direct),
         dry_run=dry_run,
     )
+    # Log final configuration (with sensitive values masked)
+    logger.info(f"Configuration resolved: repo_url={cfg.repo_url}, model={cfg.model}, strategy={cfg.strategy}")
+    logger.debug(f"Branch configuration: base_branch={cfg.base_branch}, target_branch={cfg.branch}")
+    logger.debug(f"Docker configuration: image={cfg.docker_image}, dockerfile={cfg.dockerfile}")
+    logger.debug(f"Authentication: use_ssh={cfg.use_ssh}, has_github_token={bool(cfg.github_token)}, has_api_key={bool(cfg.api_key)}")
     return cfg, content
 
 
@@ -408,8 +424,10 @@ def _docker_build_if_needed(cfg: RunConfig) -> None:
         ValueError: If docker image name or dockerfile path is invalid.
     """
     if not cfg.dockerfile:
+        logger.debug("No Dockerfile specified, skipping build")
         return
 
+    logger.info(f"Building Docker image: {cfg.docker_image} from {cfg.dockerfile}")
     # Validate docker image name
     validate_docker_image(cfg.docker_image)
 
@@ -426,7 +444,9 @@ def _docker_build_if_needed(cfg: RunConfig) -> None:
         str(cfg.dockerfile),
         str(cfg.dockerfile.parent),
     ]
+    logger.debug(f"Running: {' '.join(build_cmd)}")
     subprocess.run(build_cmd, check=True)
+    logger.info(f"Docker image built successfully: {cfg.docker_image}")
 
 
 def _build_env_args(cfg: RunConfig) -> list[str]:
@@ -587,10 +607,16 @@ def _generate_inner_script() -> str:
         gh repo clone "${REPO_OWNER}/${REPO_NAME}" repo
         cd repo
 
-        # Configure git credentials for subsequent operations
-        git config --global credential.helper store
-        echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
-        
+        # Configure git credentials using GIT_ASKPASS (no credentials written to disk)
+        # This is more secure than writing to ~/.git-credentials in plaintext
+        cat > /tmp/git-askpass.sh << 'EOF'
+#!/bin/sh
+echo "${GITHUB_TOKEN}"
+EOF
+        chmod +x /tmp/git-askpass.sh
+        export GIT_ASKPASS=/tmp/git-askpass.sh
+        export GIT_TERMINAL_PROMPT=0  # Don't prompt interactively
+
         git config user.name "${GIT_USER_NAME:-repo-agent}"
         git config user.email "${GIT_USER_EMAIL:-repo-agent@example.com}"
 
@@ -750,6 +776,7 @@ def _build_docker_run_cmd(
     Raises:
         ValueError: If docker image name is invalid.
     """
+    logger.info("Building Docker run command")
     env_args = _build_env_args(cfg)
     volume_args = _build_volume_args(cfg, workdir, instructions_body_path)
     inner_script = _generate_inner_script()
@@ -757,6 +784,7 @@ def _build_docker_run_cmd(
     # Add OpenCode config environment variable if the config file exists
     opencode_config = cfg.instructions_path.parent / OPENCODE_CONFIG_FILENAME
     if opencode_config.exists():
+        logger.debug(f"Found OpenCode config at: {opencode_config}")
         env_args.extend(["-e", f"OPENCODE_CONFIG={OPENCODE_CONFIG_CONTAINER_PATH}"])
 
     # Validate docker image name before using in command
@@ -839,8 +867,10 @@ def run_from_markdown(
             is missing, or validation fails.
         subprocess.CalledProcessError: If Docker build or run commands fail.
     """
+    logger.info(f"Starting repo-agent workflow for: {instructions_path}")
     instructions_path = instructions_path.expanduser().resolve()
     if not instructions_path.is_file():
+        logger.error(f"Instructions file not found: {instructions_path}")
         raise RepoAgentError(f"Instructions markdown not found: {instructions_path}")
 
     overrides: dict[str, Any] = {
@@ -867,22 +897,29 @@ def run_from_markdown(
     }
 
     cfg, body = _resolve_config(instructions_path, overrides)
+    logger.info(f"Configuration resolved, repo: {cfg.repo_url}, model: {cfg.model}")
 
     _docker_build_if_needed(cfg)
 
     with tempfile.TemporaryDirectory(prefix="repo-agent-") as td:
         workdir = Path(td).resolve()
+        logger.debug(f"Created temporary workspace: {workdir}")
         instructions_body_path = workdir / "instructions_body.md"
         instructions_body_path.write_text(body, encoding="utf-8")
 
         docker_cmd = _build_docker_run_cmd(cfg, workdir, instructions_body_path)
 
         if cfg.dry_run:
+            logger.info("Dry run mode - printing Docker command")
             print("# repo-agent dry run")
             print("# Working directory:", workdir)
             print("# Docker command:")
             print(" ".join(shlex.quote(p) for p in docker_cmd))
             return
 
+        logger.info(f"Running Docker container with image: {cfg.docker_image}")
+        logger.debug(f"Full command: {' '.join(shlex.quote(p) for p in docker_cmd)}")
+
         # Run Docker command without suppressing output so errors are visible
         subprocess.run(docker_cmd, check=True)
+        logger.info(f"repo-agent workflow completed successfully for {cfg.repo_url}")

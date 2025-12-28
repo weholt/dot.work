@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from dot_work.version.project_parser import ProjectInfo, PyProjectParser
+from dot_work.version.project_parser import PyProjectParser
 
 
 def test_read_project_info_success(project_with_pyproject: Path):

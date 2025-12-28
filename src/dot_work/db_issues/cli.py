@@ -253,7 +253,9 @@ def list_cmd(  # noqa: B008
     priority: str | None = typer.Option(None, "--priority", "-p", help="Filter by priority"),
     assignee: str | None = typer.Option(None, "--assignee", "-a", help="Filter by assignee"),
     project: str | None = typer.Option(None, "--project", "-P", help="Filter by project ID"),
-    include_backlog: bool = typer.Option(False, "--include-backlog", help="Include backlog priority issues"),
+    include_backlog: bool = typer.Option(
+        False, "--include-backlog", help="Include backlog priority issues"
+    ),
     limit: int = typer.Option(20, "--limit", "-n", help="Maximum number of issues"),
     format: str = typer.Option(
         "table", "--format", "-f", help="Output format: table, json, jsonl, csv, markdown"
@@ -438,7 +440,9 @@ def search_cmd(  # noqa: B008
 @app.command()
 def ready(
     priority: str | None = typer.Option(None, "--priority", "-p", help="Filter by priority"),
-    sort: str | None = typer.Option(None, "--sort", help="Sort by field: id, title, priority, status"),
+    sort: str | None = typer.Option(
+        None, "--sort", help="Sort by field: id, title, priority, status"
+    ),
     format: str = typer.Option("table", "--format", "-f", help="Output format: table, json"),
 ) -> None:
     """Show issues ready to work on (no blocking dependencies).
@@ -1195,14 +1199,26 @@ def _parse_edited_issue(content: str, original: Issue) -> dict:
 # Whitelist of allowed editors to prevent command injection
 # Users can add to this list if they need other editors
 _ALLOWED_EDITORS = {
-    "vi", "vim", "nvim", "neovim",
-    "emacs", "emacsclient",
+    "vi",
+    "vim",
+    "nvim",
+    "neovim",
+    "emacs",
+    "emacsclient",
     "nano",
-    "code", "code-server", "codium",
-    "subl", "sublime_text",
-    "atom", "mate",
-    "kak", "micro", "xed",
-    "gedit", "kate", "geany",
+    "code",
+    "code-server",
+    "codium",
+    "subl",
+    "sublime_text",
+    "atom",
+    "mate",
+    "kak",
+    "micro",
+    "xed",
+    "gedit",
+    "kate",
+    "geany",
 }
 
 
@@ -1372,7 +1388,9 @@ def edit(
 
         try:
             # Open editor
-            console.print(f"Opening [cyan]{editor_name}[/cyan] to edit issue [bold]{issue.id}[/bold]...")
+            console.print(
+                f"Opening [cyan]{editor_name}[/cyan] to edit issue [bold]{issue.id}[/bold]..."
+            )
             result = subprocess.run([editor_name, *editor_args, str(temp_path)])
 
             if result.returncode != 0:
@@ -1824,7 +1842,9 @@ def epic_set(
             console.print(f"[red]Issue not found: {issue_id}[/red]")
             raise typer.Exit(1)
 
-        console.print(f"[green]✓[/green] Assigned issue [bold]{issue_id}[/bold] to epic [bold]{epic_id}[/bold]")
+        console.print(
+            f"[green]✓[/green] Assigned issue [bold]{issue_id}[/bold] to epic [bold]{epic_id}[/bold]"
+        )
 
 
 @epic_app.command("clear")
@@ -1848,7 +1868,9 @@ def epic_clear(
             console.print(f"[red]Issue not found: {issue_id}[/red]")
             raise typer.Exit(1)
 
-        console.print(f"[green]✓[/green] Cleared epic assignment from issue [bold]{issue_id}[/bold]")
+        console.print(
+            f"[green]✓[/green] Cleared epic assignment from issue [bold]{issue_id}[/bold]"
+        )
 
 
 @epic_app.command("all")
@@ -1983,7 +2005,9 @@ def _print_epic_tree_items(items: list) -> None:
         else:
             connector = ""
 
-        console.print(f"{indent}{connector}[{status_color}]{item.issue_id}[/{status_color}] [dim]{item.title}[/dim] ([{status_color}]{item.status}[/{status_color}])")
+        console.print(
+            f"{indent}{connector}[{status_color}]{item.issue_id}[/{status_color}] [dim]{item.title}[/dim] ([{status_color}]{item.status}[/{status_color}])"
+        )
 
 
 def _generate_epic_mermaid(
@@ -2057,9 +2081,7 @@ def _generate_epic_mermaid(
 def project_create(
     name: str = typer.Argument(..., help="Project name"),
     description: str = typer.Option(None, "--description", "-d", help="Project description"),
-    set_as_default: bool = typer.Option(
-        False, "--default", help="Set as the default project"
-    ),
+    set_as_default: bool = typer.Option(False, "--default", help="Set as the default project"),
 ) -> None:
     """Create a new project."""
     engine = create_db_engine(get_db_url(), echo=is_debug_mode())
@@ -2521,7 +2543,9 @@ def io_sync(
     repo: str = typer.Option(".", "--repo", "-r", help="Path to git repository"),
     message: str | None = typer.Option(None, "--message", "-m", help="Commit message"),  # noqa: B008
     push: bool = typer.Option(False, "--push", "-p", help="Push to remote after commit"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without making changes"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be done without making changes"
+    ),
 ) -> None:
     """Export issues to JSONL and commit to git.
 
@@ -2797,12 +2821,14 @@ def deps_tree(
                 console.print("\n[dim]Copy this to https://mermaid.live/ to render[/dim]")
             else:
                 # ASCII tree format
-                tree: dict[str, list[tuple[str, str, DependencyType]]] = service.get_dependency_tree(
-                    issue_id, max_depth=max_depth
+                tree: dict[str, list[tuple[str, str, DependencyType]]] = (
+                    service.get_dependency_tree(issue_id, max_depth=max_depth)
                 )
 
                 if not tree:
-                    console.print(f"[green]✓[/green] Issue [cyan]{issue_id}[/cyan] has no dependencies")
+                    console.print(
+                        f"[green]✓[/green] Issue [cyan]{issue_id}[/cyan] has no dependencies"
+                    )
                     return
 
                 console.print(f"\nDependency tree for [cyan]{issue_id}[/cyan]:\n")
@@ -3186,9 +3212,7 @@ def labels_bulk_add(
                 if existing_label:
                     issues = [i for i in issues if existing_label in i.labels]
 
-                console.print(
-                    f"[bold]Dry run mode - {len(issues)} issues would be updated:[/bold]"
-                )
+                console.print(f"[bold]Dry run mode - {len(issues)} issues would be updated:[/bold]")
                 for idx, issue in enumerate(issues[:10], start=1):
                     console.print(f"  {idx}. {issue.id}: {issue.title[:50]}")
                     console.print(f"     Adding: {', '.join(label_list)}")
@@ -3207,7 +3231,9 @@ def labels_bulk_add(
             )
 
             # Show results
-            console.print(f"\n[bold]Result:[/bold] {result.succeeded}/{result.total} issues updated")
+            console.print(
+                f"\n[bold]Result:[/bold] {result.succeeded}/{result.total} issues updated"
+            )
             console.print(f"[green]✓[/green] Added: {', '.join(label_list)}")
 
             if result.succeeded > 0:
@@ -3241,7 +3267,9 @@ def labels_bulk_remove(
     priority: str | None = typer.Option(None, "--priority", "-p", help="Filter by priority"),
     type_filter: str | None = typer.Option(None, "--type", "-t", help="Filter by issue type"),
     assignee: str | None = typer.Option(None, "--assignee", "-a", help="Filter by assignee"),
-    must_have: bool = typer.Option(False, "--must-have", help="Only remove from issues that have the labels"),
+    must_have: bool = typer.Option(
+        False, "--must-have", help="Only remove from issues that have the labels"
+    ),
     all_issues: bool = typer.Option(False, "--all", help="Apply to all issues"),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would be done without making changes"
@@ -3292,13 +3320,9 @@ def labels_bulk_remove(
                     limit=1000,
                 )
                 if must_have:
-                    issues = [
-                        i for i in issues if any(label in i.labels for label in label_list)
-                    ]
+                    issues = [i for i in issues if any(label in i.labels for label in label_list)]
 
-                console.print(
-                    f"[bold]Dry run mode - {len(issues)} issues would be updated:[/bold]"
-                )
+                console.print(f"[bold]Dry run mode - {len(issues)} issues would be updated:[/bold]")
                 for idx, issue in enumerate(issues[:10], start=1):
                     console.print(f"  {idx}. {issue.id}: {issue.title[:50]}")
                     console.print(f"     Removing: {', '.join(label_list)}")
@@ -3317,7 +3341,9 @@ def labels_bulk_remove(
             )
 
             # Show results
-            console.print(f"\n[bold]Result:[/bold] {result.succeeded}/{result.total} issues updated")
+            console.print(
+                f"\n[bold]Result:[/bold] {result.succeeded}/{result.total} issues updated"
+            )
             console.print(f"[green]✓[/green] Removed: {', '.join(label_list)}")
 
             if result.succeeded > 0:
@@ -4331,7 +4357,6 @@ def _show_bulk_result(result: BulkResult) -> None:
             console.print(f"  ... and {len(result.issue_ids) - 20} more")
 
 
-
 # =============================================================================
 # Search Index Commands
 # =============================================================================
@@ -4373,7 +4398,8 @@ def search_index_create() -> None:
             return
 
         # Create FTS5 virtual table
-        session.exec(text("""
+        session.exec(
+            text("""
             CREATE VIRTUAL TABLE issues_fts USING fts5(
                 rowid,
                 id UNINDEXED,
@@ -4382,37 +4408,46 @@ def search_index_create() -> None:
                 content='issues',
                 content_rowid='rowid'
             );
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
 
         # Populate FTS5 table with existing data
-        insert_result = session.exec(text("""
+        insert_result = session.exec(
+            text("""
             INSERT INTO issues_fts(rowid, id, title, description)
             SELECT rowid, id, title, COALESCE(description, '')
             FROM issues;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
 
         # Create triggers to keep FTS table in sync
-        session.exec(text("""
+        session.exec(
+            text("""
             CREATE TRIGGER issues_fts_insert AFTER INSERT ON issues BEGIN
                 INSERT INTO issues_fts(rowid, id, title, description)
                 VALUES (NEW.rowid, NEW.id, NEW.title, COALESCE(NEW.description, ''));
             END;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
 
-        session.exec(text("""
+        session.exec(
+            text("""
             CREATE TRIGGER issues_fts_update AFTER UPDATE ON issues BEGIN
                 UPDATE issues_fts
                 SET title = NEW.title,
                     description = COALESCE(NEW.description, '')
                 WHERE rowid = NEW.rowid;
             END;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
 
-        session.exec(text("""
+        session.exec(
+            text("""
             CREATE TRIGGER issues_fts_delete AFTER DELETE ON issues BEGIN
                 DELETE FROM issues_fts WHERE rowid = OLD.rowid;
             END;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
 
         session.commit()
 
@@ -4460,11 +4495,13 @@ def search_index_rebuild() -> None:
         session.exec(text("DELETE FROM issues_fts;"))  # type: ignore[call-overload]
 
         # Rebuild from issues table
-        insert_result = session.exec(text("""
+        insert_result = session.exec(
+            text("""
             INSERT INTO issues_fts(rowid, id, title, description)
             SELECT rowid, id, title, COALESCE(description, '')
             FROM issues;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
 
         session.commit()
 
@@ -4517,9 +4554,11 @@ def search_index_status() -> None:
         issues_count = issues_count_result.first().cnt if issues_count_result else 0
 
         # Check triggers
-        triggers_result = session.exec(text("""
+        triggers_result = session.exec(
+            text("""
             SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'issues_fts%';
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
         triggers = [row.name for row in triggers_result]
 
     console.print("[bold]Full-Text Search Index Status[/bold]\n")
@@ -4586,7 +4625,6 @@ def init(
     # Import all models to ensure they're registered with SQLModel metadata
     from sqlmodel import SQLModel
 
-
     # Create all tables
     SQLModel.metadata.create_all(engine)
     console.print("[green]✓[/green] Database schema created")
@@ -4597,7 +4635,8 @@ def init(
 
     with Session(engine) as session:
         # Create FTS5 virtual table
-        session.exec(text("""
+        session.exec(
+            text("""
             CREATE VIRTUAL TABLE IF NOT EXISTS issues_fts USING fts5(
                 rowid,
                 id UNINDEXED,
@@ -4606,40 +4645,49 @@ def init(
                 content='issues',
                 content_rowid='rowid'
             );
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
 
         # Populate FTS5 table with existing data
-        session.exec(text("""
+        session.exec(
+            text("""
             INSERT INTO issues_fts(rowid, id, title, description)
             SELECT rowid, id, title, COALESCE(description, '')
             FROM issues;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
 
         # Create triggers to keep FTS table in sync
         # Trigger for INSERT
-        session.exec(text("""
+        session.exec(
+            text("""
             CREATE TRIGGER IF NOT EXISTS issues_fts_insert AFTER INSERT ON issues BEGIN
                 INSERT INTO issues_fts(rowid, id, title, description)
                 VALUES (NEW.rowid, NEW.id, NEW.title, COALESCE(NEW.description, ''));
             END;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
 
         # Trigger for UPDATE
-        session.exec(text("""
+        session.exec(
+            text("""
             CREATE TRIGGER IF NOT EXISTS issues_fts_update AFTER UPDATE ON issues BEGIN
                 UPDATE issues_fts
                 SET title = NEW.title,
                     description = COALESCE(NEW.description, '')
                 WHERE rowid = NEW.rowid;
             END;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
 
         # Trigger for DELETE
-        session.exec(text("""
+        session.exec(
+            text("""
             CREATE TRIGGER IF NOT EXISTS issues_fts_delete AFTER DELETE ON issues BEGIN
                 DELETE FROM issues_fts WHERE rowid = OLD.rowid;
             END;
-        """))  # type: ignore[call-overload]
+        """)
+        )  # type: ignore[call-overload]
 
         session.commit()
 
@@ -4750,12 +4798,16 @@ def info() -> None:
     console.print(f"[cyan]Dependencies:[/cyan] {len(deps)}")
 
     if last_activity:
-        console.print(f"\n[cyan]Last activity:[/cyan] {last_activity.strftime('%Y-%m-%d %H:%M:%S')}")
+        console.print(
+            f"\n[cyan]Last activity:[/cyan] {last_activity.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
 
 
 @app.command()
 def stats(
-    group_by: str | None = typer.Option(None, "--by", "-b", help="Group by: status, priority, type"),
+    group_by: str | None = typer.Option(
+        None, "--by", "-b", help="Group by: status, priority, type"
+    ),
     trend: bool = typer.Option(False, "--trend", "-t", help="Show trends over time"),
     format: str = typer.Option("table", "--format", "-f", help="Output format: table, json"),
 ) -> None:
@@ -4844,8 +4896,7 @@ def _output_stats_json(stats: Statistics, console: Console) -> None:
             for s in stats.by_priority
         ],
         "by_type": [
-            {"type": s.type, "count": s.count, "percentage": s.percentage}
-            for s in stats.by_type
+            {"type": s.type, "count": s.count, "percentage": s.percentage} for s in stats.by_type
         ],
         "metrics": {
             "blocked_count": stats.metrics.blocked_count,
@@ -4860,9 +4911,7 @@ def _output_stats_json(stats: Statistics, console: Console) -> None:
 
 @app.command()
 def compact(
-    vacuum: bool = typer.Option(
-        False, "--vacuum", "-v", help="Run VACUUM for deep compaction"
-    ),
+    vacuum: bool = typer.Option(False, "--vacuum", "-v", help="Run VACUUM for deep compaction"),
 ) -> None:
     """Compact database to reduce size.
 
@@ -4919,9 +4968,7 @@ def compact(
     console.print(f"After: {size_after_mb:.2f} MB")
 
     if saved_mb > 0:
-        console.print(
-            f"[green]Saved: {saved_mb:.2f} MB ({saved_pct:.1f}% reduction)[/green]"
-        )
+        console.print(f"[green]Saved: {saved_mb:.2f} MB ({saved_pct:.1f}% reduction)[/green]")
     else:
         console.print("[yellow]No space saved (database may already be optimized)[/yellow]")
 
@@ -4930,7 +4977,9 @@ def compact(
 def rename_prefix(
     old_prefix: str = typer.Argument(..., help="Current prefix to rename (e.g., FEAT)"),
     new_prefix: str = typer.Argument(..., help="New prefix (e.g., FEATURE)"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without making changes"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be done without making changes"
+    ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ) -> None:
     """Rename issue ID prefixes for consistency.
@@ -4963,7 +5012,9 @@ def rename_prefix(
             raise typer.Exit(0)
 
         # Show what will be renamed
-        console.print(f"[bold]Found {len(matching_issues)} issue(s) with prefix:[/bold] {old_prefix}-")
+        console.print(
+            f"[bold]Found {len(matching_issues)} issue(s) with prefix:[/bold] {old_prefix}-"
+        )
         console.print()
 
         # Show first few examples
@@ -4997,7 +5048,7 @@ def rename_prefix(
             for issue in matching_issues:
                 # Generate new ID
                 old_id = issue.id
-                suffix = old_id.split('-', 1)[1]
+                suffix = old_id.split("-", 1)[1]
                 new_id = f"{new_prefix}-{suffix}"
 
                 # Delete old issue and create new one with renamed ID
@@ -5094,9 +5145,7 @@ def cleanup(
         # Show oldest issues
         for idx, issue in enumerate(matching_issues[:5], start=1):
             age_days = (clock.now() - issue.updated_at).days
-            console.print(
-                f"  {idx}. {issue.id}: {issue.title[:40]}... ({age_days} days old)"
-            )
+            console.print(f"  {idx}. {issue.id}: {issue.title[:40]}... ({age_days} days old)")
 
         if len(matching_issues) > 5:
             console.print(f"  ... and {len(matching_issues) - 5} more")
@@ -5108,7 +5157,9 @@ def cleanup(
 
         # Confirmation prompt
         if not force:
-            console.print(f"\n[bold]{action} {len(matching_issues)} issue(s)?[/bold] [y/N]: ", end="")
+            console.print(
+                f"\n[bold]{action} {len(matching_issues)} issue(s)?[/bold] [y/N]: ", end=""
+            )
             response = input().strip().lower()
             if response not in ("y", "yes"):
                 console.print("[yellow]Cancelled.[/yellow]")
@@ -5158,9 +5209,7 @@ def cleanup(
                 for issue in matching_issues:
                     uow.issues.delete(issue.id)
 
-            console.print(
-                f"[green]✓[/green] Archived [bold]{len(matching_issues)}[/bold] issue(s)"
-            )
+            console.print(f"[green]✓[/green] Archived [bold]{len(matching_issues)}[/bold] issue(s)")
         else:
             # Delete issues
             console.print(f"\n[cyan]Deleting {len(matching_issues)} issue(s)...[/cyan]")
@@ -5169,9 +5218,7 @@ def cleanup(
                 for issue in matching_issues:
                     uow.issues.delete(issue.id)
 
-            console.print(
-                f"[green]✓[/green] Deleted [bold]{len(matching_issues)}[/bold] issue(s)"
-            )
+            console.print(f"[green]✓[/green] Deleted [bold]{len(matching_issues)}[/bold] issue(s)")
 
 
 @app.command()
@@ -5233,9 +5280,7 @@ def duplicates(
         else:
             # Output as table
             if not result.groups:
-                console.print(
-                    f"[green]No duplicates found with threshold {threshold}.[/green]"
-                )
+                console.print(f"[green]No duplicates found with threshold {threshold}.[/green]")
                 raise typer.Exit(0)
 
             console.print(
@@ -5247,7 +5292,9 @@ def duplicates(
 
             # Show each group
             for idx, group in enumerate(result.groups, start=1):
-                console.print(f"[bold]{idx}.[/bold] Similarity: [cyan]{group.similarity:.2f}[/cyan]")
+                console.print(
+                    f"[bold]{idx}.[/bold] Similarity: [cyan]{group.similarity:.2f}[/cyan]"
+                )
 
                 # Show issue details
                 issue_map = {issue.id: issue for issue in all_issues}
@@ -5268,8 +5315,12 @@ def merge(
     source_id: str = typer.Argument(..., help="Source issue ID to merge from"),
     target_id: str = typer.Argument(..., help="Target issue ID to merge into"),
     keep_comments: bool = typer.Option(False, "--keep-comments", help="Copy comments from source"),
-    keep_labels: bool = typer.Option(True, "--keep-labels/--no-keep-labels", help="Merge labels (default: yes)"),
-    close_source: bool = typer.Option(False, "--close-source", help="Close source instead of deleting"),
+    keep_labels: bool = typer.Option(
+        True, "--keep-labels/--no-keep-labels", help="Merge labels (default: yes)"
+    ),
+    close_source: bool = typer.Option(
+        False, "--close-source", help="Close source instead of deleting"
+    ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ) -> None:
     """Merge source issue into target issue.
@@ -5352,7 +5403,9 @@ def merge(
         console.print(f"  [dim]To source ({len(source_dependents)} incoming):[/dim]")
         if source_dependents:
             for dep in source_dependents[:5]:  # Show max 5
-                console.print(f"    {dep.from_issue_id} → {source_id} ({dep.dependency_type.value})")
+                console.print(
+                    f"    {dep.from_issue_id} → {source_id} ({dep.dependency_type.value})"
+                )
             if len(source_dependents) > 5:
                 console.print(f"    ... and {len(source_dependents) - 5} more")
         else:
@@ -5400,7 +5453,9 @@ def merge(
 @app.command()
 def edit(
     issue_id: str = typer.Argument(..., help="Issue ID to edit"),
-    editor: str | None = typer.Option(None, "--editor", "-e", help="Editor to use (default: $EDITOR)"),
+    editor: str | None = typer.Option(
+        None, "--editor", "-e", help="Editor to use (default: $EDITOR)"
+    ),
 ) -> None:
     """Edit an issue in an external editor.
 
@@ -5440,9 +5495,7 @@ def edit(
         # Determine editor to use
         editor_cmd = editor or os.environ.get("EDITOR")
         if not editor_cmd:
-            console.print(
-                "[red]No editor configured. Set $EDITOR or use --editor.[/red]"
-            )
+            console.print("[red]No editor configured. Set $EDITOR or use --editor.[/red]")
             console.print("[dim]Examples: --editor vim, --editor nano, --editor code[/dim]")
             raise typer.Exit(1)
 
@@ -5556,7 +5609,9 @@ def edit(
                     update_params["issue_type"] = new_type
             except ValueError:
                 console.print(f"[red]Invalid type: {modified_data['type']}[/red]")
-                console.print("[dim]Valid: bug, feature, task, enhancement, refactor, docs, test, security, performance[/dim]")
+                console.print(
+                    "[dim]Valid: bug, feature, task, enhancement, refactor, docs, test, security, performance[/dim]"
+                )
                 raise typer.Exit(1)
 
             # Status
@@ -5566,7 +5621,9 @@ def edit(
                     update_params["status"] = new_status
             except ValueError:
                 console.print(f"[red]Invalid status: {modified_data['status']}[/red]")
-                console.print("[dim]Valid: proposed, in_progress, blocked, resolved, completed, stale, wont_fix[/dim]")
+                console.print(
+                    "[dim]Valid: proposed, in_progress, blocked, resolved, completed, stale, wont_fix[/dim]"
+                )
                 raise typer.Exit(1)
 
             # Labels
@@ -5656,10 +5713,14 @@ def restore(
             console.print(f"\n[bold]Deleted issues:[/bold] {len(deleted_issues)} issue(s)\n")
 
             for issue in deleted_issues:
-                deleted_date = issue.deleted_at.strftime("%Y-%m-%d") if issue.deleted_at else "unknown"
+                deleted_date = (
+                    issue.deleted_at.strftime("%Y-%m-%d") if issue.deleted_at else "unknown"
+                )
                 console.print(f"  [cyan]{issue.id}[/cyan]: {issue.title[:60]}")
                 console.print(f"    [dim]Deleted:[/dim] {deleted_date}")
-                console.print(f"    [dim]Status:[/dim] {issue.status.value} [dim]Type:[/dim] {issue.issue_type.value}")
+                console.print(
+                    f"    [dim]Status:[/dim] {issue.status.value} [dim]Type:[/dim] {issue.issue_type.value}"
+                )
                 console.print()
 
         elif restore_all:

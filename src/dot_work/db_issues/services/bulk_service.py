@@ -534,7 +534,6 @@ class BulkService:
             issue_ids=issue_ids,
         )
 
-
     def bulk_label_add(
         self,
         labels: list[str],

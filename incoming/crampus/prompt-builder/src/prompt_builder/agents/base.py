@@ -2,17 +2,16 @@
 
 import asyncio
 import logging
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
-from datetime import datetime
 import time
+from abc import ABC, abstractmethod
+from datetime import datetime
+from typing import Any
 
 from ..models import (
     AgentConfig,
     Subtask,
-    ValidationResult,
     Task,
-    TaskStatus,
+    ValidationResult,
     ValidationType,
 )
 
@@ -20,16 +19,13 @@ from ..models import (
 class BaseAgent(ABC):
     """Base class for all validation agents."""
 
-    def __init__(self, config: Optional[AgentConfig] = None):
+    def __init__(self, config: AgentConfig | None = None):
         self.config = config or AgentConfig(name=self.__class__.__name__)
         self.logger = logging.getLogger(f"prompt_builder.{self.config.name}")
 
     @abstractmethod
     async def execute(
-        self,
-        task: Task,
-        subtask: Optional[Subtask] = None,
-        context: Optional[Dict[str, Any]] = None
+        self, task: Task, subtask: Subtask | None = None, context: dict[str, Any] | None = None
     ) -> ValidationResult:
         """Execute the agent's primary function."""
         pass
@@ -43,10 +39,10 @@ class BaseAgent(ABC):
         self,
         subtask_id: str,
         passed: bool,
-        issues: List[str] = None,
-        warnings: List[str] = None,
-        metrics: Dict[str, Any] = None,
-        execution_time: float = 0.0
+        issues: list[str] = None,
+        warnings: list[str] = None,
+        metrics: dict[str, Any] = None,
+        execution_time: float = 0.0,
     ) -> ValidationResult:
         """Create a standardized validation result."""
         return ValidationResult(
@@ -57,14 +53,10 @@ class BaseAgent(ABC):
             warnings=warnings or [],
             metrics=metrics or {},
             execution_time=execution_time,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
-    async def _execute_with_timeout(
-        self,
-        coro,
-        timeout: Optional[float] = None
-    ) -> Any:
+    async def _execute_with_timeout(self, coro, timeout: float | None = None) -> Any:
         """Execute a coroutine with timeout and retry logic."""
         timeout = timeout or self.config.timeout
         max_retries = self.config.max_retries
@@ -79,73 +71,66 @@ class BaseAgent(ABC):
                     f"Attempt {attempt + 1} timed out after {timeout}s, "
                     f"retrying... ({max_retries - attempt} attempts left)"
                 )
-                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                await asyncio.sleep(2**attempt)  # Exponential backoff
             except Exception as e:
                 if attempt == max_retries:
                     raise
                 self.logger.warning(
-                    f"Attempt {attempt + 1} failed with {e}, "
-                    f"retrying... ({max_retries - attempt} attempts left)"
+                    f"Attempt {attempt + 1} failed with {e}, retrying... ({max_retries - attempt} attempts left)"
                 )
                 await asyncio.sleep(1)
 
-    def _log_start(self, subtask: Optional[Subtask] = None):
+    def _log_start(self, subtask: Subtask | None = None):
         """Log the start of agent execution."""
         if subtask:
             self.logger.info(f"Starting {self.config.name} for subtask {subtask.id}")
         else:
             self.logger.info(f"Starting {self.config.name}")
 
-    def _log_success(
-        self,
-        result: ValidationResult,
-        subtask: Optional[Subtask] = None
-    ):
+    def _log_success(self, result: ValidationResult, subtask: Subtask | None = None):
         """Log successful execution."""
         status = "PASSED" if result.passed else "FAILED"
         if subtask:
             self.logger.info(
-                f"Completed {self.config.name} for subtask {subtask.id}: "
-                f"{status} ({result.execution_time:.2f}s)"
+                f"Completed {self.config.name} for subtask {subtask.id}: {status} ({result.execution_time:.2f}s)"
             )
         else:
-            self.logger.info(
-                f"Completed {self.config.name}: {status} "
-                f"({result.execution_time:.2f}s)"
-            )
+            self.logger.info(f"Completed {self.config.name}: {status} ({result.execution_time:.2f}s)")
 
         if result.issues:
             self.logger.warning(f"Issues found: {result.issues}")
         if result.warnings:
             self.logger.warning(f"Warnings: {result.warnings}")
 
-    def _log_error(self, error: Exception, subtask: Optional[Subtask] = None):
+    def _log_error(self, error: Exception, subtask: Subtask | None = None):
         """Log execution errors."""
         if subtask:
-            self.logger.error(
-                f"Error in {self.config.name} for subtask {subtask.id}: {error}"
-            )
+            self.logger.error(f"Error in {self.config.name} for subtask {subtask.id}: {error}")
         else:
             self.logger.error(f"Error in {self.config.name}: {error}")
 
 
 class AgentError(Exception):
     """Base exception for agent-related errors."""
+
     pass
 
 
 class AgentTimeoutError(AgentError):
     """Raised when agent execution times out."""
+
     pass
 
 
 class AgentConfigurationError(AgentError):
     """Raised when agent configuration is invalid."""
+
     pass
 
 
 def measure_execution_time(func):
     """Decorator to measure execution time of functions."""
+
     async def wrapper(*args, **kwargs):
         start_time = time.time()
         try:
@@ -153,16 +138,14 @@ def measure_execution_time(func):
             execution_time = time.time() - start_time
 
             # Add execution time to result if it's a ValidationResult
-            if hasattr(result, 'execution_time'):
+            if hasattr(result, "execution_time"):
                 result.execution_time = execution_time
 
             return result
         except Exception as e:
             execution_time = time.time() - start_time
             # Log execution time even on failure
-            logging.getLogger(__name__).warning(
-                f"Function {func.__name__} failed after {execution_time:.2f}s: {e}"
-            )
+            logging.getLogger(__name__).warning(f"Function {func.__name__} failed after {execution_time:.2f}s: {e}")
             raise
 
     return wrapper

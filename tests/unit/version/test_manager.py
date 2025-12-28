@@ -1,9 +1,9 @@
 """Tests for version manager module."""
 
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
-from dot_work.version.manager import VersionManager, VersionInfo
+from dot_work.version.manager import VersionInfo, VersionManager
 
 
 def test_version_manager_init(mock_git_repo):

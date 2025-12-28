@@ -7,6 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dot_work.db_issues.adapters import UnitOfWork
+from dot_work.db_issues.cli import app
 from dot_work.db_issues.domain.entities import IssuePriority, IssueType
 from dot_work.db_issues.services import EpicService, IssueService, TemplateService
 from dot_work.db_issues.templates import (
@@ -15,7 +16,6 @@ from dot_work.db_issues.templates import (
     TemplateManager,
     TemplateParseError,
 )
-from dot_work.db_issues.cli import app
 
 
 @pytest.fixture
@@ -78,7 +78,9 @@ def temp_templates_dir(sample_template_content: str) -> tempfile.TemporaryDirect
 class TestInstructionTemplateParser:
     """Tests for InstructionTemplateParser."""
 
-    def test_parse_valid_template(self, parser: InstructionTemplateParser, sample_template_content: str) -> None:
+    def test_parse_valid_template(
+        self, parser: InstructionTemplateParser, sample_template_content: str
+    ) -> None:
         """Test parsing a valid template."""
         template = parser.parse_content(sample_template_content)
 
@@ -110,7 +112,9 @@ Simple task description.
         assert template.tasks[0].priority == IssuePriority.MEDIUM
         assert template.tasks[0].task_type == IssueType.TASK
 
-    def test_parse_template_from_file(self, parser: InstructionTemplateParser, sample_template_content: str) -> None:
+    def test_parse_template_from_file(
+        self, parser: InstructionTemplateParser, sample_template_content: str
+    ) -> None:
         """Test parsing template from file."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
             f.write(sample_template_content)
@@ -285,9 +289,7 @@ class TestTemplateService:
     """Tests for TemplateService."""
 
     @pytest.fixture
-    def template_service(
-        self, in_memory_db, fixed_id_service, fixed_clock
-    ) -> TemplateService:
+    def template_service(self, in_memory_db, fixed_id_service, fixed_clock) -> TemplateService:
         """Create a TemplateService with test dependencies.
 
         Args:
@@ -304,17 +306,13 @@ class TestTemplateService:
         return TemplateService(uow, fixed_id_service, fixed_clock, issue_service, epic_service)
 
     @pytest.fixture
-    def issue_service(
-        self, in_memory_db, fixed_id_service, fixed_clock
-    ) -> IssueService:
+    def issue_service(self, in_memory_db, fixed_id_service, fixed_clock) -> IssueService:
         """Create an IssueService with test dependencies."""
         uow = UnitOfWork(in_memory_db)
         return IssueService(uow, fixed_id_service, fixed_clock)
 
     @pytest.fixture
-    def epic_service(
-        self, in_memory_db, fixed_id_service, fixed_clock
-    ) -> EpicService:
+    def epic_service(self, in_memory_db, fixed_id_service, fixed_clock) -> EpicService:
         """Create an EpicService with test dependencies."""
         uow = UnitOfWork(in_memory_db)
         return EpicService(uow, fixed_id_service, fixed_clock)
@@ -352,7 +350,6 @@ class TestTemplateService:
         self, template_service: TemplateService
     ) -> None:
         """Test applying template with no tasks raises ValueError."""
-        from dot_work.db_issues.templates import InstructionTemplate
 
         template = InstructionTemplate(
             name="empty",

@@ -7,16 +7,15 @@ without using the CLI.
 """
 
 import asyncio
-from datetime import datetime
 
-from prompt_builder.models import Task, TaskStatus
 from prompt_builder.agents import (
-    PlannerAgent,
-    StaticValidatorAgent,
     BehaviorValidatorAgent,
+    PlannerAgent,
     RegressionSentinelAgent,
+    StaticValidatorAgent,
 )
 from prompt_builder.cli import run_validation_workflow
+from prompt_builder.models import Task, TaskStatus
 
 
 async def basic_example():
@@ -43,8 +42,8 @@ async def basic_example():
         - Comprehensive test coverage
         """,
         base_ref="HEAD~5",  # Compare with 5 commits back
-        head_ref="HEAD",    # Current changes
-        status=TaskStatus.PENDING
+        head_ref="HEAD",  # Current changes
+        status=TaskStatus.PENDING,
     )
 
     print(f"📋 Created task: {task.title}")
@@ -58,26 +57,26 @@ async def basic_example():
         validation_summary = await run_validation_workflow(task)
 
         # Display results
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("📊 VALIDATION RESULTS")
-        print("="*60)
+        print("=" * 60)
 
         if validation_summary.overall_passed:
             print("✅ All validations PASSED!")
         else:
             print("❌ Some validations FAILED!")
 
-        print(f"\n📈 Summary:")
+        print("\n📈 Summary:")
         print(f"   Total Validations: {validation_summary.total_validations}")
         print(f"   Passed: {validation_summary.passed_validations}")
         print(f"   Failed: {validation_summary.failed_validations}")
         print(f"   Execution Time: {validation_summary.execution_time:.2f}s")
 
         # Show agent results
-        print(f"\n🤖 Agent Results:")
+        print("\n🤖 Agent Results:")
         for result in validation_summary.validation_results:
             status = "✅" if result.passed else "❌"
-            agent_name = result.validator_type.value.replace('_', ' ').title()
+            agent_name = result.validator_type.value.replace("_", " ").title()
             print(f"   {status} {agent_name}: {result.execution_time:.2f}s")
 
             if result.issues:
@@ -96,16 +95,19 @@ async def basic_example():
                     TaskStatus.COMPLETED: "✅",
                     TaskStatus.FAILED: "❌",
                     TaskStatus.IN_PROGRESS: "⏳",
-                    TaskStatus.PENDING: "⭕"
+                    TaskStatus.PENDING: "⭕",
                 }.get(subtask.status, "❓")
 
                 print(f"   {i}. {status_emoji} {subtask.summary}")
                 print(f"      Dependencies: {', '.join(subtask.dependencies) if subtask.dependencies else 'None'}")
-                print(f"      Files: {', '.join(subtask.affected_files[:3])}{'...' if len(subtask.affected_files) > 3 else ''}")
+                print(
+                    f"      Files: {', '.join(subtask.affected_files[:3])}{'...' if len(subtask.affected_files) > 3 else ''}"
+                )
 
     except Exception as e:
         print(f"❌ Validation failed with error: {e}")
         import traceback
+
         traceback.print_exc()
 
     print("\n🎯 Example completed!")
@@ -113,9 +115,9 @@ async def basic_example():
 
 async def individual_agents_example():
     """Demonstrate using individual agents directly."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🔧 INDIVIDUAL AGENTS EXAMPLE")
-    print("="*60)
+    print("=" * 60)
 
     # Create a simple task
     task = Task(
@@ -123,7 +125,7 @@ async def individual_agents_example():
         title="Fix login bug",
         description="Fix the authentication bug where users can't log in with special characters in passwords",
         base_ref="HEAD~1",
-        head_ref="HEAD"
+        head_ref="HEAD",
     )
 
     print(f"📋 Task: {task.title}")
@@ -166,7 +168,7 @@ async def individual_agents_example():
         print(f"   Checking regressions: {subtask.id}")
         result = await regression_sentinel.execute(task, subtask)
         print(f"   Status: {'✅ PASSED' if result.passed else '❌ FAILED'}")
-        if result.metrics.get('risk_score', 0) > 0.5:
+        if result.metrics.get("risk_score", 0) > 0.5:
             print(f"   ⚠️  High risk score: {result.metrics['risk_score']:.2f}")
 
     print("\n✅ Individual agents example completed!")
@@ -174,9 +176,9 @@ async def individual_agents_example():
 
 def demonstrate_task_creation():
     """Demonstrate different ways to create tasks."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("📝 TASK CREATION EXAMPLES")
-    print("="*60)
+    print("=" * 60)
 
     # Example 1: Feature development
     feature_task = Task(
@@ -195,7 +197,7 @@ def demonstrate_task_creation():
         - User preferences for notification types
         - Push notifications for mobile users
         """,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
 
     print("1️⃣ Feature Development Task:")
@@ -221,7 +223,7 @@ def demonstrate_task_creation():
         """,
         base_ref="origin/main",
         head_ref="fix/memory-leak",
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
 
     print("\n2️⃣ Bug Fix Task:")
@@ -247,21 +249,21 @@ def demonstrate_task_creation():
         - src/services/auth_service.py
         - tests/test_auth_service.py
         """,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
 
     print("\n3️⃣ Refactoring Task:")
     print(f"   Title: {refactor_task.title}")
-    print(f"   Focus: Testability improvement")
+    print("   Focus: Testability improvement")
 
     print("\n✅ Task creation examples completed!")
 
 
 def show_configuration_examples():
     """Show configuration examples."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("⚙️  CONFIGURATION EXAMPLES")
-    print("="*60)
+    print("=" * 60)
 
     # Example configuration
     config_example = """
@@ -333,7 +335,7 @@ PROMPT_BUILDER_TIMEOUT_MULTIPLIER=2.0
 async def main():
     """Run all examples."""
     print("🎯 Prompt Builder - Usage Examples")
-    print("="*60)
+    print("=" * 60)
 
     # Show task creation examples
     demonstrate_task_creation()
@@ -347,9 +349,9 @@ async def main():
     # Run individual agents example
     await individual_agents_example()
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🎉 ALL EXAMPLES COMPLETED!")
-    print("="*60)
+    print("=" * 60)
 
     print("\n💡 Next steps:")
     print("   1. Initialize your project: prompt-builder init")

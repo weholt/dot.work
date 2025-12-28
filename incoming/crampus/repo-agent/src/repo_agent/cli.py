@@ -13,7 +13,6 @@ Example:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -23,7 +22,9 @@ from .core import RepoAgentError, run_from_markdown
 EXIT_CODE_ERROR = 1
 EXIT_CODE_KEYBOARD_INTERRUPT = 130
 
-app = typer.Typer(help="Run a configurable LLM-powered code tool in Docker using markdown instructions.")
+app = typer.Typer(
+    help="Run a configurable LLM-powered code tool in Docker using markdown instructions."
+)
 
 
 @app.command()
@@ -34,27 +35,27 @@ def run(
         readable=True,
         help="Markdown file with frontmatter + instructions.",
     ),
-    repo_url: Optional[str] = typer.Option(
+    repo_url: str | None = typer.Option(
         None,
         "--repo-url",
         help="Git repo URL (overrides frontmatter repo_url).",
     ),
-    branch: Optional[str] = typer.Option(
+    branch: str | None = typer.Option(
         None,
         "--branch",
         help="Target branch to use/create for changes.",
     ),
-    base_branch: Optional[str] = typer.Option(
+    base_branch: str | None = typer.Option(
         None,
         "--base-branch",
         help="Base branch to branch from (e.g. main).",
     ),
-    docker_image: Optional[str] = typer.Option(
+    docker_image: str | None = typer.Option(
         None,
         "--docker-image",
         help="Docker image to use (defaults to frontmatter or repo-agent:latest).",
     ),
-    dockerfile: Optional[Path] = typer.Option(
+    dockerfile: Path | None = typer.Option(
         None,
         "--dockerfile",
         exists=True,
@@ -66,68 +67,68 @@ def run(
         "--ssh",
         help="Use SSH auth and mount ~/.ssh (overrides frontmatter use_ssh).",
     ),
-    ssh_key_dir: Optional[Path] = typer.Option(
+    ssh_key_dir: Path | None = typer.Option(
         None,
         "--ssh-key-dir",
         help="Directory with SSH keys to mount into the container (defaults to ~/.ssh).",
     ),
-    model: Optional[str] = typer.Option(
+    model: str | None = typer.Option(
         None,
         "--model",
         help="Model id for the tool (provider/model), overrides frontmatter model.",
     ),
-    strategy: Optional[str] = typer.Option(
+    strategy: str | None = typer.Option(
         None,
         "--strategy",
         help="Strategy: agentic or direct (overrides frontmatter strategy/opencode_strategy).",
     ),
-    pr_title: Optional[str] = typer.Option(
+    pr_title: str | None = typer.Option(
         None,
         "--pr-title",
         help="Title of the pull request.",
     ),
-    pr_body: Optional[str] = typer.Option(
+    pr_body: str | None = typer.Option(
         None,
         "--pr-body",
         help="Body/description of the pull request.",
     ),
-    github_token: Optional[str] = typer.Option(
+    github_token: str | None = typer.Option(
         None,
         "--github-token",
         envvar=["GITHUB_TOKEN", "GH_TOKEN"],
         help="GitHub token to use (or set via env / frontmatter).",
     ),
-    auto_commit: Optional[bool] = typer.Option(
+    auto_commit: bool | None = typer.Option(
         None,
         "--auto-commit/--no-auto-commit",
         help="Enable/disable auto commit & push (overrides frontmatter).",
     ),
-    create_pr: Optional[bool] = typer.Option(
+    create_pr: bool | None = typer.Option(
         None,
         "--create-pr/--no-create-pr",
         help="Enable/disable PR creation (overrides frontmatter).",
     ),
-    create_repo_if_missing: Optional[bool] = typer.Option(
+    create_repo_if_missing: bool | None = typer.Option(
         None,
         "--create-repo/--no-create-repo",
         help="Create the GitHub repository if it doesn't exist (overrides frontmatter).",
     ),
-    commit_message: Optional[str] = typer.Option(
+    commit_message: str | None = typer.Option(
         None,
         "--commit-message",
         help="Commit message for auto commits.",
     ),
-    git_user_name: Optional[str] = typer.Option(
+    git_user_name: str | None = typer.Option(
         None,
         "--git-user-name",
         help="Git user.name configured inside the container.",
     ),
-    git_user_email: Optional[str] = typer.Option(
+    git_user_email: str | None = typer.Option(
         None,
         "--git-user-email",
         help="Git user.email configured inside the container.",
     ),
-    tool_entrypoint: Optional[str] = typer.Option(
+    tool_entrypoint: str | None = typer.Option(
         None,
         "--tool-entrypoint",
         help="Override the tool entrypoint (e.g. 'opencode run', 'my-tool exec').",
@@ -200,7 +201,7 @@ def validate(
         exists=True,
         readable=True,
         help="Markdown instructions file to validate.",
-    )
+    ),
 ) -> None:
     """Validate frontmatter fields, tool configuration, and required metadata."""
     from .validation import validate_instructions

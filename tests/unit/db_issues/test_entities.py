@@ -4,13 +4,12 @@ import pytest
 
 from dot_work.db_issues.domain.entities import (
     Comment,
-    CycleDetectedError,
     Dependency,
     DependencyType,
     Epic,
     EpicStatus,
-    InvariantViolationError,
     InvalidTransitionError,
+    InvariantViolationError,
     Issue,
     IssuePriority,
     IssueStatus,
@@ -129,9 +128,7 @@ class TestIssueLabels:
 
     def test_add_label_to_issue(self) -> None:
         """Test adding a label to an issue."""
-        issue = Issue(
-            id="issue-001", project_id="test", title="Test", description="Test"
-        )
+        issue = Issue(id="issue-001", project_id="test", title="Test", description="Test")
         assert issue.labels == []
 
         new_issue = issue.add_label("bug")
@@ -179,9 +176,7 @@ class TestIssueAssignment:
 
     def test_assign_to_user(self) -> None:
         """Test assigning an issue to a user."""
-        issue = Issue(
-            id="issue-001", project_id="test", title="Test", description="Test"
-        )
+        issue = Issue(id="issue-001", project_id="test", title="Test", description="Test")
 
         new_issue = issue.assign_to("testuser")
         assert "testuser" in new_issue.assignees
@@ -237,9 +232,7 @@ class TestIssueEpicAssignment:
 
     def test_assign_to_epic(self) -> None:
         """Test assigning an issue to an epic."""
-        issue = Issue(
-            id="issue-001", project_id="test", title="Test", description="Test"
-        )
+        issue = Issue(id="issue-001", project_id="test", title="Test", description="Test")
 
         new_issue = issue.assign_to_epic("epic-001")
         assert new_issue.epic_id == "epic-001"

@@ -1,6 +1,7 @@
 """
 Fixtures and configuration for pytest.
 """
+
 import pytest
 
 

@@ -1,7 +1,8 @@
 """Tests for ScanService path validation."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from dot_work.python.scan.config import ScanConfig
 from dot_work.python.scan.service import ScanService

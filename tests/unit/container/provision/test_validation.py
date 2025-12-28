@@ -7,8 +7,8 @@ from textwrap import dedent
 
 import pytest
 
-from dot_work.container.provision.validation import validate_instructions
 from dot_work.container.provision.core import RepoAgentError
+from dot_work.container.provision.validation import validate_instructions
 
 
 class TestValidateInstructions:
@@ -62,7 +62,9 @@ class TestValidateInstructions:
         test_file = tmp_path / "instructions.md"
         test_file.write_text(content)
 
-        with pytest.raises(RepoAgentError, match="Missing required fields in frontmatter: \\['repo_url'\\]"):
+        with pytest.raises(
+            RepoAgentError, match="Missing required fields in frontmatter: \\['repo_url'\\]"
+        ):
             validate_instructions(test_file)
 
     def test_validate_missing_model(self, tmp_path: Path) -> None:
@@ -81,7 +83,9 @@ class TestValidateInstructions:
         test_file = tmp_path / "instructions.md"
         test_file.write_text(content)
 
-        with pytest.raises(RepoAgentError, match="Missing required fields in frontmatter: \\['model'\\]"):
+        with pytest.raises(
+            RepoAgentError, match="Missing required fields in frontmatter: \\['model'\\]"
+        ):
             validate_instructions(test_file)
 
     def test_validate_missing_tool_block(self, tmp_path: Path) -> None:
@@ -154,7 +158,9 @@ class TestValidateInstructions:
         test_file = tmp_path / "instructions.md"
         test_file.write_text(content)
 
-        with pytest.raises(RepoAgentError, match="Missing required tool fields: \\['entrypoint'\\]"):
+        with pytest.raises(
+            RepoAgentError, match="Missing required tool fields: \\['entrypoint'\\]"
+        ):
             validate_instructions(test_file)
 
     def test_validate_invalid_strategy(self, tmp_path: Path) -> None:

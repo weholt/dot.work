@@ -64,95 +64,107 @@ class TaskDecomposer:
         subtasks = []
 
         # Always start with planning subtask
-        subtasks.append({
-            "id": "subtask-0-plan",
-            "description": f"Plan implementation approach for: {self.description}",
-            "dependencies": [],
-            "files_affected": ["(to be determined)"],
-            "tests_required": [],
-            "baseline_tests": ["tests/"],
-            "estimated_risk": "low",
-        })
+        subtasks.append(
+            {
+                "id": "subtask-0-plan",
+                "description": f"Plan implementation approach for: {self.description}",
+                "dependencies": [],
+                "files_affected": ["(to be determined)"],
+                "tests_required": [],
+                "baseline_tests": ["tests/"],
+                "estimated_risk": "low",
+            }
+        )
 
         # Detect common patterns
         if any(word in description_lower for word in ["add", "create", "new"]):
-            subtasks.append({
-                "id": "subtask-1-create",
-                "description": "Create new files/functions",
-                "dependencies": ["subtask-0-plan"],
-                "files_affected": ["(to be determined)"],
-                "tests_required": [
-                    {
-                        "type": "unit",
-                        "path": "(to be determined)",
-                        "description": "Test new functionality",
-                    }
-                ],
-                "baseline_tests": ["tests/unittests/"],
-                "estimated_risk": "medium",
-            })
+            subtasks.append(
+                {
+                    "id": "subtask-1-create",
+                    "description": "Create new files/functions",
+                    "dependencies": ["subtask-0-plan"],
+                    "files_affected": ["(to be determined)"],
+                    "tests_required": [
+                        {
+                            "type": "unit",
+                            "path": "(to be determined)",
+                            "description": "Test new functionality",
+                        }
+                    ],
+                    "baseline_tests": ["tests/unittests/"],
+                    "estimated_risk": "medium",
+                }
+            )
 
         if any(word in description_lower for word in ["modify", "change", "update", "fix"]):
-            subtasks.append({
-                "id": "subtask-2-modify",
-                "description": "Modify existing files/functions",
-                "dependencies": ["subtask-0-plan"],
-                "files_affected": ["(to be determined)"],
-                "tests_required": [
-                    {
-                        "type": "unit",
-                        "path": "(to be determined)",
-                        "description": "Test modified functionality",
-                    }
-                ],
-                "baseline_tests": ["tests/unittests/"],
-                "estimated_risk": "high",
-            })
+            subtasks.append(
+                {
+                    "id": "subtask-2-modify",
+                    "description": "Modify existing files/functions",
+                    "dependencies": ["subtask-0-plan"],
+                    "files_affected": ["(to be determined)"],
+                    "tests_required": [
+                        {
+                            "type": "unit",
+                            "path": "(to be determined)",
+                            "description": "Test modified functionality",
+                        }
+                    ],
+                    "baseline_tests": ["tests/unittests/"],
+                    "estimated_risk": "high",
+                }
+            )
 
         if any(word in description_lower for word in ["test", "coverage"]):
-            subtasks.append({
-                "id": "subtask-3-test",
-                "description": "Add/update tests",
-                "dependencies": list({s["id"] for s in subtasks if s["id"] != "subtask-0-plan"}),
-                "files_affected": ["tests/"],
-                "tests_required": [
-                    {
-                        "type": "unit",
-                        "path": "(to be determined)",
-                        "description": "Verify test coverage",
-                    }
-                ],
-                "baseline_tests": ["tests/"],
-                "estimated_risk": "low",
-            })
+            subtasks.append(
+                {
+                    "id": "subtask-3-test",
+                    "description": "Add/update tests",
+                    "dependencies": list({s["id"] for s in subtasks if s["id"] != "subtask-0-plan"}),
+                    "files_affected": ["tests/"],
+                    "tests_required": [
+                        {
+                            "type": "unit",
+                            "path": "(to be determined)",
+                            "description": "Verify test coverage",
+                        }
+                    ],
+                    "baseline_tests": ["tests/"],
+                    "estimated_risk": "low",
+                }
+            )
 
         if any(word in description_lower for word in ["document", "docs"]):
-            subtasks.append({
-                "id": "subtask-4-docs",
-                "description": "Update documentation",
-                "dependencies": list({s["id"] for s in subtasks}),
-                "files_affected": ["solace/docs/", "README.md"],
-                "tests_required": [],
-                "baseline_tests": [],
-                "estimated_risk": "low",
-            })
+            subtasks.append(
+                {
+                    "id": "subtask-4-docs",
+                    "description": "Update documentation",
+                    "dependencies": list({s["id"] for s in subtasks}),
+                    "files_affected": ["solace/docs/", "README.md"],
+                    "tests_required": [],
+                    "baseline_tests": [],
+                    "estimated_risk": "low",
+                }
+            )
 
         # Always end with integration validation
-        subtasks.append({
-            "id": "subtask-final-integration",
-            "description": "Validate system integration",
-            "dependencies": [s["id"] for s in subtasks if "final" not in s["id"]],
-            "files_affected": [],
-            "tests_required": [
-                {
-                    "type": "integration",
-                    "path": "tests/integration/",
-                    "description": "Run full integration test suite",
-                }
-            ],
-            "baseline_tests": ["tests/integration/", "tests/e2e/"],
-            "estimated_risk": "medium",
-        })
+        subtasks.append(
+            {
+                "id": "subtask-final-integration",
+                "description": "Validate system integration",
+                "dependencies": [s["id"] for s in subtasks if "final" not in s["id"]],
+                "files_affected": [],
+                "tests_required": [
+                    {
+                        "type": "integration",
+                        "path": "tests/integration/",
+                        "description": "Run full integration test suite",
+                    }
+                ],
+                "baseline_tests": ["tests/integration/", "tests/e2e/"],
+                "estimated_risk": "medium",
+            }
+        )
 
         return subtasks
 

@@ -85,21 +85,15 @@ class TestExportAgentMd:
         """Test that export groups comments by file."""
         append_comment(
             str(tmp_path),
-            ReviewComment(
-                review_id="test", path="file1.py", line=1, message="Comment 1"
-            ),
+            ReviewComment(review_id="test", path="file1.py", line=1, message="Comment 1"),
         )
         append_comment(
             str(tmp_path),
-            ReviewComment(
-                review_id="test", path="file2.py", line=1, message="Comment 2"
-            ),
+            ReviewComment(review_id="test", path="file2.py", line=1, message="Comment 2"),
         )
         append_comment(
             str(tmp_path),
-            ReviewComment(
-                review_id="test", path="file1.py", line=10, message="Comment 3"
-            ),
+            ReviewComment(review_id="test", path="file1.py", line=10, message="Comment 3"),
         )
 
         out = export_agent_md(str(tmp_path), "test")

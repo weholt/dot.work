@@ -1,11 +1,10 @@
 """LLM integration for generating enhanced summaries and insights."""
 
-import logging
-from typing import Any, Dict, List, Optional
-from datetime import datetime
 import asyncio
+import logging
+from typing import Any
 
-from ..models import ChangeAnalysis, ComparisonResult, AnalysisConfig
+from ..models import AnalysisConfig, ChangeAnalysis, ComparisonResult
 
 
 class LLMSummarizer:
@@ -66,9 +65,10 @@ class LLMSummarizer:
         except Exception as e:
             raise Exception(f"Failed to initialize Anthropic: {e}")
 
-    def _get_api_key(self, env_var: str) -> Optional[str]:
+    def _get_api_key(self, env_var: str) -> str | None:
         """Get API key from environment variables."""
         import os
+
         return os.getenv(env_var)
 
     def is_available(self) -> bool:
@@ -119,7 +119,7 @@ class LLMSummarizer:
             self.logger.error(f"Failed to generate comparison summary: {e}")
             return result.aggregate_summary
 
-    async def analyze_impact(self, analysis: ChangeAnalysis) -> List[str]:
+    async def analyze_impact(self, analysis: ChangeAnalysis) -> list[str]:
         """
         Analyze impact areas using LLM.
 
@@ -141,7 +141,7 @@ class LLMSummarizer:
             self.logger.error(f"Failed to analyze impact: {e}")
             return analysis.impact_areas
 
-    async def suggest_testing_strategy(self, analysis: ChangeAnalysis) -> List[str]:
+    async def suggest_testing_strategy(self, analysis: ChangeAnalysis) -> list[str]:
         """
         Suggest testing strategy for the changes.
 
@@ -163,7 +163,7 @@ class LLMSummarizer:
             self.logger.error(f"Failed to generate testing suggestions: {e}")
             return self._generate_basic_testing_suggestions(analysis)
 
-    async def assess_migration_complexity(self, analysis: ChangeAnalysis) -> Dict[str, Any]:
+    async def assess_migration_complexity(self, analysis: ChangeAnalysis) -> dict[str, Any]:
         """
         Assess migration complexity and requirements.
 
@@ -200,12 +200,12 @@ Please analyze the following git commit and provide a concise, human-readable su
 Commit Details:
 - Hash: {analysis.commit_hash[:8]}
 - Author: {analysis.author}
-- Date: {analysis.timestamp.strftime('%Y-%m-%d %H:%M')}
+- Date: {analysis.timestamp.strftime("%Y-%m-%d %H:%M")}
 - Message: {analysis.message}
 - Files changed: {len(analysis.files_changed)}
 - Lines changed: +{analysis.lines_added}/-{analysis.lines_deleted}
 - Complexity score: {analysis.complexity_score:.1f}
-- Tags: {', '.join(analysis.tags) if analysis.tags else 'None'}
+- Tags: {", ".join(analysis.tags) if analysis.tags else "None"}
 
 Files changed:
 {chr(10).join(files_info)}
@@ -225,8 +225,7 @@ Format your response as a clear, professional summary.
         top_commits = []
         for commit in result.commits[:5]:  # Top 5 commits by complexity
             top_commits.append(
-                f"- {commit.short_message} (complexity: {commit.complexity_score:.1f}, "
-                f"author: {commit.author})"
+                f"- {commit.short_message} (complexity: {commit.complexity_score:.1f}, author: {commit.author})"
             )
 
         prompt = f"""
@@ -264,7 +263,7 @@ Format your response as a clear, professional summary suitable for release notes
 Analyze the impact areas for this commit:
 
 Commit: {analysis.short_message}
-Files: {', '.join(f.path for f in analysis.files_changed[:10])}
+Files: {", ".join(f.path for f in analysis.files_changed[:10])}
 Changes: +{analysis.lines_added}/-{analysis.lines_deleted} lines
 Complexity: {analysis.complexity_score:.1f}
 
@@ -289,8 +288,8 @@ Suggest a testing strategy for this commit:
 
 Commit: {analysis.short_message}
 Files changed: {len(analysis.files_changed)}
-File types: {', '.join(set(f.category.value for f in analysis.files_changed))}
-Impact areas: {', '.join(analysis.impact_areas)}
+File types: {", ".join(set(f.category.value for f in analysis.files_changed))}
+Impact areas: {", ".join(analysis.impact_areas)}
 Breaking change: {analysis.breaking_change}
 Security relevant: {analysis.security_relevant}
 
@@ -316,7 +315,7 @@ Commit: {analysis.short_message}
 Files: {len(analysis.files_changed)}
 Changes: +{analysis.lines_added}/-{analysis.lines_deleted} lines
 Complexity: {analysis.complexity_score:.1f}
-Impact areas: {', '.join(analysis.impact_areas)}
+Impact areas: {", ".join(analysis.impact_areas)}
 Breaking change: {analysis.breaking_change}
 
 Please assess:
@@ -350,11 +349,14 @@ Provide specific, actionable assessment.
                 self._client.chat.completions.create,
                 model=self.config.llm_model or "gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that analyzes git changes and provides clear, professional summaries."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that analyzes git changes and provides clear, professional summaries.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 max_tokens=self.config.llm_max_tokens or 1000,
-                temperature=self.config.llm_temperature or 0.3
+                temperature=self.config.llm_temperature or 0.3,
             )
             return response.choices[0].message.content
 
@@ -369,9 +371,7 @@ Provide specific, actionable assessment.
                 model=self.config.llm_model or "claude-3-sonnet-20240229",
                 max_tokens=self.config.llm_max_tokens or 1000,
                 temperature=self.config.llm_temperature or 0.3,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
+                messages=[{"role": "user", "content": prompt}],
             )
             return response.content[0].text
 
@@ -387,55 +387,55 @@ Provide specific, actionable assessment.
         cleaned = response.strip()
 
         # Remove any markdown formatting that might interfere
-        if cleaned.startswith('```'):
-            lines = cleaned.split('\n')
-            if lines[-1].strip() == '```':
-                cleaned = '\n'.join(lines[1:-1])
+        if cleaned.startswith("```"):
+            lines = cleaned.split("\n")
+            if lines[-1].strip() == "```":
+                cleaned = "\n".join(lines[1:-1])
             else:
-                cleaned = '\n'.join(lines[1:])
+                cleaned = "\n".join(lines[1:])
 
         return cleaned.strip()
 
-    def _parse_impact_areas(self, response: str) -> List[str]:
+    def _parse_impact_areas(self, response: str) -> list[str]:
         """Parse impact areas from LLM response."""
         # Simple parsing - split by common delimiters
         areas = []
 
         # Split by lines and clean up
-        lines = response.split('\n')
+        lines = response.split("\n")
         for line in lines:
             line = line.strip()
             # Remove common prefixes
-            for prefix in ['-', '•', '*', '1.', '2.', '3.', '4.', '5.', '6.', '7.']:
+            for prefix in ["-", "•", "*", "1.", "2.", "3.", "4.", "5.", "6.", "7."]:
                 if line.startswith(prefix):
-                    line = line[len(prefix):].strip()
+                    line = line[len(prefix) :].strip()
                     break
 
             # Add if not empty and not too long
-            if line and len(line) < 50 and not line.lower().startswith(('please', 'here', 'the')):
+            if line and len(line) < 50 and not line.lower().startswith(("please", "here", "the")):
                 areas.append(line)
 
         return areas[:7]  # Limit to 7 areas
 
-    def _parse_testing_suggestions(self, response: str) -> List[str]:
+    def _parse_testing_suggestions(self, response: str) -> list[str]:
         """Parse testing suggestions from LLM response."""
         suggestions = []
 
-        lines = response.split('\n')
+        lines = response.split("\n")
         for line in lines:
             line = line.strip()
             # Remove common prefixes and clean up
-            for prefix in ['-', '•', '*', 'Test', 'Consider', 'Run', 'Add', 'Verify']:
+            for prefix in ["-", "•", "*", "Test", "Consider", "Run", "Add", "Verify"]:
                 if line.startswith(prefix):
-                    line = line[len(prefix):].strip()
+                    line = line[len(prefix) :].strip()
                     break
 
-            if line and len(line) < 100 and not line.lower().startswith(('please', 'here', 'you should')):
+            if line and len(line) < 100 and not line.lower().startswith(("please", "here", "you should")):
                 suggestions.append(line)
 
         return suggestions[:6]  # Limit to 6 suggestions
 
-    def _parse_migration_assessment(self, response: str) -> Dict[str, Any]:
+    def _parse_migration_assessment(self, response: str) -> dict[str, Any]:
         """Parse migration assessment from LLM response."""
         assessment = {
             "complexity_level": "Medium",
@@ -443,36 +443,36 @@ Provide specific, actionable assessment.
             "risk_factors": [],
             "prerequisites": [],
             "rollback_strategy": "Standard",
-            "downtime_expected": "None"
+            "downtime_expected": "None",
         }
 
         # Simple keyword-based parsing
         response_lower = response.lower()
 
         # Complexity level
-        if any(word in response_lower for word in ['critical', 'very high', 'extremely complex']):
+        if any(word in response_lower for word in ["critical", "very high", "extremely complex"]):
             assessment["complexity_level"] = "Critical"
-        elif any(word in response_lower for word in ['high', 'complex']):
+        elif any(word in response_lower for word in ["high", "complex"]):
             assessment["complexity_level"] = "High"
-        elif any(word in response_lower for word in ['low', 'simple', 'straightforward']):
+        elif any(word in response_lower for word in ["low", "simple", "straightforward"]):
             assessment["complexity_level"] = "Low"
 
         # Extract lines for detailed info
-        lines = response.split('\n')
+        lines = response.split("\n")
         for line in lines:
             line_lower = line.lower()
-            if any(word in line_lower for word in ['hours', 'days', 'effort']):
-                if 'hours' in line_lower or 'day' in line_lower:
+            if any(word in line_lower for word in ["hours", "days", "effort"]):
+                if "hours" in line_lower or "day" in line_lower:
                     assessment["estimated_effort"] = line.strip()
-            elif any(word in line_lower for word in ['risk', 'factor', 'concern']):
+            elif any(word in line_lower for word in ["risk", "factor", "concern"]):
                 if len(line.strip()) < 100:
                     assessment["risk_factors"].append(line.strip())
-            elif any(word in line_lower for word in ['prerequisite', 'requirement', 'depend']):
+            elif any(word in line_lower for word in ["prerequisite", "requirement", "depend"]):
                 if len(line.strip()) < 100:
                     assessment["prerequisites"].append(line.strip())
-            elif any(word in line_lower for word in ['rollback', 'backout', 'revert']):
+            elif any(word in line_lower for word in ["rollback", "backout", "revert"]):
                 assessment["rollback_strategy"] = line.strip()
-            elif any(word in line_lower for word in ['downtime', 'disruption', 'outage']):
+            elif any(word in line_lower for word in ["downtime", "disruption", "outage"]):
                 assessment["downtime_expected"] = line.strip()
 
         # Limit lists
@@ -486,7 +486,7 @@ Provide specific, actionable assessment.
         """Generate basic summary without LLM."""
         parts = [
             f"Changed {len(analysis.files_changed)} files",
-            f"added {analysis.lines_added} lines, deleted {analysis.lines_deleted} lines"
+            f"added {analysis.lines_added} lines, deleted {analysis.lines_deleted} lines",
         ]
 
         if analysis.impact_areas:
@@ -503,7 +503,7 @@ Provide specific, actionable assessment.
 
         return ". ".join(parts) + "."
 
-    def _generate_basic_testing_suggestions(self, analysis: ChangeAnalysis) -> List[str]:
+    def _generate_basic_testing_suggestions(self, analysis: ChangeAnalysis) -> list[str]:
         """Generate basic testing suggestions without LLM."""
         suggestions = []
 
@@ -535,7 +535,7 @@ Provide specific, actionable assessment.
 
         return suggestions[:5]
 
-    def _generate_basic_migration_assessment(self, analysis: ChangeAnalysis) -> Dict[str, Any]:
+    def _generate_basic_migration_assessment(self, analysis: ChangeAnalysis) -> dict[str, Any]:
         """Generate basic migration assessment without LLM."""
         if analysis.breaking_change:
             return {
@@ -544,7 +544,7 @@ Provide specific, actionable assessment.
                 "risk_factors": ["Breaking changes require careful coordination"],
                 "prerequisites": ["Backup current state", "Prepare rollback plan"],
                 "rollback_strategy": "Use version control to revert if needed",
-                "downtime_expected": "Possible brief service interruption"
+                "downtime_expected": "Possible brief service interruption",
             }
         else:
             return {
@@ -553,5 +553,5 @@ Provide specific, actionable assessment.
                 "risk_factors": [],
                 "prerequisites": [],
                 "rollback_strategy": "Standard revert procedures",
-                "downtime_expected": "None"
+                "downtime_expected": "None",
             }

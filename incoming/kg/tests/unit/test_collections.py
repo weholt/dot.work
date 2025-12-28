@@ -8,12 +8,7 @@ from pathlib import Path
 import pytest
 
 from kgshred.db import (
-    Collection,
-    CollectionMember,
     Database,
-    ProjectSettings,
-    Topic,
-    TopicLink,
 )
 
 
@@ -36,9 +31,7 @@ class TestCollectionCRUD:
         assert collection.meta == {"description": "Test project"}
         db.close()
 
-    def test_create_collection_duplicate_name_error(
-        self, tmp_path: Path
-    ) -> None:
+    def test_create_collection_duplicate_name_error(self, tmp_path: Path) -> None:
         """Duplicate name should raise error."""
         db = Database(tmp_path / "test.sqlite")
         db.create_collection("c1", "project", "Duplicate Name")
@@ -428,9 +421,7 @@ class TestProjectSettings:
         db = Database(tmp_path / "test.sqlite")
         db.create_collection("p1", "project", "My Project")
 
-        settings = db.set_project_settings(
-            "p1", {"budget": 1000, "model": "gpt-4"}
-        )
+        settings = db.set_project_settings("p1", {"budget": 1000, "model": "gpt-4"})
 
         assert settings.collection_id == "p1"
         assert settings.defaults == {"budget": 1000, "model": "gpt-4"}
@@ -499,22 +490,17 @@ class TestSchemaVersion3:
         db = Database(tmp_path / "test.sqlite")
         conn = db._get_connection()
 
-        cur = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='topics'"
-        )
+        cur = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='topics'")
         assert cur.fetchone() is not None
         db.close()
 
-    def test_schema_includes_project_settings_table(
-        self, tmp_path: Path
-    ) -> None:
+    def test_schema_includes_project_settings_table(self, tmp_path: Path) -> None:
         """Schema should include project_settings table."""
         db = Database(tmp_path / "test.sqlite")
         conn = db._get_connection()
 
         cur = conn.execute(
-            "SELECT name FROM sqlite_master "
-            "WHERE type='table' AND name='project_settings'"
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='project_settings'"
         )
         assert cur.fetchone() is not None
         db.close()
@@ -522,9 +508,7 @@ class TestSchemaVersion3:
     def test_collection_meta_json_stored(self, tmp_path: Path) -> None:
         """Collection meta should be stored as JSON."""
         db = Database(tmp_path / "test.sqlite")
-        db.create_collection(
-            "c1", "project", "Test", meta={"key": "value", "num": 42}
-        )
+        db.create_collection("c1", "project", "Test", meta={"key": "value", "num": 42})
 
         result = db.get_collection("c1")
 

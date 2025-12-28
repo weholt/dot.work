@@ -1,14 +1,15 @@
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, mock_open
+from unittest.mock import Mock, patch
+
+import pytest
 from repo_agent.core import (
     RepoAgentError,
     RunConfig,
     _bool_meta,
+    _build_docker_run_cmd,
+    _docker_build_if_needed,
     _load_frontmatter,
     _resolve_config,
-    _docker_build_if_needed,
-    _build_docker_run_cmd,
     run_from_markdown,
 )
 
@@ -87,32 +88,29 @@ class TestResolveConfig:
         return {
             "repo_url": "https://github.com/user/repo.git",
             "model": "openai/gpt-4",
-            "tool": {
-                "name": "opencode",
-                "entrypoint": "opencode run"
-            }
+            "tool": {"name": "opencode", "entrypoint": "opencode run"},
         }
 
     @patch("repo_agent.core._load_frontmatter")
     def test_raises_error_when_repo_url_missing(self, mock_load):
         mock_load.return_value = ({"model": "gpt-4"}, "content")
-        
+
         with pytest.raises(RepoAgentError, match="repo_url must be provided"):
             _resolve_config(Path("test.md"), {})
 
     @patch("repo_agent.core._load_frontmatter")
     def test_raises_error_when_model_missing(self, mock_load):
         mock_load.return_value = ({"repo_url": "https://github.com/user/repo.git"}, "content")
-        
+
         with pytest.raises(RepoAgentError, match="model must be provided"):
             _resolve_config(Path("test.md"), {})
 
     @patch("repo_agent.core._load_frontmatter")
     def test_creates_config_with_minimal_frontmatter(self, mock_load, minimal_frontmatter):
         mock_load.return_value = (minimal_frontmatter, "test instructions")
-        
+
         cfg, body = _resolve_config(Path("test.md"), {})
-        
+
         assert cfg.repo_url == "https://github.com/user/repo.git"
         assert cfg.model == "openai/gpt-4"
         assert cfg.tool_name == "opencode"
@@ -125,11 +123,11 @@ class TestResolveConfig:
         overrides = {
             "repo_url": "https://github.com/override/repo.git",
             "model": "anthropic/claude-3",
-            "branch": "custom-branch"
+            "branch": "custom-branch",
         }
-        
+
         cfg, _ = _resolve_config(Path("test.md"), overrides)
-        
+
         assert cfg.repo_url == "https://github.com/override/repo.git"
         assert cfg.model == "anthropic/claude-3"
         assert cfg.branch == "custom-branch"
@@ -137,16 +135,16 @@ class TestResolveConfig:
     @patch("repo_agent.core._load_frontmatter")
     def test_generates_default_branch_name(self, mock_load, minimal_frontmatter):
         mock_load.return_value = (minimal_frontmatter, "content")
-        
+
         cfg, _ = _resolve_config(Path("test.md"), {})
-        
+
         assert cfg.branch.startswith("auto/repo-agent-")
 
     @patch("repo_agent.core._load_frontmatter")
     def test_validates_strategy_values(self, mock_load, minimal_frontmatter):
         minimal_frontmatter["strategy"] = "invalid"
         mock_load.return_value = (minimal_frontmatter, "content")
-        
+
         with pytest.raises(RepoAgentError, match="strategy must be 'agentic' or 'direct'"):
             _resolve_config(Path("test.md"), {})
 
@@ -155,9 +153,9 @@ class TestResolveConfig:
         minimal_frontmatter["github_token_env"] = "MY_TOKEN"
         monkeypatch.setenv("MY_TOKEN", "ghp_test_token")
         mock_load.return_value = (minimal_frontmatter, "content")
-        
+
         cfg, _ = _resolve_config(Path("test.md"), {})
-        
+
         assert cfg.github_token == "ghp_test_token"
 
     @patch("repo_agent.core._load_frontmatter")
@@ -167,23 +165,25 @@ class TestResolveConfig:
         instructions_file = tmp_path / "instructions.md"
         minimal_frontmatter["dockerfile"] = "Dockerfile"
         mock_load.return_value = (minimal_frontmatter, "content")
-        
+
         cfg, _ = _resolve_config(instructions_file, {})
-        
+
         assert cfg.dockerfile == dockerfile
 
     @patch("repo_agent.core._load_frontmatter")
     def test_parses_all_boolean_flags(self, mock_load, minimal_frontmatter):
-        minimal_frontmatter.update({
-            "auto_commit": False,
-            "create_pr": False,
-            "create_repo_if_missing": True,
-            "use_ssh": True
-        })
+        minimal_frontmatter.update(
+            {
+                "auto_commit": False,
+                "create_pr": False,
+                "create_repo_if_missing": True,
+                "use_ssh": True,
+            }
+        )
         mock_load.return_value = (minimal_frontmatter, "content")
-        
+
         cfg, _ = _resolve_config(Path("test.md"), {})
-        
+
         assert cfg.auto_commit is False
         assert cfg.create_pr is False
         assert cfg.create_repo_if_missing is True
@@ -196,7 +196,7 @@ class TestDockerBuildIfNeeded:
     def test_skips_build_when_no_dockerfile(self):
         cfg = Mock()
         cfg.dockerfile = None
-        
+
         # Should not raise any errors
         _docker_build_if_needed(cfg)
 
@@ -204,13 +204,13 @@ class TestDockerBuildIfNeeded:
     def test_builds_dockerfile_when_provided(self, mock_run, tmp_path):
         dockerfile = tmp_path / "Dockerfile"
         dockerfile.write_text("FROM ubuntu")
-        
+
         cfg = Mock()
         cfg.dockerfile = dockerfile
         cfg.docker_image = "test-image"
-        
+
         _docker_build_if_needed(cfg)
-        
+
         mock_run.assert_called_once()
         args = mock_run.call_args[0][0]
         assert "docker" in args
@@ -250,7 +250,7 @@ class TestBuildDockerRunCmd:
             tool_args={},
             prompt_header_agentic="Test agentic",
             prompt_header_direct="Test direct",
-            dry_run=False
+            dry_run=False,
         )
         return cfg
 
@@ -259,9 +259,9 @@ class TestBuildDockerRunCmd:
         workdir.mkdir()
         instructions = tmp_path / "instructions.txt"
         instructions.write_text("test")
-        
+
         cmd = _build_docker_run_cmd(minimal_config, workdir, instructions)
-        
+
         assert "docker" in cmd
         assert "run" in cmd
         assert "--rm" in cmd
@@ -273,10 +273,10 @@ class TestBuildDockerRunCmd:
         workdir.mkdir()
         instructions = tmp_path / "instructions.txt"
         instructions.write_text("test")
-        
+
         cmd = _build_docker_run_cmd(minimal_config, workdir, instructions)
         cmd_str = " ".join(cmd)
-        
+
         assert "REPO_URL" in cmd_str
         assert "MODEL" in cmd_str
         assert "GITHUB_TOKEN" in cmd_str
@@ -288,25 +288,25 @@ class TestBuildDockerRunCmd:
         workdir.mkdir()
         instructions = tmp_path / "instructions.txt"
         instructions.write_text("test")
-        
+
         cmd = _build_docker_run_cmd(minimal_config, workdir, instructions)
         cmd_str = " ".join(cmd)
-        
+
         assert "TOOL_EXTRA_ARGS" in cmd_str
 
     def test_mounts_ssh_keys_when_use_ssh_enabled(self, minimal_config, tmp_path):
         minimal_config.use_ssh = True
         minimal_config.ssh_key_dir = tmp_path / ".ssh"
         minimal_config.ssh_key_dir.mkdir()
-        
+
         workdir = tmp_path / "work"
         workdir.mkdir()
         instructions = tmp_path / "instructions.txt"
         instructions.write_text("test")
-        
+
         cmd = _build_docker_run_cmd(minimal_config, workdir, instructions)
         cmd_str = " ".join(cmd)
-        
+
         assert ".ssh" in cmd_str
 
 
@@ -334,14 +334,16 @@ Test instructions
     @patch("repo_agent.core._resolve_config")
     @patch("repo_agent.core._docker_build_if_needed")
     @patch("repo_agent.core._build_docker_run_cmd")
-    def test_dry_run_prints_command(self, mock_build_cmd, mock_build, mock_resolve, test_instructions_file, capsys):
+    def test_dry_run_prints_command(
+        self, mock_build_cmd, mock_build, mock_resolve, test_instructions_file, capsys
+    ):
         mock_cfg = Mock()
         mock_cfg.dry_run = True
         mock_resolve.return_value = (mock_cfg, "content")
         mock_build_cmd.return_value = ["docker", "run", "test"]
-        
+
         run_from_markdown(test_instructions_file, dry_run=True)
-        
+
         captured = capsys.readouterr()
         assert "dry run" in captured.out.lower()
         assert "docker" in captured.out
@@ -350,14 +352,16 @@ Test instructions
     @patch("repo_agent.core._docker_build_if_needed")
     @patch("repo_agent.core._build_docker_run_cmd")
     @patch("repo_agent.core.subprocess.run")
-    def test_executes_docker_command(self, mock_run, mock_build_cmd, mock_build, mock_resolve, test_instructions_file):
+    def test_executes_docker_command(
+        self, mock_run, mock_build_cmd, mock_build, mock_resolve, test_instructions_file
+    ):
         mock_cfg = Mock()
         mock_cfg.dry_run = False
         mock_resolve.return_value = (mock_cfg, "content")
         mock_build_cmd.return_value = ["docker", "run", "test"]
-        
+
         run_from_markdown(test_instructions_file)
-        
+
         mock_run.assert_called_once()
         assert mock_run.call_args[0][0] == ["docker", "run", "test"]
         assert mock_run.call_args[1]["check"] is True
@@ -365,14 +369,16 @@ Test instructions
     @patch("repo_agent.core._build_docker_run_cmd")
     @patch("repo_agent.core._resolve_config")
     @patch("repo_agent.core._docker_build_if_needed")
-    def test_creates_temporary_directory(self, mock_build, mock_resolve, mock_cmd, test_instructions_file):
+    def test_creates_temporary_directory(
+        self, mock_build, mock_resolve, mock_cmd, test_instructions_file
+    ):
         mock_cfg = Mock()
         mock_cfg.dry_run = True
         mock_resolve.return_value = (mock_cfg, "content")
         mock_cmd.return_value = ["docker", "run", "test"]
-        
+
         run_from_markdown(test_instructions_file, dry_run=True)
-        
+
         # Verify temporary directory handling (implicitly tested via execution)
         mock_resolve.assert_called_once()
         # Verify docker command was built with temp directory
@@ -409,9 +415,9 @@ class TestRunConfig:
             tool_args={},
             prompt_header_agentic="agentic",
             prompt_header_direct="direct",
-            dry_run=False
+            dry_run=False,
         )
-        
+
         assert cfg.repo_url == "https://github.com/user/repo.git"
         assert cfg.model == "gpt-4"
         assert cfg.strategy == "agentic"

@@ -27,7 +27,7 @@ class VersionManager:
 
     def __init__(self, project_root: Path):
         """Initialize version manager.
-        
+
         Args:
             project_root: Root directory of the project
         """
@@ -41,24 +41,24 @@ class VersionManager:
 
     def read_version(self) -> VersionInfo | None:
         """Read current version from version.json.
-        
+
         Returns:
             VersionInfo object or None if file doesn't exist
         """
         if not self.version_file.exists():
             return None
 
-        with open(self.version_file, encoding='utf-8') as f:
+        with open(self.version_file, encoding="utf-8") as f:
             data = json.load(f)
 
         return VersionInfo(**data)
 
     def calculate_next_version(self, current: VersionInfo | None = None) -> str:
         """Calculate next version based on current date and build number.
-        
+
         Args:
             current: Current version info, or None for first version
-            
+
         Returns:
             Next version string in format YYYY.MM.NNNNN
         """
@@ -71,7 +71,7 @@ class VersionManager:
             return f"{year}.{month:02d}.00001"
 
         # Parse current version
-        parts = current.version.split('.')
+        parts = current.version.split(".")
         curr_year = int(parts[0])
         curr_month = int(parts[1])
         curr_build = int(parts[2])
@@ -85,7 +85,7 @@ class VersionManager:
 
     def write_version(self, version_info: VersionInfo) -> None:
         """Write version info to version.json.
-        
+
         Args:
             version_info: Version information to write
         """
@@ -98,15 +98,15 @@ class VersionManager:
             "changelog_generated": version_info.changelog_generated,
         }
 
-        with open(self.version_file, 'w', encoding='utf-8') as f:
+        with open(self.version_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
     def init_version(self, version: str | None = None) -> VersionInfo:
         """Initialize version file with first version.
-        
+
         Args:
             version: Optional specific version, otherwise calculated
-            
+
         Returns:
             Created VersionInfo
         """
@@ -122,7 +122,7 @@ class VersionManager:
             git_commit=self.repo.head.commit.hexsha,
             git_tag=f"version-{version}",
             previous_version=None,
-            changelog_generated=False
+            changelog_generated=False,
         )
 
         self.write_version(version_info)
@@ -130,11 +130,11 @@ class VersionManager:
 
     def freeze_version(self, use_llm: bool = False, dry_run: bool = False) -> VersionInfo:
         """Freeze a new version with changelog generation.
-        
+
         Args:
             use_llm: Whether to use LLM for summaries
             dry_run: If True, preview without making changes
-            
+
         Returns:
             New VersionInfo
         """
@@ -153,11 +153,7 @@ class VersionManager:
         # Generate changelog
         generator = ChangelogGenerator()
         changelog_entry = generator.generate_entry(
-            version=next_version,
-            commits=commits,
-            repo_stats=self._get_repo_statistics(last_tag),
-            use_llm=use_llm,
-            project_name=self.project_info.name
+            version=next_version, commits=commits, repo_stats=self._get_repo_statistics(last_tag), use_llm=use_llm, project_name=self.project_info.name
         )
 
         if not dry_run:
@@ -172,7 +168,7 @@ class VersionManager:
                 git_commit=self.repo.head.commit.hexsha,
                 git_tag=tag_name,
                 previous_version=current.version if current else None,
-                changelog_generated=True
+                changelog_generated=True,
             )
             self.write_version(version_info)
 
@@ -181,7 +177,7 @@ class VersionManager:
             generator.append_to_changelog(changelog_entry, changelog_path)
 
             # Commit changes
-            self.repo.index.add(['version.json', 'CHANGELOG.md'])
+            self.repo.index.add(["version.json", "CHANGELOG.md"])
             self.repo.index.commit(f"chore: release version {next_version}")
 
         else:
@@ -192,17 +188,17 @@ class VersionManager:
                 git_commit=self.repo.head.commit.hexsha,
                 git_tag=f"version-{next_version}",
                 previous_version=current.version if current else None,
-                changelog_generated=False
+                changelog_generated=False,
             )
 
         return version_info
 
     def _get_repo_statistics(self, from_tag: str | None) -> dict:
         """Get repository statistics between tags.
-        
+
         Args:
             from_tag: Starting tag, or None for all history
-            
+
         Returns:
             Statistics dictionary
         """
@@ -214,56 +210,44 @@ class VersionManager:
 
         authors = set(c.author.name for c in commits)
 
-        return {
-            "commit_count": len(commits),
-            "contributor_count": len(authors),
-            "contributors": sorted(authors)
-        }
+        return {"commit_count": len(commits), "contributor_count": len(authors), "contributors": sorted(authors)}
 
     def get_latest_tag(self) -> str | None:
         """Get the most recent version tag.
-        
+
         Returns:
             Tag name or None
         """
-        tags = sorted(
-            [t for t in self.repo.tags if t.name.startswith('version-')],
-            key=lambda t: t.commit.committed_datetime,
-            reverse=True
-        )
+        tags = sorted([t for t in self.repo.tags if t.name.startswith("version-")], key=lambda t: t.commit.committed_datetime, reverse=True)
         return tags[0].name if tags else None
 
     def get_version_history(self, limit: int = 10) -> list[dict]:
         """Get version history from git tags.
-        
+
         Args:
             limit: Maximum number of versions to return
-            
+
         Returns:
             List of version dicts
         """
-        tags = sorted(
-            [t for t in self.repo.tags if t.name.startswith('version-')],
-            key=lambda t: t.commit.committed_datetime,
-            reverse=True
-        )[:limit]
+        tags = sorted([t for t in self.repo.tags if t.name.startswith("version-")], key=lambda t: t.commit.committed_datetime, reverse=True)[:limit]
 
         return [
             {
-                "version": tag.name.replace('version-', ''),
-                "date": tag.commit.committed_datetime.strftime('%Y-%m-%d %H:%M'),
+                "version": tag.name.replace("version-", ""),
+                "date": tag.commit.committed_datetime.strftime("%Y-%m-%d %H:%M"),
                 "commit": tag.commit.hexsha,
-                "author": tag.commit.author.name
+                "author": tag.commit.author.name,
             }
             for tag in tags
         ]
 
     def get_commits_since(self, since_tag: str | None) -> list:
         """Get commits since a specific tag.
-        
+
         Args:
             since_tag: Starting tag, or None for all
-            
+
         Returns:
             List of CommitInfo objects
         """
@@ -278,7 +262,7 @@ class VersionManager:
 
     def load_config(self) -> dict:
         """Load configuration from .version-management.yaml.
-        
+
         Returns:
             Configuration dictionary
         """
@@ -288,17 +272,10 @@ class VersionManager:
             return self._default_config()
 
         import yaml
-        with open(config_file, encoding='utf-8') as f:
+
+        with open(config_file, encoding="utf-8") as f:
             return yaml.safe_load(f)
 
     def _default_config(self) -> dict:
         """Get default configuration."""
-        return {
-            "format": "YYYY.MM.build-number",
-            "tag_prefix": "version-",
-            "changelog": {
-                "file": "CHANGELOG.md",
-                "include_authors": True,
-                "group_by_type": True
-            }
-        }
+        return {"format": "YYYY.MM.build-number", "tag_prefix": "version-", "changelog": {"file": "CHANGELOG.md", "include_authors": True, "group_by_type": True}}

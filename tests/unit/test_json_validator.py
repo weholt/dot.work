@@ -23,7 +23,7 @@ class TestValidateJson:
 
     def test_valid_array(self) -> None:
         """Test validation of valid JSON array."""
-        result = validate_json('[1, 2, 3]')
+        result = validate_json("[1, 2, 3]")
         assert result.valid
         assert result.data == [1, 2, 3]
 

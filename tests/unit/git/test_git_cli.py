@@ -1,11 +1,10 @@
 """Tests for git history CLI commands."""
 
-import pytest
-from typer.testing import CliRunner
 from unittest.mock import Mock, patch
 
-from dot_work.git.cli import history_app
+from typer.testing import CliRunner
 
+from dot_work.git.cli import history_app
 
 runner = CliRunner()
 
@@ -19,9 +18,7 @@ class TestHistoryCLICommands:
         mock_service = Mock()
         mock_service_class.return_value = mock_service
         mock_service.compare_refs.return_value = Mock(
-            metadata=Mock(from_ref="HEAD~1", to_ref="HEAD"),
-            commits=[],
-            contributors={}
+            metadata=Mock(from_ref="HEAD~1", to_ref="HEAD"), commits=[], contributors={}
         )
 
         result = runner.invoke(history_app, ["compare", "HEAD~1", "HEAD"])
@@ -35,9 +32,7 @@ class TestHistoryCLICommands:
         mock_service = Mock()
         mock_service_class.return_value = mock_service
         mock_service.analyze_commit.return_value = Mock(
-            commit_hash="abc123",
-            author="Test",
-            message="Test commit"
+            commit_hash="abc123", author="Test", message="Test commit"
         )
 
         result = runner.invoke(history_app, ["analyze", "abc123"])
@@ -51,9 +46,7 @@ class TestHistoryCLICommands:
         mock_service = Mock()
         mock_service_class.return_value = mock_service
         mock_service.compare_commits.return_value = Mock(
-            commit_a_hash="abc123",
-            commit_b_hash="def456",
-            differences=[]
+            commit_a_hash="abc123", commit_b_hash="def456", differences=[]
         )
 
         result = runner.invoke(history_app, ["diff-commits", "abc123", "def456"])
@@ -79,8 +72,7 @@ class TestHistoryCLICommands:
         mock_service = Mock()
         mock_service_class.return_value = mock_service
         mock_service.get_complexity_analysis.return_value = Mock(
-            average_complexity=25.0,
-            high_complexity_commits=[]
+            average_complexity=25.0, high_complexity_commits=[]
         )
 
         result = runner.invoke(history_app, ["complexity", "HEAD~10", "HEAD"])
@@ -110,9 +102,7 @@ class TestHistoryCLIOptions:
         mock_service = Mock()
         mock_service_class.return_value = mock_service
         mock_service.compare_refs.return_value = Mock(
-            metadata=Mock(from_ref="HEAD~1", to_ref="HEAD"),
-            commits=[],
-            contributors={}
+            metadata=Mock(from_ref="HEAD~1", to_ref="HEAD"), commits=[], contributors={}
         )
 
         result = runner.invoke(history_app, ["compare", "HEAD~1", "HEAD", "--format", "json"])
@@ -126,9 +116,7 @@ class TestHistoryCLIOptions:
         mock_service = Mock()
         mock_service_class.return_value = mock_service
         mock_service.compare_refs.return_value = Mock(
-            metadata=Mock(from_ref="HEAD~1", to_ref="HEAD"),
-            commits=[],
-            contributors={}
+            metadata=Mock(from_ref="HEAD~1", to_ref="HEAD"), commits=[], contributors={}
         )
 
         result = runner.invoke(history_app, ["compare", "HEAD~1", "HEAD", "--format", "yaml"])
@@ -142,9 +130,7 @@ class TestHistoryCLIOptions:
         mock_service = Mock()
         mock_service_class.return_value = mock_service
         mock_service.compare_refs.return_value = Mock(
-            metadata=Mock(from_ref="HEAD~1", to_ref="HEAD"),
-            commits=[],
-            contributors={}
+            metadata=Mock(from_ref="HEAD~1", to_ref="HEAD"), commits=[], contributors={}
         )
 
         result = runner.invoke(history_app, ["compare", "HEAD~1", "HEAD", "--verbose"])
@@ -158,12 +144,12 @@ class TestHistoryCLIOptions:
         mock_service = Mock()
         mock_service_class.return_value = mock_service
         mock_service.compare_refs.return_value = Mock(
-            metadata=Mock(from_ref="HEAD~1", to_ref="HEAD"),
-            commits=[],
-            contributors={}
+            metadata=Mock(from_ref="HEAD~1", to_ref="HEAD"), commits=[], contributors={}
         )
 
-        result = runner.invoke(history_app, ["compare", "HEAD~1", "HEAD", "--output", "/tmp/output.json"])
+        result = runner.invoke(
+            history_app, ["compare", "HEAD~1", "HEAD", "--output", "/tmp/output.json"]
+        )
 
         # Should accept the output option
         assert result.exit_code != 2
@@ -206,9 +192,7 @@ class TestHistoryCLIServiceIntegration:
         mock_service = Mock()
         mock_service_class.return_value = mock_service
         mock_service.compare_refs.return_value = Mock(
-            metadata=Mock(from_ref="HEAD~5", to_ref="HEAD"),
-            commits=[],
-            contributors={}
+            metadata=Mock(from_ref="HEAD~5", to_ref="HEAD"), commits=[], contributors={}
         )
 
         result = runner.invoke(history_app, ["compare", "HEAD~5", "HEAD"])
@@ -225,9 +209,7 @@ class TestHistoryCLIServiceIntegration:
         mock_service = Mock()
         mock_service_class.return_value = mock_service
         mock_service.analyze_commit.return_value = Mock(
-            commit_hash="abc123def456",
-            author="Test Author",
-            message="Test commit"
+            commit_hash="abc123def456", author="Test Author", message="Test commit"
         )
 
         result = runner.invoke(history_app, ["analyze", "abc123def456"])
@@ -246,7 +228,9 @@ class TestHistoryCLIServiceIntegration:
         # Mock get_complexity_distribution as the actual method name
         mock_service.get_complexity_distribution.return_value = {"0-20": 5, "20-40": 3}
 
-        result = runner.invoke(history_app, ["complexity", "HEAD~10", "HEAD", "--threshold", "30.0"])
+        result = runner.invoke(
+            history_app, ["complexity", "HEAD~10", "HEAD", "--threshold", "30.0"]
+        )
 
         # Service should be created
         mock_service_class.assert_called_once()

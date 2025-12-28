@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from kgshred.db import Database, Edge, Node
+from kgshred.db import Database, Node
 
 
 @pytest.mark.integration
@@ -23,14 +23,16 @@ class TestDatabasePersistence:
         # First session - create data
         db1 = Database(db_path)
         db1.insert_document("doc1", "/test.md", b"# Test Content")
-        node = db1.insert_node(Node(
-            node_pk=None,
-            short_id="pers",
-            full_id="doc1/h1/pers",
-            doc_id="doc1",
-            kind="heading",
-            title="Persistent Node",
-        ))
+        node = db1.insert_node(
+            Node(
+                node_pk=None,
+                short_id="pers",
+                full_id="doc1/h1/pers",
+                doc_id="doc1",
+                kind="heading",
+                title="Persistent Node",
+            )
+        )
         db1.fts_index_node(node.node_pk, "Persistent Node", "This should persist", "pers")  # type: ignore
         db1.close()
 
@@ -62,16 +64,18 @@ class TestDatabaseConcurrency:
         # Setup data
         db = Database(db_path)
         db.insert_document("doc1", "/test.md", b"content")
-        db.insert_nodes_batch([
-            Node(
-                node_pk=None,
-                short_id=f"c{i:03d}",
-                full_id=f"doc1/para/c{i:03d}",
-                doc_id="doc1",
-                kind="para",
-            )
-            for i in range(100)
-        ])
+        db.insert_nodes_batch(
+            [
+                Node(
+                    node_pk=None,
+                    short_id=f"c{i:03d}",
+                    full_id=f"doc1/para/c{i:03d}",
+                    doc_id="doc1",
+                    kind="para",
+                )
+                for i in range(100)
+            ]
+        )
         db.close()
 
         results: list[int] = []
@@ -168,17 +172,19 @@ class TestFTSPerformance:
         db.insert_document("doc1", "/test.md", b"content")
 
         # Insert and index 500 nodes
-        nodes = db.insert_nodes_batch([
-            Node(
-                node_pk=None,
-                short_id=f"f{i:04d}",
-                full_id=f"doc1/para/f{i:04d}",
-                doc_id="doc1",
-                kind="para",
-                title=f"Topic {i % 10}",
-            )
-            for i in range(500)
-        ])
+        nodes = db.insert_nodes_batch(
+            [
+                Node(
+                    node_pk=None,
+                    short_id=f"f{i:04d}",
+                    full_id=f"doc1/para/f{i:04d}",
+                    doc_id="doc1",
+                    kind="para",
+                    title=f"Topic {i % 10}",
+                )
+                for i in range(500)
+            ]
+        )
 
         for node in nodes:
             db.fts_index_node(

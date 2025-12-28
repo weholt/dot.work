@@ -32,7 +32,7 @@ def test_changelog_entry():
         commits_by_type=commits_by_type,
         statistics={"commit_count": 1, "contributor_count": 1},
         contributors=[("Test Author", 1)],
-        project_name="Test Project"
+        project_name="Test Project",
     )
 
     assert entry.version == "2025.01.001"
@@ -123,7 +123,7 @@ def test_generate_with_template(temp_dir: Path):
             commits_by_type=commits_by_type,
             statistics={"commit_count": 1, "contributor_count": 1},
             contributors=[("Test Author", 1)],
-            project_name="Test Project"
+            project_name="Test Project",
         )
     ]
 
@@ -174,7 +174,7 @@ def test_generate_with_default_template():
             commits_by_type=commits_by_type,
             statistics={"commit_count": 2, "contributor_count": 1},
             contributors=[("Test Author", 2)],
-            project_name="Test Project"
+            project_name="Test Project",
         )
     ]
 

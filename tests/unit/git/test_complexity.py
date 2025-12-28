@@ -1,15 +1,14 @@
 """Tests for complexity calculator service."""
 
-import pytest
 from datetime import datetime
 
-from dot_work.git.services.complexity import ComplexityCalculator
 from dot_work.git.models import (
     ChangeAnalysis,
-    FileChange,
-    FileCategory,
     ChangeType,
+    FileCategory,
+    FileChange,
 )
+from dot_work.git.services.complexity import ComplexityCalculator
 
 
 class TestComplexityCalculator:
@@ -20,9 +19,9 @@ class TestComplexityCalculator:
         calculator = ComplexityCalculator()
 
         assert calculator is not None
-        assert hasattr(calculator, 'weights')
-        assert 'files_changed' in calculator.weights
-        assert 'lines_added' in calculator.weights
+        assert hasattr(calculator, "weights")
+        assert "files_changed" in calculator.weights
+        assert "lines_added" in calculator.weights
 
     def test_calculate_commit_complexity_simple(self):
         """Test calculating complexity for a simple commit."""
@@ -42,7 +41,7 @@ class TestComplexityCalculator:
                     change_type=ChangeType.MODIFIED,
                     category=FileCategory.CODE,
                     lines_added=10,
-                    lines_deleted=5
+                    lines_deleted=5,
                 )
             ],
             lines_added=10,
@@ -53,7 +52,7 @@ class TestComplexityCalculator:
             complexity_score=0.0,
             summary="Add feature",
             tags=[],
-            impact_areas=[]
+            impact_areas=[],
         )
 
         complexity = calculator.calculate_complexity(commit)
@@ -79,7 +78,7 @@ class TestComplexityCalculator:
                     change_type=ChangeType.ADDED,
                     category=FileCategory.CODE,
                     lines_added=100,
-                    lines_deleted=0
+                    lines_deleted=0,
                 )
                 for i in range(25)
             ],
@@ -91,7 +90,7 @@ class TestComplexityCalculator:
             complexity_score=0.0,
             summary="Add large feature",
             tags=[],
-            impact_areas=[]
+            impact_areas=[],
         )
 
         complexity = calculator.calculate_complexity(commit)
@@ -117,7 +116,7 @@ class TestComplexityCalculator:
                     change_type=ChangeType.DELETED,
                     category=FileCategory.CODE,
                     lines_added=0,
-                    lines_deleted=200
+                    lines_deleted=200,
                 )
             ],
             lines_added=0,
@@ -129,7 +128,7 @@ class TestComplexityCalculator:
             summary="Remove deprecated API",
             tags=[],
             impact_areas=[],
-            breaking_change=True
+            breaking_change=True,
         )
 
         complexity = calculator.calculate_complexity(commit)
@@ -155,7 +154,7 @@ class TestComplexityCalculator:
                     change_type=ChangeType.MODIFIED,
                     category=FileCategory.CODE,
                     lines_added=15,
-                    lines_deleted=5
+                    lines_deleted=5,
                 )
             ],
             lines_added=15,
@@ -167,7 +166,7 @@ class TestComplexityCalculator:
             summary="Patch vulnerability",
             tags=[],
             impact_areas=[],
-            security_relevant=True
+            security_relevant=True,
         )
 
         complexity = calculator.calculate_complexity(commit)
@@ -184,20 +183,20 @@ class TestComplexityCalculator:
             change_type=ChangeType.MODIFIED,
             category=FileCategory.CODE,
             lines_added=50,
-            lines_deleted=25
+            lines_deleted=25,
         )
 
         complexity = calculator.calculate_file_complexity(file_change)
 
         # Should return a dict
         assert isinstance(complexity, dict)
-        assert 'base_score' in complexity
-        assert 'lines_score' in complexity
-        assert 'file_type_multiplier' in complexity
-        assert 'change_type_multiplier' in complexity
-        assert 'pattern_multiplier' in complexity
-        assert 'total_score' in complexity
-        assert 'complexity_level' in complexity
+        assert "base_score" in complexity
+        assert "lines_score" in complexity
+        assert "file_type_multiplier" in complexity
+        assert "change_type_multiplier" in complexity
+        assert "pattern_multiplier" in complexity
+        assert "total_score" in complexity
+        assert "complexity_level" in complexity
 
     def test_calculate_file_complexity_code_file(self):
         """Test file complexity for code file."""
@@ -208,13 +207,13 @@ class TestComplexityCalculator:
             change_type=ChangeType.MODIFIED,
             category=FileCategory.CODE,
             lines_added=50,
-            lines_deleted=25
+            lines_deleted=25,
         )
 
         complexity = calculator.calculate_file_complexity(file_change)
 
         # Code file should have multiplier
-        assert complexity['file_type_multiplier'] == 1.0
+        assert complexity["file_type_multiplier"] == 1.0
 
     def test_calculate_file_complexity_config_file(self):
         """Test file complexity for config file."""
@@ -225,13 +224,13 @@ class TestComplexityCalculator:
             change_type=ChangeType.MODIFIED,
             category=FileCategory.CONFIG,
             lines_added=20,
-            lines_deleted=10
+            lines_deleted=10,
         )
 
         complexity = calculator.calculate_file_complexity(file_change)
 
         # Config file should have higher multiplier
-        assert complexity['file_type_multiplier'] == 1.2
+        assert complexity["file_type_multiplier"] == 1.2
 
     def test_calculate_file_complexity_binary_file(self):
         """Test file complexity for binary file."""
@@ -242,13 +241,13 @@ class TestComplexityCalculator:
             change_type=ChangeType.ADDED,
             binary_file=True,
             lines_added=0,
-            lines_deleted=0
+            lines_deleted=0,
         )
 
         complexity = calculator.calculate_file_complexity(file_change)
 
         # Binary files should still get some complexity
-        assert complexity['total_score'] >= 0
+        assert complexity["total_score"] >= 0
 
     def test_get_complexity_level_low(self):
         """Test complexity level for low score."""
@@ -312,7 +311,7 @@ class TestComplexityCalculator:
                 complexity_score=15.0,
                 summary="Simple",
                 tags=[],
-                impact_areas=[]
+                impact_areas=[],
             ),
             ChangeAnalysis(
                 commit_hash="def456",
@@ -331,8 +330,8 @@ class TestComplexityCalculator:
                 complexity_score=50.0,
                 summary="Complex",
                 tags=[],
-                impact_areas=[]
-            )
+                impact_areas=[],
+            ),
         ]
 
         distribution = calculator.analyze_commit_complexity_distribution(commits)
@@ -361,7 +360,7 @@ class TestComplexityCalculator:
                     change_type=ChangeType.MODIFIED,
                     category=FileCategory.CODE,
                     lines_added=5,
-                    lines_deleted=2
+                    lines_deleted=2,
                 )
             ],
             lines_added=5,
@@ -372,7 +371,7 @@ class TestComplexityCalculator:
             complexity_score=10.0,
             summary="Simple fix",
             tags=[],
-            impact_areas=[]
+            impact_areas=[],
         )
 
         risks = calculator.identify_risk_factors(commit)
@@ -398,7 +397,7 @@ class TestComplexityCalculator:
                     change_type=ChangeType.ADDED,
                     category=FileCategory.DATA,
                     lines_added=50,
-                    lines_deleted=0
+                    lines_deleted=0,
                 )
             ],
             lines_added=500,
@@ -411,7 +410,7 @@ class TestComplexityCalculator:
             tags=[],
             impact_areas=[],
             breaking_change=True,
-            security_relevant=True
+            security_relevant=True,
         )
 
         risks = calculator.identify_risk_factors(commit)

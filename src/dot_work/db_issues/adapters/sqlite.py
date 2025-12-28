@@ -389,7 +389,9 @@ class IssueRepository:
 
         # Handle assignees via junction table
         # First delete existing assignees for this issue
-        assignee_statement = select(IssueAssigneeModel).where(IssueAssigneeModel.issue_id == issue.id)
+        assignee_statement = select(IssueAssigneeModel).where(
+            IssueAssigneeModel.issue_id == issue.id
+        )
         existing_assignees = self.session.exec(assignee_statement).all()
         for assignee_model in existing_assignees:
             self.session.delete(assignee_model)
@@ -606,9 +608,7 @@ class IssueRepository:
         models = self.session.exec(statement).all()
         return self._models_to_entities(models)
 
-    def list_by_project(
-        self, project_id: str, limit: int = 100, offset: int = 0
-    ) -> list[Issue]:
+    def list_by_project(self, project_id: str, limit: int = 100, offset: int = 0) -> list[Issue]:
         """List issues filtered by project.
 
         Args:
@@ -694,7 +694,9 @@ class IssueRepository:
         labels = [label_model.label_name for label_model in label_models]
 
         # Load assignees from junction table
-        assignee_statement = select(IssueAssigneeModel).where(IssueAssigneeModel.issue_id == model.id)
+        assignee_statement = select(IssueAssigneeModel).where(
+            IssueAssigneeModel.issue_id == model.id
+        )
         assignee_models = self.session.exec(assignee_statement).all()
         assignees = [assignee_model.assignee for assignee_model in assignee_models]
 
@@ -1083,23 +1085,39 @@ class IssueGraphRepository:
         Returns:
             True if adding edge creates cycle, False otherwise
         """
-        # Check if there's already a path from to_issue_id to from_issue_id
+        # Special case: self-loop is always a cycle
+        if from_issue_id == to_issue_id:
+            return True
+
+        # Load ALL dependencies in a single query to avoid N+1 problem
+        # This is O(1) queries instead of O(N) queries
+        statement = select(DependencyModel)
+        models = self.session.exec(statement).all()
+
+        # Build in-memory adjacency list for O(1) lookup
+        from collections import defaultdict
+
+        adjacency = defaultdict(list)
+        for model in models:
+            adjacency[model.from_issue_id].append(model.to_issue_id)
+
+        # DFS in-memory (no database queries)
         visited: set[str] = set()
 
         def dfs(current: str) -> bool:
-            """Depth-first search to detect cycles."""
+            """Depth-first search to detect cycles.
+
+            Runs entirely in-memory using the pre-built adjacency list.
+            """
             if current == from_issue_id:
                 return True
             if current in visited:
                 return False
             visited.add(current)
 
-            # Get all dependencies of current issue
-            statement = select(DependencyModel).where(DependencyModel.from_issue_id == current)
-            models = self.session.exec(statement).all()
-
-            for model in models:
-                if dfs(model.to_issue_id):
+            # Check all neighbors in-memory
+            for neighbor in adjacency.get(current, []):
+                if dfs(neighbor):
                     return True
 
             return False
@@ -1585,9 +1603,11 @@ class ProjectRepository:
         Returns:
             List of project entities with specified status
         """
-        statement = select(ProjectModel).where(
-            ProjectModel.status == status.value
-        ).order_by(ProjectModel.name)
+        statement = (
+            select(ProjectModel)
+            .where(ProjectModel.status == status.value)
+            .order_by(ProjectModel.name)
+        )
         models = self.session.exec(statement).all()
         return [self._model_to_entity(m) for m in models]
 

@@ -78,7 +78,7 @@ class TestGenerateFullId:
 
     def test_unicode_content_handled_correctly(self) -> None:
         """Unicode content should be hashed as UTF-8 bytes."""
-        content = "Hello 世界 🌍".encode("utf-8")
+        content = "Hello 世界 🌍".encode()
         result = generate_full_id("doc1", 0, len(content), "paragraph", content)
 
         assert len(result) == 32

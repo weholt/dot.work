@@ -50,10 +50,7 @@ class PyProjectParser:
             RuntimeError: If tomli/tomllib is not available
         """
         if tomllib is None:
-            raise RuntimeError(
-                "TOML parsing library not available. "
-                "Install 'tomli' for Python <3.11 or upgrade to Python 3.11+"
-            )
+            raise RuntimeError("TOML parsing library not available. Install 'tomli' for Python <3.11 or upgrade to Python 3.11+")
 
         pyproject_path = project_root / "pyproject.toml"
 

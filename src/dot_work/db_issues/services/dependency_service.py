@@ -380,9 +380,7 @@ class DependencyService:
 
         return all_deps
 
-    def generate_mermaid(
-        self, issue_id: str, max_depth: int = 5
-    ) -> str:
+    def generate_mermaid(self, issue_id: str, max_depth: int = 5) -> str:
         """Generate Mermaid diagram for dependency tree.
 
         Args:
@@ -506,9 +504,7 @@ class DependencyService:
 
         # Get all BLOCKS dependencies
         all_deps = self.uow.graph.get_all_dependencies()
-        blocks_deps = [
-            d for d in all_deps if d.dependency_type == DependencyType.BLOCKS
-        ]
+        blocks_deps = [d for d in all_deps if d.dependency_type == DependencyType.BLOCKS]
 
         # Build a map: issue_id -> list of issues that block it
         # For a blocks relationship (from -> to), "from" blocks "to"

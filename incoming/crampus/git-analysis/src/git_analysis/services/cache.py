@@ -1,19 +1,19 @@
 """Caching system for git analysis results."""
 
-import json
 import hashlib
+import json
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Optional, List
-import logging
+from typing import Any
 
-from ..models import CacheEntry, AnalysisConfig
+from ..models import AnalysisConfig, CacheEntry
 
 
 class AnalysisCache:
     """Cache system for storing and retrieving git analysis results."""
 
-    def __init__(self, cache_dir: Optional[Path] = None):
+    def __init__(self, cache_dir: Path | None = None):
         self.cache_dir = cache_dir or Path.cwd() / ".git-analysis" / "cache"
         self.logger = logging.getLogger(__name__)
         self._ensure_cache_dir()
@@ -31,7 +31,7 @@ class AnalysisCache:
         key_hash = hashlib.md5(key.encode()).hexdigest()
         return self.cache_dir / f"{key_hash}.json"
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """
         Retrieve cached data by key.
 
@@ -47,15 +47,15 @@ class AnalysisCache:
             if not cache_path.exists():
                 return None
 
-            with open(cache_path, 'r', encoding='utf-8') as f:
+            with open(cache_path, encoding="utf-8") as f:
                 cache_data = json.load(f)
 
             # Create cache entry
             entry = CacheEntry(
-                key=cache_data['key'],
-                data=cache_data['data'],
-                timestamp=datetime.fromisoformat(cache_data['timestamp']),
-                ttl_hours=cache_data.get('ttl_hours', 24)
+                key=cache_data["key"],
+                data=cache_data["data"],
+                timestamp=datetime.fromisoformat(cache_data["timestamp"]),
+                ttl_hours=cache_data.get("ttl_hours", 24),
             )
 
             # Check if expired
@@ -90,14 +90,9 @@ class AnalysisCache:
         try:
             cache_path = self._get_cache_path(key)
 
-            cache_data = {
-                'key': key,
-                'data': data,
-                'timestamp': datetime.now().isoformat(),
-                'ttl_hours': ttl_hours
-            }
+            cache_data = {"key": key, "data": data, "timestamp": datetime.now().isoformat(), "ttl_hours": ttl_hours}
 
-            with open(cache_path, 'w', encoding='utf-8') as f:
+            with open(cache_path, "w", encoding="utf-8") as f:
                 json.dump(cache_data, f, indent=2, default=str)
 
             self.logger.debug(f"Cached data for key: {key}")
@@ -160,11 +155,11 @@ class AnalysisCache:
 
             for cache_file in self.cache_dir.glob("*.json"):
                 try:
-                    with open(cache_file, 'r', encoding='utf-8') as f:
+                    with open(cache_file, encoding="utf-8") as f:
                         cache_data = json.load(f)
 
-                    timestamp = datetime.fromisoformat(cache_data['timestamp'])
-                    ttl_hours = cache_data.get('ttl_hours', 24)
+                    timestamp = datetime.fromisoformat(cache_data["timestamp"])
+                    ttl_hours = cache_data.get("ttl_hours", 24)
 
                     if datetime.now() - timestamp > timedelta(hours=ttl_hours):
                         cache_file.unlink()
@@ -184,7 +179,7 @@ class AnalysisCache:
             self.logger.error(f"Failed to cleanup expired cache: {e}")
             return 0
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """
         Get cache statistics.
 
@@ -193,11 +188,7 @@ class AnalysisCache:
         """
         try:
             if not self.cache_dir.exists():
-                return {
-                    "total_entries": 0,
-                    "total_size_bytes": 0,
-                    "cache_directory": str(self.cache_dir)
-                }
+                return {"total_entries": 0, "total_size_bytes": 0, "cache_directory": str(self.cache_dir)}
 
             cache_files = list(self.cache_dir.glob("*.json"))
             total_size = sum(f.stat().st_size for f in cache_files)
@@ -208,11 +199,11 @@ class AnalysisCache:
 
             for cache_file in cache_files:
                 try:
-                    with open(cache_file, 'r', encoding='utf-8') as f:
+                    with open(cache_file, encoding="utf-8") as f:
                         cache_data = json.load(f)
 
-                    timestamp = datetime.fromisoformat(cache_data['timestamp'])
-                    ttl_hours = cache_data.get('ttl_hours', 24)
+                    timestamp = datetime.fromisoformat(cache_data["timestamp"])
+                    ttl_hours = cache_data.get("ttl_hours", 24)
 
                     if datetime.now() - timestamp > timedelta(hours=ttl_hours):
                         expired_count += 1
@@ -229,15 +220,12 @@ class AnalysisCache:
                 "expired_entries": expired_count,
                 "total_size_bytes": total_size,
                 "total_size_mb": round(total_size / (1024 * 1024), 2),
-                "cache_directory": str(self.cache_dir)
+                "cache_directory": str(self.cache_dir),
             }
 
         except Exception as e:
             self.logger.error(f"Failed to get cache stats: {e}")
-            return {
-                "error": str(e),
-                "cache_directory": str(self.cache_dir)
-            }
+            return {"error": str(e), "cache_directory": str(self.cache_dir)}
 
     def _remove_cache_file(self, cache_path: Path):
         """Safely remove a cache file."""
@@ -255,12 +243,12 @@ class CacheManager:
         self.config = config
         self.main_cache = AnalysisCache(config.cache_dir)
         self.caches = {
-            'commits': AnalysisCache(config.cache_dir / "commits"),
-            'comparisons': AnalysisCache(config.cache_dir / "comparisons"),
-            'files': AnalysisCache(config.cache_dir / "files")
+            "commits": AnalysisCache(config.cache_dir / "commits"),
+            "comparisons": AnalysisCache(config.cache_dir / "comparisons"),
+            "files": AnalysisCache(config.cache_dir / "files"),
         }
 
-    def get_cache(self, cache_type: str = 'default') -> AnalysisCache:
+    def get_cache(self, cache_type: str = "default") -> AnalysisCache:
         """
         Get cache instance by type.
 
@@ -274,17 +262,17 @@ class CacheManager:
 
     def get_commit_cache(self) -> AnalysisCache:
         """Get cache for commit analyses."""
-        return self.get_cache('commits')
+        return self.get_cache("commits")
 
     def get_comparison_cache(self) -> AnalysisCache:
         """Get cache for comparison results."""
-        return self.get_cache('comparisons')
+        return self.get_cache("comparisons")
 
     def get_file_cache(self) -> AnalysisCache:
         """Get cache for file analyses."""
-        return self.get_cache('files')
+        return self.get_cache("files")
 
-    def cleanup_all(self) -> Dict[str, int]:
+    def cleanup_all(self) -> dict[str, int]:
         """
         Clean up expired entries in all caches.
 
@@ -299,7 +287,7 @@ class CacheManager:
 
         # Also cleanup main cache
         removed = self.main_cache.cleanup_expired()
-        results['default'] = removed
+        results["default"] = removed
 
         total_removed = sum(results.values())
         if total_removed > 0:
@@ -325,7 +313,7 @@ class CacheManager:
 
         return success
 
-    def get_all_stats(self) -> Dict[str, Any]:
+    def get_all_stats(self) -> dict[str, Any]:
         """
         Get statistics for all caches.
 
@@ -337,16 +325,16 @@ class CacheManager:
         for cache_name, cache in self.caches.items():
             stats[cache_name] = cache.get_cache_stats()
 
-        stats['default'] = self.main_cache.get_cache_stats()
+        stats["default"] = self.main_cache.get_cache_stats()
 
         # Add totals
-        total_entries = sum(s.get('total_entries', 0) for s in stats.values())
-        total_size = sum(s.get('total_size_bytes', 0) for s in stats.values())
+        total_entries = sum(s.get("total_entries", 0) for s in stats.values())
+        total_size = sum(s.get("total_size_bytes", 0) for s in stats.values())
 
-        stats['totals'] = {
-            'total_entries': total_entries,
-            'total_size_bytes': total_size,
-            'total_size_mb': round(total_size / (1024 * 1024), 2)
+        stats["totals"] = {
+            "total_entries": total_entries,
+            "total_size_bytes": total_size,
+            "total_size_mb": round(total_size / (1024 * 1024), 2),
         }
 
         return stats
@@ -365,10 +353,7 @@ def generate_cache_key(*args, **kwargs) -> str:
     """
     import json
 
-    key_data = {
-        'args': args,
-        'kwargs': sorted(kwargs.items())
-    }
+    key_data = {"args": args, "kwargs": sorted(kwargs.items())}
 
     key_str = json.dumps(key_data, sort_keys=True, default=str)
     return hashlib.md5(key_str.encode()).hexdigest()
@@ -385,7 +370,7 @@ def is_cache_enabled(config: AnalysisConfig) -> bool:
         True if caching should be used
     """
     # Check if caching is explicitly disabled
-    if hasattr(config, 'cache_enabled') and not config.cache_enabled:
+    if hasattr(config, "cache_enabled") and not config.cache_enabled:
         return False
 
     # Check if force refresh is enabled (bypasses cache)

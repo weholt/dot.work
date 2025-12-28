@@ -61,7 +61,9 @@ def run_build(
 @build_app.command()
 def run(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
-    fix: bool = typer.Option(False, "--fix", help="Automatically fix formatting and linting issues"),
+    fix: bool = typer.Option(
+        False, "--fix", help="Automatically fix formatting and linting issues"
+    ),
     clean: bool = typer.Option(False, "--clean", help="Clean build artifacts and exit"),
     use_uv: bool = typer.Option(False, "--use-uv", help="Use 'uv run' prefix for commands"),
     project_root: Path = typer.Option(

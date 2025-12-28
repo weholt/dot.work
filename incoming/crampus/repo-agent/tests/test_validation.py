@@ -1,8 +1,7 @@
+
 import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch
-from repo_agent.validation import validate_instructions
 from repo_agent.core import RepoAgentError
+from repo_agent.validation import validate_instructions
 
 
 class TestValidateInstructions:
@@ -14,10 +13,7 @@ class TestValidateInstructions:
             "repo_url": "https://github.com/user/repo.git",
             "model": "gpt-4",
             "github_token_env": "GITHUB_TOKEN",
-            "tool": {
-                "name": "opencode",
-                "entrypoint": "opencode run"
-            }
+            "tool": {"name": "opencode", "entrypoint": "opencode run"},
         }
 
     @pytest.fixture
@@ -50,7 +46,7 @@ tool:
 ---
 Content
 """)
-        
+
         with pytest.raises(RepoAgentError, match="repo_url"):
             validate_instructions(file)
 
@@ -65,7 +61,7 @@ tool:
 ---
 Content
 """)
-        
+
         with pytest.raises(RepoAgentError, match="model"):
             validate_instructions(file)
 
@@ -78,7 +74,7 @@ github_token_env: "GITHUB_TOKEN"
 ---
 Content
 """)
-        
+
         with pytest.raises(RepoAgentError, match="tool"):
             validate_instructions(file)
 
@@ -93,7 +89,7 @@ tool:
 ---
 Content
 """)
-        
+
         with pytest.raises(RepoAgentError, match="name"):
             validate_instructions(file)
 
@@ -108,7 +104,7 @@ tool:
 ---
 Content
 """)
-        
+
         with pytest.raises(RepoAgentError, match="entrypoint"):
             validate_instructions(file)
 
@@ -125,7 +121,7 @@ tool:
 ---
 Content
 """)
-        
+
         with pytest.raises(RepoAgentError, match="strategy"):
             validate_instructions(file)
 
@@ -142,7 +138,7 @@ tool:
 ---
 Content
 """)
-        
+
         # Should not raise
         validate_instructions(file)
 
@@ -159,7 +155,7 @@ tool:
 ---
 Content
 """)
-        
+
         # Should not raise
         validate_instructions(file)
 
@@ -175,14 +171,14 @@ tool:
 ---
 Content
 """)
-        
+
         # Should not raise
         validate_instructions(file)
 
     def test_validates_dockerfile_path(self, tmp_path):
         dockerfile = tmp_path / "Dockerfile"
         dockerfile.write_text("FROM ubuntu")
-        
+
         file = tmp_path / "test.md"
         file.write_text("""---
 repo_url: "https://github.com/user/repo.git"
@@ -195,7 +191,7 @@ tool:
 ---
 Content
 """)
-        
+
         # Should not raise
         validate_instructions(file)
 
@@ -212,13 +208,13 @@ tool:
 ---
 Content
 """)
-        
+
         with pytest.raises(RepoAgentError, match="Dockerfile"):
             validate_instructions(file)
 
     def test_handles_nonexistent_file(self, tmp_path):
         nonexistent = tmp_path / "nonexistent.md"
-        
+
         with pytest.raises((RepoAgentError, FileNotFoundError)):
             validate_instructions(nonexistent)
 
@@ -229,7 +225,7 @@ strategy: "invalid"
 ---
 Content
 """)
-        
+
         # Will raise on first error (repo_url missing)
         with pytest.raises(RepoAgentError):
             validate_instructions(file)
@@ -249,6 +245,6 @@ tool:
 ---
 Content
 """)
-        
+
         # Should not raise
         validate_instructions(file)
