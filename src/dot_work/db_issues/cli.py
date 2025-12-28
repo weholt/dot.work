@@ -1588,31 +1588,43 @@ def stale(
             stale_issues = service.get_stale_issues(days=days)
 
             if format == "json":
-                # type: ignore[import-not-found]
-                from dot_work.db_issues.cli_utils import format_issues_json
+                # Inline JSON formatting for stale issues
+                import json
 
-                json_output = format_issues_json(stale_issues)
-                console.print(json_output)
+                stale_data = [
+                    {
+                        "id": issue.id,
+                        "title": issue.title,
+                        "priority": issue.priority.value,
+                        "type": issue.type.value,
+                        "status": issue.status.value,
+                        "updated_at": issue.updated_at.isoformat(),
+                    }
+                    for issue in stale_issues
+                ]
+                console.print(json.dumps(stale_data, indent=2))
             else:
-                from dot_work.db_issues.cli_utils import format_issues_table
-
                 if not stale_issues:
                     console.print("[dim]No stale issues found[/dim]")
                 else:
                     console.print(f"\n[bold]Stale Issues[/bold] (not updated in {days}+ days):")
-                    format_issues_table(stale_issues, console)
+                    for issue in stale_issues:
+                        console.print(
+                            f"  [cyan]{issue.id}[/cyan] - {issue.title} "
+                            f"({issue.priority.value}/{issue.type.value})"
+                        )
         else:
             # Mark specific issue as stale
             if not issue_id:
                 console.print("[red]Error: issue_id required when not using --auto[/red]")
                 raise typer.Exit(1)
 
-            issue = service.transition_issue(issue_id, IssueStatus.STALE)
-            if not issue:
+            stale_issue = service.transition_issue(issue_id, IssueStatus.STALE)
+            if stale_issue is None:
                 console.print(f"[red]Issue not found or cannot be marked stale: {issue_id}[/red]")
                 raise typer.Exit(1)
 
-            console.print(f"[green]✓[/green] Issue marked as stale: [bold]{issue.id}[/bold]")
+            console.print(f"[green]✓[/green] Issue marked as stale: [bold]{stale_issue.id}[/bold]")
 
 
 @app.command()
