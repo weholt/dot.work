@@ -1,6 +1,7 @@
 """Version manager for date-based versioning."""
 
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -8,6 +9,8 @@ from pathlib import Path
 from git import Repo
 
 from dot_work.version.project_parser import PyProjectParser
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -76,11 +79,43 @@ class VersionManager:
             # First version
             return f"{year}.{month:02d}.00001"
 
-        # Parse current version
+        # Parse current version with validation
         parts = current.version.split(".")
-        curr_year = int(parts[0])
-        curr_month = int(parts[1])
-        curr_build = int(parts[2])
+
+        if len(parts) != 3:
+            raise ValueError(
+                f"Invalid version format: '{current.version}'. "
+                f"Expected format: YYYY.MM.NNNNN (e.g., '2025.01.00001'). "
+                f"Got {len(parts)} parts instead of 3."
+            )
+
+        try:
+            curr_year = int(parts[0])
+            curr_month = int(parts[1])
+            curr_build = int(parts[2])
+        except ValueError as e:
+            raise ValueError(
+                f"Invalid version format: '{current.version}'. "
+                f"Expected format: YYYY.MM.NNNNN where all parts are integers. "
+                f"Error: {e}"
+            ) from None
+
+        # Validate reasonable ranges
+        if not (2000 <= curr_year <= 2100):
+            raise ValueError(
+                f"Invalid year in version: '{current.version}'. "
+                f"Year must be between 2000 and 2100, got {curr_year}."
+            )
+        if not (1 <= curr_month <= 12):
+            raise ValueError(
+                f"Invalid month in version: '{current.version}'. "
+                f"Month must be between 1 and 12, got {curr_month}."
+            )
+        if not (1 <= curr_build <= 99999):
+            raise ValueError(
+                f"Invalid build number in version: '{current.version}'. "
+                f"Build number must be between 1 and 99999, got {curr_build}."
+            )
 
         if year == curr_year and month == curr_month:
             # Same month, increment build number
@@ -147,23 +182,69 @@ class VersionManager:
         Returns:
             New VersionInfo
         """
-        # Import here to avoid circular dependency
-        from dot_work.version.changelog import ChangelogGenerator
-        from dot_work.version.commit_parser import ConventionalCommitParser
-
         current = self.read_version()
         next_version = self.calculate_next_version(current)
 
-        # Get commits since last tag (only if repo exists)
-        commits = []
-        if self.repo:
-            parser = ConventionalCommitParser()
-            last_tag = current.git_tag if current else None
-            commits = parser.get_commits_since_tag(self.repo, last_tag)
+        # Get commits and generate changelog
+        commits = self._get_commits_since_last_tag(current)
+        changelog_entry = self._generate_changelog_entry(
+            next_version, commits, current, use_llm
+        )
 
-        # Generate changelog
+        # Get current git commit
+        git_commit = self.repo.head.commit.hexsha if self.repo else "unknown"
+
+        if not dry_run and self.repo:
+            return self._finalize_version_release(
+                next_version, git_commit, current, changelog_entry
+            )
+        else:
+            # Dry run - return preview version info
+            return VersionInfo(
+                version=next_version,
+                build_date=datetime.now().isoformat(),
+                git_commit=git_commit,
+                git_tag=f"version-{next_version}",
+                previous_version=current.version if current else None,
+                changelog_generated=False,
+            )
+
+    def _get_commits_since_last_tag(self, current: VersionInfo | None) -> list:
+        """Get commits since the last version tag.
+
+        Args:
+            current: Current version info
+
+        Returns:
+            List of commits since last tag
+        """
+        from dot_work.version.commit_parser import ConventionalCommitParser
+
+        if not self.repo:
+            return []
+
+        parser = ConventionalCommitParser()
+        last_tag = current.git_tag if current else None
+        return parser.get_commits_since_tag(self.repo, last_tag)
+
+    def _generate_changelog_entry(
+        self, next_version: str, commits: list, current: VersionInfo | None, use_llm: bool
+    ) -> str:
+        """Generate changelog entry for the new version.
+
+        Args:
+            next_version: New version string
+            commits: List of commits to include
+            current: Current version info
+            use_llm: Whether to use LLM for summaries
+
+        Returns:
+            Changelog entry markdown string
+        """
+        from dot_work.version.changelog import ChangelogGenerator
+
         generator = ChangelogGenerator()
-        changelog_entry = generator.generate_entry(
+        return generator.generate_entry(
             version=next_version,
             commits=commits,
             repo_stats=self._get_repo_statistics(current.git_tag if current else None),
@@ -171,15 +252,104 @@ class VersionManager:
             project_name=self.project_info.name,
         )
 
-        # Get git commit if available
-        git_commit = self.repo.head.commit.hexsha if self.repo else "unknown"
+    def _create_git_tag(self, version: str) -> None:
+        """Create a git tag for the version.
 
-        if not dry_run and self.repo:
-            # Create git tag
-            tag_name = f"version-{next_version}"
-            self.repo.create_tag(tag_name, message=f"Release {next_version}")
+        Args:
+            version: Version string to tag
 
-            # Update version.json
+        Raises:
+            RuntimeError: If git repository is not available
+        """
+        if not self.repo:
+            raise RuntimeError("Cannot create git tag: no repository available")
+
+        tag_name = f"version-{version}"
+        self.repo.create_tag(tag_name, message=f"Release {version}")
+
+    def _write_version_files(
+        self, version: str, git_commit: str, current: VersionInfo | None, tag_name: str
+    ) -> VersionInfo:
+        """Write version.json and append to CHANGELOG.md.
+
+        Args:
+            version: New version string
+            git_commit: Current git commit hash
+            current: Current version info
+            tag_name: Git tag name
+
+        Returns:
+            Created VersionInfo
+        """
+        from dot_work.version.changelog import ChangelogGenerator
+
+        version_info = VersionInfo(
+            version=version,
+            build_date=datetime.now().isoformat(),
+            git_commit=git_commit,
+            git_tag=tag_name,
+            previous_version=current.version if current else None,
+            changelog_generated=True,
+        )
+        self.write_version(version_info)
+
+        # Append to CHANGELOG.md
+        changelog_entry = self._generate_changelog_entry(
+            version, self._get_commits_since_last_tag(current), current, use_llm=False
+        )
+        changelog_path = self.project_root / "CHANGELOG.md"
+        ChangelogGenerator().append_to_changelog(changelog_entry, changelog_path)
+
+        return version_info
+
+    def _commit_version_changes(self, version: str) -> None:
+        """Commit version file changes to git.
+
+        Args:
+            version: Version string for commit message
+
+        Raises:
+            RuntimeError: If git repository is not available
+        """
+        if not self.repo:
+            raise RuntimeError("Cannot commit changes: no repository available")
+
+        self.repo.index.add(["version.json", "CHANGELOG.md"])
+        self.repo.index.commit(f"chore: release version {version}")
+
+    def _finalize_version_release(
+        self, next_version: str, git_commit: str, current: VersionInfo | None, changelog_entry: str
+    ) -> VersionInfo:
+        """Finalize the version release with git operations.
+
+        Uses transaction-like semantics: if any operation fails after tag creation,
+        the tag is deleted to maintain consistent state.
+
+        Args:
+            next_version: New version string
+            git_commit: Current git commit hash
+            current: Current version info
+            changelog_entry: Changelog entry to append
+
+        Returns:
+            Created VersionInfo
+
+        Raises:
+            RuntimeError: If git operations fail with rollback attempted
+        """
+        from dot_work.version.changelog import ChangelogGenerator
+
+        tag_name = f"version-{next_version}"
+        created_tag = False
+        wrote_version = False
+        appended_changelog = False
+
+        try:
+            # Create git tag first (cheapest operation, easy to roll back)
+            self._create_git_tag(next_version)
+            created_tag = True
+
+            # Write version.json
             version_info = VersionInfo(
                 version=next_version,
                 build_date=datetime.now().isoformat(),
@@ -189,27 +359,58 @@ class VersionManager:
                 changelog_generated=True,
             )
             self.write_version(version_info)
+            wrote_version = True
 
             # Append to CHANGELOG.md
             changelog_path = self.project_root / "CHANGELOG.md"
-            generator.append_to_changelog(changelog_entry, changelog_path)
+            ChangelogGenerator().append_to_changelog(changelog_entry, changelog_path)
+            appended_changelog = True
 
-            # Commit changes
-            self.repo.index.add(["version.json", "CHANGELOG.md"])
-            self.repo.index.commit(f"chore: release version {next_version}")
+            # Commit changes (final step, most expensive to roll back)
+            self._commit_version_changes(next_version)
 
-        else:
-            # Dry run - return preview version info
-            version_info = VersionInfo(
-                version=next_version,
-                build_date=datetime.now().isoformat(),
-                git_commit=git_commit,
-                git_tag=f"version-{next_version}",
-                previous_version=current.version if current else None,
-                changelog_generated=False,
-            )
+            return version_info
 
-        return version_info
+        except Exception as e:
+            # Rollback: clean up any partial state
+            logger.error("Failed to finalize version release: %s. Rolling back...", e)
+
+            if created_tag and self.repo:
+                try:
+                    # Delete the tag if it was created
+                    # Convert tag name string to TagReference
+                    tags = [t for t in self.repo.tags if t.name == tag_name or t.path == tag_name]
+                    if tags:
+                        self.repo.delete_tag(tags[0])
+                        logger.info("Rolled back: deleted tag %s", tag_name)
+                except Exception as tag_error:
+                    logger.error("Failed to rollback tag %s: %s", tag_name, tag_error)
+
+            if wrote_version:
+                try:
+                    # Restore previous version if it existed
+                    if current:
+                        self.write_version(current)
+                        logger.info("Rolled back: restored previous version %s", current.version)
+                    else:
+                        # Delete version.json if this was the first version
+                        if self.version_file.exists():
+                            self.version_file.unlink()
+                            logger.info("Rolled back: deleted version.json")
+                except Exception as file_error:
+                    logger.error("Failed to rollback version file: %s", file_error)
+
+            if appended_changelog:
+                try:
+                    # Remove the last entry from CHANGELOG.md
+                    # This is tricky - best we can do is log the issue
+                    logger.warning(
+                        "CHANGELOG.md was partially updated. Manual cleanup may be required."
+                    )
+                except Exception:
+                    pass
+
+            raise RuntimeError(f"Version release failed and was rolled back: {e}") from e
 
     def _get_repo_statistics(self, from_tag: str | None) -> dict:
         """Get repository statistics between tags.

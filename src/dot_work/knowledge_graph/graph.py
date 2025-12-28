@@ -6,6 +6,8 @@ Creates nodes and edges from parsed Markdown blocks.
 from __future__ import annotations
 
 import hashlib
+import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -15,7 +17,9 @@ from dot_work.knowledge_graph.parse_md import Block, BlockKind, parse_markdown
 from dot_work.knowledge_graph.search_fts import index_node
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    pass
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -62,7 +66,11 @@ def build_graph(
     Raises:
         DocumentExistsError: If document exists and force=False.
     """
+    logger.info(
+        "Building graph for document: %s (source: %s, force: %s)", doc_id, source_path, force
+    )
     blocks = list(parse_markdown(content))
+    logger.debug("Parsed %d blocks from document", len(blocks))
     return build_graph_from_blocks(doc_id, content, blocks, db, source_path, force=force)
 
 
@@ -91,14 +99,18 @@ def build_graph_from_blocks(
     Raises:
         DocumentExistsError: If document exists and force=False.
     """
+    logger.debug("Building graph from %d pre-parsed blocks", len(blocks))
+
     # Check for existing document and handle accordingly
     _ensure_document(doc_id, content, db, source_path, force=force)
 
     if not blocks:
+        logger.debug("No blocks parsed, creating document node only")
         # Create doc node even for empty content
         doc_node = _create_doc_node(doc_id, content, db, set())
         # Index doc node for FTS (empty content)
         index_node(db, doc_node, "")
+        logger.info("Created empty graph for document: %s", doc_id)
         return GraphResult(doc_id=doc_id, nodes=[doc_node], edges=[])
 
     # Track existing short_ids for collision resolution
@@ -118,6 +130,8 @@ def build_graph_from_blocks(
 
     # Previous sibling at each level for next edges
     prev_sibling_by_parent: dict[int, int] = {}
+
+    logger.debug("Creating nodes and edges for %d blocks", len(blocks))
 
     for block in blocks:
         # Create node for this block
@@ -163,6 +177,12 @@ def build_graph_from_blocks(
             if block.kind == BlockKind.HEADING and block.level is not None:
                 _update_heading_stack(heading_stack, node.node_pk, block.level)
 
+    logger.info(
+        "Built graph for document: %s (%d nodes, %d edges)",
+        doc_id,
+        len(nodes),
+        len(edges),
+    )
     return GraphResult(doc_id=doc_id, nodes=nodes, edges=edges)
 
 
@@ -192,9 +212,11 @@ def _ensure_document(
         sha256_match = existing.sha256 == new_sha256
 
         if not force:
+            logger.debug("Document already exists: %s (sha256_match: %s)", doc_id, sha256_match)
             raise DocumentExistsError(doc_id, sha256_match)
 
         # Force mode: delete existing and proceed
+        logger.info("Force mode: deleting existing document: %s", doc_id)
         db.delete_document(doc_id)
 
     db.insert_document(
@@ -202,6 +224,7 @@ def _ensure_document(
         source_path=source_path,
         raw=content,
     )
+    logger.debug("Document record ensured: %s (%d bytes)", doc_id, len(content))
 
 
 def _create_doc_node(
@@ -316,8 +339,10 @@ def get_node_tree(db: Database, doc_id: str) -> list[tuple[Node, int]]:
     Returns:
         List of (Node, depth) tuples in document order.
     """
+    logger.debug("Building node tree for document: %s", doc_id)
     nodes = db.get_nodes_by_doc_id(doc_id)
     if not nodes:
+        logger.debug("No nodes found for document: %s", doc_id)
         return []
 
     # Build parent-child mapping from contains edges
@@ -357,4 +382,5 @@ def get_node_tree(db: Database, doc_id: str) -> list[tuple[Node, int]]:
 
     visit(doc_node, 0)
 
+    logger.debug("Built node tree for %s: %d nodes", doc_id, len(result))
     return result

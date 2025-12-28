@@ -588,6 +588,42 @@ class IssueRepository:
         models = self.session.exec(statement).all()
         return self._models_to_entities(models)
 
+    def get_epic_counts(self) -> dict[str, dict[str, int]]:
+        """Get issue counts grouped by epic_id and status using SQL aggregation.
+
+        Returns a dict like: {
+            "EPIC-001": {"total": 10, "proposed": 3, "in_progress": 4, "completed": 3},
+            ...
+        }
+
+        This uses SQL GROUP BY for efficient counting without loading all issues.
+        """
+        from sqlmodel import text
+
+        result = self.session.exec(
+            text("""
+            SELECT
+                epic_id,
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'proposed' THEN 1 ELSE 0 END) as proposed,
+                SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
+            FROM issues
+            WHERE epic_id IS NOT NULL AND deleted_at IS NULL
+            GROUP BY epic_id
+        """)  # type: ignore[call-overload]
+        )
+
+        epic_counts: dict[str, dict[str, int]] = {}
+        for row in result:
+            epic_counts[row.epic_id] = {
+                "total": row.total,
+                "proposed": row.proposed,
+                "in_progress": row.in_progress,
+                "completed": row.completed,
+            }
+        return epic_counts
+
     def list_by_type(self, issue_type: IssueType, limit: int = 100, offset: int = 0) -> list[Issue]:
         """List issues filtered by type.
 
@@ -1745,7 +1781,7 @@ class UnitOfWork:
         Args:
             session: SQLModel database session for queries and transactions
         """
-        self.session = session
+        self._session = session
         self._in_transaction = False
         self._issues: IssueRepository | None = None
         self._comments: CommentRepository | None = None
@@ -1753,6 +1789,18 @@ class UnitOfWork:
         self._epics: EpicRepository | None = None
         self._labels: LabelRepository | None = None
         self._projects: ProjectRepository | None = None
+
+    @property
+    def session(self) -> Session:
+        """Get the underlying database session.
+
+        Provides access for services that need direct SQL execution
+        (e.g., SearchService with FTS5 queries).
+
+        Returns:
+            The SQLModel session.
+        """
+        return self._session
 
     def __enter__(self) -> "UnitOfWork":
         """Begin transaction.
@@ -1792,7 +1840,7 @@ class UnitOfWork:
         Persists all changes made within the transaction to the database.
         """
         logger.debug("Committing database transaction")
-        self.session.commit()
+        self._session.commit()
         logger.debug("Transaction committed successfully")
 
     def rollback(self) -> None:
@@ -1802,7 +1850,7 @@ class UnitOfWork:
         """
         if self._in_transaction:
             logger.warning("Rolling back database transaction")
-            self.session.rollback()
+            self._session.rollback()
             logger.debug("Transaction rolled back")
 
     @property

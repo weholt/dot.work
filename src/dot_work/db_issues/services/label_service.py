@@ -406,8 +406,18 @@ class LabelService:
         defined_labels = self.uow.labels.list_all()
         defined_label_map = {label.name: label for label in defined_labels}
 
-        # Get all issues and count label usage
-        all_issues = self.uow.issues.list_all(limit=1000000)
+        # Get issues for label counting with reasonable limit
+        # Use a high but safe limit to avoid OOM on large datasets
+        SAFE_LIMIT = 50000
+        all_issues = self.uow.issues.list_all(limit=SAFE_LIMIT)
+
+        # Warn if we hit the limit (counts may be incomplete)
+        if len(all_issues) >= SAFE_LIMIT:
+            logger.warning(
+                "Label count may be incomplete: reached safe limit of %d issues. "
+                "Consider implementing SQL-level label counting.",
+                SAFE_LIMIT,
+            )
 
         # Count label usage across all issues
         label_counts: dict[str, int] = {}

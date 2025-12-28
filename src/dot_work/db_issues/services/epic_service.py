@@ -14,7 +14,6 @@ from dot_work.db_issues.domain.entities import (
     EpicStatus,
     IdentifierService,
     Issue,
-    IssueStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -236,13 +235,13 @@ class EpicService:
                 logger.debug("Cleared parent for child epic: %s", child.id)
 
             # Also need to clear epic_id from any issues that reference this epic
-            all_issues = self.uow.issues.list_all(limit=1000000)
-            for issue in all_issues:
-                if issue.epic_id == epic_id:
-                    # Update issue epic_id to None
-                    # This requires using IssueRepository which doesn't have this method
-                    # We'll need to handle this in IssueService
-                    logger.debug("Issue %s references deleted epic %s", issue.id, epic_id)
+            # Use SQL-level filtering to only load issues that reference this epic
+            epic_issues = self.uow.issues.list_by_epic(epic_id)
+            for issue in epic_issues:
+                # Update issue epic_id to None
+                # This requires using IssueRepository which doesn't have this method
+                # We'll need to handle this in IssueService
+                logger.debug("Issue %s references deleted epic %s", issue.id, epic_id)
 
             deleted = self.uow.epics.delete(epic_id)
             if deleted:
@@ -345,32 +344,22 @@ class EpicService:
         # Get all epics
         epics = self.uow.epics.list_all()
 
-        # Get all issues
-        all_issues = self.uow.issues.list_all(limit=1000000)
+        # Get counts using SQL-level aggregation (no memory issues)
+        epic_counts = self.uow.issues.get_epic_counts()
 
         results: list[EpicInfo] = []
 
         for epic in epics:
-            # Filter issues belonging to this epic
-            epic_issues = [issue for issue in all_issues if issue.epic_id == epic.id]
-
-            total_count = len(epic_issues)
-            proposed_count = sum(1 for issue in epic_issues if issue.status == IssueStatus.PROPOSED)
-            in_progress_count = sum(
-                1 for issue in epic_issues if issue.status == IssueStatus.IN_PROGRESS
-            )
-            completed_count = sum(
-                1 for issue in epic_issues if issue.status == IssueStatus.COMPLETED
-            )
+            counts = epic_counts.get(epic.id, {"total": 0, "proposed": 0, "in_progress": 0, "completed": 0})
 
             results.append(
                 EpicInfo(
                     epic_id=epic.id,
                     title=epic.title,
-                    total_count=total_count,
-                    proposed_count=proposed_count,
-                    in_progress_count=in_progress_count,
-                    completed_count=completed_count,
+                    total_count=counts["total"],
+                    proposed_count=counts["proposed"],
+                    in_progress_count=counts["in_progress"],
+                    completed_count=counts["completed"],
                 )
             )
 
@@ -398,9 +387,8 @@ class EpicService:
             logger.warning("Epic not found: id=%s", epic_id)
             return []
 
-        # Get all issues and filter by epic_id
-        all_issues = self.uow.issues.list_all(limit=1000000)
-        return [issue for issue in all_issues if issue.epic_id == epic_id]
+        # Use SQL-level filtering instead of loading all issues
+        return self.uow.issues.list_by_epic(epic_id)
 
     def get_epic_tree(self, epic_id: str) -> list[EpicTreeItem]:
         """Get hierarchical tree of issues in an epic.
@@ -428,9 +416,8 @@ class EpicService:
             logger.warning("Epic not found: id=%s", epic_id)
             return []
 
-        # Get all issues in this epic
-        all_issues = self.uow.issues.list_all(limit=1000000)
-        epic_issues = [issue for issue in all_issues if issue.epic_id == epic_id]
+        # Use SQL-level filtering instead of loading all issues
+        epic_issues = self.uow.issues.list_by_epic(epic_id)
 
         # Build a parent -> children map
         children_map: dict[str, list[Issue]] = {}

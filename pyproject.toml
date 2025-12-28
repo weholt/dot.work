@@ -143,6 +143,15 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 addopts = ["-v", "--tb=short", "--strict-markers"]
+testpaths = ["tests", "src"]
+pythonpath = ["src"]
+norecursedirs = [
+  ".*",
+  "build",
+  "dist",
+  "incoming",
+  "*.egg-info",
+]
 markers = [
   "slow: marks tests as slow (deselect with '-m \"not slow\"')",
   "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",

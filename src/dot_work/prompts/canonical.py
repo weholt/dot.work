@@ -112,13 +112,13 @@ class CanonicalPrompt:
 
 
 class CanonicalPromptParser:
-    """Parser for canonical prompt files with frontmatter validation."""
+    """Parser for canonical prompt files with frontmatter validation.
+
+    This class has no state - all methods are pure functions.
+    Use the CANONICAL_PARSER singleton for efficiency.
+    """
 
     FRONTMATTER_PATTERN = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
-
-    def __init__(self):
-        """Initialize parser."""
-        pass
 
     def parse(self, file_path: str | Path) -> CanonicalPrompt:
         """Parse a canonical prompt file."""
@@ -196,11 +196,11 @@ class CanonicalPromptParser:
 
 
 class CanonicalPromptValidator:
-    """Validator for canonical prompt structure and content."""
+    """Validator for canonical prompt structure and content.
 
-    def __init__(self):
-        """Initialize validator."""
-        pass
+    This class has no state - all methods are pure functions.
+    Use the CANONICAL_VALIDATOR singleton for efficiency.
+    """
 
     def validate(self, prompt: CanonicalPrompt, strict: bool = False) -> list[ValidationError]:
         """Validate a canonical prompt and return any errors."""
@@ -330,6 +330,11 @@ def validate_canonical_prompt(
     """Convenience function to validate a canonical prompt."""
     validator = CanonicalPromptValidator()
     return validator.validate(prompt, strict)
+
+
+# Module-level singletons for efficient reuse (classes have no state)
+CANONICAL_PARSER = CanonicalPromptParser()
+CANONICAL_VALIDATOR = CanonicalPromptValidator()
 
 
 def generate_environment_prompt(prompt: CanonicalPrompt, env_name: str) -> tuple[str, str]:

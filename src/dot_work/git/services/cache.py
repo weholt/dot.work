@@ -407,25 +407,6 @@ class CacheManager:
         return stats
 
 
-def generate_cache_key(*args, **kwargs) -> str:
-    """
-    Generate a cache key from arguments.
-
-    Args:
-        *args: Positional arguments
-        **kwargs: Keyword arguments
-
-    Returns:
-        Cache key string
-    """
-    import json
-
-    key_data = {"args": args, "kwargs": sorted(kwargs.items())}
-
-    key_str = json.dumps(key_data, sort_keys=True, default=str)
-    return hashlib.sha256(key_str.encode()).hexdigest()
-
-
 def is_cache_enabled(config: AnalysisConfig) -> bool:
     """
     Check if caching is enabled in configuration.

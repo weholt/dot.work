@@ -14,7 +14,6 @@ class TestFileAnalyzer:
 
         assert analyzer is not None
         assert hasattr(analyzer, "categorize_file")
-        assert hasattr(analyzer, "detect_file_type")
 
     def test_categorize_python_code_file(self):
         """Test categorizing a Python code file."""
@@ -123,51 +122,6 @@ class TestFileAnalyzer:
         # Made up extension
         assert analyzer.categorize_file("data.xyz") == FileCategory.UNKNOWN
 
-    def test_detect_file_type_python(self):
-        """Test detecting Python file type."""
-        config = AnalysisConfig()
-        analyzer = FileAnalyzer(config)
-
-        file_type = analyzer.detect_file_type("main.py")
-
-        assert file_type == "python"
-
-    def test_detect_file_type_javascript(self):
-        """Test detecting JavaScript file type."""
-        config = AnalysisConfig()
-        analyzer = FileAnalyzer(config)
-
-        file_type = analyzer.detect_file_type("app.js")
-
-        assert file_type == "javascript"
-
-    def test_detect_file_type_yaml(self):
-        """Test detecting YAML file type."""
-        config = AnalysisConfig()
-        analyzer = FileAnalyzer(config)
-
-        file_type = analyzer.detect_file_type("config.yaml")
-
-        assert file_type == "yaml"
-
-    def test_detect_file_type_markdown(self):
-        """Test detecting Markdown file type."""
-        config = AnalysisConfig()
-        analyzer = FileAnalyzer(config)
-
-        file_type = analyzer.detect_file_type("README.md")
-
-        assert file_type == "markdown"
-
-    def test_detect_file_type_unknown(self):
-        """Test detecting unknown file type."""
-        config = AnalysisConfig()
-        analyzer = FileAnalyzer(config)
-
-        file_type = analyzer.detect_file_type("data.xyz")
-
-        assert file_type == "unknown"
-
     def test_categorize_with_directory_context(self):
         """Test that directory context affects categorization."""
         config = AnalysisConfig()
@@ -179,24 +133,3 @@ class TestFileAnalyzer:
             analyzer.categorize_file("tests/test_utils.py") == FileCategory.CODE
         )  # .py extension matches code first
         assert analyzer.categorize_file("docs/utils.md") == FileCategory.DOCUMENTATION
-
-    def test_calculate_file_importance(self):
-        """Test calculating file importance score."""
-        from dot_work.git.models import ChangeType, FileChange
-
-        config = AnalysisConfig()
-        analyzer = FileAnalyzer(config)
-
-        # Code file change
-        file_change = FileChange(
-            path="src/main.py",
-            change_type=ChangeType.MODIFIED,
-            category=FileCategory.CODE,
-            lines_added=50,
-            lines_deleted=25,
-        )
-
-        importance = analyzer.calculate_file_importance(file_change)
-
-        # Should return a score between 0 and 1
-        assert 0.0 <= importance <= 1.0

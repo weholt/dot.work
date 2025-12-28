@@ -7,7 +7,9 @@ for generating embeddings.
 from __future__ import annotations
 
 import json
+import logging
 import os
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -19,6 +21,28 @@ from dot_work.knowledge_graph.embed.base import (
     EmbeddingError,
     RateLimitError,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _mask_api_key(api_key: str | None, visible: int = 4) -> str:
+    """Mask an API key for safe logging/display.
+
+    Args:
+        api_key: The API key to mask.
+        visible: Number of characters to show at the end.
+
+    Returns:
+        Masked API key string (e.g., "sk-...1234" or "<none>").
+    """
+    if not api_key:
+        return "<none>"
+    if len(api_key) <= visible:
+        return "***"
+    # Show prefix (if common) and last N chars
+    if api_key.startswith("sk-"):
+        return f"sk-...{api_key[-visible:]}"
+    return f"...{api_key[-visible:]}"
 
 
 class OpenAIEmbedder(Embedder):
@@ -60,8 +84,41 @@ class OpenAIEmbedder(Embedder):
             # Normalize URL by removing trailing slash
             self.base_url = url.rstrip("/")
         self.model = config.model or self.DEFAULT_MODEL
-        self.dimensions = config.dimensions
+        self._dimensions = config.dimensions
+        self._dimensions_lock = threading.Lock()
+        self._dimensions_discovered = False
         self.batch_size = config.batch_size
+
+    @property
+    def dimensions(self) -> int | None:
+        """Get the embedding dimensions.
+
+        Returns:
+            Dimensions if known, None if not yet discovered.
+        """
+        return self._dimensions
+
+    def __repr__(self) -> str:
+        """Return a masked representation (safe for logging).
+
+        Returns:
+            String representation with masked API key.
+        """
+        return (
+            f"{self.__class__.__name__}("
+            f"model={self.model!r}, "
+            f"base_url={self.base_url!r}, "
+            f"api_key={_mask_api_key(self.api_key)}, "
+            f"dimensions={self._dimensions})"
+        )
+
+    def __str__(self) -> str:
+        """Return a masked string representation (safe for logging).
+
+        Returns:
+            String representation with masked API key.
+        """
+        return self.__repr__()
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings using OpenAI API.
@@ -161,9 +218,12 @@ class OpenAIEmbedder(Embedder):
             sorted_data = sorted(data, key=lambda x: x["index"])
             embeddings = [item["embedding"] for item in sorted_data]
 
-            # Update dimensions if not set
-            if self.dimensions is None and embeddings:
-                self.dimensions = len(embeddings[0])
+            # Update dimensions if not set (thread-safe)
+            if not self._dimensions_discovered and self._dimensions is None and embeddings:
+                with self._dimensions_lock:
+                    if not self._dimensions_discovered and self._dimensions is None:
+                        self._dimensions = len(embeddings[0])
+                        self._dimensions_discovered = True
 
             return embeddings
         except (KeyError, TypeError) as e:

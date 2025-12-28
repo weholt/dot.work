@@ -4,12 +4,21 @@ Task file parsing and management for the harness.
 Handles reading and writing markdown checkbox task files.
 """
 
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 # Regex to match markdown checkbox tasks: - [ ] Task text or - [x] Task text
 TASK_RE = re.compile(r"^\s*-\s*\[\s*(?P<state>[xX ])\s*\]\s*(?P<text>.+?)\s*$")
+
+
+class TaskFileError(Exception):
+    """Exception raised when a task file is invalid or cannot be found."""
+
+    pass
 
 
 @dataclass(frozen=True)
@@ -81,11 +90,11 @@ def validate_task_file(md_path: Path) -> None:
         md_path: Path to the markdown task file
 
     Raises:
-        SystemExit: If file doesn't exist or has no tasks
+        TaskFileError: If file doesn't exist or has no tasks
     """
     if not md_path.exists():
-        raise SystemExit(f"Task file not found: {md_path}")
+        raise TaskFileError(f"Task file not found: {md_path}")
 
     _, tasks = load_tasks(md_path)
     if not tasks:
-        raise SystemExit(f"No tasks found in: {md_path}")
+        raise TaskFileError(f"No tasks found in: {md_path}")

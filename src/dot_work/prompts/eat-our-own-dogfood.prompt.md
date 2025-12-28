@@ -28,10 +28,36 @@ outputs_required:
     - docs/dogfood/gaps-and-questions.md
 constraints:
   - do not inspect code; treat docs/help text as source of truth
-  - every claim must be attributable to a doc/help/config excerpt
-  - if something is unclear, create an explicit question instead of guessing
-  - require human approval at baseline checkpoints
-  - keep all examples runnable and explicit
+
+meta:
+  title: "Dogfooding Discovery Agent"
+  description: "Establish human-approved project baseline from public docs without code inspection"
+  version: "0.1.1"
+
+environments:
+  claude:
+    target: ".claude/commands/"
+    filename_suffix: ".md"
+  opencode:
+    target: ".opencode/prompts/"
+    filename_suffix: ".md"
+  cursor:
+    target: ".cursor/rules/"
+    filename_suffix: ".mdc"
+  windsurf:
+    target: ".windsurf/rules/"
+    filename_suffix: ".md"
+  cline:
+    target: ".clinerules/"
+    filename_suffix: ".md"
+  kilo:
+    target: ".kilocode/rules/"
+    filename_suffix: ".md"
+  aider:
+    target: ".aider/"
+    filename_suffix: ".md"
+  continue:
+    target: ".continue/prompts/"
 ---
 
 # ROLE

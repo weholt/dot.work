@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gc
 import json
+import logging
 import textwrap
 from collections.abc import Iterable
 from pathlib import Path
@@ -13,6 +14,8 @@ from radon.complexity import cc_visit  # type: ignore[import-untyped]
 from radon.metrics import mi_visit  # type: ignore[import-untyped]
 
 from .models import Argument, Feature, ModelDef, ModelField
+
+logger = logging.getLogger(__name__)
 
 _INTERFACE_DECORATOR_MARKERS: dict[str, list[str]] = {
     "api": ["app.get", "app.post", "router.get", "router.post", "flask.route", "bp.route"],
@@ -43,6 +46,7 @@ def _calc_metrics(code: str) -> tuple[dict[str, float], dict[str, dict[str, floa
 
         per_item: dict[str, dict[str, float]] = {}
         lines = code.splitlines()
+        high_complexity_items: list[str] = []
         for item in cc_items:
             key = f"{item.classname}.{item.name}" if item.classname else item.name
             snippet = _extract_snippet(lines, item.lineno, getattr(item, "endline", item.lineno))
@@ -50,9 +54,16 @@ def _calc_metrics(code: str) -> tuple[dict[str, float], dict[str, dict[str, floa
                 "avg_complexity": round(float(item.complexity), 2),
                 "maintainability_index": _safe_mi(snippet, maintainability),
             }
+            # Track high complexity items (complexity > 10)
+            if item.complexity > 10:
+                high_complexity_items.append(f"{key} (complexity: {item.complexity})")
+
+        if high_complexity_items:
+            logger.debug("High complexity items: %s", ", ".join(high_complexity_items))
 
         return file_metrics, per_item
-    except Exception:
+    except Exception as e:
+        logger.debug("Metrics calculation failed: %s", e)
         return ({"avg_complexity": 0.0, "maintainability_index": 0.0}, {})
 
 
@@ -76,12 +87,14 @@ def parse_python_file(path: Path, code: str, module_path: str) -> dict[str, obje
     Explicitly cleans up CST structures after parsing to prevent memory leaks.
     LibCST trees can consume 10-50x the file size in memory.
     """
+    logger.debug("Parsing Python file: %s", path)
 
     file_metrics, item_metrics = _calc_metrics(code)
 
     try:
         module = cst.parse_module(code)
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to parse %s: %s", path, e)
         return {"features": [], "models": []}
 
     collector = _Collector(
@@ -91,6 +104,13 @@ def parse_python_file(path: Path, code: str, module_path: str) -> dict[str, obje
     )
     module.visit(collector)
     result = {"features": collector.features, "models": collector.models}
+
+    logger.debug(
+        "Parsed %s: %d features, %d models",
+        path,
+        len(collector.features),
+        len(collector.models),
+    )
 
     # Explicit cleanup to help GC - CST trees consume significant memory
     # and may not be immediately collected due to circular references.
@@ -307,9 +327,25 @@ def export_features_to_json(
     features: Iterable[Feature], models: Iterable[ModelDef], destination: Path
 ) -> None:
     """Write extracted structures to JSON for subsequent LLM ingestion."""
+    logger.debug("Exporting features to JSON: %s", destination)
+
+    # Convert to lists so we can log counts and reuse for serialization
+    features_list = list(features)
+    models_list = list(models)
 
     payload = {
-        "features": [feature.to_dict() for feature in features],
-        "models": [model.to_dict() for model in models],
+        "features": [feature.to_dict() for feature in features_list],
+        "models": [model.to_dict() for model in models_list],
     }
-    destination.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    try:
+        destination.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        logger.info(
+            "Exported %d features and %d models to %s",
+            len(features_list),
+            len(models_list),
+            destination,
+        )
+    except Exception as e:
+        logger.error("Failed to export features to %s: %s", destination, e)
+        raise

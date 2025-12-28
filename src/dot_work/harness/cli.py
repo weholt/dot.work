@@ -10,6 +10,7 @@ import typer
 from rich.console import Console
 
 from .client import CLAUDE_AGENT_SDK_AVAILABLE, run_harness
+from .tasks import TaskFileError
 
 console = Console()
 app = typer.Typer(help="Claude Agent SDK autonomous agent harness.")
@@ -145,7 +146,7 @@ def validate(
             console.print(f"  [green]✓[/green] Found {total_count} task(s)")
             console.print(f"  [blue]Info:[/blue] {done_count}/{total_count} completed")
 
-        except SystemExit as e:
+        except TaskFileError as e:
             console.print(f"  [red]✗[/red] {e}")
             all_valid = False
         except Exception as e:

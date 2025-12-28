@@ -387,3 +387,95 @@ class TestExceptions:
         error = RateLimitError("Rate limit exceeded", None)
 
         assert error.retry_after is None
+
+
+class TestOpenAIKeyMasking:
+    """Tests for API key masking to prevent credential leakage (CR-077)."""
+
+    def test_repr_masks_api_key(self) -> None:
+        """Test that __repr__ masks the API key."""
+        from dot_work.knowledge_graph.embed.openai import OpenAIEmbedder
+
+        config = EmbedderConfig(
+            backend="openai",
+            model="text-embedding-3-small",
+            api_key="sk-test1234567890abcdef",
+        )
+        embedder = OpenAIEmbedder(config)
+
+        repr_str = repr(embedder)
+
+        # Should contain model and base_url but NOT the full API key
+        assert "text-embedding-3-small" in repr_str
+        assert "api.openai.com" in repr_str
+        assert "sk-test1234567890abcdef" not in repr_str
+        # Should show masked version
+        assert "sk-..." in repr_str or "..." in repr_str
+
+    def test_str_masks_api_key(self) -> None:
+        """Test that __str__ masks the API key."""
+        from dot_work.knowledge_graph.embed.openai import OpenAIEmbedder
+
+        config = EmbedderConfig(
+            backend="openai",
+            model="text-embedding-3-small",
+            api_key="sk-test1234567890abcdef",
+        )
+        embedder = OpenAIEmbedder(config)
+
+        str_str = str(embedder)
+
+        # Should NOT contain the full API key
+        assert "sk-test1234567890abcdef" not in str_str
+        # Should show masked version
+        assert "sk-..." in str_str or "..." in str_str
+
+    def test_repr_with_none_api_key(self) -> None:
+        """Test that __repr__ handles None API key."""
+        from dot_work.knowledge_graph.embed.openai import _mask_api_key
+
+        result = _mask_api_key(None)
+        assert result == "<none>"
+
+    def test_repr_with_short_api_key(self) -> None:
+        """Test that __repr__ handles very short API keys."""
+        from dot_work.knowledge_graph.embed.openai import _mask_api_key
+
+        result = _mask_api_key("abc")
+        assert result == "***"
+
+    def test_repr_with_custom_visible_chars(self) -> None:
+        """Test that _mask_api_key respects visible parameter."""
+        from dot_work.knowledge_graph.embed.openai import _mask_api_key
+
+        key = "sk-test1234567890abcdef"
+        result = _mask_api_key(key, visible=8)
+        assert result == "sk-...90abcdef"
+        assert "test123456789" not in result
+
+    def test_exception_message_does_not_leak_key(self) -> None:
+        """Test that error messages don't leak the API key."""
+        from dot_work.knowledge_graph.embed.openai import OpenAIEmbedder
+
+        config = EmbedderConfig(
+            backend="openai",
+            model="text-embedding-3-small",
+            api_key="sk-super-secret-key-that-must-not-leak",
+        )
+        embedder = OpenAIEmbedder(config)
+
+        # Create an error scenario (e.g., connection error)
+        # The error message should NOT contain the API key
+        try:
+            # Force a connection error by using invalid URL
+            embedder.base_url = "http://invalid.localdomain:9999"
+            embedder.embed(["test"])
+            pytest.fail("Expected EmbeddingError")
+        except EmbeddingError as e:
+            error_msg = str(e)
+            # Verify the API key is NOT in the error message
+            assert "sk-super-secret-key-that-must-not-leak" not in error_msg
+            # The embedder repr in any logging should also be safe
+            assert repr(embedder) not in error_msg or "sk-super-secret-key-that-must-not-leak" not in repr(
+                embedder
+            )

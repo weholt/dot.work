@@ -7,6 +7,7 @@ Default endpoint: http://localhost:11434
 from __future__ import annotations
 
 import json
+import threading
 import urllib.error
 import urllib.request
 from typing import Any
@@ -33,7 +34,18 @@ class OllamaEmbedder(Embedder):
         super().__init__(config)
         self.base_url = config.base_url or self.DEFAULT_URL
         self.model = config.model or "nomic-embed-text"
-        self.dimensions = config.dimensions
+        self._dimensions = config.dimensions
+        self._dimensions_lock = threading.Lock()
+        self._dimensions_discovered = False
+
+    @property
+    def dimensions(self) -> int | None:
+        """Get the embedding dimensions.
+
+        Returns:
+            Dimensions if known, None if not yet discovered.
+        """
+        return self._dimensions
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings using Ollama.
@@ -57,9 +69,12 @@ class OllamaEmbedder(Embedder):
 
             try:
                 embedding = self._request_embedding(payload)
-                # Update dimensions if not set
-                if self.dimensions is None:
-                    self.dimensions = len(embedding)
+                # Update dimensions if not set (thread-safe)
+                if not self._dimensions_discovered and self._dimensions is None:
+                    with self._dimensions_lock:
+                        if not self._dimensions_discovered and self._dimensions is None:
+                            self._dimensions = len(embedding)
+                            self._dimensions_discovered = True
                 results.append(embedding)
             except Exception as e:
                 raise EmbeddingError(f"Ollama embedding failed: {e}") from e

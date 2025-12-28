@@ -9,10 +9,15 @@ Wildcards, column filters, and NEAR searches are blocked. Advanced operators
 Source: /home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/src/issue_tracker/services/
 """
 
+import logging
 import re
 from dataclasses import dataclass
 
-from sqlmodel import Session, text
+from sqlmodel import text
+
+from dot_work.db_issues.adapters import UnitOfWork
+
+logger = logging.getLogger(__name__)
 
 # Whitelist pattern for simple queries (no FTS5 operators)
 _SIMPLE_QUERY_PATTERN = re.compile(r"^[\w\s\-\.]+$", re.UNICODE)
@@ -43,13 +48,13 @@ class SearchResult:
 class SearchService:
     """Service for full-text search using FTS5."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, uow: UnitOfWork) -> None:
         """Initialize search service.
 
         Args:
-            session: SQLModel session for database access
+            uow: Unit of work for database access
         """
-        self.session = session
+        self.uow = uow
 
     def search(
         self,
@@ -107,7 +112,7 @@ class SearchService:
 
         sql = text(str(sql) + " ORDER BY rank LIMIT :limit")
 
-        results = self.session.exec(sql, params={"query": safe_query, "limit": limit})  # type: ignore[call-overload]
+        results = self.uow.session.exec(sql, params={"query": safe_query, "limit": limit})  # type: ignore[call-overload]
 
         return [
             SearchResult(issue_id=row.issue_id, rank=float(row.rank), snippet=row.snippet)
@@ -150,26 +155,59 @@ class SearchService:
     def rebuild_index(self) -> int:
         """Rebuild the FTS5 index from scratch.
 
+        Uses transaction-like semantics with rollback on error to ensure
+        all-or-nothing behavior. If the INSERT fails after DELETE,
+        the transaction is rolled back to restore the previous state.
+
         Returns:
             Number of issues indexed
+
+        Raises:
+            RuntimeError: If index rebuild fails with rollback attempted
         """
-        # Clear existing FTS data
-        self.session.exec(text("DELETE FROM issues_fts;"))  # type: ignore[call-overload]
+        logger.info("Starting FTS index rebuild")
 
-        # Rebuild from issues table
-        self.session.exec(  # type: ignore[call-overload]
-            text("""
-            INSERT INTO issues_fts(rowid, id, title, description)
-            SELECT rowid, id, title, COALESCE(description, '')
-            FROM issues;
-        """)
-        )
+        try:
+            # Begin transaction (SQLite starts one on first DML statement)
+            # Clear existing FTS data
+            self.uow.session.exec(text("DELETE FROM issues_fts;"))  # type: ignore[call-overload]
+            logger.debug("Cleared existing FTS index data")
 
-        self.session.commit()
+            # Rebuild from issues table
+            self.uow.session.exec(  # type: ignore[call-overload]
+                text("""
+                INSERT INTO issues_fts(rowid, id, title, description)
+                SELECT rowid, id, title, COALESCE(description, '')
+                FROM issues;
+            """)
+            )
+            logger.debug("Inserted issues into FTS index")
 
-        # Count indexed issues
-        count_result = self.session.exec(text("SELECT COUNT(*) as cnt FROM issues_fts;"))  # type: ignore[call-overload]
-        return count_result.first().cnt if count_result else 0
+            # Commit the transaction
+            self.uow.session.commit()
+            logger.info("FTS index rebuild committed successfully")
+
+        except Exception as e:
+            # Rollback on any error
+            logger.error("FTS index rebuild failed: %s. Rolling back...", e)
+            try:
+                self.uow.session.rollback()
+                logger.info("FTS index rebuild rolled back")
+            except Exception as rollback_error:
+                logger.error("Failed to rollback FTS index rebuild: %s", rollback_error)
+            raise RuntimeError(f"FTS index rebuild failed and was rolled back: {e}") from e
+
+        # Count indexed issues (outside transaction, read-only operation)
+        try:
+            count_result = self.uow.session.exec(text("SELECT COUNT(*) as cnt FROM issues_fts;"))  # type: ignore[call-overload]
+            count = count_result.first().cnt if count_result else 0
+            logger.info("FTS index rebuild complete: %d issues indexed", count)
+            return count
+        except Exception as e:
+            # Count failure is less critical - log but don't raise
+            logger.warning("Failed to count indexed issues after rebuild: %s", e)
+            # Return 0 as a safe default - the index was built successfully
+            return 0
 
 
 def _prepare_query(

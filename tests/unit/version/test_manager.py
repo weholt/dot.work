@@ -1,7 +1,10 @@
 """Tests for version manager module."""
 
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from dot_work.version.manager import VersionInfo, VersionManager
 
@@ -201,8 +204,6 @@ def test_calculate_next_version(mock_git_repo, temp_dir: Path):
         assert next_version.endswith("00001")
 
         # Create a current version info with current month/year
-        from datetime import datetime
-
         now = datetime.now()
         current_year = now.year
         current_month = now.month
@@ -217,3 +218,111 @@ def test_calculate_next_version(mock_git_repo, temp_dir: Path):
         # Same month should increment build number
         next_version = manager.calculate_next_version(current)
         assert next_version == f"{current_year}.{current_month:02d}.00002"
+
+
+def test_calculate_next_version_invalid_format_too_few_parts(
+    mock_git_repo, temp_dir: Path
+) -> None:
+    """Test that malformed version with too few parts raises helpful error."""
+    with patch("dot_work.version.manager.Repo", return_value=mock_git_repo):
+        manager = VersionManager(project_root=temp_dir)
+
+        # Version with only 2 parts instead of 3
+        current = VersionInfo(
+            version="1.2",  # Missing build number
+            build_date=datetime.now().isoformat(),
+            git_commit="abc123",
+            git_tag="version-1.2",
+        )
+
+        with pytest.raises(ValueError, match="Invalid version format.*Got 2 parts instead of 3"):
+            manager.calculate_next_version(current)
+
+
+def test_calculate_next_version_invalid_format_too_many_parts(
+    mock_git_repo, temp_dir: Path
+) -> None:
+    """Test that malformed version with too many parts raises helpful error."""
+    with patch("dot_work.version.manager.Repo", return_value=mock_git_repo):
+        manager = VersionManager(project_root=temp_dir)
+
+        # Version with 4 parts instead of 3
+        current = VersionInfo(
+            version="1.2.3.4",
+            build_date=datetime.now().isoformat(),
+            git_commit="abc123",
+            git_tag="version-1.2.3.4",
+        )
+
+        with pytest.raises(ValueError, match="Invalid version format.*Got 4 parts instead of 3"):
+            manager.calculate_next_version(current)
+
+
+def test_calculate_next_version_invalid_format_non_integer(
+    mock_git_repo, temp_dir: Path
+) -> None:
+    """Test that version with non-integer parts raises helpful error."""
+    with patch("dot_work.version.manager.Repo", return_value=mock_git_repo):
+        manager = VersionManager(project_root=temp_dir)
+
+        # Version with non-integer parts
+        current = VersionInfo(
+            version="abc.def.ghi",
+            build_date=datetime.now().isoformat(),
+            git_commit="abc123",
+            git_tag="version-abc.def.ghi",
+        )
+
+        with pytest.raises(ValueError, match="Invalid version format.*all parts are integers"):
+            manager.calculate_next_version(current)
+
+
+def test_calculate_next_version_invalid_year(mock_git_repo, temp_dir: Path) -> None:
+    """Test that version with invalid year raises helpful error."""
+    with patch("dot_work.version.manager.Repo", return_value=mock_git_repo):
+        manager = VersionManager(project_root=temp_dir)
+
+        # Version with year out of range
+        current = VersionInfo(
+            version="1999.01.00001",  # Year too low
+            build_date=datetime.now().isoformat(),
+            git_commit="abc123",
+            git_tag="version-1999.01.00001",
+        )
+
+        with pytest.raises(ValueError, match="Invalid year.*between 2000 and 2100"):
+            manager.calculate_next_version(current)
+
+
+def test_calculate_next_version_invalid_month(mock_git_repo, temp_dir: Path) -> None:
+    """Test that version with invalid month raises helpful error."""
+    with patch("dot_work.version.manager.Repo", return_value=mock_git_repo):
+        manager = VersionManager(project_root=temp_dir)
+
+        # Version with month out of range
+        current = VersionInfo(
+            version="2025.13.00001",  # Month too high
+            build_date=datetime.now().isoformat(),
+            git_commit="abc123",
+            git_tag="version-2025.13.00001",
+        )
+
+        with pytest.raises(ValueError, match="Invalid month.*between 1 and 12"):
+            manager.calculate_next_version(current)
+
+
+def test_calculate_next_version_invalid_build(mock_git_repo, temp_dir: Path) -> None:
+    """Test that version with invalid build number raises helpful error."""
+    with patch("dot_work.version.manager.Repo", return_value=mock_git_repo):
+        manager = VersionManager(project_root=temp_dir)
+
+        # Version with build number out of range
+        current = VersionInfo(
+            version="2025.01.100000",  # Build too high
+            build_date=datetime.now().isoformat(),
+            git_commit="abc123",
+            git_tag="version-2025.01.100000",
+        )
+
+        with pytest.raises(ValueError, match="Invalid build number.*between 1 and 99999"):
+            manager.calculate_next_version(current)

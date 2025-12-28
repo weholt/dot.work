@@ -1,6 +1,8 @@
 """Prompt management utilities for dot-work."""
 
 from .canonical import (
+    CANONICAL_PARSER,
+    CANONICAL_VALIDATOR,
     CanonicalPrompt,
     CanonicalPromptError,
     CanonicalPromptParser,
@@ -14,6 +16,8 @@ from .canonical import (
 )
 
 __all__ = [
+    "CANONICAL_PARSER",
+    "CANONICAL_VALIDATOR",
     "CanonicalPrompt",
     "CanonicalPromptError",
     "CanonicalPromptParser",

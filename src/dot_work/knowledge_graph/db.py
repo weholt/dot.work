@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import sqlite3
 import time
 from collections.abc import Iterator, Sequence
@@ -20,6 +21,8 @@ from numpy import typing as npt
 
 if TYPE_CHECKING:
     pass
+
+logger = logging.getLogger(__name__)
 
 # Current schema version
 SCHEMA_VERSION = 3
@@ -154,6 +157,7 @@ class Database:
         self.db_path = db_path
         self._conn: sqlite3.Connection | None = None
         self._vec_available: bool = False  # True if sqlite-vec extension is loaded
+        logger.debug("Initializing database: %s", db_path)
         self._ensure_directory()
 
     def _ensure_directory(self) -> None:
@@ -163,6 +167,7 @@ class Database:
     def _get_connection(self) -> sqlite3.Connection:
         """Get or create database connection."""
         if self._conn is None:
+            logger.debug("Creating new database connection")
             self._conn = sqlite3.connect(
                 self.db_path,
                 detect_types=sqlite3.PARSE_DECLTYPES,
@@ -170,6 +175,7 @@ class Database:
             self._conn.row_factory = sqlite3.Row
             self._configure_pragmas()
             self._ensure_schema()
+            logger.debug("Database connection established")
         return self._conn
 
     def _configure_pragmas(self) -> None:
@@ -181,6 +187,7 @@ class Database:
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA temp_store=MEMORY")
         conn.execute("PRAGMA foreign_keys=ON")
+        logger.debug("Configured database pragmas (WAL, NORMAL sync, MEMORY temp store)")
 
         # Load sqlite-vec extension if available for fast vector search
         self._vec_available = self._load_vec_extension(conn)
@@ -199,12 +206,15 @@ class Database:
 
             try:
                 sqlite_vec.load(conn)
+                logger.info("Loaded sqlite-vec extension for fast vector search")
                 return True
-            except Exception:
+            except Exception as e:
                 # Extension load failed (missing .so file, incompatible version, etc.)
+                logger.debug("sqlite-vec extension load failed: %s", e)
                 return False
         except ImportError:
             # sqlite-vec not installed
+            logger.debug("sqlite-vec not installed, vector search will use fallback")
             return False
 
     def _ensure_schema(self) -> None:
@@ -226,6 +236,7 @@ class Database:
         row = cur.fetchone()
         current_version = row[0] if row[0] is not None else 0
 
+        logger.debug("Current schema version: %d, target: %d", current_version, SCHEMA_VERSION)
         if current_version < SCHEMA_VERSION:
             self._apply_migrations(current_version)
 
@@ -234,6 +245,10 @@ class Database:
         conn = self._conn
         if conn is None:
             return
+
+        logger.info(
+            "Applying schema migrations from version %d to %d", from_version, SCHEMA_VERSION
+        )
 
         if from_version < 1:
             # Initial schema
@@ -293,6 +308,7 @@ class Database:
                 (1, int(time.time())),
             )
             conn.commit()
+            logger.info("Schema migration to version 1 completed (initial schema)")
 
         if from_version < 2:
             # Add embeddings table for semantic search
@@ -319,6 +335,7 @@ class Database:
                 (2, int(time.time())),
             )
             conn.commit()
+            logger.info("Schema migration to version 2 completed (embeddings)")
 
         if from_version < 3:
             # Add collections, topics, and project settings tables
@@ -381,6 +398,11 @@ class Database:
                 (3, int(time.time())),
             )
             conn.commit()
+            logger.info(
+                "Schema migration to version 3 completed (collections, topics, project settings)"
+            )
+
+        logger.info("Schema migrations completed, current version: %d", SCHEMA_VERSION)
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
@@ -395,13 +417,15 @@ class Database:
         try:
             yield conn
             conn.commit()
-        except Exception:
+        except Exception as e:
             conn.rollback()
+            logger.warning("Transaction rolled back due to error: %s", e)
             raise
 
     def close(self) -> None:
         """Close the database connection."""
         if self._conn is not None:
+            logger.debug("Closing database connection")
             self._conn.close()
             self._conn = None
 

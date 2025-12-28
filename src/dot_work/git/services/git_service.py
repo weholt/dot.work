@@ -96,14 +96,29 @@ class GitAnalysisService:
         )
 
         analyzed_commits = []
+        failed_commits: list[tuple[str, str]] = []  # (commit_hash, error_message)
+
         for commit in tqdm(commits, desc="Analyzing commits"):
             try:
                 analysis = self.analyze_commit(commit.hexsha)
                 analyzed_commits.append(analysis)
                 progress.processed_commits += 1
             except Exception as e:
-                self.logger.error(f"Failed to analyze commit {commit.hexsha}: {e}")
+                error_msg = f"Failed to analyze commit {commit.hexsha}: {e}"
+                self.logger.error(error_msg)
+                failed_commits.append((commit.hexsha, str(e)))
                 continue
+
+        # Log failure summary if any commits failed
+        if failed_commits:
+            self.logger.warning(
+                f"Commit analysis completed with {len(failed_commits)} failures "
+                f"out of {len(commits)} total commits"
+            )
+            for commit_hash, error in failed_commits[:5]:  # Log first 5 failures
+                self.logger.warning(f"  - {commit_hash[:8]}: {error}")
+            if len(failed_commits) > 5:
+                self.logger.warning(f"  ... and {len(failed_commits) - 5} more failures")
 
         # Calculate comparison metadata
         metadata = self._calculate_comparison_metadata(from_ref, to_ref, analyzed_commits)
@@ -819,9 +834,9 @@ class GitAnalysisService:
 
         themes: list[str] = []
         if common_tags:
-            themes.extend(f"Tags: {', '.join(common_tags)}")
+            themes.append(f"Tags: {', '.join(common_tags)}")
         if common_areas:
-            themes.extend(f"Areas: {', '.join(common_areas)}")
+            themes.append(f"Areas: {', '.join(common_areas)}")
 
         return themes
 

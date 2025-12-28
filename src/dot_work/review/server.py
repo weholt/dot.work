@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import socket
 from collections import defaultdict
 from pathlib import Path
@@ -24,6 +25,8 @@ from dot_work.review.git import (
 )
 from dot_work.review.models import ReviewComment
 from dot_work.review.storage import append_comment, load_comments, new_review_id
+
+logger = logging.getLogger(__name__)
 
 
 class AddCommentIn(BaseModel):
@@ -89,7 +92,8 @@ def create_app(workdir: str, base_ref: str = "HEAD") -> tuple[FastAPI, str]:
                 fd = parse_unified_diff(path, diff_txt)
             try:
                 file_text = read_file_text(root, path)
-            except Exception:
+            except (FileNotFoundError, PermissionError, OSError) as e:
+                logger.warning("Failed to read file %s: %s", path, e)
                 file_text = ""
             file_lines = file_text.splitlines()
 
@@ -131,7 +135,8 @@ def create_app(workdir: str, base_ref: str = "HEAD") -> tuple[FastAPI, str]:
         try:
             text = read_file_text(root, inp.path)
             lines = text.splitlines()
-        except Exception:
+        except (FileNotFoundError, PermissionError, OSError) as e:
+            logger.warning("Failed to read file %s for comment context: %s", inp.path, e)
             lines = []
 
         i = max(0, inp.line - 1)  # 0-based index

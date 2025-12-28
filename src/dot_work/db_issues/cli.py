@@ -393,7 +393,7 @@ def search_cmd(  # noqa: B008
                 search_query = f"({' AND '.join(field_queries)})"
 
         # Perform search
-        search_service = SearchService(session)
+        search_service = SearchService(uow)
         results = search_service.search(search_query, limit=limit, include_closed=True)
 
         if not results:
@@ -1315,7 +1315,7 @@ def _get_text_from_editor(template: str = "") -> str:
     try:
         # Open editor
         console.print(f"Opening [cyan]{editor_name}[/cyan]...")
-        result = subprocess.run([editor_name, *editor_args, str(temp_path)])
+        result = subprocess.run([editor_name, *editor_args, str(temp_path)], shell=False)
 
         if result.returncode != 0:
             console.print(f"[red]Editor exited with error code {result.returncode}[/red]")
@@ -1393,7 +1393,7 @@ def edit(
             console.print(
                 f"Opening [cyan]{editor_name}[/cyan] to edit issue [bold]{issue.id}[/bold]..."
             )
-            result = subprocess.run([editor_name, *editor_args, str(temp_path)])
+            result = subprocess.run([editor_name, *editor_args, str(temp_path)], shell=False)
 
             if result.returncode != 0:
                 console.print(f"[red]Editor exited with error code {result.returncode}[/red]")
@@ -5571,7 +5571,7 @@ def edit_yaml(
             console.print(f"[dim]Temp file: {temp_path}[/dim]")
 
             # Build editor args with validated components
-            result = subprocess.run([editor_name, *editor_args, temp_path])
+            result = subprocess.run([editor_name, *editor_args, temp_path], shell=False)
 
             if result.returncode != 0:
                 console.print(f"[yellow]Editor exited with code {result.returncode}[/yellow]")

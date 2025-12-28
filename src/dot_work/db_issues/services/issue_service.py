@@ -840,6 +840,146 @@ class IssueService:
         logger.info("Found %d stale issues (older than %d days)", len(stale_issues), days)
         return stale_issues
 
+    def _merge_labels(self, target: Issue, source: Issue) -> None:
+        """Merge labels from source into target.
+
+        Takes the union of labels, preserving order from target first,
+        then adding any new labels from source.
+
+        Args:
+            target: Target issue to merge into
+            source: Source issue to merge from
+        """
+        target_label_set = set(target.labels)
+        new_labels = [label for label in source.labels if label not in target_label_set]
+        merged_labels = target.labels + new_labels
+        target.labels = merged_labels
+
+    def _merge_descriptions(self, target: Issue, source: Issue) -> None:
+        """Merge descriptions from source into target.
+
+        Combines descriptions with a separator if both exist.
+
+        Args:
+            target: Target issue to merge into
+            source: Source issue to merge from
+        """
+        if source.description:
+            if target.description:
+                separator = "\n\n---\n\n"
+                target.description = target.description + separator + source.description
+            else:
+                target.description = source.description
+
+    def _merge_dependencies(
+        self,
+        target_id: str,
+        source_id: str,
+        source_deps: list[Dependency],
+        target_deps: list[Dependency],
+        source_dependents: list[Dependency],
+    ) -> None:
+        """Merge dependencies from source into target.
+
+        Remaps all dependencies to point to target instead of source.
+        Skips any remapping that would create self-references.
+
+        Args:
+            target_id: Target issue ID
+            source_id: Source issue ID
+            source_deps: Dependencies of source issue
+            target_deps: Existing dependencies of target issue
+            source_dependents: Issues that depend on source
+        """
+        # Build sets of existing relationships for target
+        target_from_to = {(d.from_issue_id, d.to_issue_id) for d in target_deps}
+
+        # Add unique source dependencies to target
+        for dep in source_deps:
+            # Skip self-references after remapping
+            if dep.to_issue_id == source_id:
+                continue  # Source pointing to itself, skip
+            if dep.to_issue_id == target_id:
+                continue  # Would create self-reference, skip
+
+            # Remap to target
+            key = (target_id, dep.to_issue_id)
+            if key not in target_from_to:
+                new_dep = Dependency(
+                    from_issue_id=target_id,
+                    to_issue_id=dep.to_issue_id,
+                    dependency_type=dep.dependency_type,
+                    description=dep.description,
+                    created_at=self.clock.now(),
+                )
+                self.uow.graph.add_dependency(new_dep)
+                target_from_to.add(key)
+
+        # Remap dependents (issues that depend on source) to depend on target
+        for dep in source_dependents:
+            # Skip self-references after remapping
+            if dep.from_issue_id == target_id:
+                continue  # Would create self-reference, skip
+
+            # Remap to target
+            key = (dep.from_issue_id, target_id)
+            if key not in target_from_to:
+                new_dep = Dependency(
+                    from_issue_id=dep.from_issue_id,
+                    to_issue_id=target_id,
+                    dependency_type=dep.dependency_type,
+                    description=dep.description,
+                    created_at=self.clock.now(),
+                )
+                self.uow.graph.add_dependency(new_dep)
+                target_from_to.add(key)
+
+    def _copy_comments(self, source_id: str, target_id: str) -> None:
+        """Copy comments from source issue to target issue.
+
+        Each copied comment is prefixed with "[Merged from {source_id}]".
+
+        Args:
+            source_id: Source issue ID to copy comments from
+            target_id: Target issue ID to copy comments to
+        """
+        source_comments = self.uow.comments.list_by_issue(source_id)
+        for comment in source_comments:
+            new_comment = Comment(
+                id=self.id_service.generate("comment"),
+                issue_id=target_id,
+                author=comment.author,
+                text=f"[Merged from {source_id}]\n{comment.text}",
+                created_at=comment.created_at,
+                updated_at=comment.updated_at,
+            )
+            self.uow.comments.save(new_comment)
+
+    def _handle_source_disposal(
+        self,
+        source: Issue,
+        source_id: str,
+        close_source: bool,
+    ) -> None:
+        """Handle disposal of source issue after merge.
+
+        Either closes or deletes the source issue based on flag.
+
+        Args:
+            source: Source issue object
+            source_id: Source issue ID
+            close_source: If True, close the issue; otherwise delete it
+        """
+        if close_source:
+            source = source.transition(IssueStatus.COMPLETED)
+            source.updated_at = self.clock.now()
+            source.closed_at = self.clock.now()
+            self.uow.issues.save(source)
+            logger.info("Source issue closed: %s", source_id)
+        else:
+            self.uow.issues.delete(source_id)
+            logger.info("Source issue deleted: %s", source_id)
+
     def merge_issues(
         self,
         source_id: str,
@@ -875,12 +1015,10 @@ class IssueService:
             close_source,
         )
 
-        # Validate source != target
         if source_id == target_id:
             raise ValueError("Cannot merge issue into itself")
 
         with self.uow:
-            # Get both issues
             source = self.uow.issues.get(source_id)
             target = self.uow.issues.get(target_id)
 
@@ -889,101 +1027,22 @@ class IssueService:
             if not target:
                 raise ValueError(f"Target issue not found: {target_id}")
 
-            # Merge labels (union, preserving order from target then new from source)
-            target_label_set = set(target.labels)
-            new_labels = [label for label in source.labels if label not in target_label_set]
-            merged_labels = target.labels + new_labels
-            target.labels = merged_labels
+            self._merge_labels(target, source)
+            self._merge_descriptions(target, source)
 
-            # Combine descriptions
-            if source.description:
-                if target.description:
-                    # Add source description to target
-                    separator = "\n\n---\n\n"
-                    target.description = target.description + separator + source.description
-                else:
-                    target.description = source.description
-
-            # Merge dependencies
-            # 1. Get all dependencies for both issues
             source_deps = self.uow.graph.get_dependencies(source_id)
             target_deps = self.uow.graph.get_dependencies(target_id)
             source_dependents = self.uow.graph.get_dependents(source_id)
+            self._merge_dependencies(
+                target_id, source_id, source_deps, target_deps, source_dependents
+            )
 
-            # Build sets of existing relationships for target
-            target_from_to = {(d.from_issue_id, d.to_issue_id) for d in target_deps}
-
-            # Add unique source dependencies to target
-            for dep in source_deps:
-                # Skip self-references after remapping
-                if dep.to_issue_id == source_id:
-                    continue  # Source pointing to itself, skip
-                if dep.to_issue_id == target_id:
-                    continue  # Would create self-reference, skip
-
-                # Remap to target
-                key = (target_id, dep.to_issue_id)
-                if key not in target_from_to:
-                    new_dep = Dependency(
-                        from_issue_id=target_id,
-                        to_issue_id=dep.to_issue_id,
-                        dependency_type=dep.dependency_type,
-                        description=dep.description,
-                        created_at=self.clock.now(),
-                    )
-                    self.uow.graph.add_dependency(new_dep)
-                    target_from_to.add(key)
-
-            # Remap dependents (issues that depend on source) to depend on target
-            for dep in source_dependents:
-                # Skip self-references after remapping
-                if dep.from_issue_id == target_id:
-                    continue  # Would create self-reference, skip
-
-                # Remap to target
-                key = (dep.from_issue_id, target_id)
-                if key not in target_from_to:
-                    new_dep = Dependency(
-                        from_issue_id=dep.from_issue_id,
-                        to_issue_id=target_id,
-                        dependency_type=dep.dependency_type,
-                        description=dep.description,
-                        created_at=self.clock.now(),
-                    )
-                    self.uow.graph.add_dependency(new_dep)
-                    target_from_to.add(key)
-
-            # Copy comments if requested
             if keep_comments:
-                source_comments = self.uow.comments.list_by_issue(source_id)
-                for comment in source_comments:
-                    # Create new comment with same content but different ID
-                    new_comment = Comment(
-                        id=self.id_service.generate("comment"),
-                        issue_id=target_id,
-                        author=comment.author,
-                        text=f"[Merged from {source_id}]\n{comment.text}",
-                        created_at=comment.created_at,
-                        updated_at=comment.updated_at,
-                    )
-                    self.uow.comments.save(new_comment)
+                self._copy_comments(source_id, target_id)
 
-            # Update target timestamp
             target.updated_at = self.clock.now()
             self.uow.issues.save(target)
-
-            # Handle source issue
-            if close_source:
-                # Close source issue
-                source = source.transition(IssueStatus.COMPLETED)
-                source.updated_at = self.clock.now()
-                source.closed_at = self.clock.now()
-                self.uow.issues.save(source)
-                logger.info("Source issue closed: %s", source_id)
-            else:
-                # Delete source issue
-                self.uow.issues.delete(source_id)
-                logger.info("Source issue deleted: %s", source_id)
+            self._handle_source_disposal(source, source_id, close_source)
 
             self.uow.commit()
 

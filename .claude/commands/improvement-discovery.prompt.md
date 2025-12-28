@@ -135,6 +135,40 @@ If no baseline exists:
 
 * explicitly recommend whether establishing one is valuable *now*
 
+
+#### 6. Synergy, Composability & Sequencing
+
+Identify how improvements can **work together** (or conflict), so the project gets **compounding value** rather than isolated fixes.
+
+Evaluate:
+
+* **Enablers vs. dependents**
+  - What small change would unlock multiple other improvements (shared primitives, contracts, interfaces, test harnesses, CI hooks)?
+  - Which proposals are blocked by missing foundations (baseline, fixtures, typing boundaries, module seams, build pipeline steps)?
+
+* **Composable building blocks**
+  - Where can one improvement be designed as a reusable unit that reduces repeated logic across the codebase?
+  - Prefer improvements that create clear seams: stable interfaces, explicit contracts, and predictable configuration boundaries.
+
+* **Bundling opportunities**
+  - Group related proposals into 2–5 “synergy bundles” (each bundle has a single outcome).
+  - Each bundle must state: **combined outcome**, **why the bundle is better than separate tasks**, and **minimal viable sequence**.
+
+* **Sequencing & dependencies**
+  - Specify ordering using explicit dependency notation, e.g.:
+    - `A -> B -> C` (B requires A, C requires B)
+    - `A || B` (can be done in parallel)
+  - Prefer sequences that deliver measurable value early (evidence, reduced risk, reduced ambiguity).
+
+* **Conflict detection**
+  - Flag proposals that compete or introduce divergent patterns (two ways to do config, two abstractions for the same concept, parallel frameworks).
+  - If conflicts exist, recommend one direction and explicitly mark the rejected alternative as a non-recommendation (with reasoning).
+
+Rules:
+
+* Do not invent synergy. Only assert synergy when there is concrete overlap (shared files, shared responsibilities, shared pain points).
+* Synergy analysis must remain aligned with the stated project goals; do not use “reusability” as a justification by itself.
+
 ---
 
 ### Enhancement Proposal Rules (Strict)

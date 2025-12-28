@@ -4,6 +4,7 @@ Claude Agent SDK client wrapper for the harness.
 Provides async interface to Claude Agent SDK with proper configuration.
 """
 
+import logging
 from pathlib import Path
 from typing import Literal
 
@@ -20,6 +21,8 @@ except ImportError:
     CLAUDE_AGENT_SDK_AVAILABLE = False
     ClaudeSDKClient = None  # type: ignore
     ClaudeAgentOptions = None  # type: ignore
+
+logger = logging.getLogger(__name__)
 
 # Permission mode literal type
 PermissionMode = Literal["default", "acceptEdits", "plan", "bypassPermissions"]
@@ -158,7 +161,7 @@ async def run_harness_async(
             open_task = next_open_task(before_tasks)
 
             if open_task is None:
-                print("DONE: no unchecked tasks remain.")
+                logger.info("DONE: no unchecked tasks remain.")
                 return
 
             before_done = count_done(before_tasks)
@@ -168,20 +171,19 @@ async def run_harness_async(
             _, after_tasks = load_tasks(tasks_path)
             after_done = count_done(after_tasks)
 
-            print(f"\n--- Iteration {iteration} ---")
-            print(f"Next task: {open_task.text}")
+            logger.info(f"Iteration {iteration} | Next task: {open_task.text}")
             if status:
-                print(status)
+                logger.info(status)
 
             if after_done > before_done:
                 continue
 
-            print(
+            logger.warning(
                 "STOP: no task was marked done in this iteration. Check tasks.md for a BLOCKED note."
             )
             return
 
-        print("STOP: reached --max-iterations without completing all tasks.")
+        logger.info("STOP: reached --max-iterations without completing all tasks.")
 
 
 def run_harness(
