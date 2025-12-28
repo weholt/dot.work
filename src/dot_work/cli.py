@@ -680,7 +680,7 @@ def review_clear(
     Removes stored comments for a specific review or all reviews.
     """
     try:
-        from dot_work.review.config import settings
+        from dot_work.review.config import get_config
         from dot_work.review.git import repo_root
     except ImportError as e:
         console.print(f"[red]❌ Review module dependencies missing:[/red] {e}")
@@ -693,7 +693,8 @@ def review_clear(
         console.print(f"[red]❌ Not in a git repository:[/red] {e}")
         raise typer.Exit(1) from None
 
-    storage_dir = Path(root) / settings.storage_dir / "reviews"
+    config = get_config()
+    storage_dir = Path(root) / config.storage_dir / "reviews"
 
     if not storage_dir.exists():
         console.print("[yellow]⚠ No reviews directory found[/yellow]")
@@ -914,7 +915,7 @@ def prompt_create(
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Wizard cancelled.[/yellow]")
-        raise typer.Exit(0)
+        raise typer.Exit(0) from None
 
     except Exception as e:
         console.print(f"\n[red]Error creating prompt:[/red] {e}")

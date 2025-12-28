@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable
 from pathlib import Path
+from typing import cast
 
 from .code_parser import export_features_to_json, parse_python_file
 from .markdown_parser import extract_sections, slugify_fragment
@@ -32,8 +33,8 @@ def analyze_project(root: Path) -> AnalysisBundle:
         text = project_file.read_text()
         if project_file.suffix == ".py":
             result = parse_python_file(project_file.path, text, module_path=str(relative))
-            features.extend(result["features"])
-            models.extend(result["models"])
+            features.extend(cast(list[Feature], result["features"]))
+            models.extend(cast(list[ModelDef], result["models"]))
         elif project_file.suffix == ".md":
             documents.extend(extract_sections(relative, text))
 

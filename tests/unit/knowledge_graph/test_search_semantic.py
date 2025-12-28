@@ -268,7 +268,7 @@ class TestEmbedNode:
         # Verify stored
         emb = db.get_embedding("n" * 32, embedder.model)
         assert emb is not None
-        assert emb.vector == [1.0, 0.0, 0.0]  # MockEmbedder returns this for "python"
+        assert emb.vector.tolist() == [1.0, 0.0, 0.0]  # MockEmbedder returns this for "python"
 
     def test_empty_text_returns_false(self, db: Database, embedder: MockEmbedder) -> None:
         """Empty text returns False without storing."""
@@ -324,7 +324,7 @@ class TestEmbedNodesBatch:
         # Original should be unchanged
         emb = db.get_embedding("a" * 32, embedder.model)
         assert emb is not None
-        assert emb.vector == [0.5, 0.5, 0.0]
+        assert emb.vector.tolist() == [0.5, 0.5, 0.0]
 
     def test_skips_empty_texts(self, db: Database, embedder: MockEmbedder) -> None:
         """Batch embed skips empty texts."""

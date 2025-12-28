@@ -198,7 +198,7 @@ class PromptWizard:
         self.console.print("[cyan]What type of prompt is this?[/cyan]")
 
         options = list(PROMPT_TYPES.keys())
-        for i, (key, ptype) in enumerate(PROMPT_TYPES.items(), 1):
+        for i, (_key, ptype) in enumerate(PROMPT_TYPES.items(), 1):
             self.console.print(f"  [{i}] [cyan]{ptype.name}[/cyan] - {ptype.description}")
 
         while True:

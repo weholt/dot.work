@@ -94,7 +94,7 @@ def run(
                 tasks_path=context_path,
                 max_iterations=max_iterations,
                 max_turns=max_turns,
-                permission_mode=permission_mode,
+                permission_mode=permission_mode,  # type: ignore[arg-type]
             )
         except KeyboardInterrupt:
             console.print("\n[yellow]Interrupted by user.[/yellow]")

@@ -97,7 +97,7 @@ def validate_dockerfile_path(dockerfile: Path | None, project_root: Path) -> Non
         logger.debug(f"Dockerfile path validation passed: {resolved}")
     except ValueError:
         logger.error(f"Dockerfile outside project directory: {dockerfile}")
-        raise ValueError(f"Dockerfile must be within project directory: {dockerfile}")
+        raise ValueError(f"Dockerfile must be within project directory: {dockerfile}") from None
 
 
 class RepoAgentError(Exception):
@@ -403,10 +403,14 @@ def _resolve_config(
         dry_run=dry_run,
     )
     # Log final configuration (with sensitive values masked)
-    logger.info(f"Configuration resolved: repo_url={cfg.repo_url}, model={cfg.model}, strategy={cfg.strategy}")
+    logger.info(
+        f"Configuration resolved: repo_url={cfg.repo_url}, model={cfg.model}, strategy={cfg.strategy}"
+    )
     logger.debug(f"Branch configuration: base_branch={cfg.base_branch}, target_branch={cfg.branch}")
     logger.debug(f"Docker configuration: image={cfg.docker_image}, dockerfile={cfg.dockerfile}")
-    logger.debug(f"Authentication: use_ssh={cfg.use_ssh}, has_github_token={bool(cfg.github_token)}, has_api_key={bool(cfg.api_key)}")
+    logger.debug(
+        f"Authentication: use_ssh={cfg.use_ssh}, has_github_token={bool(cfg.github_token)}, has_api_key={bool(cfg.api_key)}"
+    )
     return cfg, content
 
 

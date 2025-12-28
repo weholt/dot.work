@@ -71,7 +71,7 @@ def _safe_mi(code: str, fallback: float) -> float:
         return fallback
 
 
-def parse_python_file(path: Path, code: str, module_path: str) -> dict[str, list[Any]]:
+def parse_python_file(path: Path, code: str, module_path: str) -> dict[str, object]:
     """Return discovered features and models for a given Python file.
 
     Explicitly cleans up CST structures after parsing to prevent memory leaks.

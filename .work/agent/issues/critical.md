@@ -4,6 +4,82 @@ Blockers, security issues, data loss risks.
 
 ---
 
+id: "CODE-Q-001@c2f2191"
+title: "Code quality regressions after commit c2f2191"
+description: "Build failures: formatting, linting, type checking, test failures"
+created: 2024-12-28
+section: "code-quality"
+tags: [regression, build-failures, linting, type-checking, tests]
+type: bug
+priority: critical
+status: proposed
+
+---
+
+### Problem
+After commit c2f2191 (migration cleanup), multiple build quality regressions detected:
+
+**1. Code Formatting (2 files)**
+- `src/dot_work/container/provision/core.py` - needs reformatting
+- `src/dot_work/db_issues/services/search_service.py` - needs reformatting
+
+**2. Linting Errors (30 total)**
+- B904: Missing `raise ... from err` in exception handlers (14 occurrences)
+- E712: Comparison to `True` instead of truth check (2 occurrences)
+- B008: Function call in argument defaults (2 occurrences)
+- F841: Unused variables (3 occurrences)
+- F811: Redefinition of `edit` function
+- F821: Undefined name `Any`
+- I001: Import block unsorted
+
+**3. Type Checking Errors (63 total)**
+- `src/dot_work/overview/code_parser.py`: Incompatible return value type
+- `src/dot_work/knowledge_graph/db.py`: Unused type ignore comment
+- `src/dot_work/knowledge_graph/search_semantic.py`: Argument type incompatibility
+- `src/dot_work/db_issues/adapters/sqlite.py`: Unsupported operand types
+- `src/dot_work/db_issues/services/label_service.py`: Incompatible assignment
+- `src/dot_work/db_issues/services/issue_service.py`: Missing attributes
+- `src/dot_work/db_issues/services/dependency_service.py`: Type incompatibilities
+- `src/dot_work/db_issues/cli.py`: Multiple attribute and type errors (40+ errors)
+- `src/dot_work/git/utils.py`: Unused variable
+- `src/dot_work/prompts/wizard.py`: Unused loop variable
+- `src/dot_work/review/git.py`: Missing exception chaining
+- `src/dot_work/harness/cli.py`: Argument type incompatibility
+- `src/dot_work/cli.py`: Missing attribute
+
+**4. Test Failures**
+- `tests/unit/db_issues/test_config.py`: 3 environment config tests failed
+- `tests/unit/knowledge_graph/test_search_semantic.py`: 13 cosine similarity tests failed
+- `tests/unit/test_cli.py`: 2 review clear tests failed
+
+### Affected Files
+- 2 files need formatting
+- 13 files have linting errors
+- 10 files have type errors
+- 3 test files have failures
+
+### Importance
+**CRITICAL**: Build is failing on multiple quality gates. This blocks:
+- CI/CD pipeline validation
+- Safe deployment of new features
+- Code confidence
+
+### Proposed Solution
+1. Run `uv run python scripts/build.py --fix` to auto-fix formatting
+2. Fix linting errors one by one (B904 → add `from None`, E712 → remove `== True`, etc.)
+3. Fix type errors (add proper imports, fix type annotations, remove undefined references)
+4. Investigate and fix test failures
+5. Re-run full validation
+
+### Acceptance Criteria
+- [ ] All files properly formatted (ruff format passes)
+- [ ] Zero linting errors (ruff check passes)
+- [ ] Zero type errors (mypy passes)
+- [ ] All tests passing (pytest passes)
+- [ ] Baseline updated with clean state
+
+---
+
 ---
 
 ### Problem

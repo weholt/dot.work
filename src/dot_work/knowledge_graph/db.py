@@ -195,7 +195,7 @@ class Database:
             True if sqlite-vec was successfully loaded, False otherwise.
         """
         try:
-            import sqlite_vec  # type: ignore[import-not-found]
+            import sqlite_vec  # type: ignore
 
             try:
                 sqlite_vec.load(conn)

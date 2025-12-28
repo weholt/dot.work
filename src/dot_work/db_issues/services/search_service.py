@@ -14,7 +14,6 @@ from dataclasses import dataclass
 
 from sqlmodel import Session, text
 
-
 # Whitelist pattern for simple queries (no FTS5 operators)
 _SIMPLE_QUERY_PATTERN = re.compile(r"^[\w\s\-\.]+$", re.UNICODE)
 
@@ -131,9 +130,7 @@ class SearchService:
         """
         # Validate field name against allowlist
         if field not in _ALLOWED_FIELDS:
-            raise ValueError(
-                f"Invalid field: '{field}'. Allowed fields: {sorted(_ALLOWED_FIELDS)}"
-            )
+            raise ValueError(f"Invalid field: '{field}'. Allowed fields: {sorted(_ALLOWED_FIELDS)}")
 
         # Validate query first (before adding column filter)
         safe_query = _prepare_query(query, allow_advanced=False)
@@ -148,9 +145,7 @@ class SearchService:
 
         # Use search with allow_advanced=True and _trusted_column_filter=True
         # since we already validated both components
-        return self.search(
-            fts_query, limit=limit, allow_advanced=True, _trusted_column_filter=True
-        )
+        return self.search(fts_query, limit=limit, allow_advanced=True, _trusted_column_filter=True)
 
     def rebuild_index(self) -> int:
         """Rebuild the FTS5 index from scratch.
@@ -218,8 +213,7 @@ def _prepare_query(
     for pattern in dangerous_patterns:
         if re.search(pattern, query, re.IGNORECASE):
             raise ValueError(
-                "Query contains prohibited syntax. "
-                "Wildcards and NEAR searches are not allowed."
+                "Query contains prohibited syntax. Wildcards and NEAR searches are not allowed."
             )
 
     # Check for unbalanced quotes (even in simple mode)
@@ -285,8 +279,7 @@ def _validate_advanced_query(query: str, _trusted_column_filter: bool = False) -
     for pattern in dangerous_patterns:
         if re.search(pattern, query, re.IGNORECASE):
             raise ValueError(
-                "Query contains prohibited syntax. "
-                "Wildcards and NEAR searches are not allowed."
+                "Query contains prohibited syntax. Wildcards and NEAR searches are not allowed."
             )
 
     # Check for balanced parentheses

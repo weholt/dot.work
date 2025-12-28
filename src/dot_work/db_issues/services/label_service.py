@@ -434,12 +434,12 @@ class LabelService:
             # Show all labels, with usage counts
             # First, add labels that were found in issues
             for label_name, count in label_counts.items():
-                label = defined_label_map.get(label_name)
+                found_label: Label | None = defined_label_map.get(label_name)
                 results.append(
                     LabelInfo(
                         name=label_name,
                         count=count,
-                        color=label.color if label else None,
+                        color=found_label.color if found_label else None,
                     )
                 )
 

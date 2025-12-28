@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from io import StringIO
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import typer
 from rich.console import Console
@@ -465,7 +465,7 @@ def ready(
             except KeyError:
                 console.print(f"[red]Invalid priority: {p}[/red]")
                 console.print("Valid priorities: critical, high, medium, low")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
 
     # Create database session and service
     engine = create_db_engine(get_db_url(), echo=is_debug_mode())
@@ -566,7 +566,7 @@ def _get_field_value(issue: Issue, field: str) -> str:
         "status": issue.status.value,
         "priority": str(issue.priority.value),
         "type": issue.type.value,
-        "assignee": issue.assignee or "",
+        "assignee": issue.assignees[0] if issue.assignees else "",
         "epic_id": issue.epic_id or "",
         "labels": ",".join(issue.labels) if issue.labels else "",
         "created_at": issue.created_at.isoformat() if issue.created_at else "",
@@ -624,7 +624,7 @@ def _output_table(issues: list[Issue], fields: str | None, console: Console) -> 
                 issue.status.value,
                 str(issue.priority.value),
                 issue.type.value,
-                issue.assignee or "-",
+                issue.assignees[0] if issue.assignees else "-",
             )
 
     console.print(table)
@@ -698,7 +698,7 @@ def _output_jsonl(issues: list[Issue], fields: str | None, console: Console) -> 
                 "status": issue.status.value,
                 "priority": issue.priority.value,
                 "type": issue.type.value,
-                "assignee": issue.assignee,
+                "assignee": issue.assignees[0] if issue.assignees else "",
                 "epic_id": issue.epic_id,
                 "labels": issue.labels,
                 "created_at": issue.created_at.isoformat() if issue.created_at else None,
@@ -882,7 +882,7 @@ def _output_search_jsonl(issues: list[tuple[Issue, float, str]], console: Consol
             "status": issue.status.value,
             "priority": issue.priority.value,
             "type": issue.type.value,
-            "assignee": issue.assignee,
+            "assignee": issue.assignees[0] if issue.assignees else "",
             "epic_id": issue.epic_id,
             "labels": issue.labels,
             "created_at": issue.created_at.isoformat() if issue.created_at else None,
@@ -919,7 +919,7 @@ def _output_ready_table(
             table.add_row(
                 issue.id,
                 issue.title[:37] + "..." if len(issue.title) > 37 else issue.title,
-                issue.priority.value,
+                str(issue.priority.value),
                 issue.status.value,
             )
         console.print(table)
@@ -957,7 +957,7 @@ def _output_ready_json(
             "status": issue.status.value,
             "priority": issue.priority.value,
             "type": issue.type.value,
-            "assignee": issue.assignee,
+            "assignee": issue.assignees[0] if issue.assignees else "",
             "epic_id": issue.epic_id,
             "labels": issue.labels,
             "created_at": issue.created_at.isoformat() if issue.created_at else None,
@@ -1018,7 +1018,7 @@ def show(
             console.print(f"[bold]Status:[/bold] {issue.status.value}")
             console.print(f"[bold]Priority:[/bold] {issue.priority.value}")
             console.print(f"[bold]Type:[/bold] {issue.type.value}")
-            console.print(f"[bold]Assignee:[/bold] {issue.assignee or 'Unassigned'}")
+            console.print(f"[bold]Assignee:[/bold] {issue.assignees[0] if issue.assignees else 'Unassigned'}")
             if issue.labels:
                 console.print(f"[bold]Labels:[/bold] {', '.join(issue.labels)}")
             console.print("[bold]Description:[/bold]")
@@ -1125,7 +1125,7 @@ def _generate_issue_template(issue: Issue) -> str:
         f"priority: {issue.priority.name.lower()}",
         f"status: {issue.status.value}",
         f"type: {issue.type.value}",
-        f"assignee: {issue.assignee or ''}",
+        f"assignee: {issue.assignees[0] if issue.assignees else ''}",
     ]
     if issue.labels:
         lines.append(f"labels: {', '.join(issue.labels)}")
@@ -1190,7 +1190,7 @@ def _parse_edited_issue(content: str, original: Issue) -> dict:
 
     if "assignee" in data:
         assignee = data["assignee"]
-        if assignee != original.assignee:
+        if assignee != (original.assignees[0] if original.assignees else ""):
             result["assignee"] = assignee if assignee else None
 
     return result
@@ -1432,10 +1432,10 @@ def edit(
         except InvalidTransitionError as e:
             console.print(f"[red]Invalid status transition: {e}[/red]")
             console.print("[yellow]Issue was not updated.[/yellow]")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
         except Exception as e:
             console.print(f"[red]Error editing issue: {e}[/red]")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
         finally:
             # Clean up temp file
             try:
@@ -1586,7 +1586,7 @@ def stale(
             stale_issues = service.get_stale_issues(days=days)
 
             if format == "json":
-                from dot_work.db_issues.cli_utils import format_issues_json
+                from dot_work.db_issues.cli_utils import format_issues_json  # type: ignore[import-not-found]
 
                 json_output = format_issues_json(stale_issues)
                 console.print(json_output)
@@ -1614,7 +1614,7 @@ def stale(
 
 @app.command()
 def delete(
-    issue_ids: list[str] = typer.Argument(..., help="Issue ID(s) to delete"),
+    issue_ids: list[str] = typer.Argument(..., help="Issue ID(s) to delete"),  # noqa: B008
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
 ) -> None:
     """Delete one or more issues.
@@ -2133,7 +2133,7 @@ def project_list(
                 console.print(
                     "Valid statuses: [cyan]active[/cyan], [cyan]archived[/cyan], [cyan]on_hold[/cyan]"
                 )
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
 
         projects = service.list_projects(status=project_status)
 
@@ -2218,7 +2218,7 @@ def project_update(
                 project_status = ProjectStatus(status)
             except ValueError:
                 console.print(f"[red]Invalid status: {status}[/red]")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
 
         try:
             project = service.update_project(
@@ -3591,7 +3591,7 @@ def comment_list(
 @comments_app.command("delete")
 def comment_delete(
     issue_id: str = typer.Argument(..., help="Issue ID"),
-    comment_ids: list[str] = typer.Argument(..., help="Comment ID(s) to delete"),
+    comment_ids: list[str] = typer.Argument(..., help="Comment ID(s) to delete"),  # noqa: B008
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
 ) -> None:
     """Delete one or more comments from an issue.
@@ -3833,10 +3833,10 @@ def instructions_apply(
 
         except (ValueError, TemplateParseError) as e:
             console.print(f"[red]Error applying template:[/red] {e}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
         except Exception as e:
             console.print(f"[red]Unexpected error:[/red] {e}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
 
 
 @instructions_app.command("init")
@@ -4412,7 +4412,7 @@ def search_index_create() -> None:
         )  # type: ignore[call-overload]
 
         # Populate FTS5 table with existing data
-        insert_result = session.exec(
+        _ = session.exec(
             text("""
             INSERT INTO issues_fts(rowid, id, title, description)
             SELECT rowid, id, title, COALESCE(description, '')
@@ -4495,7 +4495,7 @@ def search_index_rebuild() -> None:
         session.exec(text("DELETE FROM issues_fts;"))  # type: ignore[call-overload]
 
         # Rebuild from issues table
-        insert_result = session.exec(
+        _ = session.exec(
             text("""
             INSERT INTO issues_fts(rowid, id, title, description)
             SELECT rowid, id, title, COALESCE(description, '')
@@ -4704,9 +4704,9 @@ def init(
         uow = UnitOfWork(session)
 
         # Count issues
-        issue_count = len(uow.issues.list_issues(limit=1))
-        epic_count = len(uow.epics.list_epics(limit=1))
-        label_count = len(uow.labels.list_labels(limit=1))
+        issue_count = len(uow.issues.list_all(limit=1))
+        epic_count = len(uow.epics.list_all(limit=1))
+        label_count = len(uow.labels.list_all())
 
     console.print("\n[cyan]Current state:[/cyan]")
     console.print(f"  Issues: {issue_count}")
@@ -4766,11 +4766,11 @@ def info() -> None:
             priority_counts[priority] = priority_counts.get(priority, 0) + 1
 
         # Count epics and labels
-        epics = uow.epics.list_epics(limit=100000)
-        labels = uow.labels.list_labels(limit=100000)
+        epics = uow.epics.list_all(limit=100000)
+        labels = uow.labels.list_all()
 
         # Get dependencies count
-        deps = uow.graph.list_all_dependencies()
+        deps = uow.graph.get_all_dependencies()
 
         # Get last activity
         last_activity = None
@@ -4864,14 +4864,14 @@ def _output_stats_table(stats: Statistics, console: Console, group_by: str | Non
     if group_by == "priority" or group_by is None:
         if stats.by_priority:
             console.print("\n[bold]By Priority:[/bold]")
-            for stat in stats.by_priority:
-                console.print(f"  {stat.priority:15} {stat.count:4} ({stat.percentage:5.1f}%)")
+            for priority_stat in stats.by_priority:
+                console.print(f"  {priority_stat.priority:15} {priority_stat.count:4} ({priority_stat.percentage:5.1f}%)")
 
     if group_by == "type" or group_by is None:
         if stats.by_type:
             console.print("\n[bold]By Type:[/bold]")
-            for stat in stats.by_type:
-                console.print(f"  {stat.type:15} {stat.count:4} ({stat.percentage:5.1f}%)")
+            for type_stat in stats.by_type:
+                console.print(f"  {type_stat.type:15} {type_stat.count:4} ({type_stat.percentage:5.1f}%)")
 
     console.print("\n[bold]Metrics:[/bold]")
     console.print(f"  Blocked issues:        {stats.metrics.blocked_count}")
@@ -4906,7 +4906,7 @@ def _output_stats_json(stats: Statistics, console: Console) -> None:
         },
     }
 
-    console.print(JSON(data))
+    console.print(JSON(data))  # type: ignore[arg-type]
 
 
 @app.command()
@@ -4948,7 +4948,7 @@ def compact(
 
         with Session(engine) as session:
             console.print("[cyan]Running VACUUM...[/cyan]")
-            session.exec("VACUUM")
+            session.exec("VACUUM")  # type: ignore[call-overload]
             session.commit()
     else:
         # Run ANALYZE for optimization
@@ -4956,7 +4956,7 @@ def compact(
 
         with Session(engine) as session:
             console.print("[cyan]Running ANALYZE...[/cyan]")
-            session.exec("ANALYZE")
+            session.exec("ANALYZE")  # type: ignore[call-overload]
             session.commit()
 
     # Get size after
@@ -5063,7 +5063,7 @@ def rename_prefix(
                     status=issue.status,
                     priority=issue.priority,
                     type=issue.type,
-                    assignee=issue.assignee,
+                    assignees=issue.assignees.copy(),
                     epic_id=issue.epic_id,
                     labels=issue.labels.copy(),
                     blocked_reason=issue.blocked_reason,
@@ -5114,7 +5114,7 @@ def cleanup(
         except ValueError:
             console.print(f"[red]Error:[/red] Invalid status '{status}'")
             console.print(f"Valid values: {', '.join(s.value for s in IssueStatus)}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
 
         # Get all issues and filter by status and age
         all_issues = issue_service.list_issues(limit=100000)
@@ -5193,7 +5193,7 @@ def cleanup(
                         "status": issue.status.value,
                         "priority": issue.priority.value,
                         "type": issue.type.value,
-                        "assignee": issue.assignee,
+                        "assignee": issue.assignees[0] if issue.assignees else "",
                         "epic_id": issue.epic_id,
                         "labels": issue.labels,
                         "blocked_reason": issue.blocked_reason,
@@ -5379,9 +5379,9 @@ def merge(
         new_labels = source_label_set - target_label_set
         merged_labels = target.labels + sorted(new_labels)
 
-        source_deps = uow.issues.get_dependencies(source_id)
-        source_dependents = uow.issues.get_dependents(source_id)
-        source_comments = uow.issues.get_comments(source_id) if keep_comments else []
+        source_deps = uow.graph.get_dependencies(source_id)
+        source_dependents = uow.graph.get_dependents(source_id)
+        source_comments = uow.comments.list_by_issue(source_id) if keep_comments else []
 
         console.print(f"\n[dim]Labels to add:[/dim] {len(new_labels)} new label(s)")
         if new_labels:
@@ -5437,7 +5437,7 @@ def merge(
             )
         except ValueError as e:
             console.print(f"[red]Error: {e}[/red]")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
 
         if result:
             console.print("\n[green]✓ Merge complete[/green]")
@@ -5451,7 +5451,7 @@ def merge(
 
 
 @app.command()
-def edit(
+def edit_yaml(
     issue_id: str = typer.Argument(..., help="Issue ID to edit"),
     editor: str | None = typer.Option(
         None, "--editor", "-e", help="Editor to use (default: $EDITOR)"
@@ -5500,7 +5500,7 @@ def edit(
             raise typer.Exit(1)
 
         # Get dependencies for this issue
-        deps = uow.issues.get_dependencies(issue_id)
+        deps = uow.graph.get_dependencies(issue_id)
 
         # Build the YAML content
         yaml_content = {
@@ -5508,15 +5508,15 @@ def edit(
             "title": issue.title,
             "description": issue.description or "",
             "priority": issue.priority.value,
-            "type": issue.issue_type.value,
+            "type": issue.type.value,
             "status": issue.status.value,
             "labels": issue.labels,
-            "assignee": issue.assignee or "",
+            "assignee": issue.assignees[0] if issue.assignees else "",
         }
 
         # Add dependencies if any
         if deps:
-            yaml_content["dependencies"] = {
+            yaml_content["dependencies"] = {  # type: ignore[assignment]
                 "blocks": [d.to_issue_id for d in deps if d.dependency_type.value == "blocks"],
                 "depends_on": [
                     d.to_issue_id for d in deps if d.dependency_type.value == "depends_on"
@@ -5542,8 +5542,8 @@ def edit(
         Path(temp_path).chmod(0o600)
 
         # Calculate initial hash for change detection
-        with open(temp_path, "rb") as f:
-            initial_hash = hashlib.sha256(f.read()).hexdigest()
+        with open(temp_path, "rb") as f:  # type: ignore[assignment]
+            initial_hash = hashlib.sha256(f.read()).hexdigest()  # type: ignore[arg-type]
 
         try:
             # Validate and parse editor command
@@ -5558,15 +5558,15 @@ def edit(
                 console.print(f"[yellow]Editor exited with code {result.returncode}[/yellow]")
 
             # Check if file was modified
-            with open(temp_path, "rb") as f:
-                final_hash = hashlib.sha256(f.read()).hexdigest()
+            with open(temp_path, "rb") as f:  # type: ignore[assignment]
+                final_hash = hashlib.sha256(f.read()).hexdigest()  # type: ignore[arg-type]
 
             if initial_hash == final_hash:
                 console.print("[yellow]No changes detected[/yellow]")
                 raise typer.Exit(0)
 
             # Parse modified file
-            with open(temp_path) as f:
+            with open(temp_path) as f:  # type: ignore[assignment]
                 modified_data = yaml.safe_load(f)
 
             # Validate required fields
@@ -5600,19 +5600,19 @@ def edit(
             except ValueError:
                 console.print(f"[red]Invalid priority: {modified_data['priority']}[/red]")
                 console.print("[dim]Valid: critical, high, medium, low[/dim]")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
 
             # Type
             try:
                 new_type = IssueType(modified_data["type"])
-                if new_type != issue.issue_type:
+                if new_type != issue.type:
                     update_params["issue_type"] = new_type
             except ValueError:
                 console.print(f"[red]Invalid type: {modified_data['type']}[/red]")
                 console.print(
                     "[dim]Valid: bug, feature, task, enhancement, refactor, docs, test, security, performance[/dim]"
                 )
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
 
             # Status
             try:
@@ -5624,7 +5624,7 @@ def edit(
                 console.print(
                     "[dim]Valid: proposed, in_progress, blocked, resolved, completed, stale, wont_fix[/dim]"
                 )
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
 
             # Labels
             new_labels = modified_data.get("labels", [])
@@ -5637,7 +5637,7 @@ def edit(
             # Assignee
             new_assignee = modified_data.get("assignee", "")
             if isinstance(new_assignee, str):
-                if new_assignee != (issue.assignee or ""):
+                if new_assignee != (issue.assignees[0] if issue.assignees else ""):
                     update_params["assignee"] = new_assignee if new_assignee else None
 
             # Apply changes
@@ -5719,7 +5719,7 @@ def restore(
                 console.print(f"  [cyan]{issue.id}[/cyan]: {issue.title[:60]}")
                 console.print(f"    [dim]Deleted:[/dim] {deleted_date}")
                 console.print(
-                    f"    [dim]Status:[/dim] {issue.status.value} [dim]Type:[/dim] {issue.issue_type.value}"
+                    f"    [dim]Status:[/dim] {issue.status.value} [dim]Type:[/dim] {issue.type.value}"
                 )
                 console.print()
 

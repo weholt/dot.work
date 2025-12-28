@@ -415,7 +415,6 @@ class DependencyService:
             # Add node
             issue = self.uow.issues.get(current)
             title = issue.title[:30] if issue else "Unknown"
-            label = f"{current}: {title}"
             node_id = current.replace("-", "_")
             nodes.add(f"    {node_id}[{current}: {title}]")
 
@@ -524,9 +523,9 @@ class DependencyService:
         # Filter out completed blocking issues
         for issue_id in list(blocked_by.keys()):
             blockers = blocked_by[issue_id]
-            active_blockers = {b for b in blockers if b not in completed_issues}
-            if active_blockers:
-                blocked_by[issue_id] = active_blockers
+            active_blocker_set = {b for b in blockers if b not in completed_issues}
+            if active_blocker_set:
+                blocked_by[issue_id] = active_blocker_set
             else:
                 del blocked_by[issue_id]
 
@@ -541,14 +540,14 @@ class DependencyService:
             # Check if issue is blocked by status
             if issue.status == IssueStatus.BLOCKED:
                 # Get blockers from dependencies
-                blockers = list(blocked_by.get(issue.id, []))
-                blocked_issues.append(BlockedIssue(issue_id=issue.id, blockers=blockers))
+                blocker_list: list[str] = list(blocked_by.get(issue.id, set()))
+                blocked_issues.append(BlockedIssue(issue_id=issue.id, blockers=blocker_list))
                 continue
 
             # Check if issue has active blockers via dependencies
             if issue.id in blocked_by:
-                blockers = list(blocked_by[issue.id])
-                blocked_issues.append(BlockedIssue(issue_id=issue.id, blockers=blockers))
+                active_blockers: list[str] = list(blocked_by[issue.id])
+                blocked_issues.append(BlockedIssue(issue_id=issue.id, blockers=active_blockers))
                 continue
 
             # Check status is proposed or in-progress

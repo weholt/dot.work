@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from types import TracebackType
 
-from sqlalchemy import Engine, TypeDecorator, create_engine
+from sqlalchemy import Engine, TypeDecorator, cast, create_engine
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Column, Field, Index, Session, SQLModel, String, select
 
@@ -644,9 +644,9 @@ class IssueRepository:
         """
         statement = (
             select(IssueModel)
-            .where(IssueModel.updated_at < str(cutoff))
+            .where(IssueModel.updated_at < cutoff)
             .where(IssueModel.deleted_at.is_(None))  # type: ignore[union-attr]
-            .order_by(IssueModel.updated_at)
+            .order_by(cast(IssueModel.updated_at, String))
             .limit(limit)
             .offset(offset)
         )
@@ -1580,7 +1580,7 @@ class ProjectRepository:
         Returns:
             Default project entity if found, None otherwise
         """
-        statement = select(ProjectModel).where(ProjectModel.is_default == True)
+        statement = select(ProjectModel).where(ProjectModel.is_default)
         model = self.session.exec(statement).first()
         return self._model_to_entity(model) if model else None
 
@@ -1673,7 +1673,7 @@ class ProjectRepository:
             Updated project entity, or None if not found
         """
         # Clear default flag from all projects
-        statement = select(ProjectModel).where(ProjectModel.is_default == True)
+        statement = select(ProjectModel).where(ProjectModel.is_default)
         default_models = self.session.exec(statement).all()
         for default_model in default_models:
             default_model.is_default = False

@@ -906,9 +906,9 @@ class IssueService:
 
             # Merge dependencies
             # 1. Get all dependencies for both issues
-            source_deps = self.uow.issues.get_dependencies(source_id)
-            target_deps = self.uow.issues.get_dependencies(target_id)
-            source_dependents = self.uow.issues.get_dependents(source_id)
+            source_deps = self.uow.graph.get_dependencies(source_id)
+            target_deps = self.uow.graph.get_dependencies(target_id)
+            source_dependents = self.uow.graph.get_dependents(source_id)
 
             # Build sets of existing relationships for target
             target_from_to = {(d.from_issue_id, d.to_issue_id) for d in target_deps}
@@ -931,7 +931,7 @@ class IssueService:
                         description=dep.description,
                         created_at=self.clock.now(),
                     )
-                    self.uow.issues.add_dependency(new_dep)
+                    self.uow.graph.add_dependency(new_dep)
                     target_from_to.add(key)
 
             # Remap dependents (issues that depend on source) to depend on target
@@ -950,23 +950,23 @@ class IssueService:
                         description=dep.description,
                         created_at=self.clock.now(),
                     )
-                    self.uow.issues.add_dependency(new_dep)
+                    self.uow.graph.add_dependency(new_dep)
                     target_from_to.add(key)
 
             # Copy comments if requested
             if keep_comments:
-                source_comments = self.uow.issues.get_comments(source_id)
+                source_comments = self.uow.comments.list_by_issue(source_id)
                 for comment in source_comments:
                     # Create new comment with same content but different ID
                     new_comment = Comment(
-                        id=self.id_service.generate_id(),
+                        id=self.id_service.generate("comment"),
                         issue_id=target_id,
                         author=comment.author,
                         text=f"[Merged from {source_id}]\n{comment.text}",
                         created_at=comment.created_at,
                         updated_at=comment.updated_at,
                     )
-                    self.uow.issues.add_comment(new_comment)
+                    self.uow.comments.save(new_comment)
 
             # Update target timestamp
             target.updated_at = self.clock.now()

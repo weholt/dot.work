@@ -206,7 +206,7 @@ def is_git_repository(path: Path) -> bool:
     try:
         import git
 
-        with git.Repo(path) as repo:
+        with git.Repo(path) as _:
             # Successfully opened as a git repository
             return True
     except Exception:

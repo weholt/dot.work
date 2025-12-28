@@ -50,19 +50,25 @@ class TestDbIssuesConfigFromEnv:
             del os.environ["DOT_WORK_DB_ISSUES_PATH"]
 
         config = DbIssuesConfig.from_env()
-        assert config.base_path == Path(".work/db-issues")
+        # from_env() calls resolve() for security, so we compare resolved paths
+        assert config.base_path == Path(".work/db-issues").resolve()
 
     def test_from_env_with_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test from_env with environment variable override."""
-        monkeypatch.setenv("DOT_WORK_DB_ISSUES_PATH", "/custom/path")
+        # Use a relative path within CWD (allowed by security validation)
+        monkeypatch.setenv("DOT_WORK_DB_ISSUES_PATH", "custom/db-issues")
         config = DbIssuesConfig.from_env()
-        assert config.base_path == Path("/custom/path")
+        # from_env() resolves paths for security, so compare resolved paths
+        assert config.base_path == Path("custom/db-issues").resolve()
 
     def test_from_env_db_url_with_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test db_url with environment variable override."""
-        monkeypatch.setenv("DOT_WORK_DB_ISSUES_PATH", "/custom/path")
+        # Use a relative path within CWD (allowed by security validation)
+        monkeypatch.setenv("DOT_WORK_DB_ISSUES_PATH", "custom/db-issues")
         config = DbIssuesConfig.from_env()
-        assert config.db_url == "sqlite:///custom/path/issues.db"
+        expected_path = Path("custom/db-issues").resolve() / "issues.db"
+        # db_url strips leading slash from absolute paths
+        assert config.db_url == f"sqlite:///{str(expected_path)[1:]}"
 
 
 class TestEnsureDirectory:

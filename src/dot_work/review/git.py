@@ -274,7 +274,7 @@ def read_file_text(root: str, path: str) -> str:
     try:
         norm.relative_to(root_norm)
     except ValueError:
-        raise GitError("invalid path")
+        raise GitError("invalid path") from None
 
     return norm.read_text(encoding="utf-8", errors="replace")
 

@@ -204,7 +204,7 @@ class InstructionTemplateParser:
             raise TemplateParseError(
                 f"Invalid YAML in frontmatter: {e}",
                 path=str(source_path) if source_path else None,
-            )
+            ) from None
 
         # Extract template metadata
         name = frontmatter.get("name", source_path.stem if source_path else "unnamed")
@@ -257,7 +257,7 @@ class InstructionTemplateParser:
             valid_values = [str(p.value) for p in IssuePriority]
             raise TemplateParseError(
                 f"Invalid priority: {value}. Valid values: {', '.join(valid_values)}"
-            )
+            ) from None
 
     def _parse_type(self, value: str | None) -> IssueType:
         """Parse type string to enum.
@@ -281,7 +281,7 @@ class InstructionTemplateParser:
             valid_values = [t.value for t in IssueType]
             raise TemplateParseError(
                 f"Invalid type: {value}. Valid values: {', '.join(valid_values)}"
-            )
+            ) from None
 
     def _parse_tasks(
         self,

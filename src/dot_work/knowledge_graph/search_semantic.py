@@ -56,17 +56,23 @@ class SemanticResult:
     title: str | None
 
 
-def cosine_similarity(vec_a: npt.NDArray[np.float32], vec_b: npt.NDArray[np.float32]) -> float:
+def cosine_similarity(vec_a: npt.NDArray[np.float32] | list[float], vec_b: npt.NDArray[np.float32] | list[float]) -> float:
     """Compute cosine similarity between two vectors.
 
     Args:
-        vec_a: First vector as numpy array.
-        vec_b: Second vector as numpy array.
+        vec_a: First vector as numpy array or list.
+        vec_b: Second vector as numpy array or list.
 
     Returns:
         Cosine similarity in range [-1, 1].
         Returns 0.0 if either vector is zero-length.
     """
+    # Convert lists to numpy arrays if needed
+    if isinstance(vec_a, list):
+        vec_a = np.array(vec_a, dtype=np.float32)
+    if isinstance(vec_b, list):
+        vec_b = np.array(vec_b, dtype=np.float32)
+
     if vec_a.shape != vec_b.shape:
         raise ValueError(f"Vector dimensions must match: {vec_a.shape} != {vec_b.shape}")
 
