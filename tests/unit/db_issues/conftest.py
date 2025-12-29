@@ -10,6 +10,7 @@ from sqlalchemy import Engine
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
+from dot_work.db_issues.adapters.sqlite import UnitOfWork
 from dot_work.db_issues.domain.entities import (
     Clock,
     Epic,
@@ -20,7 +21,7 @@ from dot_work.db_issues.domain.entities import (
     IssueStatus,
     IssueType,
 )
-from dot_work.db_issues.services import EpicService, IssueService
+from dot_work.db_issues.services import DependencyService, EpicService, IssueService, LabelService
 
 # =============================================================================
 # Session-Scoped Database Engine
@@ -224,7 +225,7 @@ def in_memory_db(db_engine: Engine) -> Generator[Session, None, None]:
 @pytest.fixture
 def uow(
     in_memory_db: Session,
-) -> Generator["dot_work.db_issues.adapters.sqlite.UnitOfWork", None, None]:
+) -> Generator[UnitOfWork, None, None]:
     """Create a shared UnitOfWork for all service fixtures.
 
     Sharing a single UnitOfWork across services prevents memory leaks from
@@ -279,7 +280,7 @@ def sample_issue(fixed_clock: Clock) -> Issue:
 
 @pytest.fixture
 def issue_service(
-    uow: "dot_work.db_issues.adapters.sqlite.UnitOfWork",
+    uow: UnitOfWork,
     fixed_id_service: IdentifierService,
     fixed_clock: Clock,
 ) -> IssueService:
@@ -301,7 +302,7 @@ def issue_service(
 
 @pytest.fixture
 def epic_service(
-    uow: "dot_work.db_issues.adapters.sqlite.UnitOfWork",
+    uow: UnitOfWork,
     fixed_id_service: IdentifierService,
     fixed_clock: Clock,
 ) -> EpicService:
@@ -323,8 +324,8 @@ def epic_service(
 
 @pytest.fixture
 def dependency_service(
-    uow: "dot_work.db_issues.adapters.sqlite.UnitOfWork",
-) -> "dot_work.db_issues.services.dependency_service.DependencyService":
+    uow: UnitOfWork,
+) -> DependencyService:
     """Create a DependencyService with test dependencies.
 
     Uses the shared uow fixture to prevent memory leaks from multiple
@@ -378,10 +379,10 @@ def temp_db_path(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def label_service(
-    uow: "dot_work.db_issues.adapters.sqlite.UnitOfWork",
+    uow: UnitOfWork,
     fixed_id_service: IdentifierService,
     fixed_clock: Clock,
-) -> "LabelService":
+) -> LabelService:
     """Create a LabelService for testing.
 
     Uses the shared uow fixture to prevent memory leaks from multiple

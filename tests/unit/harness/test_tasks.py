@@ -1,5 +1,6 @@
 """Tests for harness task file parsing and management."""
 
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
@@ -29,7 +30,7 @@ class TestTask:
         """Test that Task is frozen (immutable)."""
         task = Task(line_no=1, done=False, text="Test task")
 
-        with pytest.raises(Exception):  # FrozenInstanceError
+        with pytest.raises(FrozenInstanceError):
             task.done = True
 
 
@@ -272,7 +273,7 @@ class TestTaskFileError:
 
     def test_task_file_error_can_be_caught(self):
         """Test that TaskFileError can be caught as Exception."""
-        with pytest.raises(Exception):
+        with pytest.raises(TaskFileError):
             raise TaskFileError("Test")
 
     def test_task_file_error_can_be_caught_specifically(self):

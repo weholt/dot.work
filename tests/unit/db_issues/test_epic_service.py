@@ -3,7 +3,7 @@
 import pytest
 
 from dot_work.db_issues.domain.entities import Clock, EpicStatus
-from dot_work.db_issues.services import EpicService
+from dot_work.db_issues.services import EpicService, IssueService
 
 
 class TestEpicServiceCreate:
@@ -281,7 +281,7 @@ class TestEpicServiceGetAllEpicsWithCounts:
         assert infos[0].completed_count == 0
 
     def test_get_all_epics_with_counts_with_issues(
-        self, epic_service: EpicService, issue_service: "IssueService"
+        self, epic_service: EpicService, issue_service: IssueService
     ) -> None:
         """Test get_all_epics_with_counts correctly counts issues by status."""
         epic = epic_service.create_epic("Test Epic")
@@ -289,7 +289,7 @@ class TestEpicServiceGetAllEpicsWithCounts:
         # Create issues with different statuses
         from dot_work.db_issues.domain.entities import IssueStatus
 
-        issue1 = issue_service.create_issue("Issue 1", epic_id=epic.id)
+        issue_service.create_issue("Issue 1", epic_id=epic.id)
         # Leave as proposed (default)
 
         issue2 = issue_service.create_issue("Issue 2", epic_id=epic.id)
@@ -324,7 +324,7 @@ class TestEpicServiceGetEpicIssues:
         assert issues == []
 
     def test_get_epic_issues_returns_issues_in_epic(
-        self, epic_service: EpicService, issue_service: "IssueService"
+        self, epic_service: EpicService, issue_service: IssueService
     ) -> None:
         """Test get_epic_issues returns only issues in the specified epic."""
         epic1 = epic_service.create_epic("Epic 1")
@@ -362,7 +362,7 @@ class TestEpicServiceGetEpicTree:
         assert tree == []
 
     def test_get_epic_tree_single_issue(
-        self, epic_service: EpicService, issue_service: "IssueService"
+        self, epic_service: EpicService, issue_service: IssueService
     ) -> None:
         """Test get_epic_tree with a single issue."""
         epic = epic_service.create_epic("Test Epic")
@@ -376,12 +376,12 @@ class TestEpicServiceGetEpicTree:
         assert tree[0].indent_level == 0
 
     def test_get_epic_tree_multiple_issues(
-        self, epic_service: EpicService, issue_service: "IssueService"
+        self, epic_service: EpicService, issue_service: IssueService
     ) -> None:
         """Test get_epic_tree with multiple root issues."""
         epic = epic_service.create_epic("Test Epic")
-        issue1 = issue_service.create_issue("Issue 1", epic_id=epic.id)
-        issue2 = issue_service.create_issue("Issue 2", epic_id=epic.id)
+        issue_service.create_issue("Issue 1", epic_id=epic.id)
+        issue_service.create_issue("Issue 2", epic_id=epic.id)
 
         tree = epic_service.get_epic_tree(epic.id)
 
@@ -390,7 +390,7 @@ class TestEpicServiceGetEpicTree:
         assert tree[1].indent_level == 0
 
     def test_get_epic_tree_with_nested_issues(
-        self, epic_service: EpicService, issue_service: "IssueService"
+        self, epic_service: EpicService, issue_service: IssueService
     ) -> None:
         """Test get_epic_tree with parent-child relationships (if supported)."""
         epic = epic_service.create_epic("Test Epic")
@@ -435,7 +435,7 @@ class TestEpicServiceGetAllEpicTrees:
         assert trees == {}
 
     def test_get_all_epic_trees_multiple_epics(
-        self, epic_service: EpicService, issue_service: "IssueService"
+        self, epic_service: EpicService, issue_service: IssueService
     ) -> None:
         """Test get_all_epic_trees returns trees for all epics."""
         epic1 = epic_service.create_epic("Epic 1")

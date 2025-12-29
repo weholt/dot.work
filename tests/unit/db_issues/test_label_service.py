@@ -2,7 +2,7 @@
 
 import pytest
 
-from dot_work.db_issues.services import LabelService
+from dot_work.db_issues.services import IssueService, LabelService
 
 
 class TestLabelServiceGetAllLabelsWithCounts:
@@ -27,7 +27,7 @@ class TestLabelServiceGetAllLabelsWithCounts:
         assert infos[0].color == "#ff0000"
 
     def test_get_all_labels_with_counts_with_issues(
-        self, label_service: LabelService, issue_service: "IssueService"
+        self, label_service: LabelService, issue_service: IssueService
     ) -> None:
         """Test get_all_labels_with_counts correctly counts label usage."""
         # Create issues with different labels
@@ -61,7 +61,7 @@ class TestLabelServiceGetAllLabelsWithCounts:
         assert doc_info.count == 0
 
     def test_get_all_labels_with_counts_include_unused(
-        self, label_service: LabelService, issue_service: "IssueService"
+        self, label_service: LabelService, issue_service: IssueService
     ) -> None:
         """Test get_all_labels_with_counts with include_unused=True."""
         # First create defined labels (before any issues use them)
@@ -84,7 +84,7 @@ class TestLabelServiceGetAllLabelsWithCounts:
         assert "bug" not in label_names  # bug is used
 
     def test_get_all_labels_with_counts_sorting(
-        self, label_service: LabelService, issue_service: "IssueService"
+        self, label_service: LabelService, issue_service: IssueService
     ) -> None:
         """Test get_all_labels_with_counts sorts by count descending, then name."""
         # Create issues with varying label counts
