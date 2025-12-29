@@ -11,6 +11,7 @@ from sqlmodel import Session, SQLModel
 from typer.testing import CliRunner
 
 from dot_work.db_issues.adapters import create_db_engine
+from dot_work.db_issues.config import get_db_url
 
 
 def pytest_sessionstart(session):
@@ -112,8 +113,15 @@ def integration_cli_runner(tmp_path: Path) -> CliRunner:
     test_db_dir = Path.cwd() / ".work" / "test_integration_db"
     test_db_dir.mkdir(parents=True, exist_ok=True)
 
-    # Set environment variable for test database
-
+    # Initialize the database schema for integration tests
+    # Set env var first, then get URL and create tables
     os.environ["DOT_WORK_DB_ISSUES_PATH"] = str(test_db_dir)
+    db_url = get_db_url()
+    engine = create_db_engine(db_url)
+    try:
+        SQLModel.metadata.create_all(engine)
+    finally:
+        engine.dispose()
 
-    return CliRunner()
+    # Create CLI runner with test environment
+    return CliRunner(env={**os.environ, "DOT_WORK_DB_ISSUES_PATH": str(test_db_dir)})

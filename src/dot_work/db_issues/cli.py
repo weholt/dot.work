@@ -238,6 +238,7 @@ def create(
                 labels=labels or [],
                 project_id=project,
             )
+            session.commit()
             console.print(f"[green]✓[/green] Issue created: [bold]{issue.id}[/bold]")
             console.print(f"  Title: {issue.title}")
             console.print(f"  Status: {issue.status.value}")

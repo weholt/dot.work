@@ -9,6 +9,7 @@ Tests all advanced filtering options:
 """
 
 import json
+import re
 import time
 
 import pytest
@@ -28,19 +29,24 @@ class TestAdvancedFiltering:
         # Create issues at different times
         result = runner.invoke(app, ["create", "Old issue", "-p", "medium"])
         assert result.exit_code == 0
-        # Parse issue ID from output
-        old_id = result.stdout.strip().split()[0]
+        # Parse issue ID from output (format: "✓ Issue created: issue-XXX")
+        match = re.search(r"issue-[\w]+", result.stdout)
+        assert match is not None
+        old_id = match.group(0)
 
         time.sleep(0.1)  # Small delay to ensure different timestamps
 
         result = runner.invoke(app, ["create", "New issue", "-p", "medium"])
         assert result.exit_code == 0
-        new_id = result.stdout.strip().split()[0]
+        match = re.search(r"issue-[\w]+", result.stdout)
+        assert match is not None
+        new_id = match.group(0)
 
         # List issues in JSON format
         result = runner.invoke(app, ["list-cmd", "--format", "json"])
         assert result.exit_code == 0
-        issues = json.loads(result.stdout)
+        data = json.loads(result.stdout)
+        issues = data["issues"]
         issue_ids = {i["id"] for i in issues}
         # Verify both issues were created
         assert len(issues) >= 2

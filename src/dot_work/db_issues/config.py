@@ -111,12 +111,17 @@ class DbIssuesConfig:
 
         Returns:
             Database URL string for SQLAlchemy/sqlmodel
+
+        Note: For absolute paths, SQLAlchemy requires 4 slashes: sqlite:////absolute/path
+        For relative paths, 3 slashes: sqlite:///relative/path
         """
         path_str = str(self.db_path)
-        # For absolute paths, strip the leading slash to avoid 4 slashes
-        # sqlite:///path -> sqlite:///path (not sqlite:////path)
+        # If absolute path, use sqlite:////path (4 slashes total)
+        # If relative path, use sqlite:///path (3 slashes total)
         if path_str.startswith("/"):
-            path_str = path_str[1:]
+            # sqlite: prefix (//) + // for absolute path = 4 slashes
+            return f"sqlite:////{path_str}"
+        # For relative paths, sqlite:///path is correct
         return f"sqlite:///{path_str}"
 
     def ensure_directory(self) -> None:
