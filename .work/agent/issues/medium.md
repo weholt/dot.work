@@ -852,11 +852,30 @@ references:
 Inconsistent transaction handling could cause unexpected behavior.
 
 ### Proposed Solution
-Establish and document consistent transaction pattern.
+1. Always use `with self.uow:` context manager for write operations
+2. Document the pattern as the standard for db_issues services
+3. Update all write methods to use consistent transaction handling
+
+**User decision:** Always use context manager, establish clear pattern
 
 ### Acceptance Criteria
-- [ ] Consistent transaction usage
-- [ ] Pattern documented
+- [ ] All write operations use `with self.uow:` context manager
+- [ ] Read operations skip context manager (read-only, no commit needed)
+- [ ] Transaction pattern documented in code comments
+- [ ] No auto-commit reliance
+
+### Validation Plan
+1. Audit all service methods in issue_service.py and epic_service.py
+2. For write methods (create, update, delete): add `with self.uow:` if missing
+3. For read methods (get, list, find): remove context manager if present
+4. Add documentation comment explaining the pattern
+5. Add tests verifying transaction behavior
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision received: Always use context manager for writes.
 
 ---
 
@@ -1521,66 +1540,36 @@ Each metric group executes multiple separate database round-trips.
 - Latency accumulates across the application
 
 ### Proposed Solution
-Combine into single GROUP BY query:
+1. Benchmark current implementation to measure actual performance
+2. If benchmark shows > 20ms, implement single GROUP BY query consolidation
+3. If benchmark shows < 20ms, current implementation is acceptable
 
-```python
-def get_statistics(self) -> Statistics:
-    result = self.session.exec(text("""
-        SELECT
-            COUNT(*) as total,
-            COUNT(CASE WHEN status = 'proposed' THEN 1 END) as proposed,
-            COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress,
-            COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
-            COUNT(CASE WHEN status = 'blocked' THEN 1 END) as blocked,
-            COUNT(CASE WHEN priority = 0 THEN 1 END) as critical,
-            COUNT(CASE WHEN priority = 1 THEN 1 END) as high,
-            COUNT(CASE WHEN priority = 2 THEN 1 END) as medium,
-            COUNT(CASE WHEN priority = 3 THEN 1 END) as low,
-            COUNT(CASE WHEN type = 'task' THEN 1 END) as task,
-            COUNT(CASE WHEN type = 'bug' THEN 1 END) as bug,
-            COUNT(CASE WHEN type = 'enhancement' THEN 1 END) as enhancement,
-            COUNT(CASE WHEN type = 'refactor' THEN 1 END) as refactor,
-            COUNT(CASE WHEN type = 'test' THEN 1 END) as test,
-            COUNT(CASE WHEN type = 'docs' THEN 1 END) as docs
-        FROM issues
-        WHERE deleted_at IS NULL
-    """))
-
-    row = result.first()
-    return Statistics(
-        total=row.total,
-        by_status={
-            'proposed': row.proposed or 0,
-            'in_progress': row.in_progress or 0,
-            'completed': row.completed or 0,
-            'blocked': row.blocked or 0,
-        },
-        by_priority={
-            'critical': row.critical or 0,
-            'high': row.high or 0,
-            'medium': row.medium or 0,
-            'low': row.low or 0,
-        },
-        by_type={
-            'task': row.task or 0,
-            'bug': row.bug or 0,
-            'enhancement': row.enhancement or 0,
-            'refactor': row.refactor or 0,
-            'test': row.test or 0,
-            'docs': row.docs or 0,
-        }
-    )
-```
+**User decision:** Benchmark first, then decide on consolidation
 
 ### Acceptance Criteria
-- [ ] Single GROUP BY query for all statistics
-- [ ] All metrics calculated in database
-- [ ] Performance test: < 10ms vs current 75ms
+- [ ] Benchmark results documented with current performance
+- [ ] If > 20ms: Single GROUP BY query implemented
+- [ ] If < 20ms: Current implementation kept as-is
 - [ ] Results match current implementation
 - [ ] Handles edge cases (zero issues, deleted issues)
 
+### Validation Plan
+1. Add timing test to measure current `get_statistics()` performance
+2. Run benchmark 100 times and record average/median/p95
+3. If > 20ms: implement GROUP BY consolidation
+4. Re-run benchmark after implementation
+5. Verify results match current implementation exactly
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision received: Benchmark first, consolidate only if needed.
+
 ### Notes
-This optimization reduces database round-trips from 15+ to 1, providing 5-10x speedup. The single query is more maintainable and easier to understand.
+Original issue proposed consolidation without benchmark. User correctly identified need to measure first. If current performance is acceptable (< 20ms), optimization may not be worth the complexity.
+
+---
 
 ---
 id: "PERF-008@m8n9o0"
@@ -2333,5 +2322,323 @@ def _analyze_commit_impl(commit_hash: str, repo_path: str) -> ChangeAnalysis:
 
 ### Notes
 This optimization should provide 4-8x speedup on multi-core machines (linear speedup with core count for CPU-bound analysis). Memory usage increases with worker count but is manageable.
+
+------
+
+id: "DOGFOOD-009@foa1hu"
+title: "Add non-goals section to main documentation"
+description: "dot-work documentation lacks explicit statement of what it does NOT do"
+created: 2024-12-29
+section: "dogfooding"
+tags: [documentation, clarity, dogfooding]
+type: docs
+priority: medium
+status: proposed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - README.md
+  - docs/dogfood/baseline.md
+---
+
+### Problem
+Documentation has no section on non-goals. Users may have incorrect expectations about what dot-work can do.
+
+**Missing:**
+- What problems are out of scope?
+- What won't dot-work help with?
+- What tools should be used instead for those problems?
+
+### Affected Files
+- `README.md`
+- `docs/dogfood/baseline.md`
+
+### Importance
+**MEDIUM**: Clear non-goals prevent user disappointment:
+- Sets proper expectations
+- Avoids feature requests outside scope
+- Helps users choose right tool
+
+### Proposed Solution
+Add non-goals section to README documenting that dot-work is a human-directed AI agent framework for issue management and autonomous agent implementation:
+```markdown
+## Non-Goals
+
+dot-work is a human-directed AI agent framework for issue management and autonomous agent implementation. It does NOT:
+
+- Replace full project management tools (Jira, Linear, etc.)
+- Provide autonomous agents without human direction
+- Host prompts or provide cloud services
+- Manage dependencies or build systems
+- Replace git workflow tools
+- Provide CI/CD integration
+
+It is a local development tool for AI-assisted coding workflows with human oversight.
+```
+
+**User decision:** dot-work is a human-directed AI agent framework for issue management and autonomous agent implementation
+
+### Acceptance Criteria
+- [ ] Non-goals section added to README
+- [ ] Defines dot-work as human-directed AI agent framework
+- [ ] Clear scope boundaries defined
+- [ ] Alternative tools suggested where appropriate
+
+### Validation Plan
+1. Add "Non-Goals" section to README.md
+2. Explicitly state "human-directed AI agent framework"
+3. List out-of-scope features
+4. Verify with user that definition is accurate
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Definition provided by user.
+
+### Notes
+This is gap #3 in gaps-and-questions.md (Medium Priority).
+
+---
+
+---
+
+id: "DOGFOOD-010@foa1hu"
+title: "Document issue editing workflow (AI-only)"
+description: "Clarify that AI tools should edit issue files, not humans"
+created: 2024-12-29
+section: "dogfooding"
+tags: [documentation, workflow, dogfooding]
+type: docs
+priority: medium
+status: proposed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - .work/agent/issues/
+  - .github/prompts/
+---
+
+### Problem
+How do users/edit-AI tools edit issues? User feedback: "The tools and AI should edit the issue files, not humans"
+
+**Unclear:**
+- Are there CLI commands to add/edit/move issues?
+- Should humans ever edit `.work/agent/issues/*.md` directly?
+- How to move issues between priority files?
+- How to update issue status without AI?
+
+### Affected Files
+- Documentation files
+- `.work/agent/issues/` (readme or guide)
+
+### Importance
+**MEDIUM**: Users need to understand proper workflow:
+- Prevents manual file editing mistakes
+- Ensures issues are managed correctly
+- Maintains issue file format consistency
+
+### Proposed Solution
+Add documentation section:
+```markdown
+## Editing Issues
+
+Issues are edited by AI agents via prompts:
+
+- `/new-issue` – Create issue with generated ID
+- `/do-work` – Move issue through workflow states
+- `/focus on <topic>` – Create issues in shortlist.md
+
+Direct file editing is NOT recommended. The AI manages issue state.
+```
+
+### Acceptance Criteria
+- [ ] Issue editing workflow documented
+- [ ] AI-only policy clearly stated
+- [ ] Prompt commands listed for issue management
+- [ ] Warning about manual editing
+
+### Notes
+This is gap #4 in gaps-and-questions.md (Medium Priority). User explicitly provided feedback on this.
+
+---
+
+---
+
+id: "DOGFOOD-011@foa1hu"
+title: "Document prompt trigger format by environment"
+description: "How to use installed prompts varies by AI environment - undocumented"
+created: 2024-12-29
+section: "dogfooding"
+tags: [documentation, prompts, dogfooding]
+type: docs
+priority: medium
+status: proposed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - README.md
+  - src/dot_work/prompts/
+---
+
+### Problem
+How to use prompts after install? Are all prompts slash commands? How does Claude Code use prompts (no slash commands)?
+
+**Unclear:**
+- Are all prompts slash commands?
+- How does Claude Code use prompts (no slash commands)?
+- What about Cursor, Windsurf, Aider, etc.?
+
+### Affected Files
+- `README.md`
+- Documentation files
+
+### Importance
+**MEDIUM**: Users can't use installed prompts without knowing how:
+- Prompts installed but unusable
+- Environment-specific differences confusing
+- Poor first-time user experience
+
+### Proposed Solution
+Add documentation section:
+```markdown
+## Using Installed Prompts
+
+| Environment | How to Use |
+|-------------|------------|
+| GitHub Copilot | Type `/prompt-name` in chat |
+| Claude Code | Automatically reads CLAUDE.md |
+| Cursor | Select from `@` menu |
+| Windsurf | Automatically reads .windsurf/rules/ |
+| Aider | Automatically reads CONVENTIONS.md |
+| Continue.dev | Type `/prompt-name` |
+| Amazon Q | Automatically reads .amazonq/rules.md |
+| Zed AI | Select from prompts menu |
+| OpenCode | Automatically reads AGENTS.md |
+| Generic | Manually reference prompt files |
+```
+
+### Acceptance Criteria
+- [ ] Prompt usage table added
+- [ ] All 10+ environments documented
+- [ ] Clear examples for each environment
+- [ ] Slash command vs automatic read distinction clear
+
+### Notes
+This is gap #9 in gaps-and-questions.md (Medium Priority).
+
+---
+
+---
+
+id: "DOGFOOD-012@foa1hu"
+title: "Document all undocumented CLI commands"
+description: "Some commands in --help have no documentation: canonical, zip, container, python, git, harness"
+created: 2024-12-29
+section: "dogfooding"
+tags: [documentation, cli, dogfooding]
+type: docs
+priority: medium
+status: proposed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - docs/dogfood/tooling-reference.md
+  - src/dot_work/cli.py
+---
+
+### Problem
+Some commands in `--help` have no documentation. From tooling-reference.md:
+
+**Commands needing docs:**
+| Command | Description | Priority |
+|---------|-------------|----------|
+| `canonical` | Validate/install canonical prompts | HIGH |
+| `zip` | Zip folders respecting .gitignore | LOW |
+| `container` | Container operations | MEDIUM |
+| `python` | Python utilities | MEDIUM |
+| `git` | Git analysis tools | MEDIUM |
+| `harness` | Claude Agent SDK harness | LOW |
+
+### Affected Files
+- Documentation files
+- Each command's implementation
+
+### Importance
+**MEDIUM**: Undocumented commands are unused:
+- Commands exist but users don't know about them
+- Missing features go undiscovered
+- Tool appears less capable
+
+### Proposed Solution
+For each command, add:
+1. Brief description
+2. Usage examples
+3. When to use the command
+4. Links to implementation if advanced
+
+### Acceptance Criteria
+- [ ] `canonical` command documented (HIGH priority)
+- [ ] `container` operations documented
+- [ ] `python` utilities documented
+- [ ] `git` analysis tools documented
+- [ ] All commands have at least basic documentation
+
+### Notes
+This is gap #10 in gaps-and-questions.md (Medium Priority).
+
+---
+
+---
+
+id: "DOGFOOD-013@foa1hu"
+title: "Add canonical prompt validation documentation"
+description: "How to validate .canon.md without installing - undocumented"
+created: 2024-12-29
+section: "dogfooding"
+tags: [documentation, prompts, validation, dogfooding]
+type: docs
+priority: medium
+status: proposed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - docs/prompt-authoring.md
+  - src/dot_work/prompts/canonical.py
+---
+
+### Problem
+How to validate .canon.md without installing? What validation is performed?
+
+**Unclear:**
+- Is there a `validate` command for canonical prompts?
+- What validation is performed?
+- How to test before installing?
+
+### Affected Files
+- `docs/prompt-authoring.md`
+- Tooling reference
+
+### Importance
+**MEDIUM**: Prompt authors need to validate before distributing:
+- Invalid prompts cause installation failures
+- No way to test prompts locally
+- Poor prompt authoring experience
+
+### Proposed Solution
+Add documentation section:
+```markdown
+## Validating Canonical Prompts
+
+# Validate without installing
+dot-work canonical validate my-prompt.canon.md
+
+# Or check during install
+dot-work prompts install my-prompt.canon.md --target copilot --dry-run
+```
+
+### Acceptance Criteria
+- [ ] Validation command documented (if exists)
+- [ ] Validation rules documented
+- [ ] Dry-run mode documented
+- [ ] Error examples with fixes
+
+### Notes
+This is gap #8 in gaps-and-questions.md (Medium Priority).
 
 ---

@@ -2,6 +2,19 @@
 
 ---
 id: "AUDIT-GAP-004@d3e6f2"
+title: "Missing integration tests from db_issues migration"
+description: "11 integration test files from source were not migrated to db_issues module"
+created: 2024-12-28
+section: "db_issues"
+tags: [testing, migration, db_issues, integration-tests]
+type: test
+priority: high
+status: proposed
+references:
+  - .work/agent/issues/references/AUDIT-DBISSUES-010-investigation.md
+  - tests/unit/db_issues/
+  - /home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/tests/
+---
 
 ### Problem
 During AUDIT-DBISSUES-010, it was discovered that 11 integration test files from the source (glorious agents issues skill) were NOT migrated to the destination (db_issues module).
@@ -58,6 +71,20 @@ Without integration tests, we have:
 - [ ] Bulk operations tested end-to-end
 - [ ] Dependency cycle detection tested
 - [ ] Issue lifecycle workflows tested
+
+### Validation Plan
+1. Create `tests/integration/db_issues/` directory
+2. Copy source test files from `/home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/tests/`
+3. Update imports to match `src/dot_work/db_issues/` module structure
+4. Run `uv run pytest tests/integration/db_issues/ -v` to verify all tests pass
+5. Verify coverage includes bulk operations, dependencies, cycles, and issue lifecycles
+
+### Dependencies
+- Source tests must be accessible at `/home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/tests/`
+- Existing db_issues module structure (already migrated)
+
+### Clarifications Needed
+None.
 
 ### Notes
 - Source location: `/home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/tests/`
@@ -981,39 +1008,6 @@ section: "version"
 tags: [error-handling, consistency]
 type: bug
 priority: high
-status: proposed
-references:
-  - src/dot_work/version/manager.py
----
-
-### Problem
-Git operations in `manager.py:177-199` (`create_tag`, `index.add`, `index.commit`) can all fail but have no error handling. A failed `create_tag` followed by a successful `write_version` leaves the system in an inconsistent state.
-
-### Affected Files
-- `src/dot_work/version/manager.py` (lines 177-199)
-
-### Importance
-Partial failures can corrupt version state, requiring manual recovery.
-
-### Proposed Solution
-1. Wrap in transaction pattern
-2. Add rollback logic for partial failures
-3. Or fail fast before any writes
-
-### Acceptance Criteria
-- [ ] All-or-nothing semantics
-- [ ] Clear error messages on failure
-- [ ] Recovery path documented
-
----
-id: "CR-024@a2b4c0"
-title: "Git operations in freeze_version have no transaction/rollback"
-description: "Failed tag creation followed by successful file write leaves inconsistent state"
-created: 2024-12-27
-section: "version"
-tags: [error-handling, consistency]
-type: bug
-priority: high
 status: completed
 completed: 2025-12-28
 references:
@@ -1197,19 +1191,30 @@ The `_validate_editor()` function (lines 1243-1269) only checks against a whitel
 While editor validation exists, argument sanitization is missing.
 
 ### Proposed Solution
-1. Use `shlex.quote()` to sanitize all editor arguments
-2. Set `shell=False` explicitly in all subprocess.run() calls
-3. Validate no shell metacharacters in editor configuration
-4. Consider using `subprocess.Popen()` with controlled args
-5. Add unit tests with malicious editor arguments
-6. Review all subprocess.run() calls across codebase for consistent sanitization
+1. Document threat model assumption (single-user environment)
+2. Keep existing whitelist validation as sufficient for threat model
+3. Add comment explaining why additional sanitization is not needed
+4. Explicitly set `shell=False` for clarity (defense in depth)
+
+**User decision:** Single-user threat model - current whitelist sufficient
 
 ### Acceptance Criteria
-- [ ] All editor arguments sanitized with `shlex.quote()`
-- [ ] Explicit `shell=False` in all subprocess calls
-- [ ] No shell metacharacters accepted in editor config
-- [ ] Unit tests for injection attempts
-- [ ] Security review of all subprocess usage
+- [ ] Threat model documented in code comments
+- [ ] `shell=False` explicitly set in all subprocess calls
+- [ ] Whitelist validation documented as appropriate for single-user environment
+- [ ] No additional sanitization added (not needed for threat model)
+
+### Validation Plan
+1. Add comment to `_validate_editor()` explaining threat model
+2. Verify `shell=False` is explicit in all subprocess.run() calls
+3. Document that this is appropriate for single-user developer tool
+4. No code changes to argument handling (whitelist is sufficient)
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision received: Single-user threat model, whitelist sufficient.
 
 ### Notes
 This is related to CR-032 and should be addressed together. A subprocess wrapper utility could ensure consistent security defaults across the codebase.
@@ -1277,19 +1282,32 @@ This is related to CR-053 (inconsistent transaction management) and should be ad
 
 ### Proposed Solution
 1. Wrap entire operation in try/except with explicit rollback on error
-2. Use UnitOfWork context manager for consistent transaction handling
+2. Keep current rollback-only approach (no temp table, no savepoint)
 3. Log all failures before rollback with context
 4. Verify index integrity after rebuild (count matches issues table)
 5. Add unit tests for failure scenarios
-6. Consider atomic FTS rebuild using temporary table and rename
+
+**User decision:** Rollback-only approach (simplest, sufficient for single-user)
 
 ### Acceptance Criteria
 - [ ] Operation wrapped in try/except with rollback
-- [ ] Consistent transaction pattern with UnitOfWork
 - [ ] Failures logged before rollback
 - [ ] Index integrity verified after successful rebuild
 - [ ] Unit tests for INSERT failure, COUNT failure scenarios
 - [ ] No silent data loss
+
+### Validation Plan
+1. Add try/except wrapper around DELETE + INSERT + commit sequence
+2. On exception: log error, call session.rollback(), re-raise
+3. After successful commit: verify count matches issues table
+4. Add unit test that simulates INSERT failure (e.g., bad data)
+5. Add unit test that verifies rollback restores FTS data
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision received: Rollback-only approach (simplest solution).
 
 ### Notes
 Current implementation risks leaving search in broken state. Consider using SQLite's SAVEPOINT for partial transaction support or atomic rebuild pattern (build in temp table, DELETE, rename).
@@ -1346,21 +1364,38 @@ While this specific error message doesn't leak the key, there are risks througho
 Once leaked, keys must be rotated immediately. Detection of leakage is difficult.
 
 ### Proposed Solution
-1. Implement key masking utility function (`sk-****...<last4>`)
-2. Redact API key in all error messages and logging
-3. Use constant-time string comparison for key validation
-4. Implement safe repr() for config objects
-5. Review all error handling paths for key exposure
-6. Add integration tests that verify key never appears in logs/exceptions
-7. Document key handling security requirements
+1. Create unified secrets utility module (`src/dot_work/utils/secrets.py`)
+2. Implement key masking function (`sk-****...<last4>`)
+3. Redact all API keys in error messages and logging globally
+4. Use constant-time string comparison for key validation
+5. Implement safe repr() for config objects
+6. Review all error handling paths for key exposure across entire codebase
+7. Add integration tests that verify keys never appear in logs/exceptions
+8. Document key handling security requirements
+
+**User decision:** Global - Create unified secrets utility for all API keys
 
 ### Acceptance Criteria
+- [ ] Unified secrets utility module created
 - [ ] Key masking function implemented
-- [ ] All error messages redact API key
-- [ ] Logs never contain raw API key
-- [ ] Exception context redacts API key
-- [ ] Tests verify key not in logs/exceptions
+- [ ] All error messages redact API keys across codebase
+- [ ] Logs never contain raw API keys
+- [ ] Exception context redacts API keys
+- [ ] Tests verify keys not in logs/exceptions
 - [ ] Documentation updated with security requirements
+
+### Validation Plan
+1. Create `src/dot_work/utils/secrets.py` with `mask_api_key()` function
+2. Search codebase for all API key usage (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
+3. Add masking to all error messages and logging paths
+4. Add tests that verify masked keys in error outputs
+5. Verify no raw keys appear in any exception messages
+
+### Dependencies
+- May require security audit to find all API key usage in codebase (CR-032 related)
+
+### Clarifications Needed
+None. Decision received: Global unified secrets utility approach.
 
 ### Notes
 This is similar to CR-001 (plaintext git credentials) - both involve secrets handling. A unified secrets management approach across the codebase would prevent similar issues.
@@ -1417,21 +1452,30 @@ The test suite has 103 collection errors during `pytest --collect-only`:
 A test suite that cannot run provides zero value and hides real problems.
 
 ### Proposed Solution
-1. Fix all 103 test collection errors in knowledge_graph tests
-2. Remove or update broken test references (`incoming/kg`)
-3. Fix import errors in test files
-4. Add CI gate to fail fast on collection errors
-5. Ensure all tests can be collected and executed before running full suite
-6. Add pre-commit hook to validate test collection
-7. Document test infrastructure requirements
+1. Delete the obsolete `incoming/kg/tests/unit/` test files causing collection errors
+2. Verify `pytest --collect-only` completes with 0 errors
+3. Add CI gate to fail fast on collection errors
+4. Ensure all remaining tests can execute successfully
+
+**User decision:** Delete obsolete code (incoming/kg/tests/unit/)
 
 ### Acceptance Criteria
-- [ ] All 103 collection errors resolved
+- [ ] `incoming/kg/tests/unit/` directory deleted
 - [ ] `pytest --collect-only` completes with 0 errors
-- [ ] All tests can execute successfully
-- [ ] CI gate fails on collection errors
-- [ ] Pre-commit hook validates test collection
-- [ ] Test infrastructure documented
+- [ ] All remaining tests can execute successfully
+- [ ] CI gate fails on collection errors (if not already present)
+
+### Validation Plan
+1. Delete `incoming/kg/tests/unit/` directory
+2. Run `uv run pytest --collect-only` and verify 0 errors
+3. Run full test suite to ensure all tests pass
+4. Verify no broken imports remain
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision received: Delete obsolete test code.
 
 ### Notes
 This is a critical quality issue. The existence of 103 collection errors suggests significant technical debt in the test infrastructure. Addressing this should be a priority before adding new features.
@@ -1809,5 +1853,507 @@ def import_(self, input_path: Path, ...):
 
 ### Notes
 This fix enables export/import of unlimited datasets with constant memory usage. The streaming pattern is essential for large-scale data operations.
+
+------
+
+id: "DOGFOOD-002@foa1hu"
+title: "Implement continue CLI command"
+description: "The /continue prompt exists but should be implemented as a CLI command reading the prompt"
+created: 2024-12-29
+section: "dogfooding"
+tags: [cli, feature, workflow, dogfooding]
+type: feature
+priority: high
+status: proposed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - .github/prompts/do-work.prompt.md
+  - src/dot_work/cli.py
+---
+
+### Problem
+The `/continue` instruction is referenced in prompts but is not an actual CLI command. User feedback: "prompt instruction, but should be implemented as a cli command reading the prompt and printing"
+
+**Current state:**
+- `/continue` exists only as AI prompt instruction
+- Users must manually invoke AI agent to continue work
+- No standalone CLI command to resume work
+
+**Proposed behavior:**
+```bash
+dot-work continue              # Read do-work prompt and execute
+```
+
+### Affected Files
+- `src/dot_work/cli.py` (add new command)
+- `.github/prompts/do-work.prompt.md` (reference)
+
+### Importance
+**HIGH**: Workflow continuity requires explicit continuation command:
+- Users lose context between sessions
+- Manual AI agent invocation required
+- Inconsistent with other workflow tools
+
+### Proposed Solution
+1. Create `dot-work continue` CLI command
+2. Command reads `/do-work` prompt and invokes AI agent programmatically
+3. Uses Claude Agent SDK for automatic agent invocation
+4. Update help text to document the command
+
+**User decision:** Auto - Invoke AI agent programmatically with SDK integration
+
+### Acceptance Criteria
+- [ ] `dot-work continue` command implemented
+- [ ] Reads do-work prompt and passes to AI agent
+- [ ] AI agent invoked automatically via Claude Agent SDK
+- [ ] Help text updated
+- [ ] Documented in tooling reference
+
+### Validation Plan
+1. Run `dot-work continue` and verify AI agent is invoked
+2. Verify do-work prompt content is passed to agent
+3. Test with both available and unavailable SDK
+4. Confirm graceful fallback when SDK unavailable
+
+### Dependencies
+- Claude Agent SDK integration (check if already available in project)
+- DOGFOOD-008 (unified issue interface) - may be needed for full workflow
+
+### Clarifications Needed
+None. Decision received: Auto-invoke AI agent programmatically.
+
+### Notes
+User explicitly requested this feature during dogfooding review. This is gap #4 in gaps-and-questions.md.
+
+---
+
+---
+
+id: "DOGFOOD-003@foa1hu"
+title: "Implement status CLI command"
+description: "The /status prompt instruction should be a CLI command showing focus + issue counts"
+created: 2024-12-29
+section: "dogfooding"
+tags: [cli, feature, workflow, dogfooding]
+type: feature
+priority: high
+status: proposed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - src/dot_work/cli.py
+  - .work/agent/focus.md
+---
+
+### Problem
+The `/status` instruction is referenced in prompts but is not an actual CLI command. User feedback: "prompt instruction, but should be implemented as a cli command reading the prompt and printing"
+
+**Current state:**
+- `/status` exists only as AI prompt instruction
+- Users must manually check focus.md and issue files
+- No quick overview of project status
+
+**Proposed behavior:**
+```bash
+dot-work status                # Show focus.md + issue counts
+```
+
+### Affected Files
+- `src/dot_work/cli.py` (add new command)
+- `.work/agent/focus.md` (read for status)
+- `.work/agent/issues/*.md` (count issues)
+
+### Importance
+**HIGH**: Project status visibility is essential for workflow management:
+- No quick way to see current focus
+- Manual checking of multiple files required
+- Inconsistent with other project management tools
+
+### Proposed Solution
+1. Create `dot-work status` CLI command
+2. Read and display focus.md content (Previous/Current/Next)
+3. Count issues by priority file
+4. Display as Rich table by default with optional format flags
+
+**User decision:** Table format with optional other formats (--format option)
+
+### Acceptance Criteria
+- [ ] `dot-work status` command implemented
+- [ ] Displays focus.md content (Previous/Current/Next)
+- [ ] Shows issue counts by priority
+- [ ] Default output uses Rich table format
+- [ ] Optional `--format` option for table/markdown/json/simple
+- [ ] Help text updated
+- [ ] Documented in tooling reference
+
+### Validation Plan
+1. Run `dot-work status` and verify Rich table output
+2. Test `dot-work status --format markdown` for AI-friendly output
+3. Test `dot-work status --format json` for scripting
+4. Test `dot-work status --format simple` for plain text
+5. Verify focus.md content is correctly parsed and displayed
+6. Verify issue counts match actual files
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision received: Table format with optional --format flag.
+
+### Notes
+User explicitly requested this feature during dogfooding review. This is gap #5 in gaps-and-questions.md.
+
+---
+
+---
+
+id: "DOGFOOD-004@foa1hu"
+title: "Implement focus-on CLI command"
+description: "The 'focus on <topic>' prompt instruction should be a CLI command to create prioritized issues"
+created: 2024-12-29
+section: "dogfooding"
+tags: [cli, feature, workflow, dogfooding]
+type: feature
+priority: high
+status: proposed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - src/dot_work/cli.py
+  - .work/agent/issues/shortlist.md
+---
+
+### Problem
+The `focus on <topic>` instruction is referenced in prompts but is not an actual CLI command. User feedback: "prompt instruction, but should be implemented as a cli command reading the prompt and printing"
+
+**Current state:**
+- `focus on <topic>` exists only as AI prompt instruction
+- Users must manually edit shortlist.md
+- No direct way to create focused issue lists
+
+**Proposed behavior:**
+```bash
+dot-work focus-on "authentication"  # Create issues in shortlist.md
+```
+
+### Affected Files
+- `src/dot_work/cli.py` (add new command)
+- `.work/agent/issues/shortlist.md` (write issues to)
+- `.work/agent/issues/references/` (for issue storage)
+
+### Importance
+**HIGH**: Focused work requires easy prioritization:
+- Manual shortlist.md editing is error-prone
+- No quick way to create focused issue sets
+- AI should manage issue state, not humans (per user feedback)
+
+### Proposed Solution
+1. Create `dot-work focus-on <topic>` CLI command
+2. AI agent automatically generates complete, prioritized issues for the topic
+3. Write generated issues to shortlist.md
+4. Provide dry-run mode for preview
+
+**User decision:** Auto - AI generates full issues automatically
+
+### Acceptance Criteria
+- [ ] `dot-work focus-on` command implemented
+- [ ] AI agent invoked automatically to generate issues
+- [ ] Generated issues are complete with frontmatter, validation, dependencies
+- [ ] Writes to shortlist.md in correct format
+- [ ] Provides --dry-run option for preview
+- [ ] Help text updated
+- [ ] Documented in tooling reference
+
+### Validation Plan
+1. Run `dot-work focus-on "authentication"` and verify AI generates issues
+2. Run `dot-work focus-on "performance" --dry-run` and preview without writing
+3. Verify generated issues have proper frontmatter and mandatory sections
+4. Verify issues are written to shortlist.md in correct format
+5. Test that existing shortlist.md content is preserved/appended correctly
+
+### Dependencies
+- Claude Agent SDK integration (same as DOGFOOD-002)
+- DOGFOOD-008 (unified issue interface) - for consistent issue format
+
+### Clarifications Needed
+None. Decision received: Auto-generate full issues with AI.
+
+### Notes
+User explicitly requested this feature during dogfooding review. This is gap #6 in gaps-and-questions.md.
+
+---
+
+---
+
+id: "DOGFOOD-005@foa1hu"
+title: "Document review storage location and format"
+description: "dot-work review stores data somewhere - location and format undocumented"
+created: 2024-12-29
+section: "dogfooding"
+tags: [documentation, review, dogfooding]
+type: docs
+priority: high
+status: proposed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - src/dot_work/review/storage.py
+  - src/dot_work/review/cli.py
+---
+
+### Problem
+`dot-work review` stores data somewhere, but the location and format are not documented.
+
+**Undocumented:**
+- Where are reviews stored?
+- What is the review ID format?
+- How to list all reviews?
+- How to delete old reviews?
+
+### Affected Files
+- Documentation files (README.md, docs/)
+- `src/dot_work/review/storage.py` (implementation reference)
+
+### Importance
+**HIGH**: Users cannot manage review data without knowing storage location:
+- Cannot clean up old reviews
+- Cannot backup review data
+- Cannot understand review lifecycle
+
+### Proposed Solution
+Add documentation section to README or docs:
+```markdown
+## Review Storage
+
+Reviews are stored in: `.work/reviews/`
+
+Review ID format: `YYYYMMDD-HHMMSS` (timestamp)
+
+## Listing reviews
+dot-work review export --list  # (if command exists)
+```
+
+### Acceptance Criteria
+- [ ] Review storage location documented
+- [ ] Review ID format documented
+- [ ] Listing/retrieving reviews documented
+- [ ] Example commands provided
+
+### Notes
+This is gap #5 in gaps-and-questions.md (High Priority).
+
+---
+
+---
+
+id: "DOGFOOD-006@foa1hu"
+title: "Document KG database location and schema"
+description: "dot-work kg stores data in SQLite - location and schema undocumented"
+created: 2024-12-29
+section: "dogfooding"
+tags: [documentation, knowledge-graph, dogfooding]
+type: docs
+priority: high
+status: proposed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - src/dot_work/knowledge_graph/db.py
+  - docs/db-issues/
+---
+
+### Problem
+`dot-work kg` stores data in SQLite, but the location and schema are not documented.
+
+**Undocumented:**
+- Where is the database stored?
+- What is the schema?
+- How to migrate/copy knowledge graphs?
+- How to backup/restore?
+
+### Affected Files
+- Documentation files (README.md, docs/)
+- `src/dot_work/knowledge_graph/db.py` (implementation reference)
+
+### Importance
+**HIGH**: Users cannot manage knowledge graph data without documentation:
+- Cannot backup knowledge graphs
+- Cannot migrate between projects
+- Cannot understand data structure
+
+### Proposed Solution
+Add documentation section to README or docs:
+```markdown
+## Knowledge Graph Storage
+
+Database location: `.work/kg/graph.db`
+
+To back up:
+cp .work/kg/graph.db backup/
+
+To migrate:
+dot-work kg export > backup.json
+dot-work kg ingest --import backup.json  # (if supported)
+```
+
+### Acceptance Criteria
+- [ ] Database location documented
+- [ ] Schema overview documented
+- [ ] Backup procedure documented
+- [ ] Migration procedure documented (if supported)
+
+### Notes
+This is gap #6 in gaps-and-questions.md (High Priority).
+
+---
+
+---
+
+id: "DOGFOOD-007@foa1hu"
+title: "Document migration path between issue tracking systems"
+description: "Two issue tracking systems exist - migration path between them undocumented"
+created: 2024-12-29
+section: "dogfooding"
+tags: [documentation, db-issues, migration, dogfooding]
+type: docs
+priority: high
+status: proposed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - src/dot_work/db_issues/
+  - .work/agent/issues/
+---
+
+### Problem
+Two issue tracking systems exist (file-based and db-issues), but migration between them is undocumented.
+
+**Undocumented:**
+- How to migrate from file-based to db-issues?
+- Can both systems coexist?
+- Which one should I use?
+- Is there a unified interface?
+
+### Affected Files
+- Documentation files (README.md, docs/)
+- Both issue tracking implementations
+
+### Importance
+**HIGH**: Users need guidance on choosing and migrating between systems:
+- Unclear which system to use for new projects
+- No documented migration path
+- Risk of data loss during migration
+
+### Proposed Solution
+Add documentation section:
+```markdown
+## Issue Tracking Options
+
+dot-work provides two issue tracking systems:
+
+**File-based (.work/agent/issues/)**
+- Use for: AI-driven workflows, git-tracked issues
+- Best for: Individual developers, AI-heavy workflows
+
+**db-issues (.work/db-issues/issues.db)**
+- Use for: Complex queries, relational data
+- Best for: Teams, complex dependencies, epics
+
+## Migration
+
+# File-based → db-issues (if supported)
+dot-work db-issues import --from-files .work/agent/issues/
+```
+
+### Acceptance Criteria
+- [ ] Both systems documented with use cases
+- [ ] Migration path documented (if supported)
+- [ ] Guidance on which to use
+- [ ] Warning about coexistence risks
+
+### Notes
+This is gap #7 in gaps-and-questions.md (High Priority). User also requested unified interface issue be created.
+
+---
+
+---
+
+id: "DOGFOOD-008@foa1hu"
+title: "Design unified issue interface with pluggable storage"
+description: "User requested: unified interface for issue handling with file-based, database or api as optional, pluggable storage options"
+created: 2024-12-29
+section: "dogfooding"
+tags: [architecture, feature, db-issues, design, dogfooding]
+type: feature
+priority: high
+status: proposed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - src/dot_work/db_issues/
+  - .work/agent/issues/
+---
+
+### Problem
+Two separate issue tracking systems (file-based and db-issues) with different interfaces. User feedback: "There should be an issue for making a unified interface for the issue handling with file-based, database or api as optional, pluggable storage options"
+
+**Current state:**
+- File-based: Edit markdown files directly
+- db-issues: CLI commands with SQLite storage
+- No common interface between them
+
+**Proposed design:**
+```bash
+dot-work issues create "Fix bug" --storage file
+dot-work issues create "Fix bug" --storage db
+dot-work issues create "Fix bug" --storage api
+
+# Config file: .work/config.yaml
+storage:
+  type: file  # or db, or api
+  options:
+    path: .work/agent/issues
+```
+
+### Affected Files
+- `src/dot_work/` (new unified interface module)
+- Configuration system
+- CLI commands
+
+### Importance
+**HIGH**: User explicitly requested this feature during review:
+- Unified interface simplifies usage
+- Pluggable storage enables flexibility
+- Future-proof for new storage backends
+
+### Proposed Solution
+1. Create adapter layer with abstract issue storage interface
+2. Implement file-based adapter wrapping existing .work/agent/issues/
+3. Implement db-issues adapter wrapping existing db_issues module
+4. Add configuration-based storage selection (.work/config.yaml)
+5. Implement unified `dot-work issues` CLI commands
+
+**User decision:** Adapter layer over existing implementations (not new module, not extend-db)
+
+### Acceptance Criteria
+- [ ] Abstract storage interface designed (IssueStorage protocol)
+- [ ] FileBasedAdapter wrapping existing .work/agent/issues/ file operations
+- [ ] DatabaseAdapter wrapping existing db_issues module
+- [ ] Configuration system (.work/config.yaml) for storage selection
+- [ ] Unified `dot-work issues` commands (create, list, update, delete)
+- [ ] Documentation for storage options and configuration
+- [ ] Existing implementations remain functional (non-breaking)
+
+### Validation Plan
+1. Create `src/dot_work/issues/` module with IssueStorage protocol
+2. Implement FileBasedAdapter using existing file operations
+3. Implement DatabaseAdapter using existing db_issues service
+4. Add `.work/config.yaml` parser for storage configuration
+5. Create unified CLI commands that delegate to adapters based on config
+6. Test both storage backends work through unified interface
+7. Verify backward compatibility with direct file/db access
+
+### Dependencies
+- None - adapters wrap existing implementations
+
+### Clarifications Needed
+None. Decision received: Adapter layer approach.
+
+### Notes
+This is FR-1 (Feature Request #1) from gaps-and-questions.md. User explicitly requested this issue be created.
 
 ---
