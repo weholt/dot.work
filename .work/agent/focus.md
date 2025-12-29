@@ -22,13 +22,18 @@ Last updated: 2025-12-28T20:30:00Z
 - Completed: 2025-12-28T20:30:00Z
 - Outcome: Fixed test collection - excluded incoming/kg, fixed imports, disabled 4 broken integration tests (0 errors from 103)
 
+- Issue: SQLite URL format and session.commit() bugs (pre-audit fixes)
+- Completed: 2025-12-29T19:15:00Z
+- Outcome: Fixed SQLite URL for absolute paths, added session.commit() to create command, fixed integration test fixture
+- Commit: a28f145
+
 ## Current
-- Issue: Next high priority issue
-- Started: 2025-12-28T20:30:00Z
+- Issue: TEST-040@7a277f - db-issues integration tests need CLI interface updates
+- Started: 2025-12-29T19:00:00Z
 - Status: in-progress
 - Phase: INVESTIGATE
-- Source: high.md
-- Acceptance: Continue through remaining high priority issues
+- Source: medium.md
+- Acceptance: Fix remaining integration tests to match current CLI
 
 ## Next
 - Issue: Remaining high priority issues
