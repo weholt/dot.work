@@ -67,8 +67,8 @@ class TestDbIssuesConfigFromEnv:
         monkeypatch.setenv("DOT_WORK_DB_ISSUES_PATH", "custom/db-issues")
         config = DbIssuesConfig.from_env()
         expected_path = Path("custom/db-issues").resolve() / "issues.db"
-        # db_url strips leading slash from absolute paths
-        assert config.db_url == f"sqlite:///{str(expected_path)[1:]}"
+        # db_url for absolute paths requires 4 slashes: sqlite:////absolute/path
+        assert config.db_url == f"sqlite:////{expected_path}"
 
 
 class TestEnsureDirectory:

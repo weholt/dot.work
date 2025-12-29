@@ -200,6 +200,7 @@ def create(
     assignee: str | None = typer.Option(None, "--assignee", "-a", help="Assignee username"),
     labels: list[str] | None = typer.Option(None, "--label", "-l", help="Labels to add"),  # noqa: B008
     project: str = typer.Option("default", "--project", "-P", help="Project ID"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
     """Create a new issue."""
     # Parse priority
@@ -239,10 +240,31 @@ def create(
                 project_id=project,
             )
             session.commit()
-            console.print(f"[green]✓[/green] Issue created: [bold]{issue.id}[/bold]")
-            console.print(f"  Title: {issue.title}")
-            console.print(f"  Status: {issue.status.value}")
-            console.print(f"  Priority: {issue.priority.value}")
+
+            if json_output:
+                # Output as JSON for integration tests
+                issue_dict = {
+                    "id": issue.id,
+                    "project_id": issue.project_id,
+                    "title": issue.title,
+                    "description": issue.description or "",
+                    "status": issue.status.value,
+                    "priority": issue.priority.value,
+                    "type": issue.type.value,
+                    "assignees": issue.assignees,
+                    "epic_id": issue.epic_id,
+                    "labels": issue.labels,
+                    "blocked_reason": issue.blocked_reason,
+                    "created_at": issue.created_at.isoformat() if issue.created_at else None,
+                    "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
+                    "closed_at": issue.closed_at.isoformat() if issue.closed_at else None,
+                }
+                console.print(json.dumps(issue_dict))
+            else:
+                console.print(f"[green]✓[/green] Issue created: [bold]{issue.id}[/bold]")
+                console.print(f"  Title: {issue.title}")
+                console.print(f"  Status: {issue.status.value}")
+                console.print(f"  Priority: {issue.priority.value}")
         except ValueError as e:
             console.print(f"[red]Error:[/red] {e}")
             raise typer.Exit(1) from None

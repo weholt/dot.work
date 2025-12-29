@@ -204,7 +204,7 @@ class TestNodeOperations:
             meta={"tags": ["important"], "priority": 1},
         )
 
-        result = db_with_doc.insert_node(node)
+        db_with_doc.insert_node(node)
         fetched = db_with_doc.get_node_by_short_id("efgh")
 
         assert fetched is not None

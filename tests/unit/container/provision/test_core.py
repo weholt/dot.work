@@ -411,7 +411,7 @@ class TestBuildEnvArgs:
 
         # tool_args should be serialized to CLI-style arguments
         # Format is ['-e', 'KEY=value', ...] so find the value after 'TOOL_EXTRA_ARGS'
-        for i, arg in enumerate(result):
+        for _i, arg in enumerate(result):
             if arg.startswith("TOOL_EXTRA_ARGS="):
                 tool_extra_value = arg.split("=", 1)[1]
                 assert "--verbose" in tool_extra_value

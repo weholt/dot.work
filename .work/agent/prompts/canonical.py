@@ -57,7 +57,7 @@ def parse_canonical_prompt(file_path: str) -> CanonicalPrompt:
                 frontmatter = {}
                 prompt_content = content
     except yaml.YAMLError as e:
-        raise ValueError(f"Invalid YAML in {file_path}: {e}")
+        raise ValueError(f"Invalid YAML in {file_path}: {e}") from e
 
     # Validate required fields
     errors = []

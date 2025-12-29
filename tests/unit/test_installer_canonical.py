@@ -391,7 +391,7 @@ Deterministic prompt content for testing reproducibility."""
 
         # Extract frontmatter from each
         frontmatters = []
-        for filename, content in generations:
+        for _filename, content in generations:
             # Extract frontmatter (between --- markers)
             parts = content.split("---")
             frontmatter_text = parts[1]

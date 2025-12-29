@@ -57,7 +57,7 @@ class TestTeamCollaboration:
         assert result.exit_code == 0
 
         # Filter by assignee
-        result = runner.invoke(app, ["list", "--assignee", "alice", "--json"])
+        result = runner.invoke(app, ["list-cmd", "--assignee", "alice", "--json"])
         assert result.exit_code == 0
         issues = json.loads(result.stdout)
 
@@ -86,7 +86,7 @@ class TestTeamCollaboration:
         open_task = json.loads(result.stdout)
 
         # List all in-progress work
-        result = runner.invoke(app, ["list", "--status", "in_progress", "--json"])
+        result = runner.invoke(app, ["list-cmd", "--status", "in_progress", "--json"])
         assert result.exit_code == 0
         issues = json.loads(result.stdout)
 
@@ -147,7 +147,7 @@ class TestTeamCollaboration:
         unassigned2 = json.loads(result.stdout)
 
         # List unassigned work
-        result = runner.invoke(app, ["list", "--no-assignee", "--json"])
+        result = runner.invoke(app, ["list-cmd", "--no-assignee", "--json"])
         assert result.exit_code == 0
         issues = json.loads(result.stdout)
 

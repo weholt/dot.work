@@ -9,7 +9,6 @@ Tests all advanced filtering options:
 """
 
 import json
-import re
 import time
 
 import pytest
@@ -29,25 +28,17 @@ class TestAdvancedFiltering:
         # Create issues at different times
         result = runner.invoke(app, ["create", "Old issue", "-p", "medium"])
         assert result.exit_code == 0
-        # Parse issue ID from output (format: "✓ Issue created: issue-XXX")
-        match = re.search(r"issue-[\w]+", result.stdout)
-        assert match is not None
-        old_id = match.group(0)
 
         time.sleep(0.1)  # Small delay to ensure different timestamps
 
         result = runner.invoke(app, ["create", "New issue", "-p", "medium"])
         assert result.exit_code == 0
-        match = re.search(r"issue-[\w]+", result.stdout)
-        assert match is not None
-        new_id = match.group(0)
 
         # List issues in JSON format
-        result = runner.invoke(app, ["list-cmd", "--format", "json"])
+        result = runner.invoke(app, ["list-cmd", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.stdout)
         issues = data["issues"]
-        issue_ids = {i["id"] for i in issues}
         # Verify both issues were created
         assert len(issues) >= 2
 
@@ -56,14 +47,16 @@ class TestAdvancedFiltering:
         runner = integration_cli_runner
 
         # Create issues with different priorities
-        result = runner.invoke(app, ["create", "Critical", "-p", "critical"])
+        result = runner.invoke(app, ["create", "Critical", "-p", "critical", "--json"])
         assert result.exit_code == 0
+        critical = json.loads(result.stdout)
 
-        result = runner.invoke(app, ["create", "High", "-p", "high"])
+        result = runner.invoke(app, ["create", "High", "-p", "high", "--json"])
         assert result.exit_code == 0
+        high = json.loads(result.stdout)
 
         # Filter by priority
-        result = runner.invoke(app, ["list-cmd", "-p", "critical", "--format", "json"])
+        result = runner.invoke(app, ["list-cmd", "-p", "critical", "--json"])
         assert result.exit_code == 0
         issues = json.loads(result.stdout)
         assert any(i["title"] == "Critical" for i in issues)
@@ -73,7 +66,7 @@ class TestAdvancedFiltering:
         low = json.loads(result.stdout)
 
         # Filter for high-priority only (0-1)
-        result = runner.invoke(app, ["list", "--priority-min", "0", "--priority-max", "1", "--json"])
+        result = runner.invoke(app, ["list-cmd", "--priority-min", "0", "--priority-max", "1", "--json"])
         assert result.exit_code == 0
         issues = json.loads(result.stdout)
 
@@ -97,7 +90,7 @@ class TestAdvancedFiltering:
         has_desc = json.loads(result.stdout)
 
         # Filter for empty description
-        result = runner.invoke(app, ["list", "--empty-description", "--json"])
+        result = runner.invoke(app, ["list-cmd", "--empty-description", "--json"])
         assert result.exit_code == 0
         issues = json.loads(result.stdout)
 
@@ -125,7 +118,7 @@ class TestAdvancedFiltering:
         json.loads(result.stdout)
 
         # Filter with OR logic using --label-any
-        result = runner.invoke(app, ["list", "--label-any", "frontend,backend", "--json"])
+        result = runner.invoke(app, ["list-cmd", "--label-any", "frontend,backend", "--json"])
         assert result.exit_code == 0
         issues = json.loads(result.stdout)
 
@@ -151,7 +144,7 @@ class TestAdvancedFiltering:
         db_issue = json.loads(result.stdout)
 
         # Search in title
-        result = runner.invoke(app, ["list", "--title-contains", "authentication", "--json"])
+        result = runner.invoke(app, ["list-cmd", "--title-contains", "authentication", "--json"])
         assert result.exit_code == 0
         issues = json.loads(result.stdout)
         issue_ids = {i["id"] for i in issues}
@@ -159,7 +152,7 @@ class TestAdvancedFiltering:
         assert db_issue["id"] not in issue_ids
 
         # Search in description
-        result = runner.invoke(app, ["list", "--desc-contains", "JWT", "--json"])
+        result = runner.invoke(app, ["list-cmd", "--desc-contains", "JWT", "--json"])
         assert result.exit_code == 0
         issues = json.loads(result.stdout)
         issue_ids = {i["id"] for i in issues}

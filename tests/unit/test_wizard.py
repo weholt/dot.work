@@ -108,7 +108,7 @@ class TestPromptWizard:
         mock_get_prompts_dir.return_value = temp_prompts_dir
 
         # Create initial file
-        initial_path = wizard._create_prompt_file(
+        wizard._create_prompt_file(
             title="Test Prompt",
             description="Initial content",
             version="0.1.0",

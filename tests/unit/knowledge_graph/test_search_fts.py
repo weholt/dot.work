@@ -74,7 +74,7 @@ def indexed_db(db: Database) -> Database:
         ),
     ]
 
-    for i, node in enumerate(nodes):
+    for _i, node in enumerate(nodes):
         inserted = db.insert_node(node)
         # Use the raw content for indexing
         text = raw[inserted.start : inserted.end].decode("utf-8")

@@ -256,7 +256,7 @@ class TestCrockfordBase32Encoding:
             decoded = decode_crockford_base32(encoded)
 
             # The decoded value should match the top 20 bits
-            expected = value >> max(0, value.bit_length() - 20)
+            value >> max(0, value.bit_length() - 20)
             # Account for padding
             assert decoded >= 0
 

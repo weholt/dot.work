@@ -195,7 +195,7 @@ class TestHistoryCLIServiceIntegration:
             metadata=Mock(from_ref="HEAD~5", to_ref="HEAD"), commits=[], contributors={}
         )
 
-        result = runner.invoke(history_app, ["compare", "HEAD~5", "HEAD"])
+        runner.invoke(history_app, ["compare", "HEAD~5", "HEAD"])
 
         # Service should be created
         mock_service_class.assert_called_once()
@@ -212,7 +212,7 @@ class TestHistoryCLIServiceIntegration:
             commit_hash="abc123def456", author="Test Author", message="Test commit"
         )
 
-        result = runner.invoke(history_app, ["analyze", "abc123def456"])
+        runner.invoke(history_app, ["analyze", "abc123def456"])
 
         # Service should be created
         mock_service_class.assert_called_once()

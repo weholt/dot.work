@@ -75,7 +75,7 @@ class TestCreateOptions:
             mock_options = MagicMock()
             mock_options_class.return_value = mock_options
 
-            options = client.create_options(tasks_path)
+            client.create_options(tasks_path)
 
             mock_options_class.assert_called_once()
             call_kwargs = mock_options_class.call_args.kwargs
@@ -217,8 +217,8 @@ class TestRunHarness:
         # Let's just verify the function exists and has correct signature
         from dot_work.harness.client import run_harness
 
-        cwd = Path("/test/dir")
-        tasks_path = Path("/tasks.md")
+        Path("/test/dir")
+        Path("/tasks.md")
 
         # Verify function is callable
         assert callable(run_harness)
@@ -228,8 +228,8 @@ class TestRunHarness:
         """Test that missing anyio raises ImportError."""
         from dot_work.harness.client import run_harness
 
-        cwd = Path("/test/dir")
-        tasks_path = Path("/tasks.md")
+        Path("/test/dir")
+        Path("/tasks.md")
 
         # If anyio is not installed, this should raise ImportError
         # We'll just verify the function signature is correct

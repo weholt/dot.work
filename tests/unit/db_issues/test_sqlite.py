@@ -149,7 +149,7 @@ class TestIssueRepository:
 
     def test_repository_delete_removes_issue(self, repo: IssueRepository) -> None:
         """Test that delete removes an issue."""
-        created = repo.save(
+        repo.save(
             Issue(
                 id="issue-001",
                 project_id="test",

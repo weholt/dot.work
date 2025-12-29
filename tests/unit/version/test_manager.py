@@ -189,7 +189,7 @@ def test_init_version_fails_if_exists(mock_git_repo, temp_dir: Path):
         # Second init should fail
         try:
             manager.init_version("2025.01.002")
-            assert False, "Should have raised ValueError"
+            raise AssertionError("Should have raised ValueError")
         except ValueError as e:
             assert "already exists" in str(e)
 
