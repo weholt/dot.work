@@ -2642,3 +2642,84 @@ dot-work prompts install my-prompt.canon.md --target copilot --dry-run
 This is gap #8 in gaps-and-questions.md (Medium Priority).
 
 ---
+
+---
+id: "TEST-040@7a277f"
+title: "db-issues integration tests need CLI interface updates"
+description: "Integration tests use non-existent --json flag and wrong output format"
+created: 2025-12-29
+section: "db_issues"
+tags: [tests, integration, cli-compatibility]
+type: test
+priority: medium
+status: proposed
+references:
+  - tests/integration/db_issues/test_bulk_operations.py
+  - tests/integration/db_issues/test_team_collaboration.py
+  - tests/integration/db_issues/test_agent_workflows.py
+  - tests/integration/db_issues/test_dependency_model.py
+  - tests/integration/db_issues/test_advanced_filtering.py
+  - src/dot_work/db_issues/cli.py
+---
+
+### Problem
+Integration tests in `tests/integration/db_issues/` were migrated from another project and don't match the current CLI interface:
+
+1. **Non-existent `--json` flag**: Tests use `--json` on commands that don't support it (e.g., `create --json`)
+2. **Wrong output format**: Tests expect `json.loads(result.stdout)` to return arrays directly, but the CLI returns wrapped objects like `{"command": "list", "issues": [...], "total": N}`
+3. **Issue ID parsing**: Tests use `split()[0]` to parse issue IDs, but Rich-formatted output breaks this
+
+**Affected tests:**
+- `test_bulk_operations.py` - Uses `--json` flag on create command (doesn't exist)
+- `test_team_collaboration.py` - Uses `--json` flag, expects direct array output
+- `test_agent_workflows.py` - Uses `--json` flag, expects direct array output
+- `test_dependency_model.py` - Uses `--json` flag, expects direct array output
+- `test_advanced_filtering.py` - PARTIALLY FIXED: One test updated, others still need fixes
+
+### Affected Files
+- `tests/integration/db_issues/test_bulk_operations.py`
+- `tests/integration/db_issues/test_team_collaboration.py`
+- `tests/integration/db_issues/test_agent_workflows.py`
+- `tests/integration/db_issues/test_dependency_model.py`
+- `tests/integration/db_issues/test_advanced_filtering.py` (partially fixed)
+- `src/dot_work/db_issues/cli.py` (may need --json flag added)
+
+### Importance
+**MEDIUM**: Integration tests provide valuable coverage but are currently blocked:
+- Tests can't run without fixes
+- No integration test coverage for db-issues module
+- Core bugs already fixed (SQLite URL format, session.commit()), but tests can't verify them
+
+### Proposed Solution
+**Option A: Update tests to match current CLI**
+1. Remove `--json` flag usage (doesn't exist)
+2. Parse wrapped output: `data = json.loads(result.stdout); issues = data["issues"]`
+3. Use regex for issue ID parsing: `re.search(r"issue-[\w]+", result.stdout)`
+4. Update all affected test files
+
+**Option B: Add --json flag to CLI commands**
+1. Add `--json` option to create, edit, and other commands
+2. Return issue objects directly in JSON format
+3. Update tests to use new flag
+
+**Recommendation**: Option A (update tests) is faster and matches current CLI design.
+
+### Acceptance Criteria
+- [ ] All db_issues integration tests pass
+- [ ] Tests parse CLI output correctly
+- [ ] Issue IDs extracted with regex instead of split()
+- [ ] JSON output wrapper handled correctly
+- [ ] No reliance on non-existent --json flag
+
+### Notes
+**Core bugs already fixed in commit a28f145:**
+- SQLite URL format for absolute paths (config.py)
+- Missing session.commit() in create command (cli.py)
+- Integration test fixture database initialization (conftest.py)
+
+**Already fixed:**
+- `test_advanced_filtering.py::test_filter_by_date_range` - Updated with regex and correct JSON parsing
+
+**Remaining work:** Update 4 more test files with same pattern.
+
+---
