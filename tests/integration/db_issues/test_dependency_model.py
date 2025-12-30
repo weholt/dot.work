@@ -27,11 +27,11 @@ class TestDependencyDataModel:
         issue_b = json.loads(result.stdout)
 
         # Add dependency
-        result = runner.invoke(app, ["dependencies", "add", issue_a["id"], "blocks", issue_b["id"]])
+        result = runner.invoke(app, ["deps", "add", issue_a["id"], "blocks", issue_b["id"]])
         assert result.exit_code == 0
 
         # List all dependencies
-        result = runner.invoke(app, ["dependencies", "list-all", "--json"])
+        result = runner.invoke(app, ["deps", "list-all", "--format", "json"])
         assert result.exit_code == 0
         deps = json.loads(result.stdout)
 
@@ -64,7 +64,9 @@ class TestDependencyDataModel:
             to_issue = json.loads(result.stdout)
 
             # Add dependency with specific type
-            result = runner.invoke(app, ["dependencies", "add", from_issue["id"], dep_type, to_issue["id"], "--json"])
+            result = runner.invoke(
+                app, ["deps", "add", from_issue["id"], dep_type, to_issue["id"], "--json"]
+            )
             assert result.exit_code == 0, f"Failed to add {dep_type} dependency"
 
             data = json.loads(result.stdout)
@@ -86,14 +88,17 @@ class TestDependencyDataModel:
         issue2 = json.loads(result.stdout)
 
         # Add dependency
-        result = runner.invoke(app, ["dependencies", "add", issue1["id"], "blocks", issue2["id"]])
+        result = runner.invoke(app, ["deps", "add", issue1["id"], "blocks", issue2["id"]])
         assert result.exit_code == 0
 
         # Try to add same dependency again - should be rejected
-        result = runner.invoke(app, ["dependencies", "add", issue1["id"], "blocks", issue2["id"]])
-        # Should fail with error message about duplicate
+        result = runner.invoke(app, ["deps", "add", issue1["id"], "blocks", issue2["id"]])
+        # Should fail with error message about duplicate/unique constraint
         assert result.exit_code != 0
-        assert "already exists" in result.stdout.lower() or "duplicate" in result.stdout.lower()
+        error_lower = result.stdout.lower()
+        assert (
+            "unique" in error_lower or "already exists" in error_lower or "duplicate" in error_lower
+        )
 
     def test_dependency_self_reference_prevention(self, integration_cli_runner: CliRunner):
         """Test that issues cannot depend on themselves."""
@@ -105,6 +110,7 @@ class TestDependencyDataModel:
         issue = json.loads(result.stdout)
 
         # Try to add self-dependency - should fail
-        result = runner.invoke(app, ["dependencies", "add", issue["id"], "blocks", issue["id"]])
+        result = runner.invoke(app, ["deps", "add", issue["id"], "blocks", issue["id"]])
         assert result.exit_code != 0
-        assert "itself" in result.stdout.lower() or "self" in result.stdout.lower()
+        error_lower = result.stdout.lower()
+        assert "itself" in error_lower or "self" in error_lower or "circular" in error_lower

@@ -5,6 +5,7 @@ Build runner for Python projects.
 Provides comprehensive quality checks and build automation.
 """
 
+import os
 import shutil
 import subprocess
 import time
@@ -34,6 +35,28 @@ class BuildRunner:
 
     # Default memory limit for pytest (4GB as per requirements)
     DEFAULT_MEMORY_LIMIT_MB = 4096
+
+    # Default directories to exclude from source detection
+    DEFAULT_EXCLUDE_DIRS = [
+        "tests",
+        "test",
+        "docs",
+        "examples",
+        "scripts",
+        "incoming",
+        "node_modules",
+        ".venv",
+        "venv",
+        "env",
+        ".env",
+        "dist",
+        "build",
+        ".git",
+        ".tox",
+        ".mypy_cache",
+        ".pytest_cache",
+        "__pycache__",
+    ]
 
     def __init__(
         self,
@@ -80,9 +103,21 @@ class BuildRunner:
         # Default test directories
         self.test_dirs = test_dirs or ["tests"]
 
+    def _get_exclude_dirs(self) -> set[str]:
+        """Get the set of directories to exclude from source detection.
+
+        Reads from BUILD_EXCLUDE_DIRS environment variable if set,
+        otherwise uses DEFAULT_EXCLUDE_DIRS.
+        """
+        env_exclude = os.getenv("BUILD_EXCLUDE_DIRS")
+        if env_exclude:
+            return set(name.strip() for name in env_exclude.split(",") if name.strip())
+        return set(self.DEFAULT_EXCLUDE_DIRS)
+
     def _detect_source_dirs(self) -> list[str]:
         """Auto-detect source directories in the project."""
         candidates = []
+        exclude_dirs = self._get_exclude_dirs()
 
         # Look for common Python package structures
         for item in self.project_root.iterdir():
@@ -90,7 +125,7 @@ class BuildRunner:
                 continue
             if item.name.startswith(".") or item.name.startswith("_"):
                 continue
-            if item.name in ["tests", "test", "docs", "examples", "scripts"]:
+            if item.name in exclude_dirs:
                 continue
 
             # Check if it looks like a Python package
@@ -104,7 +139,7 @@ class BuildRunner:
                     continue
                 if item.name.startswith("."):
                     continue
-                if item.name in ["tests", "test", "docs", "examples", "scripts"]:
+                if item.name in exclude_dirs:
                     continue
 
                 # Check if it has Python files

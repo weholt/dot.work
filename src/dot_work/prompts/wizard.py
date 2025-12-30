@@ -16,7 +16,7 @@ from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 
 from dot_work.prompts.canonical import (
-    CanonicalPromptValidator,
+    CANONICAL_VALIDATOR,
 )
 
 
@@ -88,7 +88,7 @@ class PromptWizard:
         """
         self.console = console or Console()
         self.prompt = Prompt(console=self.console)
-        self.validator = CanonicalPromptValidator()
+        self.validator = CANONICAL_VALIDATOR
 
     def run(
         self,
@@ -430,10 +430,9 @@ class PromptWizard:
         self.console.print()
 
         try:
-            from dot_work.prompts.canonical import CanonicalPromptParser
+            from dot_work.prompts.canonical import CANONICAL_PARSER
 
-            parser = CanonicalPromptParser()
-            prompt = parser.parse(prompt_path)
+            prompt = CANONICAL_PARSER.parse(prompt_path)
 
             errors = self.validator.validate(prompt, strict=False)
 

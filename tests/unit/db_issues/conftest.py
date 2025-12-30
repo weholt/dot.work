@@ -84,11 +84,13 @@ def _reset_database_state(db_engine: Engine) -> None:
         """Delete all data from all tables, ignoring errors for missing tables."""
         tables = [
             "epic_issues",
-            "issue_dependencies",
+            "dependencies",  # Correct table name for IssueModel dependencies
             "comments",
             "issues",
             "epics",
             "projects",
+            "issue_labels",  # Added for label associations
+            "labels",  # Added for labels
         ]
         for table in tables:
             try:

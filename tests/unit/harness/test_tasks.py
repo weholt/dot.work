@@ -40,12 +40,7 @@ class TestLoadTasks:
     def test_load_tasks_with_checkboxes(self, tmp_path: Path):
         """Test loading tasks from a file with checkboxes."""
         test_file = tmp_path / "tasks.md"
-        test_file.write_text(
-            "# Tasks\n"
-            "- [ ] Task 1\n"
-            "- [x] Task 2\n"
-            "- [ ] Task 3\n"
-        )
+        test_file.write_text("# Tasks\n- [ ] Task 1\n- [x] Task 2\n- [ ] Task 3\n")
 
         content, tasks = load_tasks(test_file)
 
@@ -63,10 +58,7 @@ class TestLoadTasks:
         """Test loading indented tasks."""
         test_file = tmp_path / "tasks.md"
         test_file.write_text(
-            "# Tasks\n"
-            "## Section\n"
-            "  - [ ] Indented task\n"
-            "    - [ ] More indented\n"
+            "# Tasks\n## Section\n  - [ ] Indented task\n    - [ ] More indented\n"
         )
 
         _, tasks = load_tasks(test_file)
@@ -97,10 +89,7 @@ class TestLoadTasks:
     def test_load_tasks_handles_x_uppercase(self, tmp_path: Path):
         """Test that both [x] and [X] are recognized as done."""
         test_file = tmp_path / "tasks.md"
-        test_file.write_text(
-            "- [ ] Lowercase x\n"
-            "- [X] Uppercase X\n"
-        )
+        test_file.write_text("- [ ] Lowercase x\n- [X] Uppercase X\n")
 
         _, tasks = load_tasks(test_file)
 
@@ -112,9 +101,7 @@ class TestLoadTasks:
         """Test loading tasks with special characters in text."""
         test_file = tmp_path / "tasks.md"
         test_file.write_text(
-            "- [ ] Task with: colon\n"
-            "- [ ] Task with @ mention\n"
-            '- [ ] Task with "quotes"\n'
+            '- [ ] Task with: colon\n- [ ] Task with @ mention\n- [ ] Task with "quotes"\n'
         )
 
         _, tasks = load_tasks(test_file)

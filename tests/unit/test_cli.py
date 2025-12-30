@@ -66,7 +66,7 @@ class TestHelpCommand:
         assert "list" in result.stdout
         assert "detect" in result.stdout
         assert "init" in result.stdout
-        assert "init-work" in result.stdout
+        assert "init-tracking" in result.stdout
         assert "validate" in result.stdout
 
     def test_no_args_shows_help(self) -> None:
@@ -105,8 +105,8 @@ class TestHelpCommand:
         assert "--env" in result.stdout
 
     def test_init_work_help(self) -> None:
-        """init-work --help should show options."""
-        result = runner.invoke(app, ["init-work", "--help"])
+        """init-tracking --help should show options."""
+        result = runner.invoke(app, ["init-tracking", "--help"])
         assert result.exit_code == 0
         assert "--target" in result.stdout
         assert "--force" in result.stdout
@@ -207,11 +207,11 @@ class TestDetectCommand:
 
 
 class TestInitWorkCommand:
-    """Tests for the 'init-work' command."""
+    """Tests for the 'init-tracking' command."""
 
     def test_init_work_creates_structure(self, tmp_path: Path) -> None:
-        """init-work should create .work directory structure."""
-        result = runner.invoke(app, ["init-work", "--target", str(tmp_path)])
+        """init-tracking should create .work directory structure."""
+        result = runner.invoke(app, ["init-tracking", "--target", str(tmp_path)])
         assert result.exit_code == 0
         assert "initialized" in result.stdout.lower()
         assert (tmp_path / ".work").exists()
@@ -219,8 +219,8 @@ class TestInitWorkCommand:
         assert (tmp_path / ".work" / "agent" / "issues").exists()
 
     def test_init_work_creates_issue_files(self, tmp_path: Path) -> None:
-        """init-work should create priority issue files."""
-        runner.invoke(app, ["init-work", "--target", str(tmp_path)])
+        """init-tracking should create priority issue files."""
+        runner.invoke(app, ["init-tracking", "--target", str(tmp_path)])
         issues_dir = tmp_path / ".work" / "agent" / "issues"
         assert (issues_dir / "critical.md").exists()
         assert (issues_dir / "high.md").exists()
@@ -228,25 +228,25 @@ class TestInitWorkCommand:
         assert (issues_dir / "low.md").exists()
 
     def test_init_work_creates_focus_and_memory(self, tmp_path: Path) -> None:
-        """init-work should create focus.md and memory.md."""
-        runner.invoke(app, ["init-work", "--target", str(tmp_path)])
+        """init-tracking should create focus.md and memory.md."""
+        runner.invoke(app, ["init-tracking", "--target", str(tmp_path)])
         agent_dir = tmp_path / ".work" / "agent"
         assert (agent_dir / "focus.md").exists()
         assert (agent_dir / "memory.md").exists()
 
     def test_init_work_nonexistent_directory(self, tmp_path: Path) -> None:
-        """init-work should error on nonexistent directory."""
+        """init-tracking should error on nonexistent directory."""
         fake_path = tmp_path / "nonexistent"
-        result = runner.invoke(app, ["init-work", "--target", str(fake_path)])
+        result = runner.invoke(app, ["init-tracking", "--target", str(fake_path)])
         assert result.exit_code == 1
         assert "does not exist" in result.stdout
 
     def test_init_work_with_force(self, tmp_path: Path) -> None:
-        """init-work --force should work on existing structure."""
+        """init-tracking --force should work on existing structure."""
         # First init
-        runner.invoke(app, ["init-work", "--target", str(tmp_path)])
+        runner.invoke(app, ["init-tracking", "--target", str(tmp_path)])
         # Second init with force
-        result = runner.invoke(app, ["init-work", "--target", str(tmp_path), "--force"])
+        result = runner.invoke(app, ["init-tracking", "--target", str(tmp_path), "--force"])
         assert result.exit_code == 0
 
 
@@ -477,8 +477,8 @@ class TestEdgeCases:
         assert "Detected" in result.stdout
 
     def test_init_work_then_validate_structure(self, tmp_path: Path) -> None:
-        """After init-work, the full structure should exist."""
-        runner.invoke(app, ["init-work", "--target", str(tmp_path)])
+        """After init-tracking, the full structure should exist."""
+        runner.invoke(app, ["init-tracking", "--target", str(tmp_path)])
 
         # Check all expected files
         work_dir = tmp_path / ".work"

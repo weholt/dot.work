@@ -1,12 +1,11 @@
 """Tests for N+1 query issue in cycle detection (PERF-001)."""
 
-from collections.abc import Generator
 from datetime import UTC, datetime
 
 import pytest
 from sqlmodel import Session
 
-from dot_work.db_issues.adapters import UnitOfWork, create_db_engine
+from dot_work.db_issues.adapters import UnitOfWork
 from dot_work.db_issues.adapters.sqlite import IssueModel
 from dot_work.db_issues.domain.entities import (
     Dependency,
@@ -15,19 +14,20 @@ from dot_work.db_issues.domain.entities import (
 
 
 @pytest.fixture
-def db_session() -> Generator[Session, None, None]:
-    """Create an in-memory database for testing.
+def db_session(db_engine) -> Session:
+    """Create a database session using the session-scoped db_engine.
+
+    Uses the shared session-scoped db_engine from conftest.py to prevent
+    memory leaks from multiple engine creations. The db_engine fixture
+    creates tables once and reuses them across all tests.
+
+    Args:
+        db_engine: Session-scoped database engine from conftest.py
 
     Yields:
         Session with test data
     """
-    engine = create_db_engine("sqlite:///:memory:", echo=False)
-
-    from sqlmodel import SQLModel
-
-    SQLModel.metadata.create_all(engine)
-
-    with Session(engine) as session:
+    with Session(db_engine) as session:
         yield session
 
 

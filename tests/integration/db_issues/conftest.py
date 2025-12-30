@@ -6,6 +6,7 @@ from pathlib import Path
 
 import psutil
 import pytest
+import sqlmodel
 from sqlalchemy import Engine
 from sqlmodel import Session, SQLModel
 from typer.testing import CliRunner
@@ -60,39 +61,108 @@ def pytest_sessionfinish(session, exitstatus):
         print(f"\n[CLEANUP] Failed during cleanup: {e}")
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def test_engine() -> Generator[Engine, None, None]:
-    """Create an in-memory database engine for testing.
+    """Create a single in-memory database engine for all integration tests.
 
-    Uses SQLite in-memory database for fast, isolated tests.
-    Properly disposes engine to prevent memory leaks on Linux.
+    This fixture is session-scoped (runs once per test session) to prevent
+    memory leaks from creating multiple engines. Each engine creation with
+    SQLModel.metadata.create_all() accumulates metadata in the global singleton.
+
+    The engine uses StaticPool which keeps a single connection alive for
+    :memory: databases so the database persists across tests.
+
+    Yields:
+        SQLAlchemy Engine backed by in-memory SQLite
     """
     engine = create_db_engine("sqlite:///:memory:")
-    yield engine
-    # CRITICAL: Dispose engine to release connection pool and file descriptors
-    # Without this, Linux accumulates memory and file handles causing OOM
-    engine.dispose()
+
+    # Create all tables once for the entire test session
+    SQLModel.metadata.create_all(engine)
+
+    try:
+        yield engine
+    finally:
+        # CRITICAL: Clear global metadata to prevent memory leaks
+        SQLModel.metadata.clear()
+
+        # Dispose engine to close all connections
+        try:
+            engine.dispose()
+        except Exception:
+            pass
+
+
+@pytest.fixture(autouse=True)
+def _reset_database_state(test_engine: Engine) -> None:
+    """Automatically reset database state between integration tests.
+
+    This fixture is autouse=True so it runs before and after every test.
+    It deletes all data from the database to ensure test isolation.
+
+    For in-memory SQLite with StaticPool, we can't rely on transaction
+    rollback alone because the database persists across tests. We need
+    to explicitly delete all data.
+
+    Args:
+        test_engine: The session-scoped database engine
+    """
+
+    def _delete_all_data(session: Session) -> None:
+        """Delete all data from all tables, ignoring errors for missing tables."""
+        tables = [
+            "epic_issues",
+            "dependencies",  # Correct table name for IssueModel dependencies
+            "comments",
+            "issues",
+            "epics",
+            "projects",
+            "issue_labels",  # Added for label associations
+            "labels",  # Added for labels
+        ]
+        for table in tables:
+            try:
+                session.exec(sqlmodel.text(f"DELETE FROM {table}"))
+            except Exception:
+                # Table doesn't exist or other error - ignore
+                pass
+        try:
+            session.commit()
+        except Exception:
+            pass
+
+    # Before test: ensure we're starting fresh
+    with Session(test_engine) as session:
+        _delete_all_data(session)
+
+    yield
+
+    # After test: clean up again for next test
+    with Session(test_engine) as session:
+        _delete_all_data(session)
 
 
 @pytest.fixture(scope="function")
 def test_session(test_engine: Engine) -> Generator[Session, None, None]:
     """Create a test database session.
 
-    Creates all tables and provides a clean session for each test.
-    Session is automatically closed after the test.
-    """
-    # Create all tables
-    SQLModel.metadata.create_all(test_engine)
+    Provides a clean session for each test. The database schema is already
+    created by the session-scoped test_engine fixture. Session is
+    automatically closed after the test.
 
+    Args:
+        test_engine: The session-scoped database engine
+
+    Yields:
+        SQLModel Session backed by in-memory SQLite
+    """
     # Create session
     session = Session(test_engine)
 
     yield session
 
-    # Cleanup - close session first, then drop tables
+    # Cleanup - close session
     session.close()
-    SQLModel.metadata.drop_all(test_engine)
-    # Note: Engine disposal is handled by test_engine fixture
 
 
 @pytest.fixture(scope="function")

@@ -186,7 +186,9 @@ class TestValidateEditor:
         assert name == "nvim"
         assert args == ["+10"]
 
-    def test_shell_metacharacter_single_quote_blocked(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_shell_metacharacter_single_quote_blocked(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Single quotes should be blocked to prevent command injection."""
         monkeypatch.delenv("EDITOR", raising=False)
 
@@ -194,7 +196,9 @@ class TestValidateEditor:
             _validate_editor("vi -c 'exec system(\"rm -rf /\")'")
         assert "invalid characters" in str(exc_info.value)
 
-    def test_shell_metacharacter_double_quote_blocked(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_shell_metacharacter_double_quote_blocked(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Double quotes should be blocked to prevent command injection."""
         monkeypatch.delenv("EDITOR", raising=False)
 

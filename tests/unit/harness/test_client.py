@@ -210,7 +210,9 @@ class TestRunHarness:
     @patch("dot_work.harness.client.ClaudeSDKClient", create=True)
     @patch("dot_work.harness.client.HarnessClient", create=True)
     @patch("anyio.run")
-    def test_run_harness_calls_async_version(self, mock_anyio_run, mock_harness_class, mock_sdk_client_class):
+    def test_run_harness_calls_async_version(
+        self, mock_anyio_run, mock_harness_class, mock_sdk_client_class
+    ):
         """Test that run_harness calls async version with anyio."""
         # Note: We patch anyio at module level, but the function imports it internally
         # We need to import the actual function to test

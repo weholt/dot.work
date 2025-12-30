@@ -259,7 +259,7 @@ def create(
                     "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
                     "closed_at": issue.closed_at.isoformat() if issue.closed_at else None,
                 }
-                console.print(json.dumps(issue_dict))
+                print(json.dumps(issue_dict))
             else:
                 console.print(f"[green]✓[/green] Issue created: [bold]{issue.id}[/bold]")
                 console.print(f"  Title: {issue.title}")
@@ -1008,7 +1008,7 @@ def _output_ready_json(
         "blocked_count": len(blocked_data),
     }
 
-    console.print(json.dumps(output, indent=2))
+    print(json.dumps(output, indent=2))
 
 
 @app.command()
@@ -1061,6 +1061,7 @@ def update(
     assignee: str | None = typer.Option(None, "--assignee", "-a", help="New assignee"),
     status: str | None = typer.Option(None, "--status", "-s", help="New status"),
     type: str | None = typer.Option(None, "--type", "-T", help="New issue type"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
     """Update issue fields.
 
@@ -1112,7 +1113,30 @@ def update(
             console.print(f"[red]Issue not found: {issue_id}[/red]")
             raise typer.Exit(1)
 
-        console.print(f"[green]✓[/green] Issue updated: [bold]{issue.id}[/bold]")
+        # Explicitly commit the transaction
+        session.commit()
+
+        if json_output:
+            # Output as JSON for integration tests
+            issue_dict = {
+                "id": issue.id,
+                "project_id": issue.project_id,
+                "title": issue.title,
+                "description": issue.description or "",
+                "status": issue.status.value,
+                "priority": issue.priority.value,
+                "type": issue.type.value,
+                "assignees": issue.assignees,
+                "epic_id": issue.epic_id,
+                "labels": issue.labels,
+                "blocked_reason": issue.blocked_reason,
+                "created_at": issue.created_at.isoformat() if issue.created_at else None,
+                "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
+                "closed_at": issue.closed_at.isoformat() if issue.closed_at else None,
+            }
+            print(json.dumps(issue_dict))
+        else:
+            console.print(f"[green]✓[/green] Issue updated: [bold]{issue.id}[/bold]")
 
 
 # =============================================================================
@@ -1472,6 +1496,8 @@ def edit(
 @app.command()
 def close(
     issue_id: str = typer.Argument(..., help="Issue ID"),
+    reason: str | None = typer.Option(None, "--reason", "-r", help="Reason for closing"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
     """Close an issue."""
     # Create database session and service
@@ -1489,7 +1515,32 @@ def close(
             console.print(f"[red]Issue not found: {issue_id}[/red]")
             raise typer.Exit(1)
 
-        console.print(f"[green]✓[/green] Issue closed: [bold]{issue.id}[/bold]")
+        if reason:
+            # Add reason as a comment
+            service.add_comment(issue.id, "cli", f"Closed: {reason}")
+            session.commit()
+
+        if json_output:
+            # Output as JSON for integration tests
+            issue_dict = {
+                "id": issue.id,
+                "project_id": issue.project_id,
+                "title": issue.title,
+                "description": issue.description or "",
+                "status": issue.status.value,
+                "priority": issue.priority.value,
+                "type": issue.type.value,
+                "assignees": issue.assignees,
+                "epic_id": issue.epic_id,
+                "labels": issue.labels,
+                "blocked_reason": issue.blocked_reason,
+                "created_at": issue.created_at.isoformat() if issue.created_at else None,
+                "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
+                "closed_at": issue.closed_at.isoformat() if issue.closed_at else None,
+            }
+            print(json.dumps(issue_dict))
+        else:
+            console.print(f"[green]✓[/green] Issue closed: [bold]{issue.id}[/bold]")
 
 
 @app.command()
@@ -2900,6 +2951,59 @@ def _print_tree(
         _print_tree(tree, to_id, prefix + child_prefix, uow)
 
 
+@deps_app.command("list")
+def deps_list(
+    issue_id: str = typer.Argument(..., help="Issue ID"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+) -> None:
+    """List dependencies for a specific issue."""
+    import json
+
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+
+        try:
+            deps = uow.graph.get_dependencies(issue_id)
+
+            if not deps:
+                if json_output:
+                    print("[]")
+                else:
+                    console.print(f"[yellow]No dependencies found for issue: {issue_id}[/yellow]")
+                return
+
+            if json_output:
+                output = [
+                    {
+                        "from": dep.from_issue_id,
+                        "to": dep.to_issue_id,
+                        "type": dep.dependency_type.value,
+                        "created_at": dep.created_at.isoformat() if dep.created_at else None,
+                    }
+                    for dep in deps
+                ]
+                print(json.dumps(output))
+            else:
+                from rich.table import Table
+
+                table = Table(title=f"Dependencies for {issue_id}")
+                table.add_column("From Issue", style="cyan")
+                table.add_column("Type", style="yellow")
+                table.add_column("To Issue", style="cyan")
+
+                for dep in deps:
+                    table.add_row(dep.from_issue_id, dep.dependency_type.value, dep.to_issue_id)
+
+                console.print(table)
+
+        except Exception as e:
+            console.print(f"[red]Error listing dependencies:[/red] {e}")
+            raise typer.Exit(1) from None
+
+
 @deps_app.command("list-all")
 def deps_list_all(
     dependency_type: str | None = typer.Option(
@@ -3011,9 +3115,120 @@ def deps_cycles(
             raise typer.Exit(1) from None
 
 
+@deps_app.command("add")
+def deps_add(
+    from_issue_id: str = typer.Argument(..., help="Source issue ID"),
+    dependency_type: str = typer.Argument(
+        ..., help="Dependency type (blocks, depends-on, related-to, discovered-from)"
+    ),
+    to_issue_id: str = typer.Argument(..., help="Target issue ID"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+) -> None:
+    """Add a dependency between two issues.
+
+    Examples:
+        db-issues deps add issue-a blocks issue-b
+        db-issues deps add issue-c depends-on issue-a
+        db-issues deps add issue-d discovered-from issue-c
+    """
+    from dot_work.db_issues.domain.entities import DependencyType
+
+    # Map string to DependencyType (handle hyphenated names)
+    type_map = {
+        "blocks": DependencyType.BLOCKS,
+        "depends-on": DependencyType.DEPENDS_ON,
+        "related-to": DependencyType.RELATED_TO,
+        "discovered-from": DependencyType.DISCOVERED_FROM,
+        "duplicates": DependencyType.DUPLICATES,
+        "parent-of": DependencyType.PARENT_OF,
+        "child-of": DependencyType.CHILD_OF,
+    }
+
+    if dependency_type not in type_map:
+        console.print(f"[red]Invalid dependency type: {dependency_type}[/red]")
+        console.print("Valid types: blocks, depends-on, related-to, discovered-from")
+        raise typer.Exit(1)
+
+    dep_type = type_map[dependency_type]
+
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = IssueService(uow, id_service, clock)
+
+        try:
+            dependency = service.add_dependency(from_issue_id, to_issue_id, dep_type)
+            if not dependency:
+                console.print("[red]Failed to add dependency (possibly circular)[/red]")
+                raise typer.Exit(1)
+
+            session.commit()
+
+            if json_output:
+                dep_dict = {
+                    "from": dependency.from_issue_id,
+                    "to": dependency.to_issue_id,
+                    "type": dependency.dependency_type.value,
+                    "created_at": dependency.created_at.isoformat()
+                    if dependency.created_at
+                    else None,
+                }
+                print(json.dumps(dep_dict))
+            else:
+                console.print(
+                    f"[green]✓[/green] Added dependency: [cyan]{from_issue_id}[/cyan] {dep_type.value} [cyan]{to_issue_id}[/cyan]"
+                )
+
+        except Exception as e:
+            console.print(f"[red]Error adding dependency:[/red] {e}")
+            raise typer.Exit(1) from None
+
+
 # =============================================================================
 # Label Commands
 # =============================================================================
+
+
+@labels_app.command("add")
+def labels_add(
+    issue_id: str = typer.Argument(..., help="Issue ID"),
+    label: str = typer.Argument(..., help="Label to add"),
+) -> None:
+    """Add a label to an issue (keeps existing labels)."""
+    engine = create_db_engine(get_db_url(), echo=is_debug_mode())
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        uow = UnitOfWork(session)
+        id_service = DefaultIdentifierService()
+        clock = DefaultClock()
+        service = IssueService(uow, id_service, clock)
+
+        # Get current issue
+        issue = service.get_issue(issue_id)
+        if not issue:
+            console.print(f"[red]Issue not found: {issue_id}[/red]")
+            raise typer.Exit(1)
+
+        # Add label to existing labels
+        current_labels = list(issue.labels) if issue.labels else []
+        if label not in current_labels:
+            current_labels.append(label)
+            updated = service.set_labels(issue_id, current_labels)
+            if updated:
+                session.commit()
+                console.print(
+                    f"[green]✓[/green] Added label [cyan]{label}[/cyan] to [bold]{issue_id}[/bold]"
+                )
+            else:
+                console.print("[red]Failed to add label[/red]")
+                raise typer.Exit(1)
+        else:
+            console.print(f"[yellow]Label [cyan]{label}[/cyan] already exists on issue[/yellow]")
 
 
 @labels_app.command("create")

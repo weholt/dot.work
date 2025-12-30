@@ -187,9 +187,7 @@ class VersionManager:
 
         # Get commits and generate changelog
         commits = self._get_commits_since_last_tag(current)
-        changelog_entry = self._generate_changelog_entry(
-            next_version, commits, current, use_llm
-        )
+        changelog_entry = self._generate_changelog_entry(next_version, commits, current, use_llm)
 
         # Get current git commit
         git_commit = self.repo.head.commit.hexsha if self.repo else "unknown"

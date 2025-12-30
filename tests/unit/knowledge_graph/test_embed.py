@@ -476,6 +476,6 @@ class TestOpenAIKeyMasking:
             # Verify the API key is NOT in the error message
             assert "sk-super-secret-key-that-must-not-leak" not in error_msg
             # The embedder repr in any logging should also be safe
-            assert repr(embedder) not in error_msg or "sk-super-secret-key-that-must-not-leak" not in repr(
+            assert repr(
                 embedder
-            )
+            ) not in error_msg or "sk-super-secret-key-that-must-not-leak" not in repr(embedder)

@@ -299,9 +299,7 @@ class TestStatsService:
         assert stats.metrics.avg_resolution_time_days is not None
         assert 3.0 <= stats.metrics.avg_resolution_time_days <= 3.5
 
-    def test_empty_database_returns_zero_stats(
-        self, in_memory_db: Session
-    ) -> None:
+    def test_empty_database_returns_zero_stats(self, in_memory_db: Session) -> None:
         """Test statistics on empty database."""
         service = StatsService(in_memory_db)
         stats = service.get_statistics()
@@ -323,9 +321,7 @@ class TestStatsService:
         # Should not divide by zero
         assert stats.total == 0
 
-    def test_deleted_issues_excluded_from_stats(
-        self, db_session_with_stats_data: Session
-    ) -> None:
+    def test_deleted_issues_excluded_from_stats(self, db_session_with_stats_data: Session) -> None:
         """Test that soft-deleted issues are excluded from statistics."""
         # Soft-delete one issue
         session = db_session_with_stats_data

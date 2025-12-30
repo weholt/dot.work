@@ -1,9 +1,11 @@
 """Tests for SQLite adapter (models, repositories)."""
 
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
 from sqlmodel import Session, SQLModel, text
+from sqlalchemy import Engine
 
 from dot_work.db_issues.adapters import (
     IssueRepository,
@@ -25,27 +27,53 @@ class TestCreateDbEngine:
         """Test create_db_engine returns a SQLAlchemy Engine."""
         engine = create_db_engine("sqlite:///:memory:")
         assert engine is not None
+        # CRITICAL: Dispose engine to prevent memory leaks
+        engine.dispose()
 
     def test_create_db_engine_with_echo(self) -> None:
         """Test create_db_engine with echo=True."""
         engine = create_db_engine("sqlite:///:memory:", echo=True)
         assert engine is not None
+        # CRITICAL: Dispose engine to prevent memory leaks
+        engine.dispose()
 
 
 class TestDatabaseInitialization:
     """Tests for database table creation."""
 
-    def test_init_creates_tables(self, tmp_path: Path) -> None:
-        """Test that database initialization creates all tables."""
+    @pytest.fixture
+    def temp_engine(self, tmp_path: Path) -> Generator[Engine, None, None]:
+        """Create a temporary database engine for testing.
+
+        Args:
+            tmp_path: Pytest temporary directory fixture
+
+        Yields:
+            SQLAlchemy Engine backed by file-based SQLite
+        """
         db_path = tmp_path / "test.db"
         engine = create_db_engine(f"sqlite:///{db_path}")
 
-        # Create tables using SQLAlchemy
+        try:
+            yield engine
+        finally:
+            # CRITICAL: Dispose engine and clear metadata to prevent memory leaks
+            try:
+                SQLModel.metadata.clear()
+            except Exception:
+                pass
+            try:
+                engine.dispose()
+            except Exception:
+                pass
 
-        SQLModel.metadata.create_all(engine)
+    def test_init_creates_tables(self, temp_engine: Engine) -> None:
+        """Test that database initialization creates all tables."""
+        # Create tables using SQLAlchemy
+        SQLModel.metadata.create_all(temp_engine)
 
         # Verify tables exist by querying sqlite_master
-        with Session(engine) as session:
+        with Session(temp_engine) as session:
             result = session.exec(
                 text("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
             )

@@ -337,6 +337,7 @@ class DependencyType(str, Enum):
     DUPLICATES = "duplicates"  # Issue A duplicates Issue B
     PARENT_OF = "parent-of"  # Issue A is parent of Issue B
     CHILD_OF = "child-of"  # Issue A is child of Issue B
+    DISCOVERED_FROM = "discovered-from"  # Issue A was discovered while working on Issue B
 
 
 # =============================================================================

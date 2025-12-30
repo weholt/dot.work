@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from types import TracebackType
 
-from sqlalchemy import Engine, TypeDecorator, cast, create_engine
+from sqlalchemy import Engine, TypeDecorator, cast, create_engine, text
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Column, Field, Index, Session, SQLModel, String, select
 
@@ -369,61 +369,61 @@ class IssueRepository:
         self.session.flush()
 
         # Handle labels via junction table
-        # First delete existing labels for this issue
-        statement = select(IssueLabelModel).where(IssueLabelModel.issue_id == issue.id)
-        existing_labels = self.session.exec(statement).all()
-        for label_model in existing_labels:
-            self.session.delete(label_model)
-        self.session.flush()
+        # Bulk delete existing labels for this issue
+        self.session.execute(
+            text("DELETE FROM issue_labels WHERE issue_id = :issue_id"), {"issue_id": issue.id}
+        )
 
-        # Then add new labels
+        # Bulk add new labels
         now = utcnow_naive()
-        for label_name in issue.labels:
-            label_model = IssueLabelModel(
-                issue_id=issue.id,
-                label_name=label_name,
-                created_at=now,
-            )
-            self.session.add(label_model)
-        self.session.flush()
+        if issue.labels:
+            label_models = [
+                IssueLabelModel(
+                    issue_id=issue.id,
+                    label_name=label_name,
+                    created_at=now,
+                )
+                for label_name in issue.labels
+            ]
+            self.session.add_all(label_models)
 
         # Handle assignees via junction table
-        # First delete existing assignees for this issue
-        assignee_statement = select(IssueAssigneeModel).where(
-            IssueAssigneeModel.issue_id == issue.id
+        # Bulk delete existing assignees for this issue
+        self.session.execute(
+            text("DELETE FROM issue_assignees WHERE issue_id = :issue_id"), {"issue_id": issue.id}
         )
-        existing_assignees = self.session.exec(assignee_statement).all()
-        for assignee_model in existing_assignees:
-            self.session.delete(assignee_model)
-        self.session.flush()
 
-        # Then add new assignees
-        for assignee in issue.assignees:
-            assignee_model = IssueAssigneeModel(
-                issue_id=issue.id,
-                assignee=assignee,
-                created_at=now,
-            )
-            self.session.add(assignee_model)
-        self.session.flush()
+        # Bulk add new assignees
+        if issue.assignees:
+            assignee_models = [
+                IssueAssigneeModel(
+                    issue_id=issue.id,
+                    assignee=assignee,
+                    created_at=now,
+                )
+                for assignee in issue.assignees
+            ]
+            self.session.add_all(assignee_models)
 
         # Handle references via junction table
         refs = getattr(issue, "references", [])
-        # First delete existing references for this issue
-        ref_statement = select(IssueReferenceModel).where(IssueReferenceModel.issue_id == issue.id)
-        existing_refs = self.session.exec(ref_statement).all()
-        for ref_model in existing_refs:
-            self.session.delete(ref_model)
-        self.session.flush()
+        # Bulk delete existing references for this issue
+        self.session.execute(
+            text("DELETE FROM issue_references WHERE issue_id = :issue_id"), {"issue_id": issue.id}
+        )
 
-        # Then add new references
-        for reference in refs:
-            ref_model = IssueReferenceModel(
-                issue_id=issue.id,
-                reference=reference,
-                created_at=now,
-            )
-            self.session.add(ref_model)
+        # Bulk add new references
+        if refs:
+            ref_models = [
+                IssueReferenceModel(
+                    issue_id=issue.id,
+                    reference=reference,
+                    created_at=now,
+                )
+                for reference in refs
+            ]
+            self.session.add_all(ref_models)
+
         self.session.flush()
 
         self.session.refresh(merged)

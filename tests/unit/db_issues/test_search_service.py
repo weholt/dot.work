@@ -296,9 +296,7 @@ class TestSearchServiceInjection:
 class TestSearchServiceRebuildIndex:
     """Tests for FTS index rebuild with transaction rollback (CR-076)."""
 
-    def test_rebuild_index_succeeds_with_valid_data(
-        self, db_uow_with_fts5: UnitOfWork
-    ) -> None:
+    def test_rebuild_index_succeeds_with_valid_data(self, db_uow_with_fts5: UnitOfWork) -> None:
         """Test that rebuild_index succeeds with valid data."""
         service = SearchService(db_uow_with_fts5)
 

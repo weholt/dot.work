@@ -56,6 +56,7 @@ class JsonlService:
         output_path: Path | str,
         include_completed: bool = True,
         status_filter: IssueStatus | None = None,
+        batch_size: int = 1000,
     ) -> int:
         """Export issues to JSONL format.
 
@@ -63,6 +64,7 @@ class JsonlService:
             output_path: Path to output JSONL file
             include_completed: Whether to include completed issues (default: True)
             status_filter: Optional status to filter by
+            batch_size: Number of issues to load per batch (default: 1000)
 
         Returns:
             Number of issues exported
@@ -71,32 +73,49 @@ class JsonlService:
             OSError: If output file cannot be written
         """
         logger.debug(
-            "Exporting issues to JSONL: output=%s, include_completed=%s, status=%s",
+            "Exporting issues to JSONL: output=%s, include_completed=%s, status=%s, batch_size=%d",
             output_path,
             include_completed,
             status_filter,
+            batch_size,
         )
 
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Get issues based on filters
-        if status_filter:
-            issues = self.uow.issues.list_by_status(status_filter, limit=1000000, offset=0)
-        else:
-            issues = self.uow.issues.list_all(limit=1000000, offset=0)
-
-        # Filter out completed if requested
-        if not include_completed:
-            issues = [i for i in issues if i.status != IssueStatus.COMPLETED]
-
-        # Write JSONL
+        # Write JSONL with batching to avoid loading all issues into memory
         count = 0
+        offset = 0
+
         with output_path.open("w", encoding="utf-8") as f:
-            for issue in issues:
-                jsonl_line = self._issue_to_jsonl(issue)
-                f.write(jsonl_line + "\n")
-                count += 1
+            while True:
+                # Get issues in batches
+                if status_filter:
+                    batch = self.uow.issues.list_by_status(
+                        status_filter, limit=batch_size, offset=offset
+                    )
+                else:
+                    batch = self.uow.issues.list_all(limit=batch_size, offset=offset)
+
+                # Stop if no more issues
+                if not batch:
+                    break
+
+                # Write batch to file
+                for issue in batch:
+                    # Filter out completed if requested
+                    if not include_completed and issue.status == IssueStatus.COMPLETED:
+                        continue
+
+                    jsonl_line = self._issue_to_jsonl(issue)
+                    f.write(jsonl_line + "\n")
+                    count += 1
+
+                # Move to next batch
+                if len(batch) < batch_size:
+                    # Last batch
+                    break
+                offset += batch_size
 
         logger.info("Exported %d issues to %s", count, output_path)
         return count
@@ -105,12 +124,14 @@ class JsonlService:
         self,
         input_path: Path | str,
         strategy: Literal["merge", "replace"] = "merge",
+        batch_size: int = 1000,
     ) -> tuple[int, int, int]:
         """Import issues from JSONL format.
 
         Args:
             input_path: Path to input JSONL file
             strategy: Import strategy - "merge" (skip existing IDs) or "replace" (clear and reload)
+            batch_size: Number of issues to process per batch for delete operations (default: 1000)
 
         Returns:
             Tuple of (created, skipped, updated) counts
@@ -119,7 +140,12 @@ class JsonlService:
             OSError: If input file cannot be read
             json.JSONDecodeError: If JSONL format is invalid
         """
-        logger.debug("Importing issues from JSONL: input=%s, strategy=%s", input_path, strategy)
+        logger.debug(
+            "Importing issues from JSONL: input=%s, strategy=%s, batch_size=%d",
+            input_path,
+            strategy,
+            batch_size,
+        )
 
         input_path = Path(input_path)
         if not input_path.exists():
@@ -130,11 +156,23 @@ class JsonlService:
         updated = 0
 
         if strategy == "replace":
-            # Delete all existing issues first
-            all_issues = self.uow.issues.list_all(limit=1000000, offset=0)
-            for issue in all_issues:
-                self.uow.issues.delete(issue.id)
-            logger.info("Cleared %d existing issues (replace strategy)", len(all_issues))
+            # Delete all existing issues in batches to avoid loading all into memory
+            offset = 0
+            deleted_count = 0
+            while True:
+                batch = self.uow.issues.list_all(limit=batch_size, offset=offset)
+                if not batch:
+                    break
+
+                for issue in batch:
+                    self.uow.issues.delete(issue.id)
+                    deleted_count += 1
+
+                if len(batch) < batch_size:
+                    break
+                offset += batch_size
+
+            logger.info("Cleared %d existing issues (replace strategy)", deleted_count)
 
         with input_path.open("r", encoding="utf-8") as f:
             for line_num, line in enumerate(f, 1):

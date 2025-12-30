@@ -220,9 +220,7 @@ def test_calculate_next_version(mock_git_repo, temp_dir: Path):
         assert next_version == f"{current_year}.{current_month:02d}.00002"
 
 
-def test_calculate_next_version_invalid_format_too_few_parts(
-    mock_git_repo, temp_dir: Path
-) -> None:
+def test_calculate_next_version_invalid_format_too_few_parts(mock_git_repo, temp_dir: Path) -> None:
     """Test that malformed version with too few parts raises helpful error."""
     with patch("dot_work.version.manager.Repo", return_value=mock_git_repo):
         manager = VersionManager(project_root=temp_dir)
@@ -258,9 +256,7 @@ def test_calculate_next_version_invalid_format_too_many_parts(
             manager.calculate_next_version(current)
 
 
-def test_calculate_next_version_invalid_format_non_integer(
-    mock_git_repo, temp_dir: Path
-) -> None:
+def test_calculate_next_version_invalid_format_non_integer(mock_git_repo, temp_dir: Path) -> None:
     """Test that version with non-integer parts raises helpful error."""
     with patch("dot_work.version.manager.Repo", return_value=mock_git_repo):
         manager = VersionManager(project_root=temp_dir)

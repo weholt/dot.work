@@ -205,6 +205,48 @@ dot-work review export --output my-review.md
 dot-work review clear --review-id 20241221-143500
 ```
 
+#### Review Storage
+
+Reviews are stored in the `.work/reviews/` directory with the following structure:
+
+```
+.work/reviews/
+├── reviews/           # Individual review data
+│   ├── 20241221-143500/    # Review ID (YYYYMMDD-HHMMSS)
+│   │   └── comments.jsonl  # Review comments (JSONL format)
+│   ├── 20241222-100000/
+│   │   └── comments.jsonl
+│   └── ...
+└── exports/           # Exported review files
+    └── review.md
+```
+
+**Review ID Format:** `YYYYMMDD-HHMMSS` (timestamp when review was started)
+
+**Configuration:**
+- Default storage directory: `.work/reviews/`
+- Can be overridden via `DOT_WORK_REVIEW_STORAGE_DIR` environment variable
+- Server host: `127.0.0.1` (configurable via `DOT_WORK_REVIEW_HOST`)
+- Server port: `0` (auto-pick, configurable via `DOT_WORK_REVIEW_PORT`)
+
+**Listing Reviews:**
+```bash
+# List all review directories
+ls -la .work/reviews/reviews/
+
+# Get the latest review ID
+cat .work/reviews/reviews/$(ls -t .work/reviews/reviews/ | head -1)/comments.jsonl | jq -r '.review_id' | head -1
+```
+
+**Cleaning Up Old Reviews:**
+```bash
+# Remove a specific review
+rm -rf .work/reviews/reviews/YYYYMMDD-HHMMSS/
+
+# Remove all reviews (use with caution)
+rm -rf .work/reviews/reviews/*
+```
+
 ---
 
 ### `validate` – File Validation
@@ -338,6 +380,157 @@ dot-work kg [OPTIONS] COMMAND [ARGS]...
 | `status` | Show database status |
 | `project` | Manage projects (collections) |
 | `topic` | Manage topics (reusable tags) |
+
+#### Database Storage
+
+The knowledge graph database is stored in SQLite with the following structure:
+
+**Default Location:** `.work/kg/db.sqlite`
+
+**Configuration:**
+- Can be overridden via `DOT_WORK_KG_DB_PATH` environment variable
+- For global knowledge base: `export DOT_WORK_KG_DB_PATH=~/.kg/db.sqlite`
+
+**Database Schema:**
+
+The database contains the following tables:
+
+| Table | Description |
+|-------|-------------|
+| `documents` | Source documents (doc_id, path, sha256, raw content) |
+| `nodes` | Parsed content blocks (headers, paragraphs, code, lists) |
+| `edges` | Relationships between nodes (parent-child, references) |
+| `fts_nodes` | Full-text search index for node content |
+| `embeddings` | Vector embeddings for semantic search |
+| `collections` | Projects/knowledgebases/workspaces |
+| `collection_members` | Links collections to docs/nodes |
+| `topics` | Reusable tags/categories |
+| `topic_links` | Links topics to docs/nodes |
+| `project_settings` | Per-collection defaults |
+
+**Key Indexes:**
+- `idx_nodes_doc_id` - Fast document lookups
+- `idx_nodes_short_id` - Node ID lookups
+- `idx_edges_type_src_dst` - Composite index for type-filtered edge queries
+- `idx_edges_type` - Edge type filtering
+- `idx_embeddings_full_id` - Embedding lookups by node ID
+
+**Backing Up:**
+```bash
+# Simple file copy
+cp .work/kg/db.sqlite backup/kg-backup-$(date +%Y%m%d).sqlite
+
+# Or use SQLite backup command
+sqlite3 .work/kg/db.sqlite ".backup backup/kg-backup.sqlite"
+```
+
+**Migrating Between Projects:**
+```bash
+# Copy database to new project
+cp /path/to/old/project/.work/kg/db.sqlite .work/kg/db.sqlite
+
+# Export and re-import (for schema migration)
+dot-work kg export --format json > kg-export.json
+# (In new project)
+dot-work kg ingest --import kg-export.json
+```
+
+**Database Status:**
+```bash
+# Check if database exists and location
+dot-work kg status
+
+# Show database statistics
+dot-work kg stats
+```
+
+#### Searching the Knowledge Graph
+
+The knowledge graph supports multiple search methods:
+
+**1. Full-Text Search (FTS)**
+
+Search for nodes by title and content:
+```bash
+# Simple search
+dot-work kg search "authentication flow"
+
+# Search in specific scope
+dot-work kg search "API" --scope src/
+
+# Limit results
+dot-work kg search "database" --limit 10
+
+# FTS5 query syntax (advanced)
+dot-work kg search "user NEAR/5 password"  # words within 5 positions
+dot-work kg search "auth*"  # prefix match
+dot-work kg search '"login system"'  # exact phrase
+```
+
+**2. Semantic Search**
+
+Search by meaning using vector embeddings:
+```bash
+# Semantic search (requires embeddings to be generated)
+dot-work kg search --semantic "how to handle errors"
+
+# Specify embedding model
+dot-work kg search --semantic --model openai "authentication methods"
+
+# Combine with scope
+dot-work kg search --semantic "database design" --scope docs/
+```
+
+**3. Scope Filtering**
+
+Limit search to specific files or directories:
+```bash
+# Single file
+dot-work kg search "function" --scope src/main.py
+
+# Directory pattern
+dot-work kg search "class" --scope src/models/
+
+# Multiple scopes
+dot-work kg search "import" --scope src/ --scope tests/
+
+# Exclude paths
+dot-work kg search "TODO" --exclude-scope vendor/
+```
+
+**4. Output Formats**
+
+```bash
+# Table format (default)
+dot-work kg search "API"
+
+# JSON output
+dot-work kg search "database" --format json
+
+# Include full content
+dot-work kg search "config" --full-content
+
+# Show as outline tree
+dot-work kg search "security" --outline
+```
+
+**Search Examples:**
+
+```bash
+# Find all documentation about authentication
+dot-work kg search "authentication" --scope docs/
+
+# Search for code comments mentioning TODO or FIXME
+dot-work kg search "TODO OR FIXME" --scope src/
+
+# Semantic search for error handling patterns
+dot-work kg search --semantic "error handling best practices"
+
+# Combine semantic search with scope
+dot-work kg search --semantic "API endpoints" --scope api/
+```
+
+**Note:** Semantic search requires embeddings to be generated. Use `dot-work kg ingest` with an embedding model to create vector embeddings for your documents.
 
 ---
 
@@ -644,6 +837,60 @@ dot-work db-issues io sync [OPTIONS]
 | `DOT_WORK_DB_ISSUES_PATH` | Custom database path |
 | `DOT_WORK_DB_ISSUES_DEBUG` | Enable debug mode |
 | `EDITOR` | Default editor |
+
+#### Database Storage
+
+The db-issues database is stored in SQLite with the following structure:
+
+**Default Location:** `.work/db-issues/issues.db`
+
+**Configuration:**
+- Can be overridden via `DOT_WORK_DB_ISSUES_PATH` environment variable
+- Example: `export DOT_WORK_DB_ISSUES_PATH=/custom/path/issues.db`
+- Path security validated to prevent directory traversal attacks
+
+**Database Schema:**
+
+The database contains the following tables:
+
+| Table | Description |
+|-------|-------------|
+| `projects` | Project settings and metadata |
+| `issues` | Issue records with status, priority, type |
+| `epics` | Epic parent records for grouping issues |
+| `dependencies` | Issue dependency relationships (blocks/blocked-by) |
+| `labels` | Issue labels/categories |
+| `issue_labels` | Junction table for issue-label relationships |
+| `assignees` | Issue assignees |
+| `issue_assignees` | Junction table for issue-assignee relationships |
+| `references` | External issue references |
+| `issue_references` | Junction table for issue-reference relationships |
+| `comments` | Issue comments and discussion history |
+| `fts_issues` | Full-text search index for issues |
+| `schema_version` | Database migration version tracking |
+
+**Backing Up:**
+```bash
+# Simple file copy
+cp .work/db-issues/issues.db backup/db-issues-$(date +%Y%m%d).db
+
+# Export to JSONL (portable format)
+dot-work db-issues export --output backup/issues-$(date +%Y%m%d).jsonl
+
+# Import from JSONL
+dot-work db-issues import --input backup/issues-YYYYMMDD.jsonl
+```
+
+**Migrating Between Projects:**
+```bash
+# Copy database directly
+cp /path/to/old/project/.work/db-issues/issues.db .work/db-issues/issues.db
+
+# Or use JSONL export/import for cleaner migration
+dot-work db-issues export --output all-issues.jsonl
+# (In new project)
+dot-work db-issues import --input all-issues.jsonl
+```
 
 ---
 

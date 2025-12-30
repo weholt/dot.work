@@ -1,7 +1,9 @@
 """CLI entry point for dot-work."""
 
+import json
+import re
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 from rich.console import Console
@@ -106,6 +108,7 @@ def install(
         prompts_dir = get_prompts_dir()
     except FileNotFoundError as e:
         console.print(f"[red]❌ {e}[/red]")
+        console.print("[dim]💡 Fix: Reinstall dot-work to ensure prompt files are available[/dim]")
         raise typer.Exit(1) from None
 
     # Discover available environments from prompt frontmatter
@@ -151,7 +154,17 @@ def install(
     else:
         console.print(f"\n[bold blue]📦 Installing prompts for {env_config.name}...[/bold blue]\n")
 
-    install_prompts(env_key, target, prompts_dir, console, force=force, dry_run=dry_run)
+    try:
+        install_prompts(env_key, target, prompts_dir, console, force=force, dry_run=dry_run)
+    except ValueError as e:
+        console.print(f"\n[red]❌ Installation failed:[/red] {e}")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"\n[red]❌ Unexpected error during installation:[/red]")
+        console.print(f"[dim]{e}[/dim]")
+        console.print("\n[dim]💡 Try running with --dry-run to preview changes[/dim]")
+        console.print("[dim]💡 Report this issue if it persists[/dim]")
+        raise typer.Exit(1)
 
     if dry_run:
         console.print("\n[bold yellow]⚠️  Dry run complete - no files were written[/bold yellow]")
@@ -212,7 +225,7 @@ def init_project(
         typer.Option(
             "--env",
             "-e",
-            help="AI environment to use",
+            help="AI environment to use (anthropic, openai, etc.)",
         ),
     ] = None,
     target: Annotated[
@@ -224,13 +237,20 @@ def init_project(
         ),
     ] = Path("."),
 ) -> None:
-    """Initialize a new project with prompts and issue tracking structure."""
+    """Initialize a new project with AI prompts and full setup.
+
+    This installs AI prompts to your project and sets up the complete development
+    environment. Use this for new projects or when you want to add AI-powered
+    development capabilities.
+
+    For issue tracking only (without AI prompts), use 'init-tracking' instead.
+    """
     # This is an alias for install that's more intuitive
     install(env=env, target=target, force=False)
 
 
-@app.command("init-work")
-def init_work(
+@app.command("init-tracking")
+def init_tracking(
     target: Annotated[
         Path,
         typer.Option(
@@ -248,10 +268,12 @@ def init_work(
         ),
     ] = False,
 ) -> None:
-    """Initialize the .work/ issue tracking directory structure.
+    """Initialize the .work/ issue tracking directory structure only.
 
-    Creates the complete .work/ directory structure for file-based issue tracking,
-    including priority files, focus tracking, and project memory.
+    Creates the .work/ directory for file-based issue tracking without installing
+    AI prompts. Use this when you only want issue tracking capabilities.
+
+    For full project setup with AI prompts, use 'init' instead.
     """
     target = target.resolve()
 
@@ -308,6 +330,219 @@ def overview(
     console.print(
         f"[dim]Found {len(bundle.features)} features, {len(bundle.models)} models, {len(bundle.documents)} document sections[/dim]"
     )
+
+
+@app.command("status")
+def status(
+    format: Annotated[
+        Literal["table", "markdown", "json", "simple"],
+        typer.Option(
+            "--format",
+            "-f",
+            help="Output format (table, markdown, json, simple)",
+        ),
+    ] = "table",
+) -> None:
+    """Show project status including focus and issue counts.
+
+    Displays the current focus (Previous/Current/Next from .work/agent/focus.md)
+    and counts issues by priority level.
+    """
+    # Get work directory
+    work_dir = Path(".work")
+    issues_dir = work_dir / "agent" / "issues"
+    focus_file = work_dir / "agent" / "focus.md"
+
+    # Check if work directory exists
+    if not work_dir.exists():
+        console.print("[yellow]⚠ No .work/ directory found[/yellow]")
+        console.print("[dim]Run 'dot-work init-tracking' to initialize issue tracking[/dim]")
+        raise typer.Exit(1)
+
+    # Parse focus.md
+    focus_data: dict[str, str] = {"previous": "N/A", "current": "N/A", "next": "N/A"}
+    if focus_file.exists():
+        content = focus_file.read_text(encoding="utf-8")
+        # Extract sections using simple regex patterns
+        current_section = None
+        for line in content.splitlines():
+            line = line.strip()
+            if line.startswith("## Previous"):
+                current_section = "previous"
+            elif line.startswith("## Current"):
+                current_section = "current"
+            elif line.startswith("## Next"):
+                current_section = "next"
+            elif line.startswith("- Issue:") and current_section:
+                issue_id = re.search(r"[\w-]+@[\w-]+", line)
+                if issue_id:
+                    focus_data[current_section] = issue_id.group(0)
+
+    # Count issues in each priority file
+    issue_counts: dict[str, int] = {}
+    priority_files = {
+        "shortlist": issues_dir / "shortlist.md",
+        "critical": issues_dir / "critical.md",
+        "high": issues_dir / "high.md",
+        "medium": issues_dir / "medium.md",
+        "low": issues_dir / "low.md",
+        "backlog": issues_dir / "backlog.md",
+    }
+
+    for priority, file_path in priority_files.items():
+        if file_path.exists():
+            count = len(re.findall(r'^id: "', file_path.read_text(encoding="utf-8"), re.MULTILINE))
+            issue_counts[priority] = count
+        else:
+            issue_counts[priority] = 0
+
+    # Output based on format
+    if format == "table":
+        _status_table(console, focus_data, issue_counts)
+    elif format == "markdown":
+        _status_markdown(console, focus_data, issue_counts)
+    elif format == "json":
+        _status_json(console, focus_data, issue_counts)
+    else:  # simple
+        _status_simple(console, focus_data, issue_counts)
+
+
+def _status_table(
+    console: Console, focus_data: dict[str, str], issue_counts: dict[str, int]
+) -> None:
+    """Output status as Rich table."""
+    # Focus table
+    focus_table = Table(title="🎯 Current Focus", show_header=True, header_style="bold cyan")
+    focus_table.add_column("Section", style="green")
+    focus_table.add_column("Issue ID")
+
+    for section, issue_id in [
+        ("Previous", focus_data["previous"]),
+        ("Current", focus_data["current"]),
+        ("Next", focus_data["next"]),
+    ]:
+        style = "bold yellow" if section == "Current" and issue_id != "N/A" else ""
+        focus_table.add_row(section, issue_id if style == "" else f"[{style}]{issue_id}[/]")
+
+    console.print(focus_table)
+    console.print()
+
+    # Issue counts table
+    counts_table = Table(title="📋 Issue Counts", show_header=True, header_style="bold cyan")
+    counts_table.add_column("Priority", style="green")
+    counts_table.add_column("Count", justify="right")
+    counts_table.add_column("Status", style="dim")
+
+    priority_colors = {
+        "shortlist": ("bold red", "User Priority"),
+        "critical": ("red", "P0"),
+        "high": ("yellow", "P1"),
+        "medium": ("blue", "P2"),
+        "low": ("cyan", "P3"),
+        "backlog": ("dim", "Backlog"),
+    }
+
+    total = 0
+    for priority, _file_path in [
+        ("shortlist", None),
+        ("critical", None),
+        ("high", None),
+        ("medium", None),
+        ("low", None),
+        ("backlog", None),
+    ]:
+        count = issue_counts.get(priority, 0)
+        total += count
+        color, level = priority_colors.get(priority, ("white", ""))
+        counts_table.add_row(priority.capitalize(), str(count), f"[{color}]{level}[/{color}]")
+
+    counts_table.add_row("Total", str(total), "")
+
+    console.print(counts_table)
+
+
+def _status_markdown(
+    console: Console, focus_data: dict[str, str], issue_counts: dict[str, int]
+) -> None:
+    """Output status as markdown."""
+    console.print("## 🎯 Current Focus\n")
+    for section, issue_id in [
+        ("Previous", focus_data["previous"]),
+        ("Current", focus_data["current"]),
+        ("Next", focus_data["next"]),
+    ]:
+        marker = "**" if section == "Current" else ""
+        console.print(f"- {marker}{section}{marker}: {issue_id}")
+
+    console.print("\n## 📋 Issue Counts\n")
+    console.print("| Priority | Count |")
+    console.print("|----------|-------|")
+
+    total = 0
+    for priority in ["shortlist", "critical", "high", "medium", "low", "backlog"]:
+        count = issue_counts.get(priority, 0)
+        total += count
+        level = {
+            "shortlist": "User",
+            "critical": "P0",
+            "high": "P1",
+            "medium": "P2",
+            "low": "P3",
+            "backlog": "Backlog",
+        }.get(priority, "")
+        console.print(f"| {priority.capitalize()} ({level}) | {count} |")
+
+    console.print(f"| **Total** | **{total}** |")
+
+
+def _status_json(
+    console: Console, focus_data: dict[str, str], issue_counts: dict[str, int]
+) -> None:
+    """Output status as JSON."""
+    output = {
+        "focus": {
+            "previous": focus_data["previous"],
+            "current": focus_data["current"],
+            "next": focus_data["next"],
+        },
+        "issue_counts": {
+            "shortlist": issue_counts.get("shortlist", 0),
+            "critical": issue_counts.get("critical", 0),
+            "high": issue_counts.get("high", 0),
+            "medium": issue_counts.get("medium", 0),
+            "low": issue_counts.get("low", 0),
+            "backlog": issue_counts.get("backlog", 0),
+            "total": sum(issue_counts.values()),
+        },
+    }
+    console.print(json.dumps(output, indent=2))
+
+
+def _status_simple(
+    console: Console, focus_data: dict[str, str], issue_counts: dict[str, int]
+) -> None:
+    """Output status as simple text."""
+    console.print("🎯 Current Focus")
+    console.print()
+    for section, issue_id in [
+        ("Previous", focus_data["previous"]),
+        ("Current", focus_data["current"]),
+        ("Next", focus_data["next"]),
+    ]:
+        prefix = "→ " if section == "Current" else "  "
+        console.print(f"{prefix}{section}: {issue_id}")
+
+    console.print()
+    console.print("📋 Issue Counts")
+    console.print()
+
+    total = 0
+    for priority in ["shortlist", "critical", "high", "medium", "low", "backlog"]:
+        count = issue_counts.get(priority, 0)
+        total += count
+        console.print(f"  {priority.capitalize()}: {count}")
+
+    console.print(f"  Total: {total}")
 
 
 def prompt_for_environment(discovered_envs: dict[str, set[str]] | None = None) -> str:

@@ -350,7 +350,9 @@ class EpicService:
         results: list[EpicInfo] = []
 
         for epic in epics:
-            counts = epic_counts.get(epic.id, {"total": 0, "proposed": 0, "in_progress": 0, "completed": 0})
+            counts = epic_counts.get(
+                epic.id, {"total": 0, "proposed": 0, "in_progress": 0, "completed": 0}
+            )
 
             results.append(
                 EpicInfo(

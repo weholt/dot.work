@@ -579,8 +579,6 @@ def _generate_inner_script() -> str:
     return script_path.read_text(encoding="utf-8")
 
 
-
-
 def _build_docker_run_cmd(
     cfg: RunConfig,
     workdir: Path,

@@ -252,7 +252,9 @@ class TestExtractShortMessage:
         config = AnalysisConfig(repo_path=Path("/test/repo"))
         service = GitAnalysisService(config)
 
-        result = service._extract_short_message("feat: add new feature\n\nThis is a long description.")
+        result = service._extract_short_message(
+            "feat: add new feature\n\nThis is a long description."
+        )
 
         assert result == "feat: add new feature"
 

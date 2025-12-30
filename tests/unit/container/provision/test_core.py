@@ -580,9 +580,7 @@ class TestBuildVolumeArgs:
         result = _build_volume_args(cfg, workdir, instructions_body)
         assert f"{ssh_dir}:/root/.ssh:ro" in result
 
-    def test_build_volume_args_with_opencode_config(
-        self, tmp_path: pytest.TempPathFactory
-    ) -> None:
+    def test_build_volume_args_with_opencode_config(self, tmp_path: pytest.TempPathFactory) -> None:
         """Test building volume args with opencode.json config."""
         workdir = tmp_path / "workspace"
         workdir.mkdir()
@@ -690,7 +688,9 @@ docker_image: custom:latest
 Content
 """)
 
-        cfg, _ = _resolve_config(instructions, {"strategy": "direct", "docker_image": "override:v1"})
+        cfg, _ = _resolve_config(
+            instructions, {"strategy": "direct", "docker_image": "override:v1"}
+        )
 
         assert cfg.strategy == "direct"  # CLI override
         assert cfg.docker_image == "override:v1"  # CLI override
@@ -817,6 +817,9 @@ Content
         assert cfg.git_user_name == "repo-agent"
         assert cfg.git_user_email == "repo-agent@example.com"
         assert cfg.pr_title == "Automated changes via repo-agent"
-        assert cfg.pr_body == "This PR was generated automatically by repo-agent using a configurable code tool."
+        assert (
+            cfg.pr_body
+            == "This PR was generated automatically by repo-agent using a configurable code tool."
+        )
         assert cfg.commit_message == "chore: automated changes via repo-agent"
         assert cfg.strategy == "agentic"

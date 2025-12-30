@@ -6,6 +6,7 @@ from datetime import UTC
 from enum import Enum, auto
 from pathlib import Path
 
+import typer
 from jinja2 import Environment as JinjaEnvironment
 from jinja2 import FileSystemLoader
 from rich.console import Console
@@ -288,7 +289,10 @@ def install_prompts(
     # Legacy fallback for non-canonical prompts
     installer = INSTALLERS.get(env_key)
     if not installer:
-        raise ValueError(f"Unknown environment: {env_key}")
+        available = list(ENVIRONMENTS.keys())
+        raise ValueError(
+            f"Unknown environment: {env_key}\nAvailable environments: {', '.join(available)}"
+        )
 
     installer(target, prompts_dir, console, force=force, dry_run=dry_run)
 
@@ -345,8 +349,18 @@ def install_prompts_generic(
             action = "Would create" if not combined_path.exists() else "Would overwrite"
             console.print(f"  [yellow][DRY-RUN][/yellow] [dim]{action}[/dim] {combined_path}")
         else:
-            combined_path.write_text("".join(sections), encoding="utf-8")
-            console.print(f"  [green]✓[/green] Created {combined_path.name}")
+            try:
+                combined_path.write_text("".join(sections), encoding="utf-8")
+                console.print(f"  [green]✓[/green] Created {combined_path.name}")
+            except PermissionError as e:
+                console.print(f"  [red]❌ Permission denied writing to:[/red] {combined_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                raise typer.Exit(1)
+            except OSError as e:
+                console.print(f"  [red]❌ Failed to write file:[/red] {combined_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                raise typer.Exit(1)
         console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {combined_path}")
         if config.messages[2]:
             console.print(f"[dim]💡 {config.messages[2]}[/dim]")
@@ -355,7 +369,17 @@ def install_prompts_generic(
     # Directory mode (copilot, cursor, windsurf, continue, zed, opencode, generic, cline, cody)
     dest_dir = target / config.dest_path
     if not dry_run:
-        dest_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            dest_dir.mkdir(parents=True, exist_ok=True)
+        except PermissionError as e:
+            console.print(f"  [red]❌ Permission denied creating directory:[/red] {dest_dir}")
+            console.print(f"  [dim]Error: {e}[/dim]")
+            console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+            raise typer.Exit(1)
+        except OSError as e:
+            console.print(f"  [red]❌ Failed to create directory:[/red] {dest_dir}")
+            console.print(f"  [dim]Error: {e}[/dim]")
+            raise typer.Exit(1)
 
     # Scan phase: collect all destination paths and categorize
     state = InstallState()
@@ -403,9 +427,19 @@ def install_prompts_generic(
             console.print(f"  [yellow][DRY-RUN][/yellow] [dim]{action}[/dim] {dest_path}")
         else:
             # Render and write
-            rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-            dest_path.write_text(rendered_content, encoding="utf-8")
-            console.print(f"  [green]✓[/green] {config.messages[0].format(name=dest_name)}")
+            try:
+                rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
+                dest_path.write_text(rendered_content, encoding="utf-8")
+                console.print(f"  [green]✓[/green] {config.messages[0].format(name=dest_name)}")
+            except PermissionError as e:
+                console.print(f"  [red]❌ Permission denied writing to:[/red] {dest_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                raise typer.Exit(1)
+            except OSError as e:
+                console.print(f"  [red]❌ Failed to write file:[/red] {dest_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                raise typer.Exit(1)
 
     # Create auxiliary files
     for aux_path, aux_content in config.auxiliary_files:
@@ -414,8 +448,18 @@ def install_prompts_generic(
             action = "[CREATE]" if not aux_full_path.exists() else "[OVERWRITE]"
             console.print(f"  [yellow][DRY-RUN][/yellow] [dim]{action}[/dim] {aux_full_path}")
         elif should_write_file(aux_full_path, force, console, batch_choice=batch_choice):
-            aux_full_path.write_text(aux_content, encoding="utf-8")
-            console.print(f"  [green]✓[/green] Created {aux_full_path.name}")
+            try:
+                aux_full_path.write_text(aux_content, encoding="utf-8")
+                console.print(f"  [green]✓[/green] Created {aux_full_path.name}")
+            except PermissionError as e:
+                console.print(f"  [red]❌ Permission denied writing to:[/red] {aux_full_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                raise typer.Exit(1)
+            except OSError as e:
+                console.print(f"  [red]❌ Failed to write file:[/red] {aux_full_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                raise typer.Exit(1)
         elif aux_full_path.exists():
             console.print(f"  [dim]⏭[/dim] Skipped {aux_full_path.name}")
 
@@ -1017,17 +1061,18 @@ def validate_canonical_prompt_file(prompt_file: Path, strict: bool = False) -> N
     Raises:
         ValueError: If the file is not a valid canonical prompt.
     """
-    from dot_work.prompts.canonical import CanonicalPromptParser, CanonicalPromptValidator
+    from dot_work.prompts.canonical import (
+        CANONICAL_PARSER,
+        CANONICAL_VALIDATOR,
+    )
 
     if not prompt_file.exists():
         raise FileNotFoundError(f"Canonical prompt file not found: {prompt_file}")
 
     try:
-        parser = CanonicalPromptParser()
-        prompt = parser.parse(prompt_file)
+        prompt = CANONICAL_PARSER.parse(prompt_file)
 
-        validator = CanonicalPromptValidator()
-        errors = validator.validate(prompt, strict=strict)
+        errors = CANONICAL_VALIDATOR.validate(prompt, strict=strict)
 
         # Filter errors by severity
         error_messages = [e.message for e in errors if e.severity == "error"]
@@ -1081,14 +1126,13 @@ def install_canonical_prompt(
         ValueError: If the environment is not supported or prompt is invalid.
         FileNotFoundError: If the prompt file doesn't exist.
     """
-    from dot_work.prompts.canonical import CanonicalPromptError, CanonicalPromptParser
+    from dot_work.prompts.canonical import CANONICAL_PARSER, CanonicalPromptError
 
     # First validate canonical prompt
     validate_canonical_prompt_file(prompt_file, strict=False)
 
     # Parse canonical prompt
-    parser = CanonicalPromptParser()
-    prompt = parser.parse(prompt_file)
+    prompt = CANONICAL_PARSER.parse(prompt_file)
 
     # Get environment configuration (will raise CanonicalPromptError if not found)
     try:
@@ -1148,10 +1192,23 @@ def install_canonical_prompt(
 
     output_path = output_dir / output_filename
 
-    # Check if we should write the file
+    # Check if we should write to file
     if not should_write_file(output_path, force, console):
         console.print(f"  [dim]⏭[/dim] Skipped {output_filename}")
         return
+
+    # Create output directory if needed
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    except PermissionError as e:
+        console.print(f"  [red]❌ Permission denied creating directory:[/red] {output_dir}")
+        console.print(f"  [dim]Error: {e}[/dim]")
+        console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+        raise typer.Exit(1)
+    except OSError as e:
+        console.print(f"  [red]❌ Failed to create directory:[/red] {output_dir}")
+        console.print(f"  [dim]Error: {e}[/dim]")
+        raise typer.Exit(1)
 
     # Build environment-specific frontmatter
     env_config_dict = {k: v for k, v in vars(env_config).items() if k != "target" and v is not None}
@@ -1167,10 +1224,20 @@ def install_canonical_prompt(
     output_content = f"""---
 {yaml.safe_dump(frontmatter, default_flow_style=False)}---
 
-{prompt.content}"""
+    {prompt.content}"""
 
-    output_path.write_text(output_content, encoding="utf-8")
-    console.print(f"  [green]✓[/green] Installed {output_filename}")
+    try:
+        output_path.write_text(output_content, encoding="utf-8")
+        console.print(f"  [green]✓[/green] Installed {output_filename}")
+    except PermissionError as e:
+        console.print(f"  [red]❌ Permission denied writing to:[/red] {output_path}")
+        console.print(f"  [dim]Error: {e}[/dim]")
+        console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+        raise typer.Exit(1)
+    except OSError as e:
+        console.print(f"  [red]❌ Failed to write file:[/red] {output_path}")
+        console.print(f"  [dim]Error: {e}[/dim]")
+        raise typer.Exit(1)
 
 
 def install_canonical_prompt_directory(
@@ -1193,7 +1260,7 @@ def install_canonical_prompt_directory(
     Raises:
         ValueError: If no canonical prompts found or invalid.
     """
-    from dot_work.prompts.canonical import CanonicalPromptParser
+    from dot_work.prompts.canonical import CANONICAL_PARSER
 
     # Find canonical prompt files
     canonical_files = list(prompts_dir.glob("*.canon.md"))
@@ -1202,7 +1269,6 @@ def install_canonical_prompt_directory(
     if not canonical_files:
         raise ValueError(f"No canonical prompt files found in {prompts_dir}")
 
-    parser = CanonicalPromptParser()
     installed_count = 0
 
     console.print(f"Installing {len(canonical_files)} canonical prompt(s) for {env_key}...")
@@ -1210,7 +1276,7 @@ def install_canonical_prompt_directory(
     for prompt_file in canonical_files:
         try:
             # Check if this file has the target environment before installing
-            prompt = parser.parse(prompt_file)
+            prompt = CANONICAL_PARSER.parse(prompt_file)
             if env_key not in prompt.environments:
                 available = ", ".join(prompt.list_environments())
                 console.print(
@@ -1251,15 +1317,14 @@ def discover_available_environments(prompts_dir: Path) -> dict[str, set[str]]:
         Dictionary mapping environment names to sets of prompt file names that support them.
         Example: {"claude": {"do-work", "new-issue"}, "copilot": {"do-work"}}
     """
-    from dot_work.prompts.canonical import CanonicalPromptParser
+    from dot_work.prompts.canonical import CANONICAL_PARSER
 
-    parser = CanonicalPromptParser()
     environments: dict[str, set[str]] = {}
 
     # Find all prompt files with canonical frontmatter
     for prompt_file in prompts_dir.glob("*.prompt.md"):
         try:
-            prompt = parser.parse(prompt_file)
+            prompt = CANONICAL_PARSER.parse(prompt_file)
             prompt_name = prompt_file.stem
 
             # Add this prompt to each environment it supports
@@ -1300,9 +1365,8 @@ def install_canonical_prompts_by_environment(
     Raises:
         ValueError: If environment not found in any prompts or installation fails.
     """
-    from dot_work.prompts.canonical import CanonicalPromptParser
+    from dot_work.prompts.canonical import CANONICAL_PARSER
 
-    parser = CanonicalPromptParser()
     prompt_files = list(prompts_dir.glob("*.prompt.md"))
     installed_count = 0
     skipped_count = 0
@@ -1320,7 +1384,7 @@ def install_canonical_prompts_by_environment(
 
     for prompt_file in prompt_files:
         try:
-            prompt = parser.parse(prompt_file)
+            prompt = CANONICAL_PARSER.parse(prompt_file)
 
             # Skip if prompt doesn't support this environment
             if env_name not in prompt.environments:
@@ -1360,14 +1424,49 @@ def install_canonical_prompts_by_environment(
                 state.new_files.append(output_path)
 
         except Exception as e:
-            console.print(f"  [yellow]⚠[/yellow] Skipping {prompt_file.name}: {e}")
+            error_str = str(e)
+
+            console.print(f"  [yellow]⚠[/yellow] Skipping {prompt_file.name}")
+            console.print(f"  [dim]Error: {error_str}[/dim]")
+
+            # Provide actionable guidance for common errors
+            if "filename" in error_str.lower() or "filename_suffix" in error_str.lower():
+                console.print(
+                    f"  [dim]💡 Fix: Add 'environments.YOUR_ENV.filename' or 'environments.YOUR_ENV.filename_suffix' to the prompt frontmatter[/dim]"
+                )
+            elif "yaml" in error_str.lower() or "frontmatter" in error_str.lower():
+                console.print(
+                    f"  [dim]💡 Fix: Check that the frontmatter section (before the first ---) has valid YAML syntax[/dim]"
+                )
+                console.print(
+                    f"  [dim]💡 Fix: Ensure multi-line values are properly indented or quoted[/dim]"
+                )
+            elif "document" in error_str.lower():
+                console.print(
+                    f"  [dim]💡 Fix: Ensure there's only one --- separator and one YAML document in the frontmatter[/dim]"
+                )
+
             skipped_count += 1
 
     if not install_plan:
+        console.print(f"  [red]❌ Environment '{env_name}' not found in any prompt files.[/red]")
+        console.print(
+            f"  [dim]💡 Fix: Ensure at least one prompt file has an 'environments.{env_name}' section in its frontmatter[/dim]"
+        )
+        console.print(
+            f"  [dim]💡 Fix: Run 'dot-work list' to see available environments and their expected frontmatter structure[/dim]"
+        )
         raise ValueError(
             f"Environment '{env_name}' not found in any prompt files. "
-            f"Checked {len(prompt_files)} file(s)."
+            f"Checked {len(prompt_files)} file(s). "
+            f"Add 'environments.{env_name}' section to at least one prompt file."
         )
+    console.print(
+        f"  [dim]💡 Fix: Ensure the prompt file has an 'environments.{env_name}' section in its frontmatter[/dim]"
+    )
+    console.print(
+        f"  [dim]💡 Fix: Run 'dot-work list' to see available environments and their expected frontmatter structure[/dim]"
+    )
 
     # Show batch menu if there are existing files and not in force/dry-run mode
     batch_choice: BatchChoice | None = None
@@ -1393,10 +1492,20 @@ def install_canonical_prompts_by_environment(
 
         # Create directory if needed
         if not dry_run:
-            output_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                output_dir.mkdir(parents=True, exist_ok=True)
+            except PermissionError as e:
+                console.print(f"  [red]❌ Permission denied creating directory:[/red] {output_dir}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                raise typer.Exit(1)
+            except OSError as e:
+                console.print(f"  [red]❌ Failed to create directory:[/red] {output_dir}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                raise typer.Exit(1)
 
         # Read prompt content
-        prompt = parser.parse(prompt_file)
+        prompt = CANONICAL_PARSER.parse(prompt_file)
 
         # Write output (without extra frontmatter - prompts already have it)
         if dry_run:
@@ -1404,9 +1513,19 @@ def install_canonical_prompts_by_environment(
             console.print(f"  [yellow][DRY-RUN][/yellow] [dim]{action}[/dim] {output_path}")
         else:
             # Write the prompt file as-is (it already has proper frontmatter)
-            output_path.write_text(prompt_file.read_text(encoding="utf-8"), encoding="utf-8")
-            console.print(f"  [green]✓[/green] Installed {output_path.name}")
-            installed_count += 1
+            try:
+                output_path.write_text(prompt_file.read_text(encoding="utf-8"), encoding="utf-8")
+                console.print(f"  [green]✓[/green] Installed {output_path.name}")
+                installed_count += 1
+            except PermissionError as e:
+                console.print(f"  [red]❌ Permission denied writing to:[/red] {output_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                raise typer.Exit(1)
+            except OSError as e:
+                console.print(f"  [red]❌ Failed to write file:[/red] {output_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                raise typer.Exit(1)
 
     if dry_run:
         console.print(

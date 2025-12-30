@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Current schema version
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 class DatabaseError(Exception):
@@ -401,6 +401,23 @@ class Database:
             logger.info(
                 "Schema migration to version 3 completed (collections, topics, project settings)"
             )
+
+        if from_version < 4:
+            # Add composite index on edges for type-optimized queries
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_edges_type_src_dst
+                ON edges(type, src_node_pk, dst_node_pk)
+                """
+            )
+
+            # Record migration
+            conn.execute(
+                "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
+                (4, int(time.time())),
+            )
+            conn.commit()
+            logger.info("Schema migration to version 4 completed (composite index on edges type)")
 
         logger.info("Schema migrations completed, current version: %d", SCHEMA_VERSION)
 
@@ -1077,24 +1094,50 @@ class Database:
 
         return self._row_to_embedding(row)
 
-    def get_all_embeddings_for_model(self, model: str) -> list[Embedding]:
-        """Get all embeddings for a specific model.
+    def get_all_embeddings_for_model(self, model: str, limit: int = 10000) -> list[Embedding]:
+        """Get all embeddings for a specific model with safety limit.
+
+        Warning: For large datasets (>10k embeddings), use
+        stream_embeddings_for_model() instead to avoid OOM crashes.
 
         Args:
             model: Embedding model name.
+            limit: Maximum number of embeddings to load (default: 10000).
+                   Set to 0 for unlimited (not recommended for production).
 
         Returns:
-            List of Embeddings for the model.
+            List of up to limit Embeddings for the model.
+
+        Raises:
+            ValueError: If limit is negative.
         """
+        if limit < 0:
+            raise ValueError("limit must be non-negative")
+
         conn = self._get_connection()
-        cur = conn.execute(
-            """
-            SELECT embedding_pk, full_id, model, dimensions, vector, created_at
-            FROM embeddings
-            WHERE model = ?
-            """,
-            (model,),
-        )
+        if limit > 0:
+            cur = conn.execute(
+                """
+                SELECT embedding_pk, full_id, model, dimensions, vector, created_at
+                FROM embeddings
+                WHERE model = ?
+                LIMIT ?
+                """,
+                (model, limit),
+            )
+        else:
+            logger.warning(
+                "Loading unlimited embeddings for model=%s - may cause OOM",
+                model,
+            )
+            cur = conn.execute(
+                """
+                SELECT embedding_pk, full_id, model, dimensions, vector, created_at
+                FROM embeddings
+                WHERE model = ?
+                """,
+                (model,),
+            )
 
         return [self._row_to_embedding(row) for row in cur.fetchall()]
 
