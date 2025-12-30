@@ -12,11 +12,9 @@ scope:
   excluded:
     - implementing any fixes/features
     - creating any new issue tracker files (no queue.md, gaps.md, blocked.md, etc.)
-new_files_policy:
-  - do not create new tracker files anywhere
-  - exception: if deeper research/clarification material is needed, you MAY create a reference note file under:
-      - .work/agent/issues/references/
-    and then link it in the issue `references:` list
+  new_files_policy:
+   - do not create new tracker files anywhere
+   - exception: if deeper research/clarification material is needed, you MAY create a reference note file under ".work/agent/issues/references/" and then link it in the issue `references:` list
 constraints:
   - you may edit and improve existing issues in ANY issue file
   - you may ask the user clarifying questions for ANY issue in ANY file

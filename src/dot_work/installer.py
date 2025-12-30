@@ -1211,7 +1211,7 @@ def install_canonical_prompt(
         raise typer.Exit(1)
 
     # Build environment-specific frontmatter
-    env_config_dict = {k: v for k, v in vars(env_config).items() if k != "target" and v is not None}
+    env_config_dict = dict(vars(env_config))
     frontmatter = {
         "meta": prompt.meta,
         "filename": output_filename,
@@ -1296,7 +1296,9 @@ def install_canonical_prompt_directory(
             f"the '{env_key}' environment."
         )
 
-    console.print(f"[green]✓[/green] Completed installation of {installed_count} canonical prompts")
+        console.print(
+            f"[green]✓[/green] Completed installation of {installed_count} canonical prompt(s)"
+        )
 
 
 # =============================================================================
@@ -1409,7 +1411,13 @@ def install_canonical_prompts_by_environment(
                 output_filename = env_config.filename
             elif env_config.filename_suffix:
                 # Use prompt file stem with suffix
-                output_filename = prompt_file.stem + env_config.filename_suffix
+                # Handle compound extensions like .prompt.md: Path.stem only removes .md,
+                # leaving 'name.prompt' which would become 'name.prompt.prompt.md'
+                # When the suffix is .prompt.md, strip .prompt from stem first
+                stem = prompt_file.stem
+                if stem.endswith(".prompt") and env_config.filename_suffix == ".prompt.md":
+                    stem = stem[:-7]  # Remove '.prompt' to avoid doubling
+                output_filename = stem + env_config.filename_suffix
             else:
                 # Default to original filename
                 output_filename = prompt_file.name

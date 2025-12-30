@@ -58,6 +58,7 @@ environments:
     filename_suffix: ".md"
   continue:
     target: ".continue/prompts/"
+    filename_suffix: ".md"
 ---
 
 # ROLE
