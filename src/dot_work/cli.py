@@ -160,7 +160,7 @@ def install(
         console.print(f"\n[red]❌ Installation failed:[/red] {e}")
         raise typer.Exit(1)
     except Exception as e:
-        console.print(f"\n[red]❌ Unexpected error during installation:[/red]")
+        console.print("\n[red]❌ Unexpected error during installation:[/red]")
         console.print(f"[dim]{e}[/dim]")
         console.print("\n[dim]💡 Try running with --dry-run to preview changes[/dim]")
         console.print("[dim]💡 Report this issue if it persists[/dim]")

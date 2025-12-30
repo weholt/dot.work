@@ -1,4 +1,9 @@
-# ➕ Create New Issue
+---
+meta:
+  title: "Create New Issue"
+  description: "This prompt creates a properly formatted issue in the file-based issue tracking system"
+  version: "0.1.1"
+---
 
 This prompt creates a properly formatted issue in the file-based issue tracking system.
 

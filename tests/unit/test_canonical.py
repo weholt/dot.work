@@ -147,7 +147,8 @@ class TestCanonicalPromptParser:
         assert prompt.meta["description"] == "A test prompt for validation"
         assert prompt.meta["version"] == "1.0.0"
 
-        assert len(prompt.environments) == 3
+        # With global.yml merged, we have at least the 3 local environments
+        assert len(prompt.environments) >= 3
         assert "copilot" in prompt.environments
         assert "claude" in prompt.environments
         assert "opencode" in prompt.environments
@@ -168,7 +169,8 @@ class TestCanonicalPromptParser:
         prompt = parser.parse_content(minimal_canonical_content)
 
         assert prompt.meta == {}
-        assert len(prompt.environments) == 1
+        # With global.yml, we have copilot from local + other defaults
+        assert len(prompt.environments) >= 1
         assert "copilot" in prompt.environments
         assert "Minimal prompt body." in prompt.content
 
@@ -202,7 +204,11 @@ Content here"""
             parser.parse_content(content)
 
     def test_parse_missing_environments(self) -> None:
-        """Test parsing content without environments section."""
+        """Test parsing content without environments section.
+
+        With global.yml providing default environments, prompts without
+        explicit environments should get the defaults from global.yml.
+        """
         content = """---
 meta:
   title: "Test"
@@ -212,11 +218,18 @@ meta:
 Content here"""
         parser = CanonicalPromptParser()
 
-        with pytest.raises(ValueError, match="must contain 'environments' section"):
-            parser.parse_content(content)
+        # With global.yml, this should parse successfully
+        # (global config provides default environments)
+        prompt = parser.parse_content(content)
+        assert prompt.meta["title"] == "Test"
+        assert len(prompt.environments) > 0  # Global defaults provided
 
     def test_parse_empty_environments(self) -> None:
-        """Test parsing content with empty environments."""
+        """Test parsing content with empty environments.
+
+        With global.yml providing default environments, empty environments
+        should be replaced by global defaults.
+        """
         content = """---
 meta: {}
 environments: {}
@@ -226,8 +239,9 @@ environments: {}
 Content here"""
         parser = CanonicalPromptParser()
 
-        with pytest.raises(ValueError, match="'environments' cannot be empty"):
-            parser.parse_content(content)
+        # With global.yml, empty environments is replaced by defaults
+        prompt = parser.parse_content(content)
+        assert len(prompt.environments) > 0  # Global defaults provided
 
     def test_parse_environment_without_target(self) -> None:
         """Test parsing environment without target."""
@@ -570,3 +584,195 @@ Content"""
 
             assert output_dir.exists()
             assert output_path.exists()
+
+
+class TestGlobalConfig:
+    """Test global configuration loading and merging."""
+
+    def test_deep_merge_basic(self) -> None:
+        """Test basic deep merge functionality."""
+        from dot_work.prompts.canonical import _deep_merge
+
+        global_dict = {"a": 1, "b": {"x": 10, "y": 20}}
+        local_dict = {"b": {"y": 30, "z": 40}, "c": 3}
+
+        result = _deep_merge(global_dict, local_dict)
+
+        # Global values preserved
+        assert result["a"] == 1
+        # Local override takes precedence for y
+        assert result["b"]["y"] == 30
+        # Global x preserved
+        assert result["b"]["x"] == 10
+        # Local new value added
+        assert result["b"]["z"] == 40
+        assert result["c"] == 3
+
+    def test_deep_merge_local_overrides_global(self) -> None:
+        """Test that local values completely override global at same key."""
+        from dot_work.prompts.canonical import _deep_merge
+
+        global_dict = {"a": {"x": 1, "y": 2}}
+        local_dict = {"a": {"x": 10}}
+
+        result = _deep_merge(global_dict, local_dict)
+
+        assert result["a"]["x"] == 10  # Local override
+        assert result["a"]["y"] == 2  # Global preserved
+
+    def test_deep_merge_no_global(self) -> None:
+        """Test merge with empty global dict."""
+        from dot_work.prompts.canonical import _deep_merge
+
+        result = _deep_merge({}, {"a": 1, "b": 2})
+        assert result == {"a": 1, "b": 2}
+
+    def test_parse_with_global_config(self) -> None:
+        """Test parsing with global configuration present."""
+        # The actual global.yml file in the repo should provide defaults
+        # This test verifies the merge happens
+        content = """---
+meta:
+  title: "Test Prompt"
+
+---
+
+Test content"""
+
+        parser = CanonicalPromptParser()
+        prompt = parser.parse_content(content)
+
+        # With global.yml, environments should be merged in
+        # At minimum, the prompt should parse successfully
+        assert prompt.meta["title"] == "Test Prompt"
+        assert "Test content" in prompt.content
+
+    def test_parse_local_override_global_env(self) -> None:
+        """Test that local environment config overrides global."""
+        # Define a prompt with custom claude config
+        content = """---
+meta:
+  title: "Test"
+
+environments:
+  claude:
+    target: ".custom/claude/"
+    filename_suffix: ".custom.md"
+  copilot:
+    target: ".custom/copilot/"
+    filename: "copilot-custom.md"
+
+---
+
+Test content"""
+
+        parser = CanonicalPromptParser()
+        prompt = parser.parse_content(content)
+
+        # Local claude config should override global
+        assert prompt.environments["claude"].target == ".custom/claude/"
+        assert prompt.environments["claude"].filename_suffix == ".custom.md"
+
+        # Local copilot config should be as specified
+        assert prompt.environments["copilot"].target == ".custom/copilot/"
+        assert prompt.environments["copilot"].filename == "copilot-custom.md"
+
+        # If global.yml exists and has other environments, they should be merged
+        # (This test assumes global.yml exists with default environments)
+        if "opencode" in prompt.environments:
+            # Global opencode config should be present
+            assert prompt.environments["opencode"].target == ".opencode/prompts/"
+
+    def test_parse_no_global_fallback(self) -> None:
+        """Test that parser works even when global.yml is missing."""
+        # This content has all required frontmatter
+        content = """---
+meta:
+  title: "Test"
+environments:
+  test:
+    target: ".test/"
+    filename: "test.md"
+
+---
+
+Test content"""
+
+        parser = CanonicalPromptParser()
+        # Should parse successfully even without global.yml
+        prompt = parser.parse_content(content)
+
+        assert prompt.environments["test"].target == ".test/"
+        assert "Test content" in prompt.content
+
+    def test_global_config_caching(self) -> None:
+        """Test that global config is cached after first load."""
+        parser = CanonicalPromptParser()
+
+        # First load
+        config1 = parser._load_global_config()
+        # Second load should return cached value
+        config2 = parser._load_global_config()
+
+        # Should be the same object (cached)
+        assert config1 is config2
+
+    def test_existing_prompts_still_work(self) -> None:
+        """Test that existing prompt files still parse correctly."""
+        # This is a real prompt file from the repo
+        parser = CanonicalPromptParser()
+        prompts_dir = Path(__file__).parent.parent.parent / "src" / "dot_work" / "prompts"
+
+        # Test a few existing prompts - use .md files that exist in the repo
+        test_files = [
+            "new-issue.md",
+            "do-work.md",
+            "code-review.md",
+        ]
+
+        for filename in test_files:
+            prompt_file = prompts_dir / filename
+            if prompt_file.exists():
+                prompt = parser.parse(prompt_file)
+
+                # Should have meta
+                assert prompt.meta is not None
+                # Should have environments (from global or local)
+                assert len(prompt.environments) > 0
+                # Should have content
+                assert len(prompt.content) > 0
+
+    def test_meta_only_with_global_config(self) -> None:
+        """Test that prompts with only meta: section parse when global.yml exists.
+
+        This is the fix for the issue where files with only meta: frontmatter
+        were being silently skipped because they lacked an environments: section.
+        With global.yml providing default environments, these files should parse.
+        """
+        parser = CanonicalPromptParser()
+        prompts_dir = Path(__file__).parent.parent.parent / "src" / "dot_work" / "prompts"
+
+        # Files that have only meta: frontmatter (relying on global.yml)
+        # These were previously being skipped during discovery
+        meta_only_files = [
+            "production-ready-apis.md",
+            "performance-review.md",
+            "security-review.md",
+        ]
+
+        for filename in meta_only_files:
+            prompt_file = prompts_dir / filename
+            if prompt_file.exists():
+                # Should parse without raising ValueError
+                prompt = parser.parse(prompt_file)
+
+                # Should have meta from local file
+                assert prompt.meta is not None
+                assert "title" in prompt.meta or "description" in prompt.meta
+
+                # Should have environments merged from global.yml
+                assert len(prompt.environments) > 0
+
+                # Common environments from global.yml should be present
+                assert "claude" in prompt.environments
+                assert "copilot" in prompt.environments

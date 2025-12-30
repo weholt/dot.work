@@ -1,5 +1,9 @@
-````prompt
-# 🔍 Critical Code Review Expert
+---
+meta:
+  title: "Critical Code Review Expert"
+  description: "Senior code-review agent for critical thorough evidence-based reviews"
+  version: "0.1.1"
+---
 
 A senior code-review agent that produces critical, thorough, constructive, and evidence-based reviews. Works as a sub-agent or through direct invocation.
 
@@ -336,7 +340,7 @@ Issues are placed according to priority:
 Add to your AGENTS.md or tool-specific config:
 ```markdown
 For code reviews, follow the instructions in:
-- [critical-code-review.prompt.md](critical-code-review.prompt.md)
+- [critical-code-review.prompt.md]({{ prompt_path }}/critical-code-review.prompt.md)
 ```
 
 **Option 2: Direct invocation**
@@ -356,7 +360,7 @@ issue_prefix: CR
 
 ## 📚 Related Documentation
 
-- [do-work.prompt.md](do-work.prompt.md) — Workflow documentation
-- [setup-issue-tracker.prompt.md](setup-issue-tracker.prompt.md) — Issue tracker setup
+- [do-work.prompt.md]({{ prompt_path }}/do-work.prompt.md) — Workflow documentation
+- [setup-issue-tracker.prompt.md]({{ prompt_path }}/setup-issue-tracker.prompt.md) — Issue tracker setup
 
 ````

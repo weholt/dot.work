@@ -1,8 +1,8 @@
-```prompt
 ---
-title: AI Code Review
-description: Comprehensive code review guidelines for security, performance, and maintainability
-tags: [code-review, security, performance, maintainability, best-practices]
+meta:
+  title: "AI Code Review"
+  description: "Comprehensive code review guidelines for security, performance, and maintainability"
+  version: "0.1.1"
 ---
 
 # AI Code Review Prompt
@@ -72,4 +72,3 @@ You are an expert code reviewer with deep knowledge of software engineering best
 - [ ] Documentation updated if needed
 - [ ] Breaking changes properly communicated
 - [ ] Code follows team conventions and standards
-```

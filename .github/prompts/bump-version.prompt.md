@@ -1,3 +1,9 @@
+---
+meta:
+  title: "Bump Version"
+  description: "Semantic versioning management for any project"
+  version: "0.1.1"
+---
 # 🔢 Bump Version
 
 This prompt manages semantic versioning for any project.

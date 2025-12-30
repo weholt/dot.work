@@ -1,4 +1,9 @@
-# 🚀 Transform Discussion to Python Project
+---
+meta:
+  title: "Python Project from Discussion"
+  description: "Transform a loose discussion into a production-ready Python project"
+  version: "0.1.1"
+---
 
 Convert a loose discussion (markdown or pasted text) into a **production-ready Python project** with proper structure, tooling, and best practices.
 

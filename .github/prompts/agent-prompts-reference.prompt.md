@@ -1,3 +1,10 @@
+---
+meta:
+  title: "Agent Prompts Reference"
+  description: "Quick reference for all available agent prompts and their integration with the issue tracker system"
+  version: "0.1.1"
+---
+
 ````prompt
 # 🤖 Agent Prompts Reference
 
@@ -9,10 +16,10 @@ Quick reference for all available agent prompts and their integration with the i
 
 | Agent | Purpose | Issue Prefix | Output Modes |
 |-------|---------|--------------|--------------|
-| [critical-code-review](critical-code-review.prompt.md) | Critical, evidence-based code review | `CR` | report, issues, both |
-| [spec-delivery-auditor](spec-delivery-auditor.prompt.md) | Verify specs were delivered in code | `SDA` | report, issues, both |
-| [establish-baseline](establish-baseline.prompt.md) | Capture frozen project snapshot | — | report, file, both |
-| [compare-baseline](compare-baseline.prompt.md) | Detect regressions vs baseline | `REG` | report, issues, both |
+| [critical-code-review]({{ prompt_path }}/critical-code-review.prompt.md) | Critical, evidence-based code review | `CR` | report, issues, both |
+| [spec-delivery-auditor]({{ prompt_path }}/spec-delivery-auditor.prompt.md) | Verify specs were delivered in code | `SDA` | report, issues, both |
+| [establish-baseline]({{ prompt_path }}/establish-baseline.prompt.md) | Capture frozen project snapshot | — | report, file, both |
+| [compare-baseline]({{ prompt_path }}/compare-baseline.prompt.md) | Detect regressions vs baseline | `REG` | report, issues, both |
 
 ---
 
@@ -156,10 +163,10 @@ These are instruction documents for AI agents, not executable commands. To use t
 Add to your AGENTS.md or tool-specific config:
 ```markdown
 For code reviews, follow the instructions in:
-- [critical-code-review.prompt.md](critical-code-review.prompt.md)
+- [critical-code-review.prompt.md]({{ prompt_path }}/critical-code-review.prompt.md)
 
 For spec verification, follow:
-- [spec-delivery-auditor.prompt.md](spec-delivery-auditor.prompt.md)
+- [spec-delivery-auditor.prompt.md]({{ prompt_path }}/spec-delivery-auditor.prompt.md)
 ```
 
 ### Option 2: Direct Invocation
@@ -240,11 +247,11 @@ strictness: strict
 
 | Document | Purpose |
 |----------|---------|
-| [do-work.prompt.md](do-work.prompt.md) | Main workflow loop |
-| [setup-issue-tracker.prompt.md](setup-issue-tracker.prompt.md) | Issue tracker initialization |
-| [critical-code-review.prompt.md](critical-code-review.prompt.md) | Code review agent |
-| [spec-delivery-auditor.prompt.md](spec-delivery-auditor.prompt.md) | Spec verification agent |
-| [establish-baseline.prompt.md](establish-baseline.prompt.md) | Baseline capture agent |
-| [compare-baseline.prompt.md](compare-baseline.prompt.md) | Regression detection agent |
+| [do-work.prompt.md]({{ prompt_path }}/do-work.prompt.md) | Main workflow loop |
+| [setup-issue-tracker.prompt.md]({{ prompt_path }}/setup-issue-tracker.prompt.md) | Issue tracker initialization |
+| [critical-code-review.prompt.md]({{ prompt_path }}/critical-code-review.prompt.md) | Code review agent |
+| [spec-delivery-auditor.prompt.md]({{ prompt_path }}/spec-delivery-auditor.prompt.md) | Spec verification agent |
+| [establish-baseline.prompt.md]({{ prompt_path }}/establish-baseline.prompt.md) | Baseline capture agent |
+| [compare-baseline.prompt.md]({{ prompt_path }}/compare-baseline.prompt.md) | Regression detection agent |
 
-````
+```

@@ -1,3 +1,10 @@
+---
+meta:
+  title: "Baseline Comparison Agent"
+  description: "Deterministic comparator that compares current project state against a frozen baseline to detect regressions"
+  version: "0.1.1"
+---
+
 ````prompt
 # 🔄 Baseline Comparison Agent
 
@@ -413,7 +420,7 @@ This agent is called:
 Add to your AGENTS.md or tool-specific config:
 ```markdown
 For regression detection, follow:
-- [compare-baseline.prompt.md](compare-baseline.prompt.md)
+- [compare-baseline.prompt.md]({{ prompt_path }}/compare-baseline.prompt.md)
 ```
 
 **Option 2: Direct invocation**
@@ -448,8 +455,8 @@ determinism:
 
 ## 📚 Related Documentation
 
-- [do-work.prompt.md](do-work.prompt.md) — Workflow documentation
-- [setup-issue-tracker.prompt.md](setup-issue-tracker.prompt.md) — Issue tracker setup
-- [establish-baseline.prompt.md](establish-baseline.prompt.md) — Baseline generation
+- [do-work.prompt.md]({{ prompt_path }}/do-work.prompt.md) — Workflow documentation
+- [setup-issue-tracker.prompt.md]({{ prompt_path }}/setup-issue-tracker.prompt.md) — Issue tracker setup
+- [establish-baseline.prompt.md]({{ prompt_path }}/establish-baseline.prompt.md) — Baseline generation
 
 ````

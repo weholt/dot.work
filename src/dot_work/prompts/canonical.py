@@ -27,12 +27,15 @@ Canonical prompt body content...
 from __future__ import annotations
 
 import io
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 class CanonicalPromptError(Exception):
@@ -119,6 +122,8 @@ class CanonicalPromptParser:
     """
 
     FRONTMATTER_PATTERN = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
+    _global_defaults: dict[str, Any] | None = None
+    _global_defaults_file: Path | None = None
 
     def parse(self, file_path: str | Path) -> CanonicalPrompt:
         """Parse a canonical prompt file."""
@@ -128,13 +133,75 @@ class CanonicalPromptParser:
             raise FileNotFoundError(f"Canonical prompt file not found: {file_path}")
 
         content = file_path.read_text(encoding="utf-8").strip()
-        return self._parse_content(content, source_file=file_path)
+        return self._parse_content(content, source_file=file_path, prompts_dir=file_path.parent)
 
     def parse_content(self, content: str) -> CanonicalPrompt:
         """Parse canonical prompt content directly."""
         return self._parse_content(content.strip())
 
-    def _parse_content(self, content: str, source_file: Path | None = None) -> CanonicalPrompt:
+    def _load_global_defaults(self, prompts_dir: Path) -> dict[str, Any]:
+        """Load global defaults from global.yml if available.
+
+        Args:
+            prompts_dir: Directory containing the prompt files and global.yml
+
+        Returns:
+            Global defaults dict, or empty dict if no global.yml found
+        """
+        global_file = prompts_dir / "global.yml"
+
+        # Return cached defaults if available for this file
+        if self._global_defaults is not None and self._global_defaults_file == global_file:
+            return self._global_defaults
+
+        # Try to load global.yml
+        if global_file.exists():
+            try:
+                content = global_file.read_text(encoding="utf-8")
+                data = yaml.safe_load(content)
+                if isinstance(data, dict) and "defaults" in data:
+                    self._global_defaults = data["defaults"]
+                    self._global_defaults_file = global_file
+                    logger.debug(f"Loaded global defaults from {global_file}")
+                    return self._global_defaults
+            except (OSError, yaml.YAMLError) as e:
+                logger.warning(f"Failed to load global.yml from {global_file}: {e}")
+
+        # No global.yml found or failed to load - return empty defaults
+        self._global_defaults = {}
+        self._global_defaults_file = global_file
+        return {}
+
+    @staticmethod
+    def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+        """Deep merge two dictionaries.
+
+        Values in `override` take precedence over values in `base`.
+        Nested dictionaries are merged recursively.
+
+        Args:
+            base: Base dictionary with default values
+            override: Dictionary with override values
+
+        Returns:
+            Merged dictionary
+        """
+        result = base.copy()
+
+        for key, value in override.items():
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = CanonicalPromptParser._deep_merge(result[key], value)
+            else:
+                result[key] = value
+
+        return result
+
+    def _parse_content(
+        self,
+        content: str,
+        source_file: Path | None = None,
+        prompts_dir: Path | None = None,
+    ) -> CanonicalPrompt:
         """Parse content string into CanonicalPrompt."""
         # Extract frontmatter and content
         match = self.FRONTMATTER_PATTERN.match(content)
@@ -151,8 +218,14 @@ class CanonicalPromptParser:
         except yaml.YAMLError as e:
             raise ValueError(f"Invalid YAML in frontmatter: {e}") from e
 
+        # Load and merge global defaults if prompts_dir is provided
+        if prompts_dir is not None:
+            global_defaults = self._load_global_defaults(prompts_dir)
+            if global_defaults:
+                frontmatter = self._deep_merge(global_defaults, frontmatter)
+
         # Validate frontmatter structure
-        self._validate_frontmatter(frontmatter)
+        self._validate_frontmatter(frontmatter, has_global_defaults=bool(prompts_dir))
 
         # Extract and parse environments
         meta = frontmatter.get("meta", {})
@@ -163,10 +236,30 @@ class CanonicalPromptParser:
             meta=meta, environments=environments, content=prompt_content, source_file=source_file
         )
 
-    def _validate_frontmatter(self, frontmatter: dict[str, Any]) -> None:
-        """Validate frontmatter structure."""
+    def _validate_frontmatter(
+        self, frontmatter: dict[str, Any], has_global_defaults: bool = False
+    ) -> None:
+        """Validate frontmatter structure.
+
+        Args:
+            frontmatter: The parsed frontmatter dict
+            has_global_defaults: Whether global defaults were loaded and merged
+        """
+        # If global defaults were loaded, environments may have come from there
+        # Otherwise, environments must be present in the frontmatter
         if "environments" not in frontmatter:
-            raise ValueError("Frontmatter must contain 'environments' section")
+            if not has_global_defaults:
+                raise ValueError(
+                    "Frontmatter must contain 'environments' section. "
+                    "Add an 'environments' section to the prompt frontmatter, "
+                    "or create a global.yml file with default environments."
+                )
+            else:
+                # This shouldn't happen if global.yml was properly loaded, but check anyway
+                raise ValueError(
+                    "No 'environments' section found in prompt or global defaults. "
+                    "Ensure global.yml contains a 'defaults.environments' section."
+                )
 
         if not isinstance(frontmatter["environments"], dict):
             raise ValueError("'environments' must be a dictionary")

@@ -1,8 +1,9 @@
-```prompt
 ---
-title: Performance Review
-description: Performance analysis guidelines for algorithms, memory, database, and I/O optimization
-tags: [performance, optimization, algorithms, database, caching, code-review]
+meta:
+  title: "Performance Review Prompt"
+  description: "Performance analysis guidelines for algorithms memory database and I/O optimization"
+  version: "0.1.1"
+  tags: [performance, optimization, algorithms, database, caching, code-review]
 ---
 
 # Performance Review Prompt

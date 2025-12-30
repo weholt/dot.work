@@ -1,4 +1,9 @@
-# 📸 Baseline Establisher
+---
+meta:
+  title: "Establish Baseline"
+  description: "Capture frozen project snapshot for regression detection"
+  version: "0.1.1"
+---
 
 A deterministic agent that establishes an evidence-backed baseline snapshot of a project. This baseline is used for future comparison to detect regressions and verify that "nothing got worse."
 
@@ -281,7 +286,7 @@ The baseline itself does not create issues. However:
 Add to your AGENTS.md or tool-specific config:
 ```markdown
 For establishing project baselines, follow:
-- [establish-baseline.prompt.md](establish-baseline.prompt.md)
+- [establish-baseline.prompt.md]({{ prompt_path }}/establish-baseline.prompt.md)
 ```
 
 **Option 2: Direct invocation**
@@ -317,6 +322,6 @@ output_mode: both  # or: report, file
 
 ## 📚 Related Documentation
 
-- [do-work.prompt.md](do-work.prompt.md) — Workflow documentation
-- [setup-issue-tracker.prompt.md](setup-issue-tracker.prompt.md) — Issue tracker setup
-- [compare-baseline.prompt.md](compare-baseline.prompt.md) — Regression detection
+- [do-work.prompt.md]({{ prompt_path }}/do-work.prompt.md) — Workflow documentation
+- [setup-issue-tracker.prompt.md]({{ prompt_path }}/setup-issue-tracker.prompt.md) — Issue tracker setup
+- [compare-baseline.prompt.md]({{ prompt_path }}/compare-baseline.prompt.md) — Regression detection

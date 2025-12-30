@@ -1,8 +1,9 @@
-```prompt
 ---
-title: Task Specification Specialist
-description: Detect and improve poor-quality tasks in the issue backlog
-tags: [task-management, issue-triage, quality, specification, backlog]
+meta:
+  title: "Task Specification Specialist"
+  description: "Detect and improve poor-quality tasks in the issue backlog"
+  version: "0.1.1"
+  tags: [task-management, issue-triage, quality, specification, backlog]
 ---
 
 # Task Specification Specialist

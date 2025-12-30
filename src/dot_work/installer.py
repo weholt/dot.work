@@ -355,7 +355,7 @@ def install_prompts_generic(
             except PermissionError as e:
                 console.print(f"  [red]❌ Permission denied writing to:[/red] {combined_path}")
                 console.print(f"  [dim]Error: {e}[/dim]")
-                console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
                 raise typer.Exit(1)
             except OSError as e:
                 console.print(f"  [red]❌ Failed to write file:[/red] {combined_path}")
@@ -374,7 +374,7 @@ def install_prompts_generic(
         except PermissionError as e:
             console.print(f"  [red]❌ Permission denied creating directory:[/red] {dest_dir}")
             console.print(f"  [dim]Error: {e}[/dim]")
-            console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+            console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
             raise typer.Exit(1)
         except OSError as e:
             console.print(f"  [red]❌ Failed to create directory:[/red] {dest_dir}")
@@ -434,7 +434,7 @@ def install_prompts_generic(
             except PermissionError as e:
                 console.print(f"  [red]❌ Permission denied writing to:[/red] {dest_path}")
                 console.print(f"  [dim]Error: {e}[/dim]")
-                console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
                 raise typer.Exit(1)
             except OSError as e:
                 console.print(f"  [red]❌ Failed to write file:[/red] {dest_path}")
@@ -454,7 +454,7 @@ def install_prompts_generic(
             except PermissionError as e:
                 console.print(f"  [red]❌ Permission denied writing to:[/red] {aux_full_path}")
                 console.print(f"  [dim]Error: {e}[/dim]")
-                console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
                 raise typer.Exit(1)
             except OSError as e:
                 console.print(f"  [red]❌ Failed to write file:[/red] {aux_full_path}")
@@ -497,11 +497,9 @@ def _get_dest_filename(prompt_file: Path, config: InstallerConfig) -> str:
     Returns:
         Destination filename.
     """
-    if config.file_naming == "prompt-suffix":
-        # copilot: use .prompt.md extension for all
-        if prompt_file.name.endswith(".prompt.md"):
-            return prompt_file.name
-        return f"{prompt_file.stem}.prompt.md"
+    if config.file_naming == "keep":
+        # keep: use original name
+        return prompt_file.name
     elif config.file_naming == "mdc-suffix":
         # cursor: use .mdc extension
         return f"{prompt_file.stem}.mdc"
@@ -519,7 +517,7 @@ def install_for_copilot(
     config = InstallerConfig(
         env_key="copilot",
         dest_path=".github/prompts",
-        file_naming="prompt-suffix",
+        file_naming="keep",
         messages=(
             "Installed {name}",
             "Prompts installed to: {path}",
@@ -689,8 +687,8 @@ The following prompts are available in `.opencode/prompts/`:
 ## Usage
 
 Reference these prompts in your conversation:
-- "Read and follow .opencode/prompts/project-from-discussion.prompt.md"
-- "Initialize issue tracking per .opencode/prompts/issue-tracker-setup.prompt.md"
+- "Read and follow .opencode/prompts/project-from-discussion.md"
+- "Initialize issue tracking per .opencode/prompts/issue-tracker-setup.md"
 
 Or use the slash command syntax if supported:
 - `/project-from-discussion`
@@ -709,7 +707,7 @@ Or use the slash command syntax if supported:
         messages=(
             "Installed {name}",
             "Prompts installed to: {path}",
-            "Reference prompts with: 'Read .opencode/prompts/<name>.prompt.md'",
+            "Reference prompts with: 'Read .opencode/prompts/<name>.md'",
         ),
     )
     install_prompts_generic(config, target, prompts_dir, console, force=force, dry_run=dry_run)
@@ -767,8 +765,8 @@ def install_for_generic(
                 "AGENTS.md",
                 "# AI Agent Instructions\n\n"
                 "See the `prompts/` directory for detailed instructions:\n\n"
-                "- `project-from-discussion.prompt.md` - Convert discussions to projects\n"
-                "- `issue-tracker-setup.prompt.md` - Set up file-based issue tracking\n\n"
+                "- `project-from-discussion.md` - Convert discussions to projects\n"
+                "- `issue-tracker-setup.md` - Set up file-based issue tracking\n\n"
                 "When starting a new project, ask the AI to read and follow these prompts.\n",
             )
         ],
@@ -1203,7 +1201,7 @@ def install_canonical_prompt(
     except PermissionError as e:
         console.print(f"  [red]❌ Permission denied creating directory:[/red] {output_dir}")
         console.print(f"  [dim]Error: {e}[/dim]")
-        console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+        console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
         raise typer.Exit(1)
     except OSError as e:
         console.print(f"  [red]❌ Failed to create directory:[/red] {output_dir}")
@@ -1232,7 +1230,7 @@ def install_canonical_prompt(
     except PermissionError as e:
         console.print(f"  [red]❌ Permission denied writing to:[/red] {output_path}")
         console.print(f"  [dim]Error: {e}[/dim]")
-        console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+        console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
         raise typer.Exit(1)
     except OSError as e:
         console.print(f"  [red]❌ Failed to write file:[/red] {output_path}")
@@ -1309,7 +1307,7 @@ def install_canonical_prompt_directory(
 def discover_available_environments(prompts_dir: Path) -> dict[str, set[str]]:
     """Discover available environments from prompt file frontmatter.
 
-    Scans all *.prompt.md files, parses their canonical frontmatter,
+    Scans all *.md files, parses their canonical frontmatter,
     and returns which environments each prompt supports.
 
     Args:
@@ -1324,7 +1322,7 @@ def discover_available_environments(prompts_dir: Path) -> dict[str, set[str]]:
     environments: dict[str, set[str]] = {}
 
     # Find all prompt files with canonical frontmatter
-    for prompt_file in prompts_dir.glob("*.prompt.md"):
+    for prompt_file in prompts_dir.glob("*.md"):
         try:
             prompt = CANONICAL_PARSER.parse(prompt_file)
             prompt_name = prompt_file.stem
@@ -1369,7 +1367,7 @@ def install_canonical_prompts_by_environment(
     """
     from dot_work.prompts.canonical import CANONICAL_PARSER
 
-    prompt_files = list(prompts_dir.glob("*.prompt.md"))
+    prompt_files = list(prompts_dir.glob("*.md"))
     installed_count = 0
     skipped_count = 0
 
@@ -1411,12 +1409,7 @@ def install_canonical_prompts_by_environment(
                 output_filename = env_config.filename
             elif env_config.filename_suffix:
                 # Use prompt file stem with suffix
-                # Handle compound extensions like .prompt.md: Path.stem only removes .md,
-                # leaving 'name.prompt' which would become 'name.prompt.prompt.md'
-                # When the suffix is .prompt.md, strip .prompt from stem first
                 stem = prompt_file.stem
-                if stem.endswith(".prompt") and env_config.filename_suffix == ".prompt.md":
-                    stem = stem[:-7]  # Remove '.prompt' to avoid doubling
                 output_filename = stem + env_config.filename_suffix
             else:
                 # Default to original filename
@@ -1440,18 +1433,18 @@ def install_canonical_prompts_by_environment(
             # Provide actionable guidance for common errors
             if "filename" in error_str.lower() or "filename_suffix" in error_str.lower():
                 console.print(
-                    f"  [dim]💡 Fix: Add 'environments.YOUR_ENV.filename' or 'environments.YOUR_ENV.filename_suffix' to the prompt frontmatter[/dim]"
+                    "  [dim]💡 Fix: Add 'environments.YOUR_ENV.filename' or 'environments.YOUR_ENV.filename_suffix' to the prompt frontmatter[/dim]"
                 )
             elif "yaml" in error_str.lower() or "frontmatter" in error_str.lower():
                 console.print(
-                    f"  [dim]💡 Fix: Check that the frontmatter section (before the first ---) has valid YAML syntax[/dim]"
+                    "  [dim]💡 Fix: Check that the frontmatter section (before the first ---) has valid YAML syntax[/dim]"
                 )
                 console.print(
-                    f"  [dim]💡 Fix: Ensure multi-line values are properly indented or quoted[/dim]"
+                    "  [dim]💡 Fix: Ensure multi-line values are properly indented or quoted[/dim]"
                 )
             elif "document" in error_str.lower():
                 console.print(
-                    f"  [dim]💡 Fix: Ensure there's only one --- separator and one YAML document in the frontmatter[/dim]"
+                    "  [dim]💡 Fix: Ensure there's only one --- separator and one YAML document in the frontmatter[/dim]"
                 )
 
             skipped_count += 1
@@ -1462,7 +1455,7 @@ def install_canonical_prompts_by_environment(
             f"  [dim]💡 Fix: Ensure at least one prompt file has an 'environments.{env_name}' section in its frontmatter[/dim]"
         )
         console.print(
-            f"  [dim]💡 Fix: Run 'dot-work list' to see available environments and their expected frontmatter structure[/dim]"
+            "  [dim]💡 Fix: Run 'dot-work list' to see available environments and their expected frontmatter structure[/dim]"
         )
         raise ValueError(
             f"Environment '{env_name}' not found in any prompt files. "
@@ -1473,7 +1466,7 @@ def install_canonical_prompts_by_environment(
         f"  [dim]💡 Fix: Ensure the prompt file has an 'environments.{env_name}' section in its frontmatter[/dim]"
     )
     console.print(
-        f"  [dim]💡 Fix: Run 'dot-work list' to see available environments and their expected frontmatter structure[/dim]"
+        "  [dim]💡 Fix: Run 'dot-work list' to see available environments and their expected frontmatter structure[/dim]"
     )
 
     # Show batch menu if there are existing files and not in force/dry-run mode
@@ -1505,7 +1498,7 @@ def install_canonical_prompts_by_environment(
             except PermissionError as e:
                 console.print(f"  [red]❌ Permission denied creating directory:[/red] {output_dir}")
                 console.print(f"  [dim]Error: {e}[/dim]")
-                console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
                 raise typer.Exit(1)
             except OSError as e:
                 console.print(f"  [red]❌ Failed to create directory:[/red] {output_dir}")
@@ -1528,7 +1521,7 @@ def install_canonical_prompts_by_environment(
             except PermissionError as e:
                 console.print(f"  [red]❌ Permission denied writing to:[/red] {output_path}")
                 console.print(f"  [dim]Error: {e}[/dim]")
-                console.print(f"  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
                 raise typer.Exit(1)
             except OSError as e:
                 console.print(f"  [red]❌ Failed to write file:[/red] {output_path}")

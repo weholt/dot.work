@@ -6283,3 +6283,80 @@ def has_cycle(self, from_issue_id: str, to_issue_id: str) -> bool:
 - The optimization provides 100-1000x speedup for large graphs
 - Memory overhead is acceptable (one adjacency list in memory)
 - No breaking changes to API or behavior
+
+---
+id: ENH-025@4a8f2c
+title: Global YAML frontmatter configuration for prompts
+description: Create global.yml with default environment configurations that are merged into each prompt at runtime, with local values overriding global defaults
+created: 2025-12-30
+section: dot-work/prompts
+tags: [enhancement, prompts, configuration, duplication]
+type: enhancement
+priority: high
+status: completed
+completed: 2025-12-30
+references:
+  - src/dot_work/prompts/global.yml
+  - src/dot_work/prompts/canonical.py
+  - src/dot_work/prompts/issue-readiness.prompt.md
+
+## Problem
+All 21 prompt files in src/dot_work/prompts/ have duplicate environments section defining 8 environments with identical configuration across all prompts.
+
+## Solution Implemented
+- Created src/dot_work/prompts/global.yml with default environment configurations
+- Modified canonical.py to load and merge global.yml with prompt frontmatter
+- Implemented _deep_merge() function with special handling for environments (complete replacement, not nested merge)
+- Added tests to test_canonical.py for global config loading, merge behavior, local overrides
+- Fixed issue-readiness.prompt.md (missing filename_suffix for continue environment)
+
+## Acceptance Criteria
+- [x] global.yml created with default environment configurations
+- [x] canonical.py loads and merges global.yml
+- [x] Local overrides work correctly
+- [x] All 22 existing prompts work without modification
+- [x] Tests pass (44/44 in test_canonical.py)
+- [x] Backward compatible (works if global.yml is missing)
+
+## Files Changed
+- src/dot_work/prompts/global.yml (NEW)
+- src/dot_work/prompts/canonical.py (added _GLOBAL_CONFIG_PATH, _GLOBAL_CONFIG, _deep_merge(), _load_global_config())
+- src/dot_work/prompts/issue-readiness.prompt.md (added filename_suffix to continue environment)
+- tests/unit/test_canonical.py (added TestGlobalConfig class with 8 tests)
+
+
+---
+
+## 2025-12-30: Remove Duplicate Environment Frontmatter from Prompts (REFACTOR-003)
+
+| Issue | Status | Completed |
+|-------|--------|----------|
+| REFACTOR-003@f4a8b2 | ✅ Complete | 2025-12-30 |
+
+### Summary
+- **Type**: Refactor (P2 Medium)
+- **Title**: Remove duplicate environment frontmatter from canonical prompts
+- **Status**: ✅ Complete
+
+### Problem
+Every canonical prompt file contained a full `environments:` section (28 lines) that duplicated the default configuration in `global.yml`. This created maintenance overhead - changes to environment targets required updating 23+ files.
+
+### Solution
+1. Fixed `global.yml`: Changed `copilot.filename_suffix` from `.md` to `.prompt.md`
+2. Removed duplicate `environments:` sections from all 22 prompt files (now only contain `meta:`)
+3. Updated `wizard.py`: Modified `_create_prompt_file()` to generate minimal frontmatter
+
+### Files Modified
+- `src/dot_work/prompts/global.yml` - fixed copilot suffix
+- `src/dot_work/prompts/*.md` (22 files) - removed duplicate environments
+- `src/dot_work/prompts/wizard.py` - generate minimal frontmatter
+
+### Verification
+- All 22 prompts parse correctly with 9 environments inherited from global.yml
+- copilot suffix correctly set to `.prompt.md`
+- All 44 unit tests pass in `test_canonical.py`
+- No regressions detected
+
+### Notes
+- The `_deep_merge()` function in canonical.py already handled global.yml merging correctly
+- Prompts that need environment-specific overrides can still include an `environments:` section with only the overridden values

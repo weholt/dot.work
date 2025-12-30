@@ -1,8 +1,9 @@
-```prompt
 ---
-title: Make This Code More Pythonic
-description: Python refactoring checklist for type annotations, dataclasses, context managers, and idioms
-tags: [python, refactoring, pythonic, pep8, best-practices]
+meta:
+  title: "Make This Code More Pythonic"
+  description: "Python refactoring checklist for type annotations dataclasses and idioms"
+  version: "0.1.1"
+  tags: [python, refactoring, pythonic, pep8, best-practices]
 ---
 
 # 🧩 Reusable Prompt — "Make This Code More Pythonic"

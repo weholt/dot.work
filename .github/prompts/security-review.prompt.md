@@ -1,8 +1,9 @@
-```prompt
 ---
-title: Security Review
-description: OWASP-based security checklist for identifying and preventing vulnerabilities
-tags: [security, owasp, authentication, authorization, code-review]
+meta:
+  title: "Security Review"
+  description: "OWASP-based security checklist for identifying and preventing vulnerabilities"
+  version: "0.1.1"
+  tags: [security, owasp, authentication, authorization, code-review]
 ---
 
 # Security Review Prompt
