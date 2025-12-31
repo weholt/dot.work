@@ -25,38 +25,53 @@ class ComplexityCalculator:
 
     def __init__(self):
         # Complexity weights for different factors
+        #
+        # Rationale for weight values:
+        # - Line changes: Deletions weighted higher (0.015) than additions (0.01) because
+        #   removing code can have subtle ripple effects that are harder to review than
+        #   new code which is typically more straightforward.
+        # - Message indicators: Breaking changes (25.0) and security (20.0) weighted highest
+        #   as they represent highest risk. Refactor (15.0) and migration (18.0) are high
+        #   complexity due to broad impact. Performance (12.0) and hotfix (12.0) indicate
+        #   urgency and complexity. Feature work (10.0) is standard complexity, bugs (8.0)
+        #   are typically localized. WIP (5.0) and draft (3.0) are lower as they may be
+        #   incomplete.
+        # - File types: Deployment (1.5x) and config (1.2x) weighted higher due to risk.
+        #   Tests (0.7x) and docs (0.3x via patterns) weighted lower as they're safer.
+        # - Change types: New files (1.2x) require more review than modifications (1.0x).
+        #   Deletions (0.8x) are simpler than additions. Renames (0.6x) are simplest.
         self.weights = {
-            "files_changed": 5.0,  # Per file
-            "lines_added": 0.01,  # Per line added
-            "lines_deleted": 0.015,  # Per line deleted (higher cost for deletions)
+            "files_changed": 5.0,  # Per file - each file adds context switching overhead
+            "lines_added": 0.01,  # Per line added - baseline complexity
+            "lines_deleted": 0.015,  # Per line deleted - higher cost due to ripple effects
             "file_types": {  # Multipliers for different file types
-                FileCategory.CODE: 1.0,
-                FileCategory.TESTS: 0.7,
-                FileCategory.CONFIG: 1.2,
-                FileCategory.DOCUMENTATION: 0.3,
-                FileCategory.DATA: 0.5,
-                FileCategory.BUILD: 0.8,
-                FileCategory.DEPLOYMENT: 1.5,
-                FileCategory.UNKNOWN: 0.6,
+                FileCategory.CODE: 1.0,  # Baseline for code changes
+                FileCategory.TESTS: 0.7,  # Tests are lower risk than production code
+                FileCategory.CONFIG: 1.2,  # Config changes can have broad impact
+                FileCategory.DOCUMENTATION: 0.3,  # Docs are very low risk
+                FileCategory.DATA: 0.5,  # Data changes are moderate risk
+                FileCategory.BUILD: 0.8,  # Build changes are moderate complexity
+                FileCategory.DEPLOYMENT: 1.5,  # Deployment changes are high risk
+                FileCategory.UNKNOWN: 0.6,  # Unknown files get moderate weight
             },
             "change_types": {
-                ChangeType.ADDED: 1.2,
-                ChangeType.DELETED: 0.8,
-                ChangeType.MODIFIED: 1.0,
-                ChangeType.RENAMED: 0.6,
-                ChangeType.COPIED: 0.7,
+                ChangeType.ADDED: 1.2,  # New files require understanding from scratch
+                ChangeType.DELETED: 0.8,  # Deletions simplify the codebase
+                ChangeType.MODIFIED: 1.0,  # Baseline for modifications
+                ChangeType.RENAMED: 0.6,  # Renames are typically straightforward
+                ChangeType.COPIED: 0.7,  # Copies add some duplication
             },
             "message_indicators": {
-                "breaking": 25.0,
-                "security": 20.0,
-                "refactor": 15.0,
-                "migration": 18.0,
-                "performance": 12.0,
-                "feature": 10.0,
-                "bug": 8.0,
-                "hotfix": 12.0,
-                "wip": 5.0,  # Work in progress
-                "draft": 3.0,
+                "breaking": 25.0,  # Breaking changes have highest impact/risk
+                "security": 20.0,  # Security issues are critical
+                "migration": 18.0,  # Migrations affect entire data model
+                "refactor": 15.0,  # Refactors touch many files
+                "performance": 12.0,  # Perf changes require careful analysis
+                "hotfix": 12.0,  # Hotfixes are urgent and risky
+                "feature": 10.0,  # New features are standard complexity
+                "bug": 8.0,  # Bug fixes are typically localized
+                "wip": 5.0,  # Work in progress - may be incomplete
+                "draft": 3.0,  # Drafts are not final
             },
             "file_complexity_patterns": [
                 # High complexity patterns

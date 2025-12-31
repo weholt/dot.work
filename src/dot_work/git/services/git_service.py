@@ -91,6 +91,8 @@ class GitAnalysisService:
             raise ValueError(f"No commits found between {from_ref} and {to_ref}")
 
         # Analyze each commit
+        # Note: estimated_remaining_seconds is a rough estimate (~2s per commit)
+        # for progress display purposes only, not based on actual timing.
         progress = AnalysisProgress(
             total_commits=len(commits),
             processed_commits=0,
