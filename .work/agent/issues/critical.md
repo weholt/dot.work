@@ -361,3 +361,153 @@ None. Decision received: Rename `init-work` to `init-tracking`.
 This gap was discovered during dogfooding phase 1 (baseline documentation review). The discovery methodology emphasized documentation-only analysis to simulate a new user's experience.
 
 ---
+---
+
+id: "CR-099@t7u5v6"
+title: "Silent Failures in Git History Analysis with Empty Results"
+description: "Commit analysis failures caught and logged but analysis continues with empty data"
+created: 2024-12-31
+section: "git"
+tags: [error-handling, correctness, silent-failure]
+type: refactor
+priority: critical
+status: proposed
+references:
+  - src/dot_work/git/services/git_service.py
+  - src/dot_work/git/services/llm_summarizer.py
+---
+
+### Problem
+In `git_service.py:101-122`, commit analysis failures are caught and logged but execution continues with partial data:
+
+```python
+for commit in tqdm(commits, desc="Analyzing commits"):
+    try:
+        analysis = self.analyze_commit(commit.hexsha)
+        analyzed_commits.append(analysis)
+        progress.processed_commits += 1
+    except Exception as e:
+        error_msg = f"Failed to analyze commit {commit.hexsha}: {e}"
+        self.logger.error(error_msg)
+        failed_commits.append((commit.hexsha, str(e)))
+        continue  # Continues with incomplete data
+```
+
+If multiple commits fail, the subsequent analysis (metadata calculation, contributor stats, summaries) is based on incomplete data, potentially producing misleading results.
+
+### Affected Files
+- `src/dot_work/git/services/git_service.py` (lines 101-122)
+- `src/dot_work/git/services/llm_summarizer.py` (multiple exception handlers)
+
+### Importance
+**CRITICAL**: Silent failures produce misleading analysis results:
+- Contributor statistics skewed by missing commits
+- Risk assessment based on incomplete data
+- Aggregate summaries inaccurate
+- User receives false confidence in analysis
+
+### Proposed Solution
+1. Require minimum success rate (e.g., 90% of commits must analyze successfully)
+2. Add `--continue-on-failure` flag for explicit opt-in to partial results
+3. Exit with error if too many commits fail
+4. Report percentage of successful analysis in output
+
+```python
+success_rate = len(analyzed_commits) / len(commits)
+if success_rate < 0.9:
+    raise ValueError(
+        f"Analysis failed: {success_rate:.1%} commits succeeded. "
+        f"Use --continue-on-failure to proceed with partial results."
+    )
+```
+
+### Acceptance Criteria
+- [ ] Analysis exits with error if success rate below threshold
+- [ ] `--continue-on-failure` flag for explicit partial results opt-in
+- [ ] Success rate reported in output metadata
+- [ ] Tests verify failure handling behavior
+
+---
+---
+
+id: "CR-100@u8v6w7"
+title: "Knowledge Graph Database Operations Lack Atomicity Guarantees"
+description: "Multi-step database operations without transaction management can leave database in inconsistent state"
+created: 2024-12-31
+section: "knowledge_graph"
+tags: [correctness, state-management, transactions]
+type: refactor
+priority: critical
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/db.py
+  - src/dot_work/knowledge_graph/search_semantic.py
+---
+
+### Problem
+In `db.py`, multi-step database operations lack explicit transaction management:
+
+1. **Node and edge insertion** (lines 1000+): Nodes, edges, and embeddings inserted separately
+2. **Document operations**: Document, nodes, edges, embeddings inserted in sequence
+3. **No explicit rollback**: If later steps fail, earlier insertions remain
+
+Example pattern observed in multiple methods:
+```python
+# Insert document
+self.insert_document(doc_id, source_path, sha256, raw)
+# Insert nodes (may fail)
+for node in nodes:
+    self.insert_node(node)
+# Insert edges (may fail)
+for edge in edges:
+    self.insert_edge(edge)
+# If edges fail, document and nodes remain in database
+```
+
+### Affected Files
+- `src/dot_work/knowledge_graph/db.py` (document/node/edge insertion methods)
+- `src/dot_work/knowledge_graph/search_semantic.py` (multi-step queries)
+
+### Importance
+**CRITICAL**: Data integrity issues without transactions:
+- Partial insertions leave database inconsistent
+- No rollback mechanism for failed operations
+- Referential integrity violations possible
+- User must manually clean up partial state
+
+### Proposed Solution
+1. Add explicit transaction context manager
+2. Wrap multi-step operations in transactions
+3. Ensure atomic commits or rollbacks
+
+```python
+@contextmanager
+def transaction(self):
+    """Begin a transaction for atomic operations."""
+    cursor = self.conn.cursor()
+    try:
+        cursor.execute("BEGIN")
+        yield cursor
+        cursor.execute("COMMIT")
+    except Exception:
+        cursor.execute("ROLLBACK")
+        raise
+
+# Usage
+with self.transaction() as cursor:
+    self.insert_document(...)
+    for node in nodes:
+        self.insert_node(node)
+    for edge in edges:
+        self.insert_edge(edge)
+    # All succeed or all fail
+```
+
+### Acceptance Criteria
+- [ ] Transaction context manager implemented
+- [ ] Multi-step operations wrapped in transactions
+- [ ] Rollback on exception tested
+- [ ] No orphaned data after failed operations
+
+---
+

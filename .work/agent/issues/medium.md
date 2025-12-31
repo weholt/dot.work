@@ -5,6 +5,200 @@ Enhancements, technical debt, code quality improvements.
 ---
 
 ---
+id: "PERF-014@9c7e2b"
+title: "Repeated regex compilation in ComplexityCalculator._get_pattern_weight()"
+description: "File complexity patterns recompiled on every file categorization"
+created: 2025-12-31
+section: "git"
+tags: [performance, regex, compilation]
+type: performance
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/services/complexity.py
+---
+
+### Problem
+In `complexity.py:138-143`, `_get_pattern_weight()` uses `re.search()` on patterns that are compiled on every call. The `file_complexity_patterns` list has ~15 regex patterns.
+
+```python
+def _get_pattern_weight(self, file_path: str) -> float:
+    for pattern, weight in self.weights["file_complexity_patterns"]:
+        if re.search(pattern, file_path, re.IGNORECASE):  # ← Compiles pattern every time
+            return weight
+    return 1.0
+```
+
+This is called for every file in every commit during complexity analysis.
+
+### Affected Files
+- `src/dot_work/git/services/complexity.py` (lines 47-58, 138-143)
+
+### Impact
+For analyzing 1000 file changes:
+- Current: 1000 files × ~15 patterns = 15,000 regex compilations
+- Optimized: 15 regex compilations once at initialization
+
+### Proposed Solution
+Pre-compile patterns in `__init__`:
+
+```python
+def __init__(self):
+    # ... existing code ...
+
+    # Pre-compile file complexity patterns
+    self._compiled_complexity_patterns = [
+        (re.compile(pattern, re.IGNORECASE), weight)
+        for pattern, weight in self.weights["file_complexity_patterns"]
+    ]
+
+def _get_pattern_weight(self, file_path: str) -> float:
+    for pattern, weight in self._compiled_complexity_patterns:
+        if pattern.search(file_path):
+            return weight
+    return 1.0
+```
+
+### Acceptance Criteria
+- [ ] File complexity patterns pre-compiled at initialization
+- [ ] `_get_pattern_weight()` uses compiled patterns
+- [ ] Existing tests pass
+- [ ] No regression in complexity calculations
+
+---
+
+---
+id: "PERF-015@2d8e5a"
+title: "Inefficient string concatenation in risk factor detection"
+description: "Any/any pattern in risk_factors creates intermediate lists"
+created: 2025-12-31
+section: "git"
+tags: [performance, algorithm, complexity]
+type: performance
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/services/complexity.py
+---
+
+### Problem
+In `complexity.py:358-376`, the risk factor detection uses nested `any()` calls that create generator expressions and intermediate lists:
+
+```python
+for file_change in commit.files_changed:
+    if any(
+        pattern in file_change.path.lower()
+        for pattern in [
+            "migration", "schema", "database", "auth", "security",
+            "permission", "role", "cert", "key", "secret"
+        ]
+    ):
+        risk_factors.append(f"High-risk file modified: {file_change.path}")
+```
+
+The pattern list is created on every iteration, and `file_change.path.lower()` is called repeatedly.
+
+### Affected Files
+- `src/dot_work/git/services/complexity.py` (lines 358-376)
+
+### Impact
+- For F files and P patterns: F × P string comparisons
+- Pattern list created F times instead of once
+- `path.lower()` called P times per file instead of once
+
+### Proposed Solution
+Move pattern list to class constant and cache lowercased path:
+
+```python
+class ComplexityCalculator:
+    _RISKY_PATH_PATTERNS = [
+        "migration", "schema", "database", "auth", "security",
+        "permission", "role", "cert", "key", "secret"
+    ]
+
+def identify_risk_factors(self, commit: ChangeAnalysis) -> list[str]:
+    # ... existing code ...
+
+    # Check for risky file patterns
+    for file_change in commit.files_changed:
+        path_lower = file_change.path.lower()
+        if any(pattern in path_lower for pattern in self._RISKY_PATH_PATTERNS):
+            risk_factors.append(f"High-risk file modified: {file_change.path}")
+```
+
+### Acceptance Criteria
+- [ ] Risky patterns defined as class constant
+- [ ] `path.lower()` called once per file
+- [ ] Existing tests pass
+- [ ] No functional regression
+
+---
+
+---
+id: "PERF-016@4b9f7c"
+title: "Potential memory leak in SQLAlchemy adapter without explicit disposal"
+description: "UnitOfWork creates engine but lacks explicit cleanup method"
+created: 2025-12-31
+section: "database"
+tags: [performance, memory, database]
+type: performance
+priority: medium
+status: proposed
+references:
+  - src/dot_work/db_issues/adapters/sqlite.py
+---
+
+### Problem
+In `sqlite.py`, the `UnitOfWork` creates a SQLAlchemy engine but doesn't provide explicit disposal. While SQLAlchemy has connection pooling, long-running processes may accumulate connections.
+
+```python
+class UnitOfWork(SqlAlchemyUnitOfWork):
+    def __init__(self, db_path: str) -> None:
+        self._engine = create_engine(  # ← Engine created but never explicitly disposed
+            f"sqlite:///{db_path}",
+            connect_args={"check_same_thread": False},
+        )
+        self.session_factory = sessionmaker(bind=self._engine)
+```
+
+### Affected Files
+- `src/dot_work/db_issues/adapters/sqlite.py` (entire class)
+
+### Impact
+- In long-running CLI sessions, connections may accumulate
+- No explicit cleanup mechanism for resource disposal
+- Potential file handle leaks on SQLite
+
+### Proposed Solution
+Add explicit disposal method and context manager support:
+
+```python
+class UnitOfWork(SqlAlchemyUnitOfWork):
+    def __init__(self, db_path: str) -> None:
+        # ... existing code ...
+
+    def dispose(self) -> None:
+        """Dispose of database engine and release resources."""
+        if self._engine:
+            self._engine.dispose()
+            self._engine = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.dispose()
+```
+
+### Acceptance Criteria
+- [ ] `dispose()` method added
+- [ ] Context manager support implemented
+- [ ] CLI commands use context manager for long operations
+- [ ] Existing tests pass
+
+---
+
+---
 id: "CR-028@a4b6c8"
 title: "Display functions in git/cli.py should be extracted to formatters module"
 description: "260 lines of _display_* functions embedded in CLI module"
@@ -3266,5 +3460,231 @@ def index(
 - [ ] Tests can inject different file states
 
 ---
+---
+
+id: "CR-103@y1z2a3"
+title: "Installer Module Compound Extension Logic Has Hidden Complexity"
+description: "Compound extension handling in installer.py has unclear edge cases and insufficient documentation"
+created: 2024-12-31
+section: "installer"
+tags: [complexity, hidden-control-flow, cognitive-load]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/installer.py
+  - tests/unit/test_installer.py
+---
+
+### Problem
+In `installer.py`, compound extension handling (handling compound prompts like "base+python") has hidden complexity:
+
+**Observed issues:**
+1. **Complex string parsing**: Extensions like `.base+python.md` parsed with unclear rules
+2. **Hidden precedence**: When both single and compound extensions exist, behavior is unclear
+3. **Edge cases unclear**: What happens with `base+python+review.md`?
+4. **No validation**: Invalid compound formats may fail silently
+
+The fix in "857535c" addressed some issues, but the logic remains complex and hard to follow.
+
+### Affected Files
+- `src/dot_work/installer.py` (compound extension handling)
+- `tests/unit/test_installer.py` (test coverage for compound extensions)
+
+### Importance
+**MEDIUM**: Cognitive load and maintainability concern:
+- Complex parsing logic hard to understand
+- Edge cases may produce unexpected behavior
+- Adding new extension types requires understanding hidden rules
+- Tests cover basic cases but edge cases undocumented
+
+### Proposed Solution
+1. Extract compound extension parsing to separate class
+2. Document all edge cases and precedence rules
+3. Add validation for invalid compound formats
+4. Use regex or formal grammar for parsing
+
+```python
+class CompoundExtension:
+    """Handles compound prompt extensions like 'base+python'."""
+
+    PART_SEPARATOR = "+"
+    MAX_PARTS = 3
+
+    def __init__(self, extension: str):
+        parts = extension.rstrip(".md").split(self.PART_SEPARATOR)
+        if len(parts) > self.MAX_PARTS:
+            raise ValueError(
+                f"Compound extension has {len(parts)} parts, "
+                f"maximum {self.MAX_PARTS} allowed"
+            )
+        self.parts = parts
+        self.base = parts[0]
+        self.modifiers = parts[1:]
+
+    def __str__(self) -> str:
+        return f".{self.PART_SEPARATOR.join(self.parts)}.md"
+```
+
+### Acceptance Criteria
+- [ ] Compound extension parsing extracted to class
+- [ ] All edge cases documented
+- [ ] Invalid formats raise clear errors
+- [ ] Tests cover all edge cases
+
+---
+---
+
+id: "CR-104@z2a3b4"
+title: "Canonical Prompt Parser Has Unclear Purpose for Multiple Parsing Methods"
+description: "Multiple parsing methods in canonical.py without clear differentiation of use cases"
+created: 2024-12-31
+section: "prompts"
+tags: [abstraction-clarity, api-design]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/prompts/canonical.py
+  - tests/unit/test_canonical.py
+---
+
+### Problem
+In `canonical.py`, the `CanonicalPromptParser` class has multiple parsing methods with unclear purpose:
+
+**Methods observed:**
+1. `parse()` - Main parsing method
+2. `parse_frontmatter()` - Extracts frontmatter only
+3. `parse_content()` - Parses content sections
+4. `parse_sections()` - Parses individual sections
+
+**Issues:**
+1. **Unclear responsibility**: Which method should be called externally?
+2. **Hidden dependencies**: Methods call each other in non-obvious ways
+3. **Public vs private**: All methods public but some seem internal
+4. **No use case documentation**: When to use `parse_frontmatter()` vs `parse()`?
+
+The `@dataclass` classes and parser lack clear guidance on which methods form the public API.
+
+### Affected Files
+- `src/dot_work/prompts/canonical.py` (parser class, lines 200-400)
+- Tests for canonical prompts
+
+### Importance
+**MEDIUM**: API clarity and usage guidance concern:
+- Users don't know which parsing method to use
+- Unclear what the "public API" is
+- Hard to add new features without breaking existing usage
+- Tests cover implementation but not use cases
+
+### Proposed Solution
+1. Clarify public vs private API with `_` prefix for internal methods
+2. Add use case documentation to each public method
+3. Consider splitting into separate classes for different use cases
+4. Add usage examples in docstrings
+
+```python
+class CanonicalPromptParser:
+    """Parse canonical prompt files.
+
+    Public API:
+    - parse() : Parse entire file (most common use case)
+    - parse_frontmatter() : Extract metadata only
+
+    Internal methods (prefixed with _):
+    - _parse_content() : Parse content sections
+    - _parse_sections() : Parse individual sections
+    """
+```
+
+### Acceptance Criteria
+- [ ] Public API clearly documented
+- [ ] Internal methods prefixed with `_`
+- [ ] Use cases documented for each public method
+- [ ] Usage examples in docstrings
+
+---
+---
+
+id: "CR-105@a3b4c5"
+title: "Prompt Installer Discovery Logic Has Unclear Contract"
+description: "discover_available_environments() has unclear contract with callers about environment handling"
+created: 2024-12-31
+section: "installer"
+tags: [abstraction-clarity, api-design]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/installer.py
+  - src/dot_work/cli.py (lines 115-146)
+---
+
+### Problem
+In `installer.py`, `discover_available_environments()` has an unclear contract:
+
+**Observed issues:**
+1. **Unclear return type**: Returns dict but what if no environments found?
+2. **Error handling**: What happens if prompts_dir doesn't exist?
+3. **Caller confusion**: `cli.py:115-146` shows complex interaction
+
+From `cli.py:138-146`:
+```python
+if env_key not in discovered_envs:
+    console.print(
+        f"[yellow]⚠ Environment '{env_key}' not found in any prompt frontmatter.[/yellow]"
+    )
+    if not typer.confirm("Continue with legacy installation?", default=False):
+        raise typer.Exit(0)
+```
+
+This implies the function's contract is unclear - what's "legacy installation"?
+
+### Affected Files
+- `src/dot_work/installer.py` (`discover_available_environments`)
+- `src/dot_work/cli.py` (lines 115-146, caller logic)
+
+### Importance
+**MEDIUM**: API clarity concern:
+- Caller doesn't know what to expect from the function
+- "Legacy installation" concept unclear
+- No documented error handling behavior
+- Function's purpose unclear from name alone
+
+### Proposed Solution
+1. Document function contract explicitly
+2. Return a result object with success/failure status
+3. Clarify "legacy installation" concept
+4. Add tests for edge cases
+
+```python
+@dataclass
+class DiscoveryResult:
+    """Result of environment discovery."""
+    environments: dict[str, str]  # env_key -> prompt_count
+    has_prompts: bool
+    prompts_dir: Path
+
+def discover_available_environments(
+    prompts_dir: Path
+) -> DiscoveryResult:
+    """Discover environments from prompt frontmatter.
+
+    Returns:
+        DiscoveryResult with discovered environments and metadata.
+
+    Raises:
+        FileNotFoundError: If prompts_dir doesn't exist
+    """
+```
+
+### Acceptance Criteria
+- [ ] Function contract documented
+- [ ] Return type changed to result object
+- [ ] Error handling documented
+- [ ] Tests cover edge cases
+
+---
+
 
 ---
