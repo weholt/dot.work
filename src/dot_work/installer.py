@@ -135,6 +135,7 @@ def render_prompt(
     prompts_dir: Path,
     prompt_file: Path,
     env_config: Environment,
+    jinja_env: JinjaEnvironment | None = None,
 ) -> str:
     """Render a prompt template with environment-specific variables.
 
@@ -142,6 +143,8 @@ def render_prompt(
         prompts_dir: Path to the directory containing prompt templates.
         prompt_file: Path to the specific prompt file to render.
         env_config: Environment configuration with template values.
+        jinja_env: Optional pre-configured Jinja2 environment for reusing
+            across multiple calls. If not provided, creates a new one.
 
     Returns:
         Rendered prompt content with all template variables substituted.
@@ -150,7 +153,8 @@ def render_prompt(
         jinja2.TemplateNotFound: If the template file doesn't exist.
         jinja2.TemplateSyntaxError: If the template has invalid syntax.
     """
-    jinja_env = create_jinja_env(prompts_dir)
+    if jinja_env is None:
+        jinja_env = create_jinja_env(prompts_dir)
     template = jinja_env.get_template(prompt_file.name)
     context = build_template_context(env_config)
     return template.render(**context)
@@ -326,8 +330,11 @@ def install_prompts_generic(
             sorted(prompts_dir.glob("*.md")) if config.sort_files else prompts_dir.glob("*.md")
         )
 
+        # Create Jinja2 environment once for all files
+        jinja_env = create_jinja_env(prompts_dir)
+
         for prompt_file in prompt_files:
-            content = render_prompt(prompts_dir, prompt_file, env_config)
+            content = render_prompt(prompts_dir, prompt_file, env_config, jinja_env)
             title = prompt_file.stem.replace("-", " ").replace("_", " ").title()
             sections.append(f"---\n\n## {title}\n\n")
             sections.append(content)
@@ -397,6 +404,9 @@ def install_prompts_generic(
             console.print("[yellow]Installation cancelled.[/yellow]")
             return
 
+    # Create Jinja2 environment once for all files
+    jinja_env = create_jinja_env(prompts_dir)
+
     # Process each file
     for prompt_file in prompt_files:
         # Determine destination filename
@@ -416,7 +426,7 @@ def install_prompts_generic(
         else:
             # Render and write
             try:
-                rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
+                rendered_content = render_prompt(prompts_dir, prompt_file, env_config, jinja_env)
                 dest_path.write_text(rendered_content, encoding="utf-8")
                 console.print(f"  [green]✓[/green] {config.messages[0].format(name=dest_name)}")
             except PermissionError as e:
@@ -917,12 +927,11 @@ def detect_project_context(target: Path) -> dict[str, str]:
         "test_framework": "unknown",
     }
 
-    # Detect Python
-    if (target / "pyproject.toml").exists():
+    # Detect Python - read file once
+    try:
+        pyproject_content = (target / "pyproject.toml").read_text(encoding="utf-8")
         context["language"] = "Python"
         context["package_manager"] = "uv or pip"
-
-        pyproject_content = (target / "pyproject.toml").read_text(encoding="utf-8")
         if "pytest" in pyproject_content:
             context["test_framework"] = "pytest"
         if "typer" in pyproject_content:
@@ -933,38 +942,41 @@ def detect_project_context(target: Path) -> dict[str, str]:
             context["framework"] = "Django"
         elif "flask" in pyproject_content:
             context["framework"] = "Flask"
+    except FileNotFoundError:
+        # Check for requirements.txt as fallback
+        if (target / "requirements.txt").exists():
+            context["language"] = "Python"
+            context["package_manager"] = "pip"
 
-    elif (target / "requirements.txt").exists():
-        context["language"] = "Python"
-        context["package_manager"] = "pip"
-
-    # Detect Node.js
-    elif (target / "package.json").exists():
-        context["language"] = "JavaScript/TypeScript"
-        context["package_manager"] = "npm or yarn"
-
-        pkg_content = (target / "package.json").read_text(encoding="utf-8")
-        if "jest" in pkg_content:
-            context["test_framework"] = "Jest"
-        elif "mocha" in pkg_content:
-            context["test_framework"] = "Mocha"
-        if "next" in pkg_content:
-            context["framework"] = "Next.js"
-        elif "react" in pkg_content:
-            context["framework"] = "React"
-        elif "vue" in pkg_content:
-            context["framework"] = "Vue"
-        elif "express" in pkg_content:
-            context["framework"] = "Express"
+    # Detect Node.js - read file once
+    if context["language"] == "unknown":
+        try:
+            pkg_content = (target / "package.json").read_text(encoding="utf-8")
+            context["language"] = "JavaScript/TypeScript"
+            context["package_manager"] = "npm or yarn"
+            if "jest" in pkg_content:
+                context["test_framework"] = "Jest"
+            elif "mocha" in pkg_content:
+                context["test_framework"] = "Mocha"
+            if "next" in pkg_content:
+                context["framework"] = "Next.js"
+            elif "react" in pkg_content:
+                context["framework"] = "React"
+            elif "vue" in pkg_content:
+                context["framework"] = "Vue"
+            elif "express" in pkg_content:
+                context["framework"] = "Express"
+        except FileNotFoundError:
+            pass
 
     # Detect Rust
-    elif (target / "Cargo.toml").exists():
+    if context["language"] == "unknown" and (target / "Cargo.toml").exists():
         context["language"] = "Rust"
         context["package_manager"] = "cargo"
         context["test_framework"] = "cargo test"
 
     # Detect Go
-    elif (target / "go.mod").exists():
+    if context["language"] == "unknown" and (target / "go.mod").exists():
         context["language"] = "Go"
         context["package_manager"] = "go modules"
         context["test_framework"] = "go test"

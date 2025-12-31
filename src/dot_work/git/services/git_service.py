@@ -45,6 +45,7 @@ class GitAnalysisService:
         self.tag_generator = TagGenerator()
         self.logger = logging.getLogger(__name__)
         self._commit_to_branch_cache: dict[str, str] = {}
+        self._tag_to_commit_cache: dict[str, list[str]] = {}
 
         # Initialize git repository
         self._initialize_repo()
@@ -80,6 +81,9 @@ class GitAnalysisService:
         # Build commit-to-branch mapping cache once for all commits
         self._commit_to_branch_cache = self._build_commit_branch_mapping()
 
+        # Build tag-to-commit mapping cache once for all commits
+        self._tag_to_commit_cache = self._build_tag_commit_mapping()
+
         # Get commits between references
         commits = self._get_commits_between_refs(from_ref, to_ref)
 
@@ -111,17 +115,35 @@ class GitAnalysisService:
 
         # Log failure summary if any commits failed
         if failed_commits:
+            success_rate = len(analyzed_commits) / len(commits)
             self.logger.warning(
                 f"Commit analysis completed with {len(failed_commits)} failures "
-                f"out of {len(commits)} total commits"
+                f"out of {len(commits)} total commits ({success_rate:.1%} success rate)"
             )
             for commit_hash, error in failed_commits[:5]:  # Log first 5 failures
                 self.logger.warning(f"  - {commit_hash[:8]}: {error}")
             if len(failed_commits) > 5:
                 self.logger.warning(f"  ... and {len(failed_commits) - 5} more failures")
 
+            # Check if success rate is below minimum threshold
+            if success_rate < self.config.min_success_rate:
+                if self.config.continue_on_failure:
+                    self.logger.warning(
+                        f"Success rate {success_rate:.1%} is below threshold "
+                        f"{self.config.min_success_rate:.1%}, but continuing due to "
+                        f"continue_on_failure=True"
+                    )
+                else:
+                    raise ValueError(
+                        f"Analysis failed: only {success_rate:.1%} of commits succeeded "
+                        f"(minimum: {self.config.min_success_rate:.1%}). "
+                        f"Use continue_on_failure=True to proceed with partial results."
+                    )
+
         # Calculate comparison metadata
-        metadata = self._calculate_comparison_metadata(from_ref, to_ref, analyzed_commits)
+        metadata = self._calculate_comparison_metadata(
+            from_ref, to_ref, analyzed_commits, failed_commits
+        )
 
         # Calculate contributor statistics
         contributors = self._calculate_contributor_stats(analyzed_commits)
@@ -358,6 +380,32 @@ class GitAnalysisService:
 
         return mapping
 
+    def _build_tag_commit_mapping(self) -> dict[str, list[str]]:
+        """Build a mapping of commit SHAs to tag names.
+
+        This pre-computes the mapping once, avoiding O(n*m) repeated lookups.
+        For a repo with T tags and C commits, this is O(T) once versus O(T)
+        per commit without caching.
+
+        Returns:
+            Dictionary mapping commit SHA to list of tag names
+        """
+        if self.repo is None:
+            return {}
+
+        mapping: dict[str, list[str]] = {}
+        try:
+            for tag in self.repo.tags:
+                sha = tag.commit.hexsha
+                if sha not in mapping:
+                    mapping[sha] = []
+                mapping[sha].append(tag.name)
+            self.logger.debug(f"Built tag-to-commit mapping with {len(mapping)} entries")
+        except Exception as e:
+            self.logger.warning(f"Failed to build tag-to-commit mapping: {e}")
+
+        return mapping
+
     def _analyze_commit_files(self, commit: gitpython.Commit) -> list[FileChange]:
         """Analyze file changes in a commit."""
         if self.repo is None:
@@ -431,7 +479,11 @@ class GitAnalysisService:
         )
 
     def _calculate_comparison_metadata(
-        self, from_ref: str, to_ref: str, commits: list[ChangeAnalysis]
+        self,
+        from_ref: str,
+        to_ref: str,
+        commits: list[ChangeAnalysis],
+        failed_commits: list[tuple[str, str]] | None = None,
     ) -> ComparisonMetadata:
         """Calculate metadata for the comparison."""
         if self.repo is None:
@@ -460,6 +512,10 @@ class GitAnalysisService:
         # Get branches involved
         branches_involved = list({commit.branch for commit in commits})
 
+        # Calculate success rate
+        total_commits_attempted = len(commits) + len(failed_commits or [])
+        success_rate = len(commits) / total_commits_attempted if total_commits_attempted > 0 else 1.0
+
         return ComparisonMetadata(
             from_ref=from_ref,
             to_ref=to_ref,
@@ -473,6 +529,8 @@ class GitAnalysisService:
             total_complexity=total_complexity,
             time_span_days=time_span_days,
             branches_involved=branches_involved,
+            analysis_success_rate=success_rate,
+            failed_commits_count=len(failed_commits or []),
         )
 
     def _calculate_contributor_stats(
@@ -666,9 +724,21 @@ class GitAnalysisService:
         return self._commit_to_branch_cache.get(commit.hexsha, "unknown")
 
     def _get_commit_tags(self, commit: gitpython.Commit) -> list[str]:
-        """Get tags pointing to this commit."""
+        """Get tags pointing to this commit using cache.
+
+        This is O(1) lookup instead of O(T) iteration through all tags.
+        The cache is built once per comparison in compare_refs().
+
+        If cache is empty (e.g., in tests or direct calls), falls back to O(T) lookup.
+        """
         if self.repo is None:
             return []
+
+        # Use cache if available (built by compare_refs)
+        if self._tag_to_commit_cache:
+            return self._tag_to_commit_cache.get(commit.hexsha, [])
+
+        # Fallback for direct calls or tests (O(T) iteration)
         try:
             tags = []
             for tag in self.repo.tags:

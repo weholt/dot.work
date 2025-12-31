@@ -119,6 +119,8 @@ class ComparisonMetadata:
     total_complexity: float
     time_span_days: int
     branches_involved: list[str]
+    analysis_success_rate: float = 1.0
+    failed_commits_count: int = 0
 
 
 @dataclass
@@ -189,6 +191,10 @@ class AnalysisConfig:
     # Caching settings
     cache_ttl_hours: int = 24
     force_refresh: bool = False
+
+    # Error handling settings
+    continue_on_failure: bool = False
+    min_success_rate: float = 0.9  # Require 90% of commits to analyze successfully
 
 
 @dataclass

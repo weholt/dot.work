@@ -6,6 +6,9 @@ from pathlib import Path
 
 from dot_work.git.models import FileCategory
 
+# Type alias for compiled regex pattern
+Pattern = re.Pattern
+
 
 @dataclass
 class LanguageInfo:
@@ -43,10 +46,10 @@ class FileAnalyzer:
         if any(pattern in file_path for pattern in self.ignore_patterns):
             return FileCategory.UNKNOWN
 
-        # Check category patterns
+        # Check category patterns (pre-compiled regex)
         for category, patterns in self.file_category_patterns.items():
             for pattern in patterns:
-                if re.search(pattern, file_path, re.IGNORECASE):
+                if pattern.search(file_path):
                     return category
 
         # Check by extension/language
@@ -125,9 +128,9 @@ class FileAnalyzer:
 
         return languages
 
-    def _initialize_category_patterns(self) -> dict[FileCategory, list[str]]:
-        """Initialize file category patterns."""
-        return {
+    def _initialize_category_patterns(self) -> dict[FileCategory, list[Pattern]]:
+        """Initialize file category patterns with pre-compiled regex."""
+        patterns = {
             FileCategory.CODE: [
                 r"\.(py|js|ts|jsx|tsx|java|go|rs|c|cpp|cc|cxx|h|hpp|cs|php|rb|kt|scala|swift|dart|lua|perl|r|sql)$",
                 r"^src/",
@@ -221,4 +224,10 @@ class FileAnalyzer:
                 r"^cloudformation/",
                 r"/cloudformation/",
             ],
+        }
+
+        # Pre-compile all patterns
+        return {
+            category: [re.compile(pattern, re.IGNORECASE) for pattern in pattern_list]
+            for category, pattern_list in patterns.items()
         }
