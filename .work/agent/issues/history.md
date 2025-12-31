@@ -2316,3 +2316,53 @@ Files modified:
 - `src/dot_work/git/services/complexity.py` - added comprehensive weight documentation
 
 ---
+
+---
+---
+id: "CR-061@d6e8f0"
+title: "ConventionalCommitParser scope regex doesn't support common formats"
+description: "Scope pattern doesn't allow api/v2 or @angular/core"
+completed: 2025-12-31
+section: "version"
+tags: [compatibility, parsing]
+type: enhancement
+priority: low
+status: resolved
+references:
+  - src/dot_work/version/commit_parser.py
+---
+
+### Outcome
+**Status:** Resolved - Expanded scope regex
+
+Updated the scope pattern from `[\w-]+` to `[\w/-@]+` to support:
+- Slashes for nested scopes like `api/v2`
+- At-signs for package scopes like `@angular/core`
+
+Files modified:
+- `src/dot_work/version/commit_parser.py` - updated COMMIT_PATTERN regex
+
+---
+---
+id: "CR-062@e7f9a1"
+title: "short_hash uses 12 chars instead of conventional 7"
+description: "Non-standard short hash length may confuse users"
+completed: 2025-12-31
+section: "version"
+tags: [convention, clarity]
+type: enhancement
+priority: low
+status: resolved
+references:
+  - src/dot_work/version/commit_parser.py
+---
+
+### Outcome
+**Status:** Resolved - Changed to git convention
+
+Changed `short_hash` from `commit.hexsha[:12]` to `commit.hexsha[:7]` to match the standard git short hash length used by `git log --oneline` and other git commands.
+
+Files modified:
+- `src/dot_work/version/commit_parser.py` - updated short_hash to 7 characters
+
+---
