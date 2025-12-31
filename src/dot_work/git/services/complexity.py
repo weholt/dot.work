@@ -9,6 +9,20 @@ from dot_work.git.models import ChangeAnalysis, ChangeType, FileCategory, FileCh
 class ComplexityCalculator:
     """Calculates complexity scores for commits and file changes."""
 
+    # Risky path patterns for security/sensitive file detection
+    _RISKY_PATH_PATTERNS = [
+        "migration",
+        "schema",
+        "database",
+        "auth",
+        "security",
+        "permission",
+        "role",
+        "cert",
+        "key",
+        "secret",
+    ]
+
     def __init__(self):
         # Complexity weights for different factors
         self.weights = {
@@ -65,6 +79,12 @@ class ComplexityCalculator:
             "message_indicators": 30.0,
             "base_score": 10.0,
         }
+
+        # Pre-compile file complexity patterns for performance
+        self._compiled_complexity_patterns = [
+            (re.compile(pattern, re.IGNORECASE), weight)
+            for pattern, weight in self.weights["file_complexity_patterns"]
+        ]
 
     def calculate_complexity(self, commit: ChangeAnalysis) -> float:
         """
@@ -136,9 +156,9 @@ class ComplexityCalculator:
         return max(0.3, min(average_weight, 3.0))
 
     def _get_pattern_weight(self, file_path: str) -> float:
-        """Get weight multiplier based on file path patterns."""
-        for pattern, weight in self.weights["file_complexity_patterns"]:
-            if re.search(pattern, file_path, re.IGNORECASE):
+        """Get weight multiplier based on file path patterns using pre-compiled regex."""
+        for pattern, weight in self._compiled_complexity_patterns:
+            if pattern.search(file_path):
                 return weight
         return 1.0
 
@@ -357,21 +377,8 @@ class ComplexityCalculator:
 
         # Check for risky file patterns
         for file_change in commit.files_changed:
-            if any(
-                pattern in file_change.path.lower()
-                for pattern in [
-                    "migration",
-                    "schema",
-                    "database",
-                    "auth",
-                    "security",
-                    "permission",
-                    "role",
-                    "cert",
-                    "key",
-                    "secret",
-                ]
-            ):
+            path_lower = file_change.path.lower()
+            if any(pattern in path_lower for pattern in self._RISKY_PATH_PATTERNS):
                 risk_factors.append(f"High-risk file modified: {file_change.path}")
 
         return risk_factors
