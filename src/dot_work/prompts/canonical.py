@@ -26,31 +26,29 @@ Canonical prompt body content...
 
 from __future__ import annotations
 
-
+import copy
 import io
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
 import yaml
-import copy
 
 # Path to global defaults file
 GLOBAL_DEFAULTS_PATH = Path(__file__).parent / "global.yml"
+
 
 def _deep_merge(a: dict, b: dict) -> dict:
     """Recursively merge dict b into dict a (a is not mutated, returns new dict)."""
     result = copy.deepcopy(a)
     for k, v in b.items():
-        if (
-            k in result
-            and isinstance(result[k], dict)
-            and isinstance(v, dict)
-        ):
+        if k in result and isinstance(result[k], dict) and isinstance(v, dict):
             result[k] = _deep_merge(result[k], v)
         else:
             result[k] = copy.deepcopy(v)
     return result
+
 
 def _load_global_defaults() -> dict:
     """Load global.yml defaults if present, else return empty dict."""
@@ -145,7 +143,6 @@ class CanonicalPromptParser:
     """
 
     FRONTMATTER_PATTERN = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
-
 
     def parse(self, file_path: str | Path) -> CanonicalPrompt:
         """Parse a canonical prompt file, merging with global defaults if present."""

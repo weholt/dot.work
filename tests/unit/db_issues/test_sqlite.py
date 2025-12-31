@@ -4,8 +4,8 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from sqlmodel import Session, SQLModel, text
 from sqlalchemy import Engine
+from sqlmodel import Session, SQLModel, text
 
 from dot_work.db_issues.adapters import (
     IssueRepository,

@@ -30,7 +30,9 @@ runner = CliRunner()
 
 
 @pytest.mark.integration
-@pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+@pytest.mark.skip(
+    reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+)
 class TestGitHistoryIntegration:
     """Integration tests using the dot-work repo itself.
 
@@ -38,7 +40,9 @@ class TestGitHistoryIntegration:
     live repository. See module docstring for details on how to enable safely.
     """
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_compare_refs_basic(self):
         """Test comparing HEAD~5 to HEAD."""
         result = runner.invoke(app, ["git", "history", "compare", "HEAD~5", "HEAD"])
@@ -46,7 +50,9 @@ class TestGitHistoryIntegration:
         # Should contain output section headers
         assert any(word in result.output for word in ["Commits:", "commits", "Commit"])
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_compare_refs_json_format(self):
         """Test comparing refs with JSON output format."""
         result = runner.invoke(
@@ -55,7 +61,9 @@ class TestGitHistoryIntegration:
         # Command should not error (format option accepted)
         assert result.exit_code != 2
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_compare_refs_yaml_format(self):
         """Test comparing refs with YAML output format."""
         result = runner.invoke(
@@ -64,7 +72,9 @@ class TestGitHistoryIntegration:
         # Command should not error (format option accepted)
         assert result.exit_code != 2
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_analyze_commit_head(self):
         """Test analyzing HEAD commit."""
         result = runner.invoke(app, ["git", "history", "analyze", "HEAD"])
@@ -72,7 +82,9 @@ class TestGitHistoryIntegration:
         # Should output something about the commit
         assert len(result.output) > 0
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_analyze_commit_by_hash(self):
         """Test analyzing a commit by hash (using HEAD~1)."""
         # First get the hash for HEAD~1
@@ -80,7 +92,9 @@ class TestGitHistoryIntegration:
         # Should work without error
         assert hash_result.exit_code == 0
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_diff_commits(self):
         """Test diffing two commits."""
         result = runner.invoke(app, ["git", "history", "diff-commits", "HEAD~2", "HEAD~1"])
@@ -88,7 +102,9 @@ class TestGitHistoryIntegration:
         # Should produce output
         assert len(result.output) > 0
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_contributors(self):
         """Test showing contributors between refs."""
         result = runner.invoke(app, ["git", "history", "contributors", "HEAD~10", "HEAD"])
@@ -96,7 +112,9 @@ class TestGitHistoryIntegration:
         # Should have some output
         assert len(result.output) > 0
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_complexity_analysis(self):
         """Test complexity analysis."""
         result = runner.invoke(app, ["git", "history", "complexity", "HEAD~10", "HEAD"])
@@ -104,7 +122,9 @@ class TestGitHistoryIntegration:
         # Should have output about complexity
         assert len(result.output) > 0
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_complexity_analysis_with_threshold(self):
         """Test complexity analysis with threshold option."""
         result = runner.invoke(
@@ -113,21 +133,27 @@ class TestGitHistoryIntegration:
         # Should accept threshold option
         assert result.exit_code != 2
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_releases(self):
         """Test showing recent releases."""
         result = runner.invoke(app, ["git", "history", "releases"])
         # Command should exist (even if no releases found)
         assert result.exit_code != 2
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_releases_with_count(self):
         """Test showing recent releases with count limit."""
         result = runner.invoke(app, ["git", "history", "releases", "--count", "5"])
         # Should accept count option
         assert result.exit_code != 2
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_help_text(self):
         """Test that help text is available."""
         result = runner.invoke(app, ["git", "history", "--help"])
@@ -139,7 +165,9 @@ class TestGitHistoryIntegration:
         assert "complexity" in result.output
         assert "releases" in result.output
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_compare_help(self):
         """Test compare command help."""
         result = runner.invoke(app, ["git", "history", "compare", "--help"])
@@ -147,14 +175,18 @@ class TestGitHistoryIntegration:
         # Should show usage
         assert "compare" in result.output.lower()
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_verbose_flag(self):
         """Test that verbose flag is accepted."""
         result = runner.invoke(app, ["git", "history", "compare", "HEAD~3", "HEAD", "--verbose"])
         # Should accept verbose flag
         assert result.exit_code != 2
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_output_flag(self):
         """Test that output flag is accepted."""
         result = runner.invoke(
@@ -164,14 +196,18 @@ class TestGitHistoryIntegration:
         # Should accept output flag (may fail if file can't be written, but flag should be recognized)
         assert result.exit_code != 2
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_invalid_ref_shows_error(self):
         """Test that invalid refs show appropriate error."""
         result = runner.invoke(app, ["git", "history", "compare", "invalid_ref_xyz", "HEAD"])
         # Should show error (not command not found)
         assert result.exit_code != 0
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_git_history_help(self):
         """Test git history subcommand help."""
         result = runner.invoke(app, ["git", "history", "--help"])
@@ -184,7 +220,9 @@ class TestGitHistoryIntegration:
         assert "complexity" in result.output
         assert "releases" in result.output
 
-    @pytest.mark.skip(reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation.")
+    @pytest.mark.skip(
+        reason="Tests operate on live git repository - unsafe for automated runs. Requires temp repo isolation implementation."
+    )
     def test_git_help(self):
         """Test git command help."""
         result = runner.invoke(app, ["git", "--help"])
