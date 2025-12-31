@@ -25,7 +25,8 @@ class ConventionalCommitParser:
     """Parser for conventional commit messages."""
 
     # Pattern: type(scope): subject
-    COMMIT_PATTERN = re.compile(r"^(?P<type>\w+)(?:\((?P<scope>[\w-]+)\))?: (?P<subject>.+)$")
+    # Scope allows: word chars, hyphens, slashes (for api/v2), at-signs (for @angular/core)
+    COMMIT_PATTERN = re.compile(r"^(?P<type>\w+)(?:\((?P<scope>[\w/-@]+)\))?: (?P<subject>.+)$")
 
     COMMIT_TYPES = {
         "feat": "Features",
@@ -77,7 +78,7 @@ class ConventionalCommitParser:
 
         return CommitInfo(
             commit_hash=commit.hexsha,
-            short_hash=commit.hexsha[:12],
+            short_hash=commit.hexsha[:7],  # Git conventional short hash length
             commit_type=commit_type,
             scope=scope,
             subject=subject,

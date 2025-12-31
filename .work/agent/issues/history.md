@@ -2263,3 +2263,56 @@ Files modified:
 - `src/dot_work/knowledge_graph/config.py` - removed unused `validate_path()` function
 
 ---
+
+---
+---
+id: "CR-058@a3b5c7"
+title: "AnalysisProgress.estimated_remaining_seconds is hardcoded fiction"
+description: "Progress tracking uses len(commits) * 2 without actual timing"
+completed: 2025-12-31
+section: "git"
+tags: [ux, accuracy]
+type: enhancement
+priority: low
+status: resolved
+references:
+  - src/dot_work/git/models.py
+  - src/dot_work/git/services/git_service.py
+---
+
+### Outcome
+**Status:** Resolved - Added clarifying documentation
+
+Added comment explaining that `estimated_remaining_seconds` is a rough estimate (~2s per commit) for progress display purposes only, not based on actual timing. The hardcoded value is documented as a conservative estimate for UX purposes.
+
+Files modified:
+- `src/dot_work/git/services/git_service.py` - added clarifying comment
+
+---
+---
+id: "CR-059@b4c6d8"
+title: "Magic numbers in complexity.py weights lack documentation"
+description: "No explanation for why deletions cost 0.015 vs additions at 0.01"
+completed: 2025-12-31
+section: "git"
+tags: [documentation, clarity]
+type: docs
+priority: low
+status: resolved
+references:
+  - src/dot_work/git/services/complexity.py
+---
+
+### Outcome
+**Status:** Resolved - Added comprehensive weight documentation
+
+Added detailed comments explaining the rationale for all complexity weights:
+- Line changes: Deletions (0.015) > additions (0.01) due to ripple effects
+- Message indicators: Breaking (25.0) > security (20.0) > migration (18.0) > refactor (15.0)
+- File types: Deployment (1.5x) > config (1.2x) > code (1.0x) > tests (0.7x) > docs (0.3x)
+- Change types: Added (1.2x) > modified (1.0x) > deleted (0.8x) > renamed (0.6x)
+
+Files modified:
+- `src/dot_work/git/services/complexity.py` - added comprehensive weight documentation
+
+---
