@@ -26,8 +26,12 @@
     - performance-review.md
     - security-review.md
 
-**MANDATORY** Any and all issues found during this process MUST be added as new issues to the issue tracking files using the new-issue.md instructions.
+**MANDATORY** Any and all issues found during this process MUST be added as new issues to the issue tracking files using the new-issue.md instructions, but NOT implemented.
 
-9. Scan ALL issue files; shortlist.md, critical.md, high.md, medium.md, and low.md for ANY proposed, incomplete, partially completed etc issue. If nothing is found proceed to step 10, otherwise you MUST goto step 1.
+9. Read ALL issue files AGAIN carefully; shortlist.md, critical.md, high.md, medium.md, and low.md for ANY proposed, incomplete, partially completed etc issue. If nothing is found proceed to step 10, otherwise you MUST goto step 1.
 
-10. When there are no issue in any of the issue files with status proposed and ALL validation steps are running without findings of any kind, report back "AGENT DONE."
+10. If you got to this step, check this:
+- Does the build step run without ANY issues or warnings? If not, go to step 1.
+- Are there ANY proposed issues in ANY of the issue files? Remember to re-read the files to be sure. If yes, go to step 1.
+- If there is ANYTHING at ALL to do without human intervention - go to step 1.
+- If ALL checks above are completed, report back "AGENT DONE."

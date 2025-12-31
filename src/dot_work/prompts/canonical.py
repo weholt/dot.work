@@ -40,11 +40,21 @@ GLOBAL_DEFAULTS_PATH = Path(__file__).parent / "global.yml"
 
 
 def _deep_merge(a: dict, b: dict) -> dict:
-    """Recursively merge dict b into dict a (a is not mutated, returns new dict)."""
+    """Recursively merge dict b into dict a (a is not mutated, returns new dict).
+
+    Special handling for environment configs: if local (b) specifies 'filename',
+    any 'filename_suffix' from global (a) is removed, and vice versa.
+    """
     result = copy.deepcopy(a)
     for k, v in b.items():
         if k in result and isinstance(result[k], dict) and isinstance(v, dict):
             result[k] = _deep_merge(result[k], v)
+            # Handle filename/filename_suffix mutual exclusion for environment configs
+            if "filename" in v or "filename_suffix" in v:
+                if "filename" in v:
+                    result[k].pop("filename_suffix", None)
+                elif "filename_suffix" in v:
+                    result[k].pop("filename", None)
         else:
             result[k] = copy.deepcopy(v)
     return result

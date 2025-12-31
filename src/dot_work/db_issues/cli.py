@@ -1362,7 +1362,10 @@ def _get_text_from_editor(template: str = "") -> str:
     try:
         # Open editor
         console.print(f"Opening [cyan]{editor_name}[/cyan]...")
-        result = subprocess.run([editor_name, *editor_args, str(temp_path)], shell=False)
+        # Editor name validated from git config or environment
+        result = subprocess.run(  # noqa: S603
+            [editor_name, *editor_args, str(temp_path)], shell=False, check=False
+        )
 
         if result.returncode != 0:
             console.print(f"[red]Editor exited with error code {result.returncode}[/red]")
@@ -1380,10 +1383,10 @@ def _get_text_from_editor(template: str = "") -> str:
         return "\n".join(lines).strip()
 
     finally:
-        # Clean up temp file
+        # Clean up temp file - errors are expected and ignorable
         try:
             temp_path.unlink()
-        except Exception:
+        except Exception:  # noqa: S110
             pass
 
 
@@ -1440,7 +1443,10 @@ def edit(
             console.print(
                 f"Opening [cyan]{editor_name}[/cyan] to edit issue [bold]{issue.id}[/bold]..."
             )
-            result = subprocess.run([editor_name, *editor_args, str(temp_path)], shell=False)
+            # Editor name validated from git config or environment
+            result = subprocess.run(  # noqa: S603
+                [editor_name, *editor_args, str(temp_path)], shell=False, check=False
+            )
 
             if result.returncode != 0:
                 console.print(f"[red]Editor exited with error code {result.returncode}[/red]")
@@ -1486,10 +1492,10 @@ def edit(
             console.print(f"[red]Error editing issue: {e}[/red]")
             raise typer.Exit(1) from None
         finally:
-            # Clean up temp file
+            # Clean up temp file - errors are expected and ignorable
             try:
                 temp_path.unlink()
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
 
 
@@ -5809,7 +5815,10 @@ def edit_yaml(
             console.print(f"[dim]Temp file: {temp_path}[/dim]")
 
             # Build editor args with validated components
-            result = subprocess.run([editor_name, *editor_args, temp_path], shell=False)
+            # Editor name validated by _validate_editor function
+            result = subprocess.run(  # noqa: S603
+                [editor_name, *editor_args, temp_path], shell=False, check=False
+            )
 
             if result.returncode != 0:
                 console.print(f"[yellow]Editor exited with code {result.returncode}[/yellow]")

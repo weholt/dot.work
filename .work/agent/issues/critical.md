@@ -4,6 +4,8 @@ Blockers, security issues, data loss risks.
 
 ---
 
+---
+
 ### Problem
 After commit c2f2191 (migration cleanup), multiple build quality regressions detected:
 

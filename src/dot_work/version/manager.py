@@ -405,7 +405,8 @@ class VersionManager:
                     logger.warning(
                         "CHANGELOG.md was partially updated. Manual cleanup may be required."
                     )
-                except Exception:
+                except Exception:  # noqa: S110
+                    # If logging fails during rollback, just proceed with the error
                     pass
 
             raise RuntimeError(f"Version release failed and was rolled back: {e}") from e

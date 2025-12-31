@@ -3,7 +3,6 @@
 Enhancements, technical debt, code quality improvements.
 
 ---
-
 ---
 id: "PERF-014@9c7e2b"
 title: "Repeated regex compilation in ComplexityCalculator._get_pattern_weight()"

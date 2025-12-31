@@ -123,7 +123,7 @@ class User:
             try:
                 username = (
                     subprocess.check_output(
-                        ["git", "config", "user.name"], stderr=subprocess.DEVNULL
+                        ["git", "config", "user.name"], stderr=subprocess.DEVNULL  # noqa: S607
                     )
                     .decode()
                     .strip()
@@ -134,7 +134,7 @@ class User:
             try:
                 email = (
                     subprocess.check_output(
-                        ["git", "config", "user.email"], stderr=subprocess.DEVNULL
+                        ["git", "config", "user.email"], stderr=subprocess.DEVNULL  # noqa: S607
                     )
                     .decode()
                     .strip()

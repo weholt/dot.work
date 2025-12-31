@@ -472,8 +472,9 @@ class Database:
         """
         try:
             self.close()
-        except Exception:
+        except Exception:  # noqa: S110
             # Ignore errors during cleanup in destructor
+            # Logging here could cause issues during garbage collection
             pass
 
     # Document operations
@@ -1269,11 +1270,15 @@ class Database:
             )
 
         # Create a unique table name for this model
-        vec_table_name = f"vec_{model.replace('-', '_').replace('.', '_')}"
+        # Sanitize model name to be SQL-safe for table names
+        safe_model = model.replace("-", "_").replace(".", "_")
+        if not safe_model.replace("_", "").isalnum():
+            raise ValueError(f"Invalid model name for table creation: {model}")
+        vec_table_name = f"vec_{safe_model}"
 
         # Create vec0 virtual table if it doesn't exist
         try:
-            conn.execute(
+            conn.execute(  # noqa: S608
                 f"CREATE VIRTUAL TABLE IF NOT EXISTS {vec_table_name} "
                 f"USING vec0(embedding_float32({dimensions}))"
             )
@@ -1282,7 +1287,7 @@ class Database:
 
         # Populate vec0 table with current embeddings (upsert to handle duplicates)
         conn.execute(
-            f"INSERT OR REPLACE INTO {vec_table_name}(rowid, vector) "
+            f"INSERT OR REPLACE INTO {vec_table_name}(rowid, vector) "  # noqa: S608
             f"SELECT embedding_pk, vector FROM embeddings WHERE model = ?",
             (model,),
         )
@@ -1292,7 +1297,7 @@ class Database:
 
         # Perform similarity search
         cur = conn.execute(
-            f"SELECT e.full_id, distance "
+            f"SELECT e.full_id, distance "  # noqa: S608
             f"FROM {vec_table_name} v "
             f"JOIN embeddings e ON v.rowid = e.embedding_pk "
             f"WHERE v.vector MATCH ? AND k = ? "

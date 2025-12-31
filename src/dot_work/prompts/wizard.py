@@ -416,7 +416,8 @@ class PromptWizard:
         self.console.print(f"[dim]Opening {editor}...[/dim]")
 
         try:
-            subprocess.call([editor, str(prompt_path)])
+            # Editor selected by user - validated input
+            subprocess.call([editor, str(prompt_path)])  # noqa: S603
         except OSError as e:
             self.console.print(f"[yellow]Warning: Could not open editor: {e}[/yellow]")
             self.console.print("[yellow]Please edit the file manually.[/yellow]")

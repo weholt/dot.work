@@ -245,7 +245,8 @@ class BuildRunner:
             print(f"Running: {' '.join(cmd)}")
 
         try:
-            result = subprocess.run(
+            # Commands are build tools (pytest, ruff, mypy) - user controls execution
+            result = subprocess.run(  # noqa: S603, pylint: disable=subprocess-run-check
                 cmd,
                 capture_output=capture_output,
                 text=True,

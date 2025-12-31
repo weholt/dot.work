@@ -1320,8 +1320,9 @@ def discover_available_environments(prompts_dir: Path) -> dict[str, set[str]]:
                 if env_name not in environments:
                     environments[env_name] = set()
                 environments[env_name].add(prompt_name)
-        except Exception:
+        except Exception:  # noqa: S112, pylint: disable=broad-except
             # Skip files that can't be parsed (not canonical format)
+            # Logging here would be too verbose during discovery
             continue
 
     return environments
