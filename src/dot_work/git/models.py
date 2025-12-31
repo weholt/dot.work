@@ -241,5 +241,3 @@ class AnalysisProgress:
         if self.total_commits == 0:
             return 0.0
         return (self.processed_commits / self.total_commits) * 100
-
-

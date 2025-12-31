@@ -361,5 +361,3 @@ def get_file_extension_stats(file_paths: list[str]) -> dict[str, int]:
             extensions["(no extension)"] = extensions.get("(no extension)", 0) + 1
 
     return dict(sorted(extensions.items(), key=lambda x: x[1], reverse=True))
-
-

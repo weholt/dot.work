@@ -49,4 +49,3 @@ def ensure_db_directory(db_path: Path | None = None) -> Path:
         return db_path
     except OSError as e:
         raise ConfigError(f"Cannot create database directory: {e}") from e
-

@@ -516,7 +516,9 @@ class GitAnalysisService:
 
         # Calculate success rate
         total_commits_attempted = len(commits) + len(failed_commits or [])
-        success_rate = len(commits) / total_commits_attempted if total_commits_attempted > 0 else 1.0
+        success_rate = (
+            len(commits) / total_commits_attempted if total_commits_attempted > 0 else 1.0
+        )
 
         return ComparisonMetadata(
             from_ref=from_ref,

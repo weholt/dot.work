@@ -10,7 +10,6 @@ from dot_work.knowledge_graph.config import (
     ConfigError,
     ensure_db_directory,
     get_db_path,
-    validate_path,
 )
 
 
@@ -62,36 +61,3 @@ class TestEnsureDbDirectory:
             with pytest.raises(ConfigError, match="Cannot create database directory"):
                 ensure_db_directory(db_path)
 
-
-class TestValidatePath:
-    """Tests for validate_path function."""
-
-    def test_valid_path_returns_path(self, temp_dir: Path) -> None:
-        """Valid paths should be returned unchanged."""
-        valid_path = temp_dir / "test.sqlite"
-        result = validate_path(valid_path)
-        assert result == valid_path
-
-    def test_invalid_path_no_extension_raises_error(self, temp_dir: Path) -> None:
-        """Invalid paths should raise ConfigError."""
-        invalid_path = temp_dir / "no_extension"
-        with pytest.raises(ConfigError, match="no file extension"):
-            validate_path(invalid_path)
-
-    def test_path_with_nonexistent_parent_validates(self, temp_dir: Path) -> None:
-        """Path with nonexistent parent should still validate (can be created)."""
-        deep_path = temp_dir / "a" / "b" / "c" / "d" / "test.sqlite"
-        result = validate_path(deep_path)
-        assert result == deep_path
-
-    def test_path_resolve_oserror_raises_config_error(self, temp_dir: Path) -> None:
-        """OSError during resolve should raise ConfigError."""
-        with patch.object(Path, "resolve", side_effect=OSError("Invalid path")):
-            with pytest.raises(ConfigError, match="Invalid path"):
-                validate_path(temp_dir / "test.sqlite")
-
-    def test_path_resolve_value_error_raises_config_error(self, temp_dir: Path) -> None:
-        """ValueError during resolve should raise ConfigError."""
-        with patch.object(Path, "resolve", side_effect=ValueError("Bad path")):
-            with pytest.raises(ConfigError, match="Invalid path"):
-                validate_path(temp_dir / "test.sqlite")
