@@ -11,7 +11,7 @@ This tool provides **12 AI agent prompts** for:
 - **Project scaffolding** - Turn discussions into production-ready projects
 - **Workflow management** - Issue tracking, focus, and iteration loops
 - **Quality assurance** - Baselines, code reviews, and delivery auditing
-- **Version control** - Semantic versioning with safety checks
+- **Version control** - Date-based versioning with changelog generation
 
 The installer detects your AI coding environment and puts the prompts in the right place so they work as slash commands.
 
@@ -183,7 +183,7 @@ After installing, use the prompts in your AI environment:
 
 | Prompt | Description |
 |--------|-------------|
-| **`bump-version`** | Semantic version bumping with safety checks and multi-file sync |
+| **`bump-version`** | Date-based version bumping with safety checks and multi-file sync |
 | **`api-export`** | Generate API documentation or export specifications |
 
 ---
@@ -207,10 +207,12 @@ Here's my project idea: [paste discussion]
 /do-work
 ```
 
-**Bump version after changes:**
+**Freeze version after changes:**
+```bash
+dot-work version freeze
 ```
-/bump-version patch
-```
+
+This creates a new version, updates `version.json`, and appends to `CHANGELOG.md`.
 
 ## 🔄 Workflow Example
 
@@ -246,6 +248,41 @@ Here's my project idea: [paste discussion]
    - Issue tracking for tasks
    - Memory persistence across sessions
    - Quality assurance workflows
+
+## 📦 Version Format
+
+dot-work uses **CalVer (Calendar Versioning)** format: `YYYY.MM.PATCH`
+
+### Format Breakdown
+
+- **`YYYY`** – 4-digit year (e.g., `2025`)
+- **`MM`** – 2-digit month (e.g., `01` for January, `12` for December)
+- **`PATCH`** – 5-digit sequence number (e.g., `00001`, `00002`)
+
+### Example Versions
+
+```
+2025.01.001  # January 2025, 1st build
+2025.01.002  # January 2025, 2nd build
+2025.02.001  # February 2025, 1st build
+2026.01.001  # January 2026, 1st build
+```
+
+### Rationale for CalVer
+
+1. **Time-based ordering** – Versions naturally sort chronologically
+2. **No SemVer conflicts** – Avoids debates about "breaking changes" vs "features"
+3. **Release cadence** – Encourages frequent releases tied to time periods
+4. **Simplicity** – Easy to determine version age and ordering
+
+### Version Ordering
+
+When comparing versions:
+1. Compare year first (higher = newer)
+2. Then compare month (higher = newer)
+3. Then compare patch number (higher = newer)
+
+Example: `2025.02.001` > `2025.01.999` > `2024.12.999`
 
 ## 🛠️ Development
 

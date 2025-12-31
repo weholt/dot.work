@@ -2570,3 +2570,153 @@ status: completed
 Implemented atomic cache writes using temporary file + `os.replace()` pattern in git/services/cache.py.
 
 ---
+
+---
+
+id: "DOGFOOD-014@foa1hu"
+title: "Document version format conventions"
+description: "dot-work version uses date-based format - why and how documented?"
+created: 2024-12-29
+completed: 2025-12-31
+section: "dogfooding"
+tags: [documentation, versioning, dogfooding]
+type: docs
+priority: low
+status: completed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - src/dot_work/version/
+---
+
+### Outcome
+Added comprehensive version format documentation to README.md:
+- Documented CalVer format: `YYYY.MM.PATCH`
+- Explained rationale for date-based versioning
+- Provided version ordering rules
+- Added examples showing year, month, and patch components
+- Changed "Semantic versioning" references to "Date-based versioning"
+
+Files modified:
+- README.md - added "Version Format" section with format breakdown, examples, and rationale
+
+---
+
+---
+
+id: "DOGFOOD-015@foa1hu"
+title: "Add integration testing guide for prompts"
+description: "How to verify prompts work across AI tools - requires human validation"
+created: 2024-12-29
+completed: 2025-12-31
+section: "dogfooding"
+tags: [documentation, testing, prompts, dogfooding]
+type: docs
+priority: low
+status: completed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - docs/dogfood/baseline.md
+---
+
+### Outcome
+Added "Testing Installation" section to tooling-reference.md:
+- File existence verification checklist for all 9 environments
+- Manual testing steps for each AI tool
+- Expected results documentation
+- Commands to verify prompt files are installed correctly
+
+Files modified:
+- docs/dogfood/tooling-reference.md - added "Testing Installation" section
+
+---
+
+---
+
+id: "DOGFOOD-016@foa1hu"
+title: "Document changelog format and customization"
+description: "dot-work version freeze generates changelog - format and customization undocumented"
+created: 2024-12-29
+completed: 2025-12-31
+section: "dogfooding"
+tags: [documentation, versioning, changelog, dogfooding]
+type: docs
+priority: low
+status: completed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - src/dot_work/version/
+---
+
+### Outcome
+Added "Changelog Format" section to tooling-reference.md:
+- Documented Keep a Changelog format
+- Specified storage location (CHANGELOG.md)
+- Provided version format examples
+- Listed all standard changelog categories
+- Explained customization limitations
+- Referenced Keep a Changelog external guide
+
+Files modified:
+- docs/dogfood/tooling-reference.md - added "Changelog Format" section
+
+---
+
+---
+
+id: "DOGFOOD-017@foa1hu"
+title: "Document environment detection signals and logic"
+description: "dot-work detect identifies AI tool - signals and logic undocumented"
+created: 2024-12-29
+completed: 2025-12-31
+section: "dogfooding"
+tags: [documentation, cli, detection, dogfooding]
+type: docs
+priority: low
+status: completed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - src/dot_work/installer.py
+---
+
+### Outcome
+Added "Detection Logic" section to tooling-reference.md:
+- Created detection signals table for all 9 environments + generic fallback
+- Documented priority order for multiple detections
+- Explained first-match behavior
+- Documented no-detection fallback (user prompt)
+- Documented --env override option
+
+Files modified:
+- docs/dogfood/tooling-reference.md - added "Detection Logic" section
+
+---
+
+---
+
+id: "DOGFOOD-018@foa1hu"
+title: "Document prompt uninstallation process"
+description: "How to remove installed prompts - undocumented"
+created: 2024-12-29
+completed: 2025-12-31
+section: "dogfooding"
+tags: [documentation, prompts, uninstall, dogfooding]
+type: docs
+priority: low
+status: completed
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - src/dot_work/installer.py
+---
+
+### Outcome
+Added "Uninstalling Prompts" section to tooling-reference.md:
+- Documented manual file removal for all 9 environments
+- Provided "remove all" command
+- Added warning about data loss (custom prompts)
+- Provided backup recommendation with commands
+- Noted that no uninstall command exists (manual removal required)
+
+Files modified:
+- docs/dogfood/tooling-reference.md - added "Uninstalling Prompts" section
+
+---

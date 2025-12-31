@@ -965,3 +965,265 @@ The following are NOT CLI commands but AI prompt triggers (used after `dot-work 
 | `/bump-version` | Semantic version | AI prompt |
 
 *Note: Per user review, some of these should be implemented as CLI commands.*
+
+---
+
+## Testing Installation
+
+After running `dot-work install`, verify prompts are installed correctly.
+
+### File Existence Checks
+
+Verify prompt files exist for your environment:
+
+```bash
+# GitHub Copilot
+ls -la .github/prompts/
+# Expected: *.prompt.md files
+
+# Claude Code
+ls -la CLAUDE.md
+# Expected: Single file
+
+# Cursor
+ls -la .cursor/rules/
+# Expected: *.mdc files
+
+# Windsurf
+ls -la .windsurf/rules/
+# Expected: *.md files
+
+# Aider
+ls -la CONVENTIONS.md
+# Expected: Single file
+
+# Continue.dev
+ls -la .continue/prompts/
+# Expected: *.md files
+
+# Amazon Q
+ls -la .amazonq/rules.md
+# Expected: Single file
+
+# Zed AI
+ls -la .zed/prompts/
+# Expected: *.md files
+
+# OpenCode
+ls -la .opencode/prompts/ AGENTS.md
+# Expected: *.md files + AGENTS.md
+```
+
+### Manual Testing with AI Tools
+
+After verifying files exist, test prompts with your AI tool:
+
+**GitHub Copilot:**
+1. Open a file in VS Code with Copilot enabled
+2. Type `/agent-prompts-reference`
+3. Should see list of available prompts
+
+**Claude Code:**
+1. Prompts are automatically read from CLAUDE.md
+2. No manual verification needed
+
+**Cursor:**
+1. Open Command Palette (Cmd/Ctrl+Shift+P)
+2. Type `@` to see available prompts
+3. Should list installed prompts
+
+**Windsurf:**
+1. Open AI assistant panel
+2. Type `/` to see available commands
+3. Should list installed prompts
+
+**Aider:**
+1. Run `aider --help`
+2. Check if CONVENTIONS.md is loaded
+3. Type `/help` in aider session
+
+**Continue.dev:**
+1. Open Continue sidebar
+2. Type `/` in chat input
+3. Should see list of slash commands
+
+**Amazon Q:**
+1. Open Amazon Q panel
+2. Check if `.amazonq/rules.md` is loaded
+3. Type a query to verify prompts are active
+
+**Zed AI:**
+1. Open AI assistant in Zed
+2. Check `.zed/prompts/` files are loaded
+3. Type `/` to see available prompts
+
+**OpenCode:**
+1. Check `AGENTS.md` exists in project root
+2. Verify `.opencode/prompts/*.md` files exist
+3. Open OpenCode AI assistant to verify prompts are loaded
+
+---
+
+## Detection Logic
+
+The `dot-work detect` command identifies AI environments by checking for specific files and directories.
+
+### Detection Signals Table
+
+| Environment | Detection Signals | Priority |
+|-------------|------------------|----------|
+| `copilot` | `.github/prompts/` or `.github/copilot-instructions.md` | 1 |
+| `claude` | `CLAUDE.md` or `.claude/` directory | 2 |
+| `cursor` | `.cursor/rules/` or `.cursorrules` file | 3 |
+| `windsurf` | `.windsurf/rules/` or `.windsurfrules` file | 4 |
+| `aider` | `CONVENTIONS.md` in project root | 5 |
+| `continue` | `.continue/prompts/` directory | 6 |
+| `amazon-q` | `.amazonq/rules.md` file | 7 |
+| `zed` | `.zed/prompts/` directory | 8 |
+| `opencode` | `.opencode/prompts/` directory or `AGENTS.md` | 9 |
+| `generic` | Fallback (no specific environment detected) | 10 |
+
+### Multiple Environments Detected
+
+If multiple environments are detected, `dot-work detect` uses the **first match** based on priority order (Copilot → Claude → Cursor → etc.).
+
+To override automatic detection, use the `--env` flag:
+```bash
+dot-work install --env claude
+```
+
+### No Environment Detected
+
+If no environment is detected:
+1. Interactive mode will prompt you to select from available environments
+2. Run `dot-work list` to see all supported environments
+3. Specify environment explicitly with `--env` flag
+
+---
+
+## Changelog Format
+
+The `dot-work version freeze` command generates changelogs in **Keep a Changelog** format.
+
+### Storage Location
+
+Changelogs are stored in `CHANGELOG.md` in the project root.
+
+### Format
+
+```markdown
+# Changelog
+
+## [2025.10.001] - 2025-10-15
+### Added
+- New feature X
+
+### Fixed
+- Bug Y
+
+### Changed
+- Modified behavior Z
+
+### Deprecated
+- Old feature A
+
+### Removed
+- Removed feature B
+
+### Security
+- Security fix C
+```
+
+### Version Format
+
+- **Format:** `[YYYY.MM.PATCH] - YYYY-MM-DD`
+- **Example:** `[2025.10.001] - 2025-10-15`
+
+### Categories
+
+Standard changelog categories:
+- **Added** - New features
+- **Fixed** - Bug fixes
+- **Changed** - Changes to existing functionality
+- **Deprecated** - Features marked for removal
+- **Removed** - Removed features
+- **Security** - Security-related changes
+
+### Customization
+
+Currently, changelog format follows Keep a Changelog conventions and is not customizable. For custom changelog formats:
+1. Edit `CHANGELOG.md` directly after generation
+2. Or use `dot-work version commits` to get commit messages and format manually
+
+Reference: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+
+---
+
+## Uninstalling Prompts
+
+Remove installed AI prompts from your project.
+
+### Manual File Removal
+
+Remove prompt files for specific environments:
+
+```bash
+# GitHub Copilot
+rm .github/prompts/*.prompt.md
+rmdir .github/prompts 2>/dev/null || true
+
+# Claude Code
+rm CLAUDE.md
+
+# Cursor
+rm .cursor/rules/*.mdc
+rmdir .cursor/rules 2>/dev/null || true
+
+# Windsurf
+rm .windsurf/rules/*.md
+rmdir .windsurf/rules 2>/dev/null || true
+
+# Aider
+rm CONVENTIONS.md
+
+# Continue.dev
+rm .continue/prompts/*.md
+rmdir .continue/prompts 2>/dev/null || true
+
+# Amazon Q
+rm .amazonq/rules.md
+rmdir .amazonq 2>/dev/null || true
+
+# Zed AI
+rm .zed/prompts/*.md
+rmdir .zed/prompts 2>/dev/null || true
+
+# OpenCode
+rm .opencode/prompts/*.md
+rm AGENTS.md
+rmdir .opencode/prompts 2>/dev/null || true
+```
+
+### Remove All Prompts
+
+```bash
+# Remove all AI tool configuration
+rm -rf .github/prompts/ .claude/ .cursor/ .windsurf/ .continue/ .amazonq/ .zed/ .opencode/
+rm -f CLAUDE.md CONVENTIONS.md .cursorrules .windsurfrules AGENTS.md
+```
+
+### ⚠️ Warning
+
+**Data Loss Risk:** Removing prompt files will delete any custom prompts or local modifications you have made.
+
+**Backup Recommendation:** Before uninstalling, back up your custom prompts:
+```bash
+# Create backup directory
+mkdir -p backup/prompts
+
+# Copy all prompt files
+cp -r .github/prompts/ .claude/ .cursor/ .windsurf/ backup/prompts/ 2>/dev/null || true
+cp -f CLAUDE.md CONVENTIONS.md AGENTS.md backup/prompts/ 2>/dev/null || true
+```
+
+**Note:** As of this version, there is no `dot-work uninstall` command. Manual file removal is required.
