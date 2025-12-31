@@ -3,6 +3,7 @@
 import hashlib
 import json
 import logging
+import os
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -153,11 +154,24 @@ class AnalysisCache:
                 "ttl_hours": ttl_hours,
             }
 
-            with open(cache_path, "w", encoding="utf-8") as f:
-                json.dump(cache_data, f, indent=2)
+            # Atomic write: write to temp file first, then rename
+            temp_path = cache_path.with_suffix(".tmp")
+            try:
+                with open(temp_path, "w", encoding="utf-8") as f:
+                    json.dump(cache_data, f, indent=2)
 
-            self.logger.debug(f"Cached data for key: {key}")
-            return True
+                # Atomic rename (atomic on POSIX, near-atomic on Windows)
+                os.replace(temp_path, cache_path)
+
+                self.logger.debug(f"Cached data for key: {key}")
+                return True
+            finally:
+                # Clean up temp file if it still exists
+                if temp_path.exists():
+                    try:
+                        temp_path.unlink()
+                    except Exception as cleanup_error:
+                        self.logger.debug(f"Failed to cleanup temp file: {cleanup_error}")
 
         except Exception as e:
             self.logger.error(f"Failed to cache data for key {key}: {e}")

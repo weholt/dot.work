@@ -211,7 +211,15 @@ class DuplicateService:
             clock: Time provider (uses system time if None)
         """
         self.detector = detector or JaccardDuplicateDetector()
-        self.clock = clock
+        if clock:
+            self.clock = clock
+        else:
+            # Default clock using system time
+            class _DefaultClock:
+                def now(self) -> datetime:
+                    return datetime.now(UTC).replace(tzinfo=None)
+
+            self.clock = _DefaultClock()
 
     def find_duplicates(
         self,
@@ -227,7 +235,7 @@ class DuplicateService:
         Returns:
             Duplicate detection result with groups and statistics
         """
-        start_time = datetime.now(UTC).timestamp()
+        start_time = self.clock.now().timestamp()
 
         logger.debug("Finding duplicates: issues=%d, threshold=%s", len(issues), threshold)
 
@@ -237,7 +245,7 @@ class DuplicateService:
         # Count duplicates
         duplicates_count = sum(len(g.issues) for g in groups)
 
-        end_time = datetime.now(UTC).timestamp()
+        end_time = self.clock.now().timestamp()
         scan_time = end_time - start_time
 
         result = DuplicateDetectionResult(

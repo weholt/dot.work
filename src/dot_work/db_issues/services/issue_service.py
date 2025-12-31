@@ -7,7 +7,6 @@ Source: /home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/src/is
 """
 
 import logging
-from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from dot_work.db_issues.adapters import UnitOfWork
@@ -43,11 +42,9 @@ class AuditLog:
 
     Attributes:
         entries: List of audit entries
-        on_entry: Optional callback for each new entry
     """
 
     entries: list[AuditEntry] = field(default_factory=list)
-    on_entry: Callable[[AuditEntry], None] | None = None
 
     def log(
         self,
@@ -84,12 +81,6 @@ class AuditLog:
             details=details,
         )
         self.entries.append(entry)
-
-        if self.on_entry:
-            try:
-                self.on_entry(entry)
-            except Exception as e:
-                logger.warning("Audit log callback failed: %s", e)
 
 
 class IssueService:

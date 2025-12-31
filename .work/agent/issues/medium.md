@@ -37,3 +37,37 @@ Complexity proportional to value delivered. Simpler code is easier to maintain.
 - [ ] Tag quality maintained or improved
 
 
+
+---
+id: "TEST-001@cov001"
+title: "Test coverage below 15% threshold"
+description: "Unit tests pass but coverage threshold not met"
+created: 2025-12-31
+section: "testing"
+tags: [coverage, testing]
+type: bug
+priority: medium
+status: proposed
+references:
+  - scripts/build.py
+---
+
+### Problem
+Unit tests run successfully but the coverage threshold of 15% is not being met. The build reports "Unit Tests with Coverage - FAILED" even though no individual tests are failing.
+
+### Affected Files
+- Test suite (tests/ directory)
+
+### Importance
+Build fails coverage check despite passing tests. Need to either:
+1. Add more tests to increase coverage
+2. Identify why coverage is below 15%
+
+### Proposed Solution
+Investigate current coverage percentage and add tests for uncovered code paths.
+
+### Acceptance Criteria
+- [ ] Test coverage meets 15% threshold
+- [ ] All tests pass
+
+---

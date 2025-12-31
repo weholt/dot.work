@@ -3,7 +3,7 @@
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from git import Repo
@@ -71,7 +71,7 @@ class VersionManager:
         Returns:
             Next version string in format YYYY.MM.NNNNN
         """
-        now = datetime.now()
+        now = datetime.now(UTC)
         year = now.year
         month = now.month
 
@@ -162,7 +162,7 @@ class VersionManager:
 
         version_info = VersionInfo(
             version=version,
-            build_date=datetime.now().isoformat(),
+            build_date=datetime.now(UTC).isoformat(),
             git_commit=git_commit,
             git_tag=f"version-{version}",
             previous_version=None,
@@ -172,11 +172,10 @@ class VersionManager:
         self.write_version(version_info)
         return version_info
 
-    def freeze_version(self, use_llm: bool = False, dry_run: bool = False) -> VersionInfo:
+    def freeze_version(self, dry_run: bool = False) -> VersionInfo:
         """Freeze a new version with changelog generation.
 
         Args:
-            use_llm: Whether to use LLM for summaries
             dry_run: If True, preview without making changes
 
         Returns:
@@ -187,7 +186,7 @@ class VersionManager:
 
         # Get commits and generate changelog
         commits = self._get_commits_since_last_tag(current)
-        changelog_entry = self._generate_changelog_entry(next_version, commits, current, use_llm)
+        changelog_entry = self._generate_changelog_entry(next_version, commits, current)
 
         # Get current git commit
         git_commit = self.repo.head.commit.hexsha if self.repo else "unknown"
@@ -200,7 +199,7 @@ class VersionManager:
             # Dry run - return preview version info
             return VersionInfo(
                 version=next_version,
-                build_date=datetime.now().isoformat(),
+                build_date=datetime.now(UTC).isoformat(),
                 git_commit=git_commit,
                 git_tag=f"version-{next_version}",
                 previous_version=current.version if current else None,
@@ -226,7 +225,7 @@ class VersionManager:
         return parser.get_commits_since_tag(self.repo, last_tag)
 
     def _generate_changelog_entry(
-        self, next_version: str, commits: list, current: VersionInfo | None, use_llm: bool
+        self, next_version: str, commits: list, current: VersionInfo | None
     ) -> str:
         """Generate changelog entry for the new version.
 
@@ -234,7 +233,6 @@ class VersionManager:
             next_version: New version string
             commits: List of commits to include
             current: Current version info
-            use_llm: Whether to use LLM for summaries
 
         Returns:
             Changelog entry markdown string
@@ -246,7 +244,6 @@ class VersionManager:
             version=next_version,
             commits=commits,
             repo_stats=self._get_repo_statistics(current.git_tag if current else None),
-            use_llm=use_llm,
             project_name=self.project_info.name,
         )
 
@@ -283,7 +280,7 @@ class VersionManager:
 
         version_info = VersionInfo(
             version=version,
-            build_date=datetime.now().isoformat(),
+            build_date=datetime.now(UTC).isoformat(),
             git_commit=git_commit,
             git_tag=tag_name,
             previous_version=current.version if current else None,
@@ -293,7 +290,7 @@ class VersionManager:
 
         # Append to CHANGELOG.md
         changelog_entry = self._generate_changelog_entry(
-            version, self._get_commits_since_last_tag(current), current, use_llm=False
+            version, self._get_commits_since_last_tag(current), current
         )
         changelog_path = self.project_root / "CHANGELOG.md"
         ChangelogGenerator().append_to_changelog(changelog_entry, changelog_path)
@@ -350,7 +347,7 @@ class VersionManager:
             # Write version.json
             version_info = VersionInfo(
                 version=next_version,
-                build_date=datetime.now().isoformat(),
+                build_date=datetime.now(UTC).isoformat(),
                 git_commit=git_commit,
                 git_tag=tag_name,
                 previous_version=current.version if current else None,

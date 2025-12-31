@@ -111,7 +111,6 @@ class ChangelogGenerator:
         version: str,
         commits: list[CommitInfo],
         repo_stats: dict,
-        use_llm: bool = False,
         project_name: str = "Project",
     ) -> str:
         """Generate a changelog entry for a version.
@@ -120,7 +119,6 @@ class ChangelogGenerator:
             version: Version string
             commits: List of commits
             repo_stats: Repository statistics
-            use_llm: Whether to use LLM for summaries
             project_name: Name of the project from pyproject.toml
 
         Returns:
@@ -136,10 +134,10 @@ class ChangelogGenerator:
             display_commits[display_name] = commit_list
 
         highlights = self.extract_highlights(commits)
-        summary = self.generate_summary(commits, use_llm)
+        summary = self.generate_summary(commits)
         contributors = self._count_contributors(commits)
 
-        entry = ChangelogEntry(
+        return self.template.render(
             version=version,
             date=self._get_current_date(),
             summary=summary,
@@ -148,17 +146,6 @@ class ChangelogGenerator:
             statistics=repo_stats,
             contributors=contributors,
             project_name=project_name,
-        )
-
-        return self.template.render(
-            version=entry.version,
-            date=entry.date,
-            summary=entry.summary,
-            highlights=entry.highlights,
-            commits_by_type=entry.commits_by_type,
-            statistics=entry.statistics,
-            contributors=entry.contributors,
-            project_name=entry.project_name,
         )
 
     def extract_highlights(self, commits: list[CommitInfo]) -> list[str]:
@@ -180,21 +167,16 @@ class ChangelogGenerator:
 
         return highlights[:5]  # Limit to 5 highlights
 
-    def generate_summary(self, commits: list[CommitInfo], use_llm: bool) -> str:
+    def generate_summary(self, commits: list[CommitInfo]) -> str:
         """Generate version summary.
 
         Args:
             commits: List of commits
-            use_llm: Whether to use LLM
 
         Returns:
             Summary string
         """
-        if use_llm:
-            # TODO: Implement LLM integration
-            return self._generate_conventional_summary(commits)
-        else:
-            return self._generate_conventional_summary(commits)
+        return self._generate_conventional_summary(commits)
 
     def _generate_conventional_summary(self, commits: list[CommitInfo]) -> str:
         """Generate summary from commit types.

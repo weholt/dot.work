@@ -2366,3 +2366,207 @@ Files modified:
 - `src/dot_work/version/commit_parser.py` - updated short_hash to 7 characters
 
 ---
+
+---
+id: "CR-058@a3b5c7"
+title: "AnalysisProgress.estimated_remaining_seconds is hardcoded fiction"
+description: "Progress tracking uses len(commits) * 2 without actual timing"
+completed: 2025-12-31
+section: "git"
+tags: [ux, accuracy]
+type: enhancement
+priority: low
+status: completed
+---
+
+### Outcome
+Added clarifying comment in git_service.py:94-95 explaining that estimated_remaining_seconds is a rough estimate (~2s per commit) for progress display purposes only, not based on actual timing.
+
+---
+
+---
+id: "CR-059@b4c6d8"
+title: "Magic numbers in complexity.py weights lack documentation"
+description: "No explanation for why deletions cost 0.015 vs additions at 0.01"
+completed: 2025-12-31
+section: "git"
+tags: [documentation, clarity]
+type: docs
+priority: low
+status: completed
+---
+
+### Outcome
+Added comprehensive weight documentation in complexity.py:28-42 explaining the rationale for all complexity weights.
+
+---
+
+---
+id: "CR-061@d6e8f0"
+title: "ConventionalCommitParser scope regex doesn't support common formats"
+description: "Scope pattern doesn't allow api/v2 or @angular/core"
+completed: 2025-12-31
+section: "version"
+tags: [compatibility, parsing]
+type: enhancement
+priority: low
+status: completed
+---
+
+### Outcome
+Expanded scope regex in commit_parser.py:28-29 to support word chars, hyphens, slashes (for api/v2), and at-signs (for @angular/core).
+
+---
+
+---
+id: "CR-062@e7f9a1"
+title: "short_hash uses 12 chars instead of conventional 7"
+description: "Non-standard short hash length may confuse users"
+completed: 2025-12-31
+section: "version"
+tags: [convention, clarity]
+type: enhancement
+priority: low
+status: completed
+---
+
+### Outcome
+Changed short_hash from 12 to 7 characters in commit_parser.py:81 to match git convention.
+
+---
+
+---
+id: "CR-064@a9b1c3"
+title: "time-based review ID has 1-second collision risk"
+description: "Rapid successive calls could produce identical IDs"
+completed: 2025-12-31
+section: "review"
+tags: [reliability, uniqueness]
+type: bug
+priority: low
+status: completed
+---
+
+### Outcome
+Added millisecond precision to new_review_id() in review/storage.py:36-37 to prevent collision on rapid successive calls.
+
+---
+
+---
+id: "CR-070@a5b7c9"
+title: "use_llm branch in generate_summary does same thing as else"
+description: "Parameter is effectively dead code"
+completed: 2025-12-31
+section: "version"
+tags: [dead-code, cleanup]
+type: refactor
+priority: low
+status: completed
+---
+
+### Outcome
+Removed dead `use_llm` parameter from ChangelogGenerator.generate_summary() and related methods in changelog.py and manager.py.
+
+---
+
+---
+id: "CR-066@c1d3e5"
+title: "__all__ exports module names instead of symbols in overview/__init__.py"
+description: "Unusual export pattern doesn't match typical usage"
+completed: 2025-12-31
+section: "overview"
+tags: [api, clarity]
+type: refactor
+priority: low
+status: completed
+---
+
+### Outcome
+Fixed `__all__` exports in overview/__init__.py to export actual functions (`analyze_project`, `build_markdown_report`) instead of non-existent module names.
+
+---
+
+---
+id: "CR-068@e3f5a7"
+title: "datetime.now() without timezone in version/manager.py"
+description: "Timezone-naive datetime could cause version collisions"
+completed: 2025-12-31
+section: "version"
+tags: [reliability, datetime]
+type: bug
+priority: low
+status: completed
+---
+
+### Outcome
+Made all `datetime.now()` calls timezone-aware using `datetime.now(UTC)` in version/manager.py. Added UTC to imports.
+
+---
+
+---
+id: "CR-069@f4a6b8"
+title: "generate_entry creates dataclass only to destructure it"
+description: "Unnecessary overhead in changelog.py"
+completed: 2025-12-31
+section: "version"
+tags: [performance, simplification]
+type: refactor
+priority: low
+status: completed
+---
+
+### Outcome
+Removed unnecessary `ChangelogEntry` dataclass creation in changelog.py `generate_entry()`. Now passes values directly to template render.
+
+---
+
+---
+id: "CR-071@b6c8d0"
+title: "AuditLog callback on_entry is never used"
+description: "Unused callback mechanism in issue_service.py"
+completed: 2025-12-31
+section: "db_issues"
+tags: [dead-code, cleanup]
+type: refactor
+priority: low
+status: completed
+---
+
+### Outcome
+Removed unused `on_entry` callback from `AuditLog` class and removed unused `Callable` import.
+
+---
+
+---
+id: "CR-072@c7d9e1"
+title: "DuplicateService.clock injected but never used"
+description: "Uses datetime.now() directly instead of injected clock"
+completed: 2025-12-31
+section: "db_issues"
+tags: [dead-code, testability]
+type: refactor
+priority: low
+status: completed
+---
+
+### Outcome
+Fixed `DuplicateService` to use injected clock properly instead of direct `datetime.now()` calls. Created internal `_DefaultClock` class.
+
+---
+
+---
+id: "PERF-015@t5u6v7"
+title: "Potential Race Condition in Cache File Access"
+description: "Concurrent cache writes may corrupt files without atomic operations"
+completed: 2025-12-31
+section: "git"
+tags: [performance, concurrency, race-condition, cache, file-atomic]
+type: bug
+priority: low
+status: completed
+---
+
+### Outcome
+Implemented atomic cache writes using temporary file + `os.replace()` pattern in git/services/cache.py.
+
+---

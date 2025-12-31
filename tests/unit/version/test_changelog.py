@@ -203,7 +203,7 @@ def test_generate_summary_with_use_llm_false():
         )
     ]
 
-    summary = generator.generate_summary(commits, use_llm=False)
+    summary = generator.generate_summary(commits)
 
     # Should return conventional summary
     assert summary is not None
@@ -229,7 +229,7 @@ def test_generate_summary_with_use_llm_true():
     ]
 
     # With LLM integration not implemented, should fall back to conventional
-    summary = generator.generate_summary(commits, use_llm=True)
+    summary = generator.generate_summary(commits)
 
     assert summary is not None
     assert len(summary) > 0

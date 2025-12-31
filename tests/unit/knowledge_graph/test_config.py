@@ -60,4 +60,3 @@ class TestEnsureDbDirectory:
         with patch.object(Path, "mkdir", side_effect=OSError("Permission denied")):
             with pytest.raises(ConfigError, match="Cannot create database directory"):
                 ensure_db_directory(db_path)
-

@@ -36,7 +36,6 @@ def init(
 
 @app.command()
 def freeze(
-    llm: bool = typer.Option(False, "--llm", help="Use LLM for enhanced summaries"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Preview without making changes"),
     push: bool = typer.Option(False, "--push", help="Push tags to remote after freeze"),
     project_root: Path = typer.Option(Path.cwd(), help="Project root directory"),
@@ -46,7 +45,7 @@ def freeze(
 
     try:
         with console.status("[bold blue]Freezing version...", spinner="dots"):
-            result = manager.freeze_version(use_llm=llm, dry_run=dry_run)
+            result = manager.freeze_version(dry_run=dry_run)
 
         if dry_run:
             console.print("[yellow]DRY RUN - No changes made[/yellow]")

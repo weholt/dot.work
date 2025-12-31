@@ -123,8 +123,8 @@ class User:
             try:
                 username = (
                     subprocess.check_output(
-                        ["git", "config", "user.name"],
-                        stderr=subprocess.DEVNULL,  # nosec: B603 - git is trusted command
+                        ["git", "config", "user.name"],  # noqa: S607
+                        stderr=subprocess.DEVNULL,
                     )
                     .decode()
                     .strip()
@@ -135,8 +135,8 @@ class User:
             try:
                 email = (
                     subprocess.check_output(
-                        ["git", "config", "user.email"],
-                        stderr=subprocess.DEVNULL,  # nosec: B603 - git is trusted command
+                        ["git", "config", "user.email"],  # noqa: S607
+                        stderr=subprocess.DEVNULL,
                     )
                     .decode()
                     .strip()

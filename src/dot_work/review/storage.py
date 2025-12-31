@@ -31,9 +31,10 @@ def new_review_id() -> str:
     """Generate a new sortable review ID.
 
     Returns:
-        Timestamp-based review ID.
+        Timestamp-based review ID with millisecond precision to avoid collisions.
     """
-    return time.strftime("%Y%m%d-%H%M%S")
+    # Use milliseconds to prevent collision on rapid successive calls
+    return time.strftime("%Y%m%d-%H%M%S") + f"-{int(time.time() * 1000) % 1000:03d}"
 
 
 def review_dir(root: str, review_id: str) -> Path:
