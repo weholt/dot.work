@@ -84,7 +84,7 @@ I want to build a CLI tool that...
 
 ```bash
 # 1. Initialize .work/ directory structure
-dot-work init-work
+dot-work init-tracking
 
 # 2. Generate baseline before any code changes
 # (This is done via AI agent prompt, not CLI command)
@@ -180,7 +180,7 @@ dot-work kg outline <document-id>
 ## 7. Open Questions & Gaps
 
 1. **Non-goals** – What does dot-work explicitly NOT do? (Not stated in docs)
-2. **`init` vs `init-work`** – What's the difference between `dot-work init` and `dot-work init-work`?
+2. **`init` vs `init-tracking`** – What's the difference between `dot-work init` and `dot-work init-tracking`?
 3. **`generate-baseline` command** – Referenced in prompts but not listed in `--help`. Is it a CLI command or only an AI prompt?
 4. **`continue` command** – Referenced in prompts but not shown in CLI help. Is it a real command or a prompt instruction?
 5. **`status` command** – Referenced in prompts but not shown in CLI help.

@@ -288,20 +288,6 @@ Performance: O(B×C) once vs O(B×C) per commit, where B=branches, C=commits.
 
 ---
 
-id: "DOGFOOD-001@foa1hu"
-title: "Investigate init vs init-work implementation difference"
-description: "CLI has both `dot-work init` and `dot-work init-work` commands - purpose unclear from documentation alone"
-created: 2024-12-29
-section: "dogfooding"
-tags: [documentation, cli, discovery, dogfooding]
-type: enhancement
-priority: critical
-status: proposed
-references:
-  - docs/dogfood/gaps-and-questions.md
-  - docs/dogfood/baseline.md
-  - src/dot_work/cli.py
----
 
 ### Problem
 During dogfooding discovery (documentation-only analysis), two similar commands were identified:

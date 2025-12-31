@@ -13,7 +13,7 @@
 | `list` | List supported environments | CLI |
 | `detect` | Detect AI environment in project | CLI |
 | `init` | Initialize project with prompts + tracking | CLI |
-| `init-work` | Initialize .work/ directory | CLI |
+| `init-tracking` | Initialize .work/ directory | CLI |
 | `review` | Interactive code review system | CLI group |
 | `validate` | File validation | CLI group |
 | `overview` | Generate codebase overview | CLI |
@@ -115,12 +115,12 @@ dot-work init --env copilot --target ./new-project
 
 ---
 
-### `init-work` – Initialize Issue Tracking
+### `init-tracking` – Initialize Issue Tracking
 
 Initialize the `.work/` issue tracking directory structure.
 
 ```bash
-dot-work init-work [OPTIONS]
+dot-work init-tracking [OPTIONS]
 ```
 
 | Option | Short | Type | Default | Description |

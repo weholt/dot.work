@@ -1468,3 +1468,111 @@ resolution: "Fixed engine accumulation with session-scoped fixtures"
 - Results: 337 db_issues unit tests pass with +16.4 MB memory growth
 
 ---
+---
+
+id: "DOGFOOD-001@foa1hu"
+title: "Investigate init vs init-work implementation difference"
+description: "CLI has both `dot-work init` and `dot-work init-work` commands - purpose unclear from documentation alone"
+created: 2024-12-29
+completed: 2025-12-31
+section: "dogfooding"
+tags: [documentation, cli, discovery, dogfooding]
+type: enhancement
+priority: critical
+status: completed
+resolution: "Renamed init-work to init-tracking and updated all documentation"
+references:
+  - docs/dogfood/gaps-and-questions.md
+  - docs/dogfood/baseline.md
+  - src/dot_work/cli.py
+---
+
+### Problem
+During dogfooding discovery (documentation-only analysis), two similar commands were identified:
+- `dot-work init` – Initialize project with prompts + tracking
+- `dot-work init-work` – Initialize .work/ directory
+
+The documentation doesn't clearly explain the difference between these commands. User feedback during review: "Investigate and clarify the difference by looking at the implementation"
+
+### Affected Files
+- `src/dot_work/cli.py` (lines 208-267: both command definitions)
+- `src/dot_work/installer.py` (`initialize_work_directory`, `install_prompts`)
+
+### Importance
+**CRITICAL**: User confusion about basic setup commands blocks onboarding:
+- New users don't know which command to use
+- Unclear whether commands are alternatives or complementary
+- Documentation alone insufficient to understand the difference
+
+### Investigation Findings (from implementation)
+
+**Implementation difference discovered:**
+
+1. **`dot-work init`** (lines 208-229):
+   - Alias for the `install` command
+   - Calls `install(env=env, target=target, force=False)`
+   - Installs AI prompts to the project (via `install_prompts`)
+   - Accepts `--env` option to choose AI environment
+   - Does NOT call `init-work` internally
+
+2. **`dot-work init-work`** (lines 232-267):
+   - Calls `initialize_work_directory(target, console, force=force)`
+   - Creates only the `.work/` directory structure
+   - Does NOT install any prompts
+   - No `--env` option (not needed)
+
+**Key difference:**
+- `init` = install prompts + set up project (full initialization)
+- `init-work` = create `.work/` directory only (issue tracking setup only)
+
+**No internal call relationship:**
+- `init` does NOT call `init-work`
+- They are independent operations
+
+### Proposed Solution
+1. Rename `init-work` to `init-tracking` for clarity
+2. Update CLI help text to clearly differentiate the commands
+3. Add "When to use" section to documentation
+
+**User decision:** Option B - Rename `init-work` to `init-tracking`
+
+### Acceptance Criteria
+- [ ] `init-work` renamed to `init-tracking`
+- [ ] CLI help text updated with clear guidance
+- [ ] Documentation updated with "When to use" section
+- [ ] User confusion resolved
+
+### Validation Plan
+1. Rename command in `src/dot_work/cli.py` from `init-work` to `init-tracking`
+2. Verify help text for `dot-work init --help` and `dot-work init-tracking --help` clearly differentiate
+3. Test that both commands work as documented
+4. Confirm `init-tracking` creates only `.work/` directory (no prompts installed)
+5. Confirm `init` still installs prompts correctly
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision received: Rename `init-work` to `init-tracking`.
+
+### Notes
+This gap was discovered during dogfooding phase 1 (baseline documentation review). The discovery methodology emphasized documentation-only analysis to simulate a new user's experience.
+
+---
+
+### Outcome
+- CLI command `init-tracking` already exists in cli.py
+- Updated all documentation files to use `init-tracking` instead of `init-work`:
+  - baseline.md: 3 occurrences
+  - feature-inventory.md: 8 occurrences
+  - gaps-and-questions.md: 7 occurrences
+  - recipes.md: 6 occurrences
+  - tooling-reference.md: 3 occurrences
+- Both commands clearly differentiated in help text:
+  - `init` - Full initialization with prompts
+  - `init-tracking` - .work/ directory only
+- CLI verification: `dot-work --help` shows both commands correctly
+
+---
+
+

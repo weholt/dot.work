@@ -7,25 +7,25 @@
 
 ## Critical Gaps (Block Dogfooding)
 
-### 1. `init` vs `init-work` Difference
+### 1. `init` vs `init-tracking` Difference
 
 **Context:** Both commands exist, purpose unclear
 **Where discovered:** CLI help, baseline.md
 **User feedback:** "Investigate and clarify the difference by looking at the implementation"
 
 **Questions:**
-- What does `init` do that `init-work` doesn't?
-- Does `init` call `init-work` internally?
+- What does `init` do that `init-tracking` doesn't?
+- Does `init` call `init-tracking` internally?
 - When should I use one vs the other?
 
 **Proposed doc addition:**
 ```markdown
-## init vs init-work
+## init vs init-tracking
 
 - `dot-work init` – Install prompts + initialize .work/ (combined)
-- `dot-work init-work` – Initialize .work/ only (prompts already installed)
+- `dot-work init-tracking` – Initialize .work/ only (prompts already installed)
 
-Use `init` for new projects. Use `init-work` if you've already run `install`.
+Use `init` for new projects. Use `init-tracking` if you've already run `install`.
 ```
 
 **Priority:** CRITICAL
@@ -496,7 +496,7 @@ storage:
 ## Next Steps
 
 1. **Immediate:**
-   - [ ] Investigate `init` vs `init-work` implementation
+   - [ ] Investigate `init` vs `init-tracking` implementation
    - [ ] Document issue editing workflow (AI-only)
    - [ ] Add review storage location to docs
 

@@ -1,5 +1,5 @@
 # Agent Focus
-Last updated: 2025-12-30T23:45:00Z
+Last updated: 2025-12-31T11:20:00Z
 
 ## Previous
 - Issue: Commit shortlist issues and installer fixes
@@ -19,10 +19,17 @@ Last updated: 2025-12-30T23:45:00Z
 - Outcome: Removed 28-line duplicate environments section from all 22 prompt files, fixed copilot suffix in global.yml, updated wizard.py; all 44 tests pass
 
 ## Current
-- Issue: TBD (select from shortlist.md or other priority file)
-- Started: N/A
-- Status: None
-- Phase: N/A
+- Issue: DOGFOOD-001@foa1hu - Rename init-work to init-tracking
+- Started: 2025-12-31T11:20:00Z
+- Status: in-progress
+- Phase: Implementation
+- Progress:
+  - [x] Investigation complete (findings in issue)
+  - [ ] Rename command in cli.py
+  - [ ] Update CLI help text
+  - [ ] Update documentation
+  - [ ] Run validation
+- Source: critical.md (P0)
 
 ## Next
-- Issue: TBD (select from shortlist.md)
+- Issue: TBD (select from high.md after DOGFOOD-001 completes)

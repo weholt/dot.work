@@ -13,7 +13,7 @@
 | **list** | CLI command | List all supported AI environments | Developer discovering options | (none) → table of environments | dot-work installed | README.md, `list --help` |
 | **detect** | CLI command | Detect AI environment in project directory | Developer with existing project | target path → environment name | dot-work installed | `detect --help` |
 | **init** | CLI command | Initialize new project with prompts + issue tracking | Developer starting project | env, target path → .work/ structure + prompts | dot-work installed | `init --help` |
-| **init-work** | CLI command | Initialize .work/ issue tracking directory | Developer setting up workflow | target path → .work/ directory structure | dot-work installed | `init-work --help` |
+| **init-tracking** | CLI command | Initialize .work/ issue tracking directory | Developer setting up workflow | target path → .work/ directory structure | dot-work installed | `init-tracking --help` |
 | **review** | CLI command group | Interactive code review with AI export | Developer reviewing changes | git diff → comments + markdown export | git repo, browser | README.md, `review --help` |
 | **validate** | CLI command group | Validate JSON/YAML files | Developer checking config | file path → validation result | dot-work installed | `validate --help` |
 | **overview** | CLI command | Generate codebase overview (birdseye) | Developer understanding new codebase | input_dir, output_dir → markdown + JSON | Python files, docs | `overview --help` |
@@ -146,7 +146,7 @@ dot-work detect --target /path/to/project
 
 ```bash
 # Initialize .work/ directory structure
-dot-work init-work
+dot-work init-tracking
 
 # Initialize with prompts + issue tracking
 dot-work init --env copilot
@@ -744,10 +744,10 @@ dot-work install --env <detected>
 ```
 *Workflow: Auto-configure prompts for detected environment*
 
-**2. init-work + generate-baseline**
+**2. init-tracking + generate-baseline**
 ```bash
 # Setup tracking, then capture quality floor
-dot-work init-work
+dot-work init-tracking
 /generate-baseline  # AI prompt
 ```
 *Workflow: Prepare project for AI-assisted development*
@@ -807,7 +807,7 @@ I want to build a CLI tool that...
 ```bash
 # SETUP (one-time)
 dot-work install --env claude
-dot-work init-work
+dot-work init-tracking
 /generate-baseline
 
 # ITERATION
@@ -837,7 +837,7 @@ dot-work version show
 | If you want... | Choose... |
 |---------------|-----------|
 | AI prompts in your project | `dot-work install --env <your-tool>` |
-| Track work with AI agent | `dot-work init-work` + `/do-work` |
+| Track work with AI agent | `dot-work init-tracking` + `/do-work` |
 | Review code changes | `dot-work review start` |
 | Manage versions | `dot-work version init` + `dot-work version freeze` |
 | Create custom prompt | `dot-work prompts create` |
@@ -854,7 +854,7 @@ See `gaps-and-questions.md` for complete gap tracking.
 
 Key high-priority gaps:
 1. CLI commands vs AI prompt instructions (generate-baseline, continue, status, focus on)
-2. init vs init-work difference
+2. init vs init-tracking difference
 3. Migration between file-based and db-issues
 4. Review storage location and management
 5. kg database location

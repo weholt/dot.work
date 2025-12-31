@@ -112,7 +112,7 @@ cd /path/to/existing-project
 dot-work install --env copilot
 
 # 3. Initialize .work/ structure
-dot-work init-work
+dot-work init-tracking
 
 # 4. Generate baseline (CRITICAL before any code changes)
 /generate-baseline
@@ -811,10 +811,10 @@ ENV=$(dot-work detect | awk '{print $1}')
 dot-work install --env $ENV
 ```
 
-**2. init-work + generate-baseline**
+**2. init-tracking + generate-baseline**
 ```bash
 # Setup tracking and quality floor
-dot-work init-work
+dot-work init-tracking
 /generate-baseline
 ```
 
@@ -845,7 +845,7 @@ dot-work review clear --force
 ```bash
 # SETUP
 dot-work install --env claude
-dot-work init-work
+dot-work init-tracking
 /generate-baseline
 
 # DEVELOPMENT
@@ -876,7 +876,7 @@ git tag -l | tail -1
 - `--target` changes where files are written
 - Safe defaults: `--target .` (current directory)
 
-**init-work --force:**
+**init-tracking --force:**
 - Overwrites existing `.work/` directory
 - Use with caution: destroys existing issues/history
 - Default: safe (aborts if exists)
@@ -907,7 +907,7 @@ git tag -l | tail -1
 | Version management | Recipe 8 | Date-based + changelog |
 | Searchable docs | Recipe 9 | Knowledge graph |
 | Custom workflows | Recipe 10 | Canonical prompts |
-| File-based issues | `init-work` + AI prompts | Simple, git-tracked |
+| File-based issues | `init-tracking` + AI prompts | Simple, git-tracked |
 | Database issues | `db-issues init` | Complex queries, teams |
 
 ---
