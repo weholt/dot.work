@@ -1,30 +1,31 @@
 # Agent Focus
-Last updated: 2025-12-31T16:00:00Z
+Last updated: 2025-12-31T17:00:00Z
 
 ## Previous
-- Issue: Ralph Loop Iteration 2 - Critical issues cleanup
-- Completed: 2025-12-31T16:00:00Z
+- Issue: Medium-priority performance optimizations (PERF-014 through PERF-016)
+- Completed: 2025-12-31T17:00:00Z
 - Outcome:
-  - Moved 6 resolved issues from critical.md to history.md
-  - critical.md now empty (all issues resolved)
-  - Build verified clean (linting + type checking pass)
+  - PERF-014: Pre-compiled complexity patterns
+  - PERF-015: Optimized risk factor detection
+  - PERF-016: Resolved (issue does not apply to current code)
+  - 3 medium-priority issues complete
 
 ## Current
-- Issue: PERF-010@3d8a2f - N+1 query in _get_commit_tags
-- Started: 2025-12-31T16:00:00Z
+- Issue: Ralph Loop Iteration 2 - Continuing medium-priority issues
+- Started: 2025-12-31T17:00:00Z
 - Status: in-progress
-- Source: high.md
-- Description: O(n*m) tag lookups, need tag-to-commit cache
+- Source: medium.md (63 issues remain)
 
 ## Next
-- Issue: PERF-011@7b2c9e - Repeated regex compilation
-- Source: high.md
-- Reason: Next high-priority performance issue
+- Issue: Continue processing medium.md issues
+- Source: medium.md
+- Reason: 63 proposed issues remain
 
 ## Ralph Loop Status
 **Iteration 2 Progress:**
 - Fixed all 14 security errors (BUILD-001)
 - Fixed 19 test failures (TEST-001)
 - Cleared all 6 critical issues
-- Working on 4 high-priority performance issues
-- 114 proposed issues remain across high.md (4), medium.md (66), low.md (21), backlog.md (25)
+- Completed all 4 high-priority performance issues
+- Completed 3 medium-priority performance issues (PERF-014, 015, 016)
+- 109 proposed issues remain across medium.md (63), low.md (21), backlog.md (25)
