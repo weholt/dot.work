@@ -2063,4 +2063,29 @@ Optimized risk factor detection:
 - Eliminated repeated pattern list creation
 
 ---
+---
+id: "PERF-016@4b9f7c"
+title: "Potential memory leak in SQLAlchemy adapter without explicit disposal"
+description: "UnitOfWork creates engine but lacks explicit cleanup method"
+completed: 2025-12-31
+section: "database"
+tags: [performance, memory, database]
+type: performance
+priority: medium
+status: resolved
+references:
+  - src/dot_work/db_issues/adapters/sqlite.py
+---
+
+### Outcome
+**Status:** Issue does not apply to current codebase
+
+The current `UnitOfWork` implementation:
+- Takes a `Session` as parameter (doesn't create its own engine)
+- Already has context manager support via the Session
+- Engine disposal is managed by the caller via `create_db_engine()`
+
+No changes needed - issue was based on outdated code assumptions.
+
+---
 
