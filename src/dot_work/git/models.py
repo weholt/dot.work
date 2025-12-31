@@ -243,8 +243,3 @@ class AnalysisProgress:
         return (self.processed_commits / self.total_commits) * 100
 
 
-# Type aliases
-CommitHash = str
-BranchName = str
-TagName = str
-FilePath = str

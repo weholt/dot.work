@@ -2089,3 +2089,177 @@ No changes needed - issue was based on outdated code assumptions.
 
 ---
 
+
+---
+---
+id: "CR-028@a4b6c8"
+title: "Display functions in git/cli.py should be extracted to formatters module"
+description: "260 lines of _display_* functions embedded in CLI module"
+completed: 2025-12-31
+section: "git"
+tags: [refactor, separation-of-concerns]
+type: refactor
+priority: medium
+status: resolved
+references:
+  - src/dot_work/git/cli.py
+  - src/dot_work/git/formatters.py
+---
+
+### Outcome
+**Status:** Already resolved
+
+The display functions were already extracted to `git/formatters.py`:
+- `display_table_results()` - displays comparison results in table format
+- `display_commit_analysis()` - displays detailed commit analysis
+- `display_commit_comparison()` - displays comparison between two commits
+- `display_contributor_stats()` - displays contributor statistics
+- `display_complexity_analysis()` - displays complexity analysis
+- `display_release_analysis()` - displays release analysis
+- `display_risk_assessment()` - displays risk assessment panel
+
+The CLI module (`cli.py`) now imports these functions from formatters.py.
+
+No changes needed - separation of concerns was already implemented.
+
+---
+---
+id: "CR-029@b5c7d9"
+title: "CacheManager class in git module is never used"
+description: "Dead code that creates unnecessary abstraction"
+completed: 2025-12-31
+section: "git"
+tags: [dead-code, cleanup]
+type: refactor
+priority: medium
+status: resolved
+references:
+  - src/dot_work/git/services/cache.py
+---
+
+### Outcome
+**Status:** Resolved - Removed dead code
+
+Removed the `CacheManager` class (104 lines) from `cache.py:304-408`:
+- The class was never instantiated in the codebase
+- `GitAnalysisService` uses `AnalysisCache` directly
+- No multi-cache functionality was needed
+
+Files modified:
+- `src/dot_work/git/services/cache.py` - removed `CacheManager` class
+
+---
+---
+id: "CR-031@d7e9f1"
+title: "Dead code in utils.py - extract_emoji_indicators and calculate_commit_velocity"
+description: "~100 lines of never-called functions"
+completed: 2025-12-31
+section: "git"
+tags: [dead-code, cleanup]
+type: refactor
+priority: medium
+status: resolved
+references:
+  - src/dot_work/git/utils.py
+---
+
+### Outcome
+**Status:** Resolved - Removed dead code
+
+Removed three unused functions from `utils.py` (112 lines total):
+
+1. `extract_emoji_indicators()` (lines 333-382, 50 lines) - never called
+2. `calculate_commit_velocity()` (lines 418-426, 9 lines) - never called
+3. `identify_commit_patterns()` (lines 429-477, 49 lines) - never called
+
+These functions had no imports or callers in the codebase.
+
+Files modified:
+- `src/dot_work/git/utils.py` - removed dead functions
+
+---
+
+---
+---
+id: "CR-032@e8f0a2"
+title: "Unused type aliases in git/models.py"
+description: "CommitHash, BranchName, TagName, FilePath defined but never used"
+completed: 2025-12-31
+section: "git"
+tags: [dead-code, cleanup]
+type: refactor
+priority: medium
+status: resolved
+references:
+  - src/dot_work/git/models.py
+---
+
+### Outcome
+**Status:** Resolved - Removed unused type aliases
+
+Removed 4 unused type aliases from `git/models.py:246-250`:
+- `CommitHash = str`
+- `BranchName = str`
+- `TagName = str`
+- `FilePath = str`
+
+These were defined but never imported or used anywhere in the codebase.
+
+Files modified:
+- `src/dot_work/git/models.py` - removed unused type aliases
+
+---
+---
+id: "CR-033@f9a1b3"
+title: "Unused harness_app Typer instance in harness/__init__.py"
+description: "Competing CLI entry points create confusion"
+completed: 2025-12-31
+section: "harness"
+tags: [dead-code, cleanup]
+type: refactor
+priority: medium
+status: resolved
+references:
+  - src/dot_work/harness/__init__.py
+  - src/dot_work/harness/cli.py
+---
+
+### Outcome
+**Status:** Resolved - Removed duplicate entry point
+
+Removed `harness_app` Typer instance from `harness/__init__.py`. The CLI uses `app` from `harness/cli.py` instead:
+```python
+# cli.py imports from cli.py, not __init__.py
+from dot_work.harness.cli import app as harness_app
+```
+
+This eliminates confusion about which is the canonical entry point.
+
+Files modified:
+- `src/dot_work/harness/__init__.py` - removed unused `harness_app` and typer import
+
+---
+---
+id: "CR-037@d3e5f7"
+title: "Unused validate_path function in knowledge_graph/config.py"
+description: "Function defined but never called in production"
+completed: 2025-12-31
+section: "knowledge_graph"
+tags: [dead-code, cleanup]
+type: refactor
+priority: medium
+status: resolved
+references:
+  - src/dot_work/knowledge_graph/config.py
+---
+
+### Outcome
+**Status:** Resolved - Removed unused function
+
+Removed `validate_path()` function from `config.py:54-78` (26 lines).
+The function was never called from production code - `get_db_path()` and `ensure_db_directory()` don't use it.
+
+Files modified:
+- `src/dot_work/knowledge_graph/config.py` - removed unused `validate_path()` function
+
+---

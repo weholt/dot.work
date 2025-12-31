@@ -50,29 +50,3 @@ def ensure_db_directory(db_path: Path | None = None) -> Path:
     except OSError as e:
         raise ConfigError(f"Cannot create database directory: {e}") from e
 
-
-def validate_path(path: Path) -> Path:
-    """Validate that a path is suitable for database storage.
-
-    Args:
-        path: Path to validate.
-
-    Returns:
-        Validated absolute path.
-
-    Raises:
-        ConfigError: If path is invalid.
-    """
-    try:
-        resolved_path = path.resolve()
-
-        # Check that it has a file extension (database file)
-        if resolved_path.suffix == "":
-            raise ConfigError("Invalid path: no file extension")
-
-        return resolved_path
-
-    except OSError as e:
-        raise ConfigError(f"Invalid path: {e}") from e
-    except ValueError as e:
-        raise ConfigError(f"Invalid path: {e}") from e
