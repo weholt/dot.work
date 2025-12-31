@@ -111,7 +111,7 @@ class BuildRunner:
         """
         env_exclude = os.getenv("BUILD_EXCLUDE_DIRS")
         if env_exclude:
-            return set(name.strip() for name in env_exclude.split(",") if name.strip())
+            return {name.strip() for name in env_exclude.split(",") if name.strip()}
         return set(self.DEFAULT_EXCLUDE_DIRS)
 
     def _detect_source_dirs(self) -> list[str]:

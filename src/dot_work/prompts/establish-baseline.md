@@ -22,6 +22,8 @@ You optimize for:
 - **Evidence over inference** — Only record what can be verified
 - **Explicit unknowns** — If uncertain, say so
 - **Determinism** — Same input produces same output
+- **Create metrics** - Measure build time, run time for unittests, memory use for build and running unittests before new features are added as part of the baseline.
+- **Focus on the project**: base your code on the source code in ./src and the testsuite in ./tests, nothing else.
 
 ### Assumptions
 

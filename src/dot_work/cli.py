@@ -158,13 +158,13 @@ def install(
         install_prompts(env_key, target, prompts_dir, console, force=force, dry_run=dry_run)
     except ValueError as e:
         console.print(f"\n[red]❌ Installation failed:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except Exception as e:
         console.print("\n[red]❌ Unexpected error during installation:[/red]")
         console.print(f"[dim]{e}[/dim]")
         console.print("\n[dim]💡 Try running with --dry-run to preview changes[/dim]")
         console.print("[dim]💡 Report this issue if it persists[/dim]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     if dry_run:
         console.print("\n[bold yellow]⚠️  Dry run complete - no files were written[/bold yellow]")

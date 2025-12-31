@@ -356,11 +356,11 @@ def install_prompts_generic(
                 console.print(f"  [red]❌ Permission denied writing to:[/red] {combined_path}")
                 console.print(f"  [dim]Error: {e}[/dim]")
                 console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
             except OSError as e:
                 console.print(f"  [red]❌ Failed to write file:[/red] {combined_path}")
                 console.print(f"  [dim]Error: {e}[/dim]")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
         console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {combined_path}")
         if config.messages[2]:
             console.print(f"[dim]💡 {config.messages[2]}[/dim]")
@@ -375,11 +375,11 @@ def install_prompts_generic(
             console.print(f"  [red]❌ Permission denied creating directory:[/red] {dest_dir}")
             console.print(f"  [dim]Error: {e}[/dim]")
             console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
         except OSError as e:
             console.print(f"  [red]❌ Failed to create directory:[/red] {dest_dir}")
             console.print(f"  [dim]Error: {e}[/dim]")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
 
     # Scan phase: collect all destination paths and categorize
     state = InstallState()
@@ -435,11 +435,11 @@ def install_prompts_generic(
                 console.print(f"  [red]❌ Permission denied writing to:[/red] {dest_path}")
                 console.print(f"  [dim]Error: {e}[/dim]")
                 console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
             except OSError as e:
                 console.print(f"  [red]❌ Failed to write file:[/red] {dest_path}")
                 console.print(f"  [dim]Error: {e}[/dim]")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
 
     # Create auxiliary files
     for aux_path, aux_content in config.auxiliary_files:
@@ -455,11 +455,11 @@ def install_prompts_generic(
                 console.print(f"  [red]❌ Permission denied writing to:[/red] {aux_full_path}")
                 console.print(f"  [dim]Error: {e}[/dim]")
                 console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
             except OSError as e:
                 console.print(f"  [red]❌ Failed to write file:[/red] {aux_full_path}")
                 console.print(f"  [dim]Error: {e}[/dim]")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
         elif aux_full_path.exists():
             console.print(f"  [dim]⏭[/dim] Skipped {aux_full_path.name}")
 
@@ -1202,11 +1202,11 @@ def install_canonical_prompt(
         console.print(f"  [red]❌ Permission denied creating directory:[/red] {output_dir}")
         console.print(f"  [dim]Error: {e}[/dim]")
         console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except OSError as e:
         console.print(f"  [red]❌ Failed to create directory:[/red] {output_dir}")
         console.print(f"  [dim]Error: {e}[/dim]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     # Build environment-specific frontmatter
     env_config_dict = dict(vars(env_config))
@@ -1231,11 +1231,11 @@ def install_canonical_prompt(
         console.print(f"  [red]❌ Permission denied writing to:[/red] {output_path}")
         console.print(f"  [dim]Error: {e}[/dim]")
         console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except OSError as e:
         console.print(f"  [red]❌ Failed to write file:[/red] {output_path}")
         console.print(f"  [dim]Error: {e}[/dim]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 def install_canonical_prompt_directory(
@@ -1499,11 +1499,11 @@ def install_canonical_prompts_by_environment(
                 console.print(f"  [red]❌ Permission denied creating directory:[/red] {output_dir}")
                 console.print(f"  [dim]Error: {e}[/dim]")
                 console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
             except OSError as e:
                 console.print(f"  [red]❌ Failed to create directory:[/red] {output_dir}")
                 console.print(f"  [dim]Error: {e}[/dim]")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
 
         # Read prompt content
         prompt = CANONICAL_PARSER.parse(prompt_file)
@@ -1522,11 +1522,11 @@ def install_canonical_prompts_by_environment(
                 console.print(f"  [red]❌ Permission denied writing to:[/red] {output_path}")
                 console.print(f"  [dim]Error: {e}[/dim]")
                 console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
             except OSError as e:
                 console.print(f"  [red]❌ Failed to write file:[/red] {output_path}")
                 console.print(f"  [dim]Error: {e}[/dim]")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
 
     if dry_run:
         console.print(

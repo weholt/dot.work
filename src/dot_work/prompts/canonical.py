@@ -135,9 +135,17 @@ class CanonicalPromptParser:
         content = file_path.read_text(encoding="utf-8").strip()
         return self._parse_content(content, source_file=file_path, prompts_dir=file_path.parent)
 
-    def parse_content(self, content: str) -> CanonicalPrompt:
-        """Parse canonical prompt content directly."""
-        return self._parse_content(content.strip())
+    def parse_content(self, content: str, prompts_dir: Path | None = None) -> CanonicalPrompt:
+        """Parse canonical prompt content directly.
+
+        Args:
+            content: The prompt content to parse
+            prompts_dir: Directory containing global.yml. If None, uses the module's directory.
+        """
+        if prompts_dir is None:
+            # Default to the module's directory where global.yml is located
+            prompts_dir = Path(__file__).parent.resolve()
+        return self._parse_content(content.strip(), prompts_dir=prompts_dir)
 
     def _load_global_defaults(self, prompts_dir: Path) -> dict[str, Any]:
         """Load global defaults from global.yml if available.
@@ -179,6 +187,9 @@ class CanonicalPromptParser:
         Values in `override` take precedence over values in `base`.
         Nested dictionaries are merged recursively.
 
+        Special case: 'environments' key is merged non-recursively - local
+        environment definitions completely replace global ones.
+
         Args:
             base: Base dictionary with default values
             override: Dictionary with override values
@@ -189,7 +200,10 @@ class CanonicalPromptParser:
         result = base.copy()
 
         for key, value in override.items():
-            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            if key == "environments" and key in result:
+                # For environments, merge non-recursively - local envs replace global envs
+                result[key] = {**result[key], **value}
+            elif key in result and isinstance(result[key], dict) and isinstance(value, dict):
                 result[key] = CanonicalPromptParser._deep_merge(result[key], value)
             else:
                 result[key] = value

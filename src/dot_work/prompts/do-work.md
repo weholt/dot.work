@@ -199,7 +199,7 @@ Output: focus.md updated with previous/current/next
 
 ## Next
 - Issue: ENHANCE-001@b2c3d4 – Improve error messages
-- Source: shortlist.md
+- Source: critical.md
 - Reason: User priority, follows current work
 ```
 

@@ -591,12 +591,12 @@ class TestGlobalConfig:
 
     def test_deep_merge_basic(self) -> None:
         """Test basic deep merge functionality."""
-        from dot_work.prompts.canonical import _deep_merge
+        parser = CanonicalPromptParser()
 
         global_dict = {"a": 1, "b": {"x": 10, "y": 20}}
         local_dict = {"b": {"y": 30, "z": 40}, "c": 3}
 
-        result = _deep_merge(global_dict, local_dict)
+        result = parser._deep_merge(global_dict, local_dict)
 
         # Global values preserved
         assert result["a"] == 1
@@ -610,21 +610,21 @@ class TestGlobalConfig:
 
     def test_deep_merge_local_overrides_global(self) -> None:
         """Test that local values completely override global at same key."""
-        from dot_work.prompts.canonical import _deep_merge
+        parser = CanonicalPromptParser()
 
         global_dict = {"a": {"x": 1, "y": 2}}
         local_dict = {"a": {"x": 10}}
 
-        result = _deep_merge(global_dict, local_dict)
+        result = parser._deep_merge(global_dict, local_dict)
 
         assert result["a"]["x"] == 10  # Local override
         assert result["a"]["y"] == 2  # Global preserved
 
     def test_deep_merge_no_global(self) -> None:
         """Test merge with empty global dict."""
-        from dot_work.prompts.canonical import _deep_merge
+        parser = CanonicalPromptParser()
 
-        result = _deep_merge({}, {"a": 1, "b": 2})
+        result = parser._deep_merge({}, {"a": 1, "b": 2})
         assert result == {"a": 1, "b": 2}
 
     def test_parse_with_global_config(self) -> None:
@@ -708,11 +708,12 @@ Test content"""
     def test_global_config_caching(self) -> None:
         """Test that global config is cached after first load."""
         parser = CanonicalPromptParser()
+        prompts_dir = Path(__file__).parent.parent.parent / "src" / "dot_work" / "prompts"
 
         # First load
-        config1 = parser._load_global_config()
+        config1 = parser._load_global_defaults(prompts_dir)
         # Second load should return cached value
-        config2 = parser._load_global_config()
+        config2 = parser._load_global_defaults(prompts_dir)
 
         # Should be the same object (cached)
         assert config1 is config2

@@ -1625,3 +1625,1070 @@ dot-work container opencode context validate --dir ./project-context
 - Future: Remote context URLs with authentication
 - Consider context size limits and optimization
 - Security: Validate file paths (no path traversal attacks)
+
+---
+id: "FEAT-027@e1f7g3"
+title: "Runtime URL-based context injection for OpenCode containers"
+description: "Add support for injecting context files, directories, and archives from remote URLs into running containers"
+created: 2025-12-30
+section: "container/docker/context"
+tags: [feature, docker, containerization, opencode, context-injection, urls, remote-content]
+type: enhancement
+priority: medium
+status: proposed
+references:
+  - .work/agent/issues/backlog.md:FEAT-026@d0e6f2
+  - README.md
+  - src/dot_work/container/
+---
+
+### Problem
+FEAT-026 adds build-time URL context injection, but runtime containers also need to:
+1. Fetch updated documentation from remote URLs
+2. Pull latest configuration files from internal servers
+3. Download context archives from CI/CD pipelines
+4. Fetch prompts/skills from shared repositories
+5. Update context without rebuilding or restarting container
+
+Runtime URL injection enables live updates to container context without rebuilding images.
+
+### Affected Files
+- MODIFIED: `src/dot_work/container/opencode/entrypoint.sh` (add URL download logic)
+- MODIFIED: `src/dot_work/container/opencode/.env.example` (add URL env vars)
+- MODIFIED: `src/dot_work/cli.py` (add --context-url to run command)
+- NEW: `src/dot_work/container/opencode/url-downloader.py` (downloader utility)
+- MODIFIED: `src/dot_work/container/opencode/README.md` (add URL examples)
+
+### Importance
+**MEDIUM**: Runtime URL injection enables:
+- Live context updates without container restart
+- CI/CD integration (inject build artifacts, test results)
+- Centralized context management (fetch from shared servers)
+- Dynamic prompt/skill distribution
+- Zero-downtime context refresh
+- Multi-environment consistency (dev/stage/prod from same source)
+
+### Proposed Solution
+
+**Phase 1: URL Download Utility (1-2 days)**
+Create `url-downloader.py` script:
+
+1. Supported URL schemes:
+   - HTTP/HTTPS: `https://example.com/file.txt`
+   - Raw GitHub: `gh://org/repo/path/file.md`
+   - GitLab: `gl://org/project/path/file.md`
+   - S3: `s3://bucket/path/file.txt` (optional, with boto3)
+   - Local file: `file:///path/to/file`
+
+2. Download with validation:
+   ```python
+   def download_url(url, dest_dir, validate=True):
+     """Download URL to destination directory."""
+     parsed = urlparse(url)
+
+     if parsed.scheme in ('http', 'https'):
+       return download_http(url, dest_dir)
+     elif parsed.netloc == 'github.com' or url.startswith('gh://'):
+       return download_github(url, dest_dir)
+     elif parsed.scheme == 'file':
+       return copy_local(url, dest_dir)
+     else:
+       raise ValueError(f"Unsupported URL scheme: {parsed.scheme}")
+   ```
+
+3. Validation options:
+   - File size limits (e.g., max 100MB)
+   - Content type validation (e.g., only text/markdown)
+   - Checksum verification (SHA256)
+   - SSL certificate validation for HTTPS
+   - Auth token injection from env vars
+
+**Phase 2: Runtime URL CLI Flags (1 day)**
+Add `--context-url` to `dot-work container opencode run`:
+
+```bash
+# Download single file
+dot-work container opencode run \
+  --context-url https://example.com/api-spec.md \
+  --context-dest docs/
+
+# Download manifest from URL
+dot-work container opencode run \
+  --context-url https://raw.githubusercontent.com/org/repo/main/context.yaml \
+  --context-type manifest
+
+# Download archive from URL
+dot-work container opencode run \
+  --context-url https://releases.example.com/context.tar.gz \
+  --context-type archive
+
+# Multiple URLs
+dot-work container opencode run \
+  --context-url https://example.com/docs/api.md \
+  --context-url https://example.com/configs/providers.yaml \
+  --context-url gh://org/skills/code-review
+```
+
+URL formats:
+- `--context-url URL[:DEST][:TYPE]`
+  - `URL`: Source URL
+  - `DEST`: Destination in context (default: auto-detect)
+  - `TYPE`: File type (manifest, archive, file, dir) (default: auto-detect)
+
+**Phase 3: Entrypoint URL Handling (1-2 days)**
+Extend `entrypoint.sh` to download URLs on startup:
+
+```bash
+# Download context URLs
+if [ -n "$CONTEXT_URLS" ]; then
+  echo "Downloading context URLs..."
+  IFS=';' read -ra URLS <<< "$CONTEXT_URLS"
+  for url_spec in "${URLS[@]}"; do
+    python3 /usr/local/bin/url-downloader.py download \
+      --url "$url_spec" \
+      --dest /workspace/context
+  done
+fi
+```
+
+Environment variables:
+- `CONTEXT_URLS`: Semicolon-separated URL specs
+- `CONTEXT_URL_TIMEOUT`: Download timeout (default: 30s)
+- `CONTEXT_URL_MAX_SIZE`: Max file size (default: 100MB)
+- `GITHUB_TOKEN`: For private GitHub repos
+- `HTTP_AUTH_TOKEN`: Generic HTTP auth token
+
+**Phase 4: Runtime Context Update Command (1-2 days)**
+Add CLI command to update context in running container:
+
+```bash
+# Update context from URLs
+dot-work container opencode context update CONTAINER \
+  --url https://example.com/docs/api.md \
+  --url https://example.com/config.yaml
+
+# Update from manifest URL
+dot-work container opencode context update CONTAINER \
+  --manifest-url https://raw.githubusercontent.com/org/repo/main/context.yaml
+
+# Update with force (overwrite existing files)
+dot-work container opencode context update CONTAINER \
+  --url https://example.com/docs/new.md \
+  --force
+
+# Dry run (preview changes)
+dot-work container opencode context update CONTAINER \
+  --url https://example.com/docs/updated.md \
+  --dry-run
+```
+
+Update workflow:
+1. Download files to temporary location
+2. Validate and verify checksums
+3. Show diff vs existing files
+4. Apply changes (unless dry-run)
+5. Trigger OpenCode context reload (if supported)
+
+**Phase 5: URL Authentication Support (1 day)**
+Support authenticated URLs:
+
+1. GitHub tokens:
+   - Use `GITHUB_TOKEN` env var
+   - Inject into GitHub raw content URLs
+   - Support private repos
+
+2. HTTP auth:
+   - Use `HTTP_AUTH_TOKEN` env var
+   - Basic auth via `HTTP_AUTH_USER:HTTP_AUTH_PASS`
+   - Bearer token via `HTTP_AUTH_BEARER`
+
+3. Custom headers:
+   - `CONTEXT_URL_HEADERS: Authorization=Bearer token,X-Custom=value`
+   - Inject into HTTP requests
+
+4. SSH keys for git URLs:
+   - Mount SSH key into container
+   - Use for git-based URLs (gh://, gl://)
+
+**Phase 6: URL Caching and Versioning (1-2 days)**
+Implement caching to avoid redundant downloads:
+
+1. Cache directory:
+   - `/workspace/context/.cache/`
+   - Store downloaded files by URL hash
+   - Cache TTL (configurable via env var)
+
+2. Versioning support:
+   ```yaml
+   # URL in manifest with version
+   urls:
+     - url: https://example.com/docs/api-v2.md
+       version: "2.1.0"
+       checksum: "sha256:abc123..."
+       cache_ttl: 3600  # 1 hour
+   ```
+
+3. Conditional download:
+   - Check if cached file exists
+   - Verify checksum matches
+   - Skip download if valid and within TTL
+
+**Phase 7: URL Monitoring and Auto-Refresh (2-3 days)**
+Optional background monitoring:
+
+1. Watch mode:
+   ```bash
+   dot-work container opencode context watch CONTAINER \
+     --url https://example.com/docs/api.md \
+     --interval 300  # check every 5 minutes
+   ```
+
+2. Webhook support:
+   - Expose endpoint for webhook notifications
+   - Trigger context update on webhook call
+   - Support GitHub webhooks, CI/CD pipelines
+
+3. Inotify integration:
+   - Monitor downloaded files for changes
+   - Trigger OpenCode context reload on change
+
+**Phase 8: Documentation and Examples (1 day)**
+Extend `container/opencode/README.md`:
+
+```bash
+# Quick examples
+## Download single file
+dot-work container opencode run \
+  --context-url https://example.com/api-spec.md
+
+## Download from GitHub
+dot-work container opencode run \
+  --context-url gh://org/repo/docs/architecture.md
+
+## Download manifest
+dot-work container opencode run \
+  --context-url https://raw.githubusercontent.com/org/repo/main/context.yaml \
+  --context-type manifest
+
+## Multiple URLs with auth
+export GITHUB_TOKEN=ghp_xxx
+dot-work container opencode run \
+  --context-url https://raw.githubusercontent.com/org/repo/main/docs/api.md \
+  --context-url https://raw.githubusercontent.com/org/repo/main/configs/providers.yaml
+
+## Update running container
+dot-work container opencode context update my-container \
+  --url https://example.com/docs/updated-api.md
+
+## Watch for updates
+dot-work container opencode context watch my-container \
+  --url https://example.com/docs/api.md \
+  --interval 600
+```
+
+### Acceptance Criteria
+- [ ] `url-downloader.py` supports HTTP/HTTPS, GitHub, GitLab URLs
+- [ ] Runtime `--context-url` flag works in run command
+- [ ] Entrypoint downloads URLs on startup
+- [ ] `dot-work container opencode context update` command works
+- [ ] URL authentication via env vars (GitHub token, HTTP auth)
+- [ ] URL caching with TTL support
+- [ ] Dry-run mode for updates
+- [ ] Documentation with examples
+- [ ] Unit tests for download, validation, caching
+- [ ] Integration tests for runtime URL injection
+- [ ] Error handling for network failures, invalid URLs, auth failures
+
+### Notes
+- URL downloads should be optional (container works without URLs)
+- Security: Validate URLs (no SSRF attacks), limit file sizes
+- Consider rate limiting for frequent downloads
+- Future: Support custom URL handlers via plugins
+- Future: URL signing and verification
+- Future: Proxy support for corporate environments
+- Monitor download sizes to prevent disk exhaustion
+
+---
+id: "FEAT-028@f2g8h4"
+title: "File upload/download utilities for OpenCode containers"
+description: "Add optional file transfer utilities for easy uploading and downloading files to and from running containers"
+created: 2025-12-30
+section: "container/docker/file-transfer"
+tags: [feature, docker, containerization, opencode, file-transfer, upload, download]
+type: enhancement
+priority: medium
+status: proposed
+references:
+  - .work/agent/issues/backlog.md:FEAT-025@c9d5e1
+  - README.md
+  - src/dot_work/container/
+---
+
+### Problem
+Users working with OpenCode containers need convenient ways to:
+1. Upload generated files (code, docs, configs) from container to host
+2. Download reference files, datasets, or prompts from host to container
+3. Transfer files between containers
+4. Bulk upload/download operations
+5. Resume interrupted transfers
+6. Track transfer history and status
+
+Current approach requires manual `docker cp` commands or volume mounts, which are inconvenient for ad-hoc transfers.
+
+### Affected Files
+- NEW: `src/dot_work/container/opencode/file-server.py` (simple HTTP file server)
+- NEW: `src/dot_work/container/opencode/file-transfer.sh` (transfer utilities)
+- MODIFIED: `src/dot_work/container/opencode/entrypoint.sh` (optional file server)
+- MODIFIED: `src/dot_work/container/opencode/Dockerfile` (add curl, transfer tools)
+- `src/dot_work/cli.py` (add file transfer commands)
+- MODIFIED: `src/dot_work/container/opencode/.env.example` (add file server vars)
+
+### Importance
+**MEDIUM**: File transfer utilities enable:
+- Ad-hoc file sharing without volume mounts
+- Easy backup of container work artifacts
+- Transfer files between containers and host
+- Integration with CI/CD pipelines
+- User-friendly alternative to `docker cp`
+- Progress tracking for large transfers
+
+### Proposed Solution
+
+**Phase 1: Simple HTTP File Server (2-3 days)**
+Create optional HTTP file server in container:
+
+1. `file-server.py`:
+   - Lightweight HTTP server using Flask or FastAPI
+   - Endpoints: `/upload`, `/download`, `/list`, `/delete`
+   - Authentication (optional token-based)
+   - CORS support
+   - Chunked upload for large files
+   - Progress tracking
+
+2. API design:
+   ```python
+   # Upload file
+   POST /upload
+   Query: ?dest=/workspace/uploads/
+   Body: multipart/form-data with file
+
+   # Download file
+   GET /download
+   Query: ?path=/workspace/path/file.txt
+
+   # List files
+   GET /list
+   Query: ?path=/workspace/
+
+   # Delete file
+   DELETE /delete
+   Query: ?path=/workspace/path/file.txt
+
+   # Transfer status
+   GET /status/:transfer_id
+   ```
+
+3. Optional activation via env var:
+   - `FILE_SERVER_ENABLED=true`
+   - `FILE_SERVER_PORT=9000` (different from webui port)
+   - `FILE_SERVER_AUTH_TOKEN=secret` (optional)
+   - `FILE_SERVER_MAX_SIZE=1GB` (default)
+
+**Phase 2: File Transfer CLI Commands (2-3 days)**
+Add `dot-work container opencode transfer` commands:
+
+```bash
+# Upload file to container
+dot-work container opencode transfer upload CONTAINER \
+  /path/on/host/file.txt \
+  --dest /workspace/uploads/
+
+# Upload directory (recursive)
+dot-work container opencode transfer upload CONTAINER \
+  /path/on/host/dir/ \
+  --dest /workspace/context/docs/ \
+  --recursive
+
+# Download file from container
+dot-work container opencode transfer download CONTAINER \
+  /workspace/workspace/generated-code.py \
+  --dest ./downloads/
+
+# Download directory
+dot-work container opencode transfer download CONTAINER \
+  /workspace/context/ \
+  --dest ./context-backup/ \
+  --recursive
+
+# List files in container
+dot-work container opencode transfer list CONTAINER \
+  --path /workspace/
+
+# Delete file in container
+dot-work container opencode transfer delete CONTAINER \
+  /workspace/workspace/temp-file.txt
+
+# Show transfer history
+dot-work container opencode transfer status
+```
+
+Transfer features:
+- Progress bars for large files
+- Resume capability (skip if exists and checksum matches)
+- Dry-run mode
+- Verbose logging
+- Checksum verification (SHA256)
+- Compression for transfers (`--compress`)
+- Parallel transfers (`--jobs 4`)
+
+**Phase 3: Web-Based File Manager (Optional, 2-3 days)**
+Simple web UI for file transfers:
+
+1. File upload form:
+   - Drag and drop
+   - Progress indicators
+   - Batch upload
+   - Destination selection
+
+2. File browser:
+   - Tree view of container files
+   - Download buttons
+   - Delete confirmation
+   - Search/filter
+
+3. Web UI access:
+   - `http://localhost:FILE_SERVER_PORT/files/`
+   - Authentication via token
+   - Responsive design
+
+**Phase 4: Transfer History and Tracking (1-2 days)**
+Track file transfers:
+
+1. Transfer log:
+   ```yaml
+   # /workspace/.transfer-log.yaml
+   transfers:
+     - id: "tx_001"
+       type: "upload"
+       timestamp: "2025-12-30T10:00:00Z"
+       source: "/host/file.txt"
+       dest: "/workspace/uploads/file.txt"
+       size: 12345
+       checksum: "sha256:abc123..."
+       status: "completed"
+
+     - id: "tx_002"
+       type: "download"
+       timestamp: "2025-12-30T10:05:00Z"
+       source: "/workspace/output.txt"
+       dest: "/host/downloads/output.txt"
+       size: 67890
+       status: "failed"
+       error: "timeout"
+   ```
+
+2. Status command:
+   ```bash
+   # Show recent transfers
+   dot-work container opencode transfer status --recent 10
+
+   # Show specific transfer
+   dot-work container opencode transfer status tx_001
+
+   # Filter by status
+   dot-work container opencode transfer status --status failed
+
+   # Retry failed transfer
+   dot-work container opencode transfer retry tx_002
+   ```
+
+**Phase 5: Alternative: SCP/SFTP Mode (Optional, 2 days)**
+Enable SCP/SFTP transfers for SSH users:
+
+1. Install OpenSSH server in container (optional)
+2. User configuration:
+   - `SSH_ENABLED=true` (disabled by default for security)
+   - `SSH_USER=opencode`
+   - `SSH_KEY_MOUNT=/ssh/keys`
+
+3. SCP usage:
+   ```bash
+   # Upload via SCP
+   scp file.txt opencode@container:/workspace/uploads/
+
+   # Download via SCP
+   scp opencode@container:/workspace/output.txt ./downloads/
+   ```
+
+**Phase 6: rsync Integration (1-2 days)**
+Add rsync for efficient sync:
+
+```bash
+# Sync directory (incremental)
+dot-work container opencode transfer sync CONTAINER \
+  /host/dir/ \
+  --dest /workspace/context/ \
+  --direction push
+
+# Sync from container
+dot-work container opencode transfer sync CONTAINER \
+  /workspace/context/ \
+  --dest /host/backup/ \
+  --direction pull
+
+# Dry-run sync
+dot-work container opencode transfer sync CONTAINER \
+  /host/dir/ \
+  --dest /workspace/ \
+  --dry-run
+```
+
+Sync features:
+- Only transfer changed files (based on checksum)
+- Delete extraneous files (`--delete`)
+- Exclude patterns (`--exclude .git`)
+- Compression (`--compress`)
+- Bandwidth limit (`--bwlimit 1M`)
+
+**Phase 7: Entrypoint Integration (1 day)**
+Optional file server startup in entrypoint:
+
+```bash
+# Start file server if enabled
+if [ "$FILE_SERVER_ENABLED" = "true" ]; then
+  echo "Starting file server on port $FILE_SERVER_PORT..."
+  python3 /usr/local/bin/file-server.py \
+    --port "$FILE_SERVER_PORT" \
+    --auth-token "$FILE_SERVER_AUTH_TOKEN" \
+    --max-size "$FILE_SERVER_MAX_SIZE" \
+    --path /workspace \
+    &
+
+  echo "File server running on port $FILE_SERVER_PORT"
+  echo "Access: http://localhost:$FILE_SERVER_PORT/files/"
+fi
+```
+
+**Phase 8: Security Hardening (1-2 days)**
+1. Authentication:
+   - Required auth token for file server
+   - Token rotation support
+   - HTTPS/TLS (optional, via reverse proxy)
+
+2. Access control:
+   - Allowed paths whitelist (e.g., only `/workspace/`)
+   - File size limits
+   - User-specific permissions
+
+3. Auditing:
+   - Log all transfer operations
+   - Include source/destination IP
+   - Include user/token ID
+   - Timestamp and file metadata
+
+**Phase 9: Documentation and Examples (1 day)**
+Extend `container/opencode/README.md`:
+
+```bash
+# Quick start: Enable file server
+export FILE_SERVER_ENABLED=true
+export FILE_SERVER_AUTH_TOKEN=my-secret-token
+dot-work container opencode run
+
+# Upload file
+dot-work container opencode transfer upload my-container \
+  ./local-file.txt \
+  --dest /workspace/uploads/
+
+# Download generated code
+dot-work container opencode transfer download my-container \
+  /workspace/workspace/generated.py \
+  --dest ./downloads/
+
+# Sync directory
+dot-work container opencode transfer sync my-container \
+  ./docs/ \
+  --dest /workspace/context/docs/ \
+  --direction push
+
+# Web UI access
+# Open http://localhost:9000/files/
+# Enter token: my-secret-token
+# Drag and drop files to upload
+
+# Show transfer history
+dot-work container opencode transfer status --recent 5
+```
+
+### Acceptance Criteria
+- [ ] `file-server.py` with upload/download/list/delete endpoints
+- [ ] File server optional activation via env vars
+- [ ] CLI transfer commands: upload, download, list, delete, sync
+- [ ] Progress bars for large file transfers
+- [ ] Resume capability and checksum verification
+- [ ] Transfer history tracking
+- [ ] Optional web UI for file manager
+- [ ] Security: auth token, path restrictions, size limits
+- [ ] rsync integration for efficient sync
+- [ ] Documentation with examples
+- [ ] Unit tests for file server and transfer logic
+- [ ] Integration tests for file transfers
+
+### Notes
+- File server should be optional (disabled by default)
+- Security: Never enable file server in production without auth
+- Consider rate limiting for transfers
+- Future: S3 bucket integration for cloud storage
+- Future: Transfer scheduling (upload at specific time)
+- Future: Webhook notifications on transfer completion
+- Monitor disk usage during transfers
+
+---
+id: "INFRA-001@g3h9i5"
+title: "Issue file size management and automatic splitting"
+description: "Implement token limit enforcement and automatic splitting for issue files to maintain them below 25,000 tokens"
+created: 2025-12-30
+section: "infrastructure/issue-tracker"
+tags: [infrastructure, issue-tracker, token-management, file-splitting, data-integrity]
+type: maintenance
+priority: high
+status: proposed
+references:
+  - .work/agent/issues/backlog.md
+  - .work/agent/issues/references/issue-file-format.md
+---
+
+### Problem
+Issue tracker files (`backlog.md`, `doing.md`, `done.md`, etc.) grow indefinitely as issues are added. Problems:
+
+1. **Token overflow**: Files exceed 25,000 tokens, causing context truncation
+2. **Performance**: Reading large files slows down AI agents
+3. **Memory**: Large files consume more memory and tokens
+4. **Maintenance**: Hard to navigate and manage large files
+5. **Risk**: Data loss if manual splitting fails
+
+Current state: `backlog.md` has 2245+ lines and growing.
+
+### Affected Files
+- NEW: `src/dot_work/db_issues/token_counter.py` (token estimation utility)
+- NEW: `src/dot_work/db_issues/issue_splitter.py` (file splitting tool)
+- NEW: `src/dot_work/db_issues/issue_indexer.py` (index maintenance)
+- MODIFIED: `src/dot_work/db_issues/parser.py` (handle split files)
+- MODIFIED: `src/dot_work/db_issues/__init__.py` (add split commands)
+- `src/dot_work/cli.py` (add issue file management commands)
+
+### Importance
+**HIGH**: File size management ensures:
+- AI agents can read complete issue files without truncation
+- Consistent performance regardless of file size
+- Data integrity during splits (no lost issues)
+- Automatic maintenance (no manual intervention)
+- Scalability to hundreds/thousands of issues
+- Reduced token usage and costs
+
+### Proposed Solution
+
+**Phase 1: Token Estimation (1 day)**
+Create token counter utility:
+
+1. Token estimation strategies:
+   - Word-based: ~0.75 tokens per word (rough estimate)
+   - Character-based: ~4 characters per token
+   - Exact tokenization: Use tiktoken or similar library
+
+2. `token_counter.py`:
+   ```python
+   def estimate_tokens(text: str, method: str = "word") -> int:
+     """Estimate token count for text."""
+     if method == "word":
+       return len(text.split()) * 0.75
+     elif method == "char":
+       return len(text) / 4
+     elif method == "exact":
+       import tiktoken
+       enc = tiktoken.encoding_for_model("gpt-4")
+       return len(enc.encode(text))
+
+   def count_file_tokens(path: Path) -> int:
+     """Count tokens in issue file."""
+     content = path.read_text()
+     return estimate_tokens(content)
+
+   def count_issue_tokens(issue_yaml: str) -> int:
+     """Count tokens in single issue block."""
+     return estimate_tokens(issue_yaml)
+   ```
+
+3. CLI command:
+   ```bash
+   # Check file token count
+   dot-work db-issues tokens backlog.md
+
+   # Check all issue files
+   dot-work db-issues tokens --all
+
+   # Show detailed breakdown
+   dot-work db-issues tokens backlog.md --verbose
+   ```
+
+**Phase 2: Issue Parser Enhancement (2 days)**
+Enhance parser to handle split files:
+
+1. Multi-file parsing:
+   ```python
+   def parse_issues_dir(dir_path: Path) -> List[Issue]:
+     """Parse all issue files in directory."""
+     issues = []
+     for file_path in dir_path.glob("*.md"):
+       issues.extend(parse_issues_file(file_path))
+     return sorted(issues, key=lambda i: i.created, reverse=True)
+   ```
+
+2. Issue file discovery:
+   - Support patterns: `backlog-001.md`, `backlog-002.md`, etc.
+   - Support dates: `backlog-2025-12-30.md`
+   - Support alphabetical: `backlog-a.md`, `backlog-b.md`
+
+3. Index file:
+   ```yaml
+   # .work/agent/issues/index.yaml
+   files:
+     - path: "backlog-001.md"
+       issues: 50
+       tokens: 23456
+       date_range: ["2025-12-26", "2025-12-28"]
+     - path: "backlog-002.md"
+       issues: 30
+       tokens: 18900
+       date_range: ["2025-12-29", "2025-12-30"]
+   total_issues: 80
+   total_tokens: 42356
+   ```
+
+**Phase 3: Automatic Splitting Strategy (2-3 days)**
+Create splitting tool:
+
+1. Split triggers:
+   - Token limit exceeded (default: 25,000 tokens)
+   - Issue count threshold (default: 50 issues)
+   - Manual split command
+   - Time-based (e.g., monthly splits)
+
+2. Split strategies:
+   - **By issue count**: N issues per file
+   - **By date**: All issues within time range
+   - **By section**: Group by section/tags
+   - **Balanced**: Equal token distribution
+
+3. `issue_splitter.py`:
+   ```python
+   def split_file(
+     source_path: Path,
+     output_dir: Path,
+     max_tokens: int = 25000,
+     strategy: str = "balanced"
+   ) -> List[Path]:
+     """Split issue file into multiple files."""
+     issues = parse_issues_file(source_path)
+
+     if strategy == "balanced":
+       return split_balanced(issues, output_dir, max_tokens)
+     elif strategy == "date":
+       return split_by_date(issues, output_dir, max_tokens)
+     elif strategy == "count":
+       return split_by_count(issues, output_dir, max_tokens)
+     elif strategy == "section":
+       return split_by_section(issues, output_dir, max_tokens)
+
+   def split_balanced(issues, output_dir, max_tokens):
+     """Split into files with balanced token counts."""
+     files = []
+     current_issues = []
+     current_tokens = 0
+     file_num = 1
+
+     for issue in issues:
+       issue_tokens = estimate_tokens(issue.content)
+
+       if current_tokens + issue_tokens > max_tokens and current_issues:
+         # Flush current file
+         out_path = output_dir / f"{source_path.stem}-{file_num:03d}.md"
+         write_issues_file(out_path, current_issues)
+         files.append(out_path)
+         current_issues = []
+         current_tokens = 0
+         file_num += 1
+
+       current_issues.append(issue)
+       current_tokens += issue_tokens
+
+     # Write remaining issues
+     if current_issues:
+       out_path = output_dir / f"{source_path.stem}-{file_num:03d}.md"
+       write_issues_file(out_path, current_issues)
+       files.append(out_path)
+
+     return files
+   ```
+
+4. Validation before split:
+   - Verify all issues parsed successfully
+   - Count total issues
+   - Estimate tokens
+   - Preview split plan
+   - Require confirmation (unless `--force`)
+
+**Phase 4: Split CLI Commands (2 days)**
+Add splitting commands:
+
+```bash
+# Check if file needs splitting
+dot-work db-issues check-split backlog.md
+
+# Show split preview
+dot-work db-issues split backlog.md --preview
+
+# Perform split
+dot-work db-issues split backlog.md \
+  --max-tokens 25000 \
+  --strategy balanced \
+  --output-dir .work/agent/issues/
+
+# Split with confirmation
+dot-work db-issues split backlog.md --interactive
+
+# Force split (no confirmation)
+dot-work db-issues split backlog.md --force
+
+# Split all files
+dot-work db-issues split --all --max-tokens 25000
+
+# Merge split files (reverse operation)
+dot-work db-issues merge \
+  --pattern "backlog-*.md" \
+  --output backlog-merged.md
+```
+
+**Phase 5: Index Maintenance (1-2 days)**
+Create index management:
+
+1. Auto-update index:
+   - Update on split/merge operations
+   - Update on issue creation/closure
+   - Validate index consistency
+
+2. Index commands:
+   ```bash
+   # Build/update index
+   dot-work db-issues index build
+
+   # Validate index
+   dot-work db-issues index validate
+
+   # Show index
+   dot-work db-issues index show
+
+   # Rebuild from scratch
+   dot-work db-issues index rebuild
+   ```
+
+3. Index format:
+   ```yaml
+   version: "1.0"
+   updated: "2025-12-30T12:00:00Z"
+   files:
+     backlog:
+       - path: "backlog-001.md"
+         issues: 50
+         tokens: 24500
+         date_range: ["2025-12-26", "2025-12-28"]
+         sections: ["skills", "docker", "context"]
+       - path: "backlog-002.md"
+         issues: 30
+         tokens: 18900
+         date_range: ["2025-12-29", "2025-12-30"]
+         sections: ["file-transfer", "url-injection"]
+     doing:
+       - path: "doing.md"
+         issues: 5
+         tokens: 3200
+     done:
+       - path: "done.md"
+         issues: 20
+         tokens: 15000
+   totals:
+     issues: 105
+     tokens: 61600
+   ```
+
+**Phase 6: Safe Splitting with Rollback (1-2 days)**
+Ensure data integrity:
+
+1. Atomic split operation:
+   - Create temporary directory for split files
+   - Write split files to temp location
+   - Validate split files contain all issues
+   - Rename original to backup
+   - Move split files to final location
+   - Delete backup on success
+
+2. Rollback on failure:
+   - If validation fails, restore backup
+   - Log failure reason
+   - Keep backup for manual recovery
+
+3. Validation checks:
+   - Issue count: total after split == total before split
+   - Issue IDs: all unique, no duplicates
+   - Issue content: YAML frontmatter preserved
+   - Token counts: within limits
+   - File format: valid markdown
+
+**Phase 7: Automatic Splitting (1-2 days)**
+Automatic split on threshold:
+
+1. Auto-split triggers:
+   - On issue creation if file exceeds limit
+   - Scheduled check (e.g., daily via cron)
+   - CLI command: `dot-work db-issues check --auto-split`
+
+2. Auto-split workflow:
+   ```python
+   def auto_split_if_needed(file_path: Path, max_tokens: int):
+     """Check and auto-split if file exceeds limit."""
+     tokens = count_file_tokens(file_path)
+
+     if tokens > max_tokens:
+       log.info(f"File {file_path} exceeds {max_tokens} tokens, splitting...")
+       split_file(file_path, max_tokens=max_tokens, strategy="balanced")
+       return True
+     return False
+   ```
+
+3. Configuration:
+   ```yaml
+   # .work/agent/issues/config.yaml
+   splitting:
+     max_tokens: 25000
+     max_issues: 50
+     strategy: balanced
+     auto_split: true
+     backup_enabled: true
+     backup_retention: 30d
+   ```
+
+**Phase 8: Merge and Consolidation (1 day)**
+Reverse operation to merge split files:
+
+```bash
+# Merge split files back
+dot-work db-issues merge \
+  --pattern "backlog-*.md" \
+  --output backlog-merged.md \
+  --sort date  # or name, priority
+
+# Merge specific files
+dot-work db-issues merge \
+  --files backlog-001.md,backlog-002.md \
+  --output backlog.md
+
+# Merge and sort by priority
+dot-work db-issues merge \
+  --pattern "backlog-*.md" \
+  --output backlog.md \
+  --sort priority
+```
+
+Merge features:
+- Deduplicate issues (by ID)
+- Preserve original order or re-sort
+- Update index
+- Validate merged file
+
+**Phase 9: Documentation (1 day)**
+Create documentation:
+
+1. Splitting guide:
+   - When to split (token limits, issue count)
+   - How to split (preview, interactive, force)
+   - Split strategies (balanced, date, count, section)
+   - Troubleshooting common issues
+
+2. Reference docs:
+   - File naming conventions
+   - Index format reference
+   - Configuration options
+   - Best practices
+
+3. Examples in README:
+   ```bash
+   # Check file size
+   dot-work db-issues tokens backlog.md
+   # Output: File: backlog.md, Issues: 80, Tokens: 42356
+
+   # Preview split
+   dot-work db-issues split backlog.md --preview
+   # Output:
+   # Will split into 2 files:
+   #   backlog-001.md: 50 issues, 23456 tokens
+   #   backlog-002.md: 30 issues, 18900 tokens
+
+   # Perform split
+   dot-work db-issues split backlog.md --strategy balanced
+   # Output: Created backlog-001.md, backlog-002.md
+
+   # Auto-split all files
+   dot-work db-issues split --all --auto-split
+
+   # Merge files back
+   dot-work db-issues merge --pattern "backlog-*.md" --output backlog.md
+   ```
+
+**Phase 10: Testing (2 days)**
+Comprehensive testing:
+
+1. Unit tests:
+   - Token estimation accuracy
+   - Issue parsing from split files
+   - Split strategies (balanced, date, count, section)
+   - Index building and validation
+
+2. Integration tests:
+   - End-to-end split operation
+   - Rollback on validation failure
+   - Merge operation
+   - Auto-split triggers
+   - Index updates
+
+3. Edge case tests:
+   - Single issue larger than token limit
+   - Empty files
+   - Invalid YAML frontmatter
+   - Duplicate issue IDs
+   - Concurrent splits (file locking)
+
+### Acceptance Criteria
+- [ ] `token_counter.py` with word/char/exact token estimation
+- [ ] CLI command to check file tokens
+- [ ] Parser handles multiple issue files
+- [ ] `issue_splitter.py` with 4 split strategies
+- [ ] Split CLI commands: check, preview, split, merge
+- [ ] Atomic split with rollback
+- [ ] Index file maintenance
+- [ ] Auto-split on threshold exceedance
+- [ ] Configuration via config.yaml
+- [ ] Validation checks (issue count, IDs, content)
+- [ ] Documentation with examples
+- [ ] Unit tests for all components
+- [ ] Integration tests for split/merge workflows
+
+### Notes
+- Token estimation doesn't need to be exact (±10% acceptable)
+- Splitting should preserve issue order and metadata
+- Consider adding file locking for concurrent access
+- Future: Support splitting by status (backlog/doing/done)
+- Future: Support splitting by priority (high/medium/low)
+- Future: GUI tool for visual splitting
+- Monitor split file sizes in production
+- Keep backups for configurable retention period
+- Consider compression for large issue files

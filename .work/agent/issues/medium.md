@@ -2723,3 +2723,817 @@ Integration tests in `tests/integration/db_issues/` were migrated from another p
 **Remaining work:** Update 4 more test files with same pattern.
 
 ---
+---
+id: "CR-085@e3f1g2"
+title: "Missing Type Annotation for FileAnalyzer config Parameter"
+description: "Parameter named 'config' but type is AnalysisConfig without annotation"
+created: 2024-12-31
+section: "git"
+tags: [type-hints, naming, clarity]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/services/file_analyzer.py
+---
+
+### Problem
+In `file_analyzer.py:24-25`, `FileAnalyzer.__init__` parameter is named `config` but the actual type is `AnalysisConfig`. No type annotation exists, making it unclear what configuration is expected.
+
+### Affected Files
+- `src/dot_work/git/services/file_analyzer.py` (lines 24-25)
+
+### Importance
+**MEDIUM**: Missing type annotations reduce IDE support and make refactoring harder:
+- No autocomplete for config properties
+- mypy cannot catch type mismatches
+- Unclear what configuration object is required
+
+### Proposed Solution
+Add proper type annotation:
+```python
+from dot_work.git.models import AnalysisConfig
+
+class FileAnalyzer:
+    def __init__(self, config: AnalysisConfig):
+        self.config = config
+```
+
+### Acceptance Criteria
+- [ ] Type annotation added to `__init__` parameter
+- [ ] Import of `AnalysisConfig` added
+- [ ] mypy passes without new errors
+- [ ] Documentation reflects typed parameter
+
+---
+
+---
+id: "CR-086@f4g2h3"
+title: "Excessive Use of Any in Cache Service Type Hints"
+description: "Cache system uses Any return types despite having specific cached types"
+created: 2024-12-31
+section: "git"
+tags: [type-safety, type-hints, abstraction]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/services/cache.py
+---
+
+### Problem
+In `cache.py`, methods use `Any` return types extensively despite knowing specific types like `ChangeAnalysis`:
+- `get(self, key: str) -> Any | None`
+- `_serialize_data(self, data: Any) -> Any`
+- `_deserialize_data(self, data: Any) -> Any`
+
+This defeats the purpose of type checking. The cache knows it stores `ChangeAnalysis` but still returns `Any`.
+
+### Affected Files
+- `src/dot_work/git/services/cache.py` (lines 37-45, 81-99, 101-129)
+
+### Importance
+**MEDIUM**: Type safety issues reduce value of static typing:
+- Callers must cast or use `type: ignore`
+- mypy cannot catch type mismatches
+- Changes to cached types not caught by tests
+
+### Proposed Solution
+Introduce generic type parameter for cache:
+```python
+from typing import TypeVar, Generic
+
+T = TypeVar('T')
+
+class AnalysisCache(Generic[T]):
+    def get(self, key: str) -> T | None:
+        ...
+
+    def _serialize_data(self, data: T) -> Any:
+        ...
+
+    def _deserialize_data(self, data: Any, expected_type: type[T]) -> T:
+        ...
+```
+
+Or use TypedDict/Protocol for specific cached types.
+
+### Acceptance Criteria
+- [ ] Cache type hints use generics or specific types
+- [ ] Callers get proper type inference
+- [ ] No `type: ignore` needed for cache usage
+- [ ] Tests verify type correctness
+
+---
+
+---
+id: "CR-087@g5h3i4"
+title: "Magic Numbers in Search Service Without Named Constants"
+description: "Query limits 500 and 10 appear without explanation"
+created: 2024-12-31
+section: "db_issues"
+tags: [magic-values, maintainability, constants]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/db_issues/services/search_service.py
+---
+
+### Problem
+In `search_service.py:240-241, 279-282, 335-336`, magic numbers appear:
+- `len(query) > 500` - maximum query length
+- `query.count(" OR ") > 10` - maximum OR conditions
+
+These appear multiple times but are not defined as module-level constants.
+
+### Affected Files
+- `src/dot_work/db_issues/services/search_service.py` (lines 240-241, 279-282, 335-336)
+
+### Importance
+**MEDIUM**: Magic numbers without names make code harder to maintain:
+- Unclear why 500 and 10 were chosen
+- Can't easily adjust limits
+- Must search/replace to change values
+- No single source of truth
+
+### Proposed Solution
+Define named constants:
+```python
+MAX_QUERY_LENGTH = 500
+MAX_OR_CONDITIONS = 10
+
+def _validate_query(query: str) -> str:
+    if len(query) > MAX_QUERY_LENGTH:
+        raise ValueError(f"Query too long (maximum {MAX_QUERY_LENGTH} characters)")
+
+    if query.count(" OR ") > MAX_OR_CONDITIONS:
+        raise ValueError(f"Too many OR conditions (maximum {MAX_OR_CONDITIONS})")
+```
+
+### Acceptance Criteria
+- [ ] Named constants defined at module level
+- [ ] All usages reference constants
+- [ ] Constants documented with rationale
+- [ ] Tests reference constants for edge cases
+
+---
+
+---
+id: "CR-088@h6i4j5"
+title: "Silent Exception in Scanner Config Loading"
+description: "Bare except Exception swallows pyproject.toml parse errors without logging"
+created: 2024-12-31
+section: "overview"
+tags: [error-handling, observability]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/overview/scanner.py
+---
+
+### Problem
+In `scanner.py:74-88`, `load_scanner_config` has a bare `except Exception:` on line 81 that silently catches all exceptions when reading `pyproject.toml`:
+
+```python
+try:
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+except Exception:
+    data = {}
+```
+
+No logging of what went wrong. Users can't diagnose malformed config files.
+
+### Affected Files
+- `src/dot_work/overview/scanner.py` (lines 74-88)
+
+### Importance
+**MEDIUM**: Silent failures make debugging difficult:
+- Can't tell if pyproject.toml was malformed
+- Can't tell if file was unreadable
+- Silent fallback to default config
+- User unaware of configuration problems
+
+### Proposed Solution
+Add specific exception handling with logging:
+```python
+import logging
+import tomllib.TOMLDecodeError
+
+logger = logging.getLogger(__name__)
+
+try:
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+except tomllib.TOMLDecodeError as e:
+    logger.warning("Invalid TOML in %s: %s", pyproject, e)
+    data = {}
+except OSError as e:
+    logger.warning("Could not read %s: %s", pyproject, e)
+    data = {}
+```
+
+### Acceptance Criteria
+- [ ] Specific exceptions caught (TOMLDecodeError, OSError)
+- [ ] All exceptions logged with context
+- [ ] Generic Exception not used
+- [ ] Tests verify error handling
+
+---
+
+---
+id: "CR-089@i7j5k6"
+title: "Cache Type Deserialization Inconsistency Causes Data Loss"
+description: "Dataclass types serialized with data but deserialized as empty dict"
+created: 2024-12-31
+section: "git"
+tags: [bug, data-loss, serialization]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/services/cache.py
+---
+
+### Problem
+In `cache.py:88, 96-97`, inconsistent handling of dataclass types:
+
+**Serialization (line 88):**
+```python
+"data": asdict(data) if not isinstance(data, type) else asdict(data()),
+```
+This calls `asdict(data())` for types, serializing an **instance** with data.
+
+**Deserialization (lines 96-97):**
+```python
+elif isinstance(data, type):
+    return {"__dataclass__": data.__name__, "__module__": data.__module__, "data": {}}
+```
+This returns `data: {}`, an **empty dict**.
+
+Deserialized types lose all their data. The special case for `ChangeAnalysis` (lines 110-115) suggests this is a known workaround.
+
+### Affected Files
+- `src/dot_work/git/services/cache.py` (lines 88, 96-97, 110-115)
+
+### Importance
+**MEDIUM**: Data loss bug in cache serialization:
+- Cached dataclass types corrupted on deserialization
+- Workaround for `ChangeAnalysis` indicates known issue
+- Other types would lose data silently
+- Cache cannot reliably store dataclass types
+
+### Proposed Solution
+Fix deserialization to reconstruct with data:
+```python
+# Remove the empty dict case
+# Instead, reconstruct the instance using __init__ or factory
+```
+
+Or document that only instances (not types) should be cached.
+
+### Acceptance Criteria
+- [ ] Deserialization reconstructs instances correctly
+- [ ] `ChangeAnalysis` workaround no longer needed
+- [ ] Tests verify round-trip for cached types
+- [ ] Documentation clarifies cache contract
+
+---
+
+---
+id: "CR-090@j8k6l7"
+title: "Git Ref Regex Over-Permissive on Special Characters"
+description: "Validation allows ^ and @ anywhere in ref, not just in valid positions"
+created: 2024-12-31
+section: "review"
+tags: [validation, regex, correctness]
+type: bug
+priority: medium
+status: proposed
+references:
+  - src/dot_work/review/git.py
+---
+
+### Problem
+In `git.py:17-22`, the ref validation regex is over-permissive:
+
+```python
+_REF_PATTERN = re.compile(
+    r"^[a-zA-Z0-9_\-./~^:@]+$"  # Standard ref characters
+    r"|^[a-fA-F0-9]{40,64}$"  # Full commit hash
+    r"|^HEAD$"  # HEAD reference
+    r"|^@\{-[0-9]+\}$"  # @annotation syntax (e.g., @{-1})
+)
+```
+
+The first alternative `^[a-zA-Z0-9_\-./~^:@]+$` allows `^` and `@` anywhere, not just in specific positions. Strings like `test@value` or `foo^bar` would pass validation even though they're not valid git refs.
+
+Git ref specs restrict these characters to specific positions:
+- `^` only at end for dereference (e.g., `HEAD^`)
+- `@` only in `@{u}`, `@{-1}` contexts
+
+### Affected Files
+- `src/dot_work/review/git.py` (lines 17-22)
+
+### Importance
+**MEDIUM**: Validation accepts invalid refs:
+- False positives in validation
+- Errors passed to git commands instead of caught early
+- Poor error messages for invalid input
+
+### Proposed Solution
+Tighten regex to restrict special characters to valid positions:
+```python
+_REF_PATTERN = re.compile(
+    r"^[a-zA-Z0-9_\-./~]+$"  # Standard ref characters (no ^, @)
+    r"|^[a-zA-Z0-9_\-./~]+(\^[0-9]*)?$"  # Ref with optional ^ dereference
+    r"|^[a-fA-F0-9]{40,64}$"  # Full commit hash
+    r"|^HEAD$"  # HEAD reference
+    r"|^@\{-[0-9]+\}$"  # @annotation syntax (e.g., @{-1})
+    r"|^[a-zA-Z0-9_\-./~]+@\{[uU]\}$"  # @{u} upstream syntax
+)
+```
+
+### Acceptance Criteria
+- [ ] Regex restricts ^ to end-of-ref position
+- [ ] Regex restricts @ to @{n} or @{u} syntax
+- [ ] Invalid refs like `test@value` rejected
+- [ ] Tests cover edge cases
+
+---
+
+---
+id: "CR-091@k9l7m8"
+title: "Deduplication Pattern Repeated 3 Times in Dependency Service"
+description: "Exact deduplication logic duplicated across methods"
+created: 2024-12-31
+section: "db_issues"
+tags: [code-duplication, maintainability]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/db_issues/services/dependency_service.py
+---
+
+### Problem
+In `dependency_service.py:246-253, 301-308`, the exact deduplication pattern appears multiple times:
+
+```python
+# Deduplicate while preserving order
+seen: set[tuple[str, str]] = set()
+unique_impact: list[Dependency] = []
+for dep in all_impact:
+    key = (dep.from_issue_id, dep.to_issue_id)
+    if key not in seen:
+        seen.add(key)
+        unique_impact.append(dep)
+```
+
+This exact logic appears 3 times in the same file. Violates DRY principle.
+
+### Affected Files
+- `src/dot_work/db_issues/services/dependency_service.py` (lines 246-253, 301-308)
+
+### Importance
+**MEDIUM**: Code duplication creates maintenance burden:
+- Bug fixes must be applied 3 times
+- Inconsistent behavior if one instance missed
+- Harder to understand intent
+- Violates DRY principle
+
+### Proposed Solution
+Extract to helper function:
+```python
+def _deduplicate_dependencies(
+    dependencies: list[Dependency]
+) -> list[Dependency]:
+    """Deduplicate dependencies by (from_issue_id, to_issue_id)."""
+    seen: set[tuple[str, str]] = set()
+    unique: list[Dependency] = []
+    for dep in dependencies:
+        key = (dep.from_issue_id, dep.to_issue_id)
+        if key not in seen:
+            seen.add(key)
+            unique.append(dep)
+    return unique
+```
+
+### Acceptance Criteria
+- [ ] Helper function extracted
+- [ ] All 3 usages replaced
+- [ ] Tests verify deduplication works
+- [ ] Type hints added to helper
+
+---
+
+---
+id: "CR-092@l0m8n9"
+title: "O(n) path.index() in Cycle Detection Algorithm"
+description: "Cycle detection uses linear search in visited path for each node"
+created: 2024-12-31
+section: "db_issues"
+tags: [performance, algorithm]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/db_issues/services/dependency_service.py
+---
+
+### Problem
+In `dependency_service.py:94-156`, cycle detection uses `path.index(current)` which is O(n):
+
+```python
+def find_cycle(current: str) -> list[str] | None:
+    if current in path:
+        # Found a cycle - extract the cycle portion
+        cycle_start = path.index(current)  # O(n) search
+        return path[cycle_start:] + [current]
+```
+
+In large dependency graphs with many nodes, this repeated O(n) search makes the algorithm O(n²).
+
+### Affected Files
+- `src/dot_work/db_issues/services/dependency_service.py` (lines 94-156)
+
+### Importance
+**MEDIUM**: Performance issue for large graphs:
+- Cycle detection slows with graph size
+- O(n²) worst-case complexity
+- Could block operations on projects with many issues
+- Easy fix with large improvement
+
+### Proposed Solution
+Track node positions in a dict for O(1) lookup:
+```python
+def check_circular(self, issue_id: str) -> CycleResult:
+    visited: set[str] = set()
+    path: list[str] = []
+    path_index: dict[str, int] = {}  # Track positions
+
+    def find_cycle(current: str) -> list[str] | None:
+        if current in path_index:  # O(1) lookup
+            cycle_start = path_index[current]
+            return path[cycle_start:] + [current]
+
+        if current in visited:
+            return None
+
+        visited.add(current)
+        path_index[current] = len(path)  # Track position
+        path.append(current)
+        # ... rest of DFS
+```
+
+### Acceptance Criteria
+- [ ] Cycle detection uses O(1) position lookup
+- [ ] Performance test: 1000 issues < 100ms vs current 1+ seconds
+- [ ] Tests verify cycle detection correctness
+- [ ] Algorithm documented
+
+---
+
+---
+id: "CR-093@m1n9o0"
+title: "Generic Exception Catching in Code Parser"
+description: "CST parsing catches all Exceptions instead of specific parse errors"
+created: 2024-12-31
+section: "overview"
+tags: [error-handling, specificity]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/overview/code_parser.py
+---
+
+### Problem
+In `code_parser.py:94-98`, generic `Exception` catch without logging specific error type:
+
+```python
+try:
+    module = cst.parse_module(code)
+except Exception as e:
+    logger.warning("Failed to parse %s: %s", path, e)
+    return {"features": [], "models": []}
+```
+
+CST throws specific exceptions like `cst.ParserSyntaxError` that would be more useful to log. Generic catch may also hide unexpected errors.
+
+### Affected Files
+- `src/dot_work/overview/code_parser.py` (lines 94-98)
+
+### Importance
+**MEDIUM**: Overly broad exception catching:
+- Can't distinguish parse errors from other failures
+- Specific error types not logged for debugging
+- May hide unexpected errors (OSError, MemoryError, etc.)
+- Poor diagnostic information
+
+### Proposed Solution
+Catch specific CST exceptions:
+```python
+try:
+    module = cst.parse_module(code)
+except cst.ParserSyntaxError as e:
+    logger.warning("Syntax error in %s: %s", path, e)
+    return {"features": [], "models": []}
+except Exception as e:
+    logger.error("Unexpected error parsing %s: %s", path, e)
+    raise  # Re-raise unexpected errors
+```
+
+### Acceptance Criteria
+- [ ] Specific CST exceptions caught
+- [ ] Unexpected exceptions re-raised
+- [ ] Error types logged for debugging
+- [ ] Tests verify error handling
+
+---
+
+---
+id: "CR-094@n2o0p1"
+title: "Module-Level Singleton Instantiation at Import Time"
+description: "CANONICAL_PARSER and CANONICAL_VALIDATOR instantiated on module import"
+created: 2024-12-31
+section: "prompts"
+tags: [hidden-control-flow, side-effects]
+type: refactor
+priority: low
+status: proposed
+references:
+  - src/dot_work/prompts/canonical.py
+---
+
+### Problem
+In `canonical.py:428-430`, module-level singletons instantiated at import time:
+
+```python
+# Module-level singletons for efficient reuse (classes have no state)
+CANONICAL_PARSER = CanonicalPromptParser()
+CANONICAL_VALIDATOR = CanonicalPromptValidator()
+```
+
+While documented as "stateless", these are instantiated at import time. If `__init__` methods become non-trivial, this causes import-time side effects.
+
+### Affected Files
+- `src/dot_work/prompts/canonical.py` (lines 428-430)
+
+### Importance
+**LOW**: Potential issue if initialization becomes complex:
+- Import-time initialization can be slow
+- Hard to test with different configurations
+- Hidden control flow - code runs "just because"
+- If __init__ gains side effects, affects all imports
+
+### Proposed Solution
+Use lazy initialization or module-level functions:
+```python
+# Option 1: Lazy initialization
+_CANONICAL_PARSER: CanonicalPromptParser | None = None
+
+def get_canonical_parser() -> CanonicalPromptParser:
+    global _CANONICAL_PARSER
+    if _CANONICAL_PARSER is None:
+        _CANONICAL_PARSER = CanonicalPromptParser()
+    return _CANONICAL_PARSER
+
+# Option 2: Just use class directly (no instances needed)
+# Call CanonicalPromptParser().parse() instead of CANONICAL_PARSER.parse()
+```
+
+### Acceptance Criteria
+- [ ] Singletons not instantiated at import time
+- [ ] Lazy initialization or direct class usage
+- [ ] Tests verify initialization behavior
+- [ ] No performance regression
+
+---
+
+---
+id: "CR-095@o3p1q2"
+title: "TODO Comment for LLM Integration Not Addressed"
+description: "Unimplemented LLM integration in changelog module"
+created: 2024-12-31
+section: "version"
+tags: [technical-debt, incomplete-feature]
+type: refactor
+priority: low
+status: proposed
+references:
+  - src/dot_work/version/changelog.py
+---
+
+### Problem
+In `changelog.py:194`, TODO comment for unimplemented feature:
+
+```python
+# TODO: Implement LLM integration
+```
+
+This technical debt marker has not been addressed. Unclear if this is still planned or should be removed.
+
+### Affected Files
+- `src/dot_work/version/changelog.py` (line 194)
+
+### Importance
+**LOW**: Technical debt marker needs resolution:
+- Unclear if feature is still planned
+- TODO comments accumulate and become noise
+- No indication of priority or ownership
+- May indicate incomplete feature
+
+### Proposed Solution
+1. Implement the LLM integration if still needed
+2. Remove TODO if feature is no longer planned
+3. Convert TODO to a tracked issue if desired
+4. Add GitHub issue reference if appropriate
+
+### Acceptance Criteria
+- [ ] TODO addressed (implemented, removed, or tracked)
+- [ ] No orphaned TODO comments
+- [ ] Feature documented if implemented
+- [ ] Issue linked if deferred
+
+---
+
+---
+id: "CR-096@p4q2r3"
+title: "Exit Code Constants Not Encapsulated"
+description: "EXIT_CODE_* constants defined as module-level globals"
+created: 2024-12-31
+section: "container"
+tags: [constants, encapsulation]
+type: refactor
+priority: low
+status: proposed
+references:
+  - src/dot_work/container/provision/cli.py
+---
+
+### Problem
+In `cli.py:22-23`, exit codes as module-level constants:
+
+```python
+EXIT_CODE_ERROR = 1
+EXIT_CODE_KEYBOARD_INTERRUPT = 130
+```
+
+Not encapsulated in Enum or class, making them harder to discover and reuse consistently.
+
+### Affected Files
+- `src/dot_work/container/provision/cli.py` (lines 22-23)
+
+### Importance
+**LOW**: Constants could be better organized:
+- Harder to discover all valid exit codes
+- No namespace/grouping
+- Inconsistent with other constants in codebase
+- Could conflict with other imports
+
+### Proposed Solution
+Encapsulate in Enum or class:
+```python
+from enum import IntEnum
+
+class ExitCode(IntEnum):
+    ERROR = 1
+    KEYBOARD_INTERRUPT = 130
+    SUCCESS = 0
+```
+
+### Acceptance Criteria
+- [ ] Exit codes encapsulated in Enum or class
+- [ ] All usages updated to reference Enum
+- [ ] Tests verify exit codes
+- [ ] Documented in module docstring
+
+---
+
+---
+id: "CR-097@q5r3s4"
+title: "Hardcoded Editor Allowlist May Be Overly Restrictive"
+description: "Editor validation uses hardcoded list without extension mechanism"
+created: 2024-12-31
+section: "db_issues"
+tags: [validation, usability, magic-values]
+type: refactor
+priority: low
+status: proposed
+references:
+  - src/dot_work/db_issues/cli.py
+---
+
+### Problem
+In `cli.py:1248-1257`, hardcoded editor allowlist:
+
+```python
+_ALLOWED_EDITORS = {
+    "vi", "vim", "nvim", "nano", "emacs", "pico", "micro", "kak",
+    "code", "code-server", "codium", "subl", "mate", "bbedit",
+    "hx", "neovide", "lvim", "astrovim", "nvim-qt", "gvim",
+}
+```
+
+Validation at line 1322 rejects any editor not in this list. No way to extend or bypass this validation.
+
+### Affected Files
+- `src/dot_work/db_issues/cli.py` (lines 1248-1257, 1322)
+
+### Importance
+**LOW**: Usability concern for users with other editors:
+- Legitimate editors rejected
+- No way to add custom editors
+- Must modify source code to use different editor
+- Poor user experience for non-standard editors
+
+### Proposed Solution
+1. Add `--allow-any-editor` flag to bypass validation
+2. Allow config file extension of allowed editors
+3. Document how to request adding editors
+4. Consider removing validation entirely (what's the risk?)
+
+### Acceptance Criteria
+- [ ] Way to bypass validation exists
+- [ ] Config file can extend allowed editors
+- [ ] Documentation explains editor validation
+- [ ] Tests cover validation bypass
+
+---
+
+---
+id: "CR-098@r6s4t5"
+title: "Review Server Closure Pattern Captures Startup State"
+description: "Route handlers close over variables computed once at app creation"
+created: 2024-12-31
+section: "review"
+tags: [hidden-control-flow, state-management]
+type: refactor
+priority: low
+status: proposed
+references:
+  - src/dot_work/review/server.py
+---
+
+### Problem
+In `server.py:70-76, 78-119`, route handlers close over variables from `create_app`:
+
+```python
+files = list_all_files(root)
+tracked = set(list_tracked_files(root))
+changed = changed_files(root, base=base_ref)
+untracked = {f for f in files if f not in tracked}
+all_changed = changed | untracked
+
+@app.get("/", response_class=HTMLResponse)
+def index(request: Request, path: str | None = None) -> HTMLResponse:
+    if not path and files:  # Closes over files
+        path = next((p for p in files if p in all_changed), files[0])
+```
+
+State computed once at startup, captured in closures. Related to CR-050 and CR-083 but this is about the closure pattern itself.
+
+### Affected Files
+- `src/dot_work/review/server.py` (lines 70-76, 78-119)
+
+### Importance
+**LOW**: Closure pattern could be confusing:
+- State looks local but is effectively module-level
+- Multiple app creations don't work as expected
+- Harder to test with different file states
+- Closures obscure data flow
+
+### Proposed Solution
+Use request-scoped state or FastAPI dependencies:
+```python
+from fastapi import Depends
+
+def get_file_state():
+    # Recompute on each request
+    files = list_all_files(root)
+    tracked = set(list_tracked_files(root))
+    changed = changed_files(root, base=base_ref)
+    untracked = {f for f in files if f not in tracked}
+    return {"files": files, "all_changed": changed | untracked}
+
+@app.get("/", response_class=HTMLResponse)
+def index(
+    request: Request,
+    path: str | None = None,
+    state: dict = Depends(get_file_state)
+) -> HTMLResponse:
+    files = state["files"]
+    all_changed = state["all_changed"]
+    # ...
+```
+
+### Acceptance Criteria
+- [ ] State not captured in closures
+- [ ] FastAPI dependencies used for shared state
+- [ ] File state recomputed per request (or cached with TTL)
+- [ ] Tests can inject different file states
+
+---
+
+---
