@@ -2021,4 +2021,46 @@ Performance improvement: O(N) I/O → O(N/2) I/O where N=config files checked
 - Particularly beneficial on network filesystems
 
 ---
+---
+id: "PERF-014@9c7e2b"
+title: "Repeated regex compilation in ComplexityCalculator._get_pattern_weight()"
+description: "File complexity patterns recompiled on every file categorization"
+completed: 2025-12-31
+section: "git"
+tags: [performance, regex, compilation]
+type: performance
+priority: medium
+status: completed
+references:
+  - src/dot_work/git/services/complexity.py
+---
+
+### Outcome
+Implemented pre-compiled file complexity patterns:
+- Added _compiled_complexity_patterns list in __init__
+- Updated _get_pattern_weight() to use pre-compiled patterns
+- Performance: O(F*P) → O(P) compilations where F=files, P=patterns (~15)
+
+---
+---
+id: "PERF-015@2d8e5a"
+title: "Inefficient string concatenation in risk factor detection"
+description: "Any/any pattern in risk_factors creates intermediate lists"
+completed: 2025-12-31
+section: "git"
+tags: [performance, algorithm, complexity]
+type: performance
+priority: medium
+status: completed
+references:
+  - src/dot_work/git/services/complexity.py
+---
+
+### Outcome
+Optimized risk factor detection:
+- Added _RISKY_PATH_PATTERNS class constant
+- Cache path.lower() result per file iteration
+- Eliminated repeated pattern list creation
+
+---
 
