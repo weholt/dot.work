@@ -731,39 +731,7 @@ Offline usage is a reasonable requirement for development tools.
 ---
 
 ---
-id: "CR-050@e6f8a0"
-title: "Server closures capture stale state in review/server.py"
-description: "Files computed once at startup won't reflect changes during session"
-created: 2024-12-27
-section: "review"
-tags: [state-management, reliability]
-type: bug
-priority: medium
-status: proposed
-references:
-  - src/dot_work/review/server.py
----
 
-### Problem
-In `server.py:67-72`, `files`, `tracked`, `changed`, and `all_changed` are computed once at app creation and captured in route closures. If files change during the review session, the UI shows stale data.
-
-### Affected Files
-- `src/dot_work/review/server.py`
-
-### Importance
-Long-running sessions could show incorrect file state.
-
-### Proposed Solution
-1. Recompute file lists on each request, or
-2. Add refresh mechanism, or
-3. Document limitation
-
-### Acceptance Criteria
-- [ ] File state accurate or limitation documented
-
----
-
----
 id: "CR-051@f7a9b1"
 title: "Inconsistent parameter naming include_unused vs unused_only"
 description: "Parameter name suggests inclusion but filters exclusively"
@@ -827,59 +795,7 @@ Use IssueService methods for updates.
 ---
 
 ---
-id: "CR-053@b9c1d3"
-title: "Inconsistent transaction management in db_issues services"
-description: "Some methods use with self.uow context, others don't"
-created: 2024-12-27
-section: "db_issues"
-tags: [consistency, transactions]
-type: refactor
-priority: medium
-status: proposed
-references:
-  - src/dot_work/db_issues/services/issue_service.py
-  - src/dot_work/db_issues/services/epic_service.py
----
 
-### Problem
-`set_epic` and `clear_epic` (issue_service.py:701-740) use `with self.uow:` context manager and call `self.uow.commit()`, while most other methods don't. In epic_service, `create_epic` and `update_epic` use `with self.uow:` but `get_epic`, `list_epics`, `delete_epic` don't.
-
-### Affected Files
-- `src/dot_work/db_issues/services/issue_service.py`
-- `src/dot_work/db_issues/services/epic_service.py`
-
-### Importance
-Inconsistent transaction handling could cause unexpected behavior.
-
-### Proposed Solution
-1. Always use `with self.uow:` context manager for write operations
-2. Document the pattern as the standard for db_issues services
-3. Update all write methods to use consistent transaction handling
-
-**User decision:** Always use context manager, establish clear pattern
-
-### Acceptance Criteria
-- [ ] All write operations use `with self.uow:` context manager
-- [ ] Read operations skip context manager (read-only, no commit needed)
-- [ ] Transaction pattern documented in code comments
-- [ ] No auto-commit reliance
-
-### Validation Plan
-1. Audit all service methods in issue_service.py and epic_service.py
-2. For write methods (create, update, delete): add `with self.uow:` if missing
-3. For read methods (get, list, find): remove context manager if present
-4. Add documentation comment explaining the pattern
-5. Add tests verifying transaction behavior
-
-### Dependencies
-None.
-
-### Clarifications Needed
-None. Decision received: Always use context manager for writes.
-
----
-
----
 id: "CR-054@c0d2e4"
 title: "Bare gitignore parse failure in zip/zipper.py"
 description: "Parse failure prints warning but continues, potentially exposing sensitive files"
@@ -1407,88 +1323,7 @@ For production use, consider implementing file system watching (e.g., `watchdog`
 ---
 
 ---
-id: "CR-084@e9f5a3"
-title: "Inconsistent Transaction Usage in db_issues Services"
-description: "Mixed transaction patterns across services cause unpredictable behavior"
-created: 2024-12-27
-section: "db_issues"
-tags: [consistency, transactions, database]
-type: refactor
-priority: medium
-status: proposed
-references:
-  - src/dot_work/db_issues/services/issue_service.py
-  - src/dot_work/db_issues/services/epic_service.py
-  - src/dot_work/db_issues/services/
----
 
-### Problem
-Inconsistent transaction usage patterns across db_issues services:
-
-**Using context manager:**
-```python
-# issue_service.py:711-740
-def set_epic(self, issue_id: str, epic_id: str | None) -> None:
-    with self.uow:
-        # ... operations ...
-        self.uow.commit()
-
-# epic_service.py:143-209
-def create_epic(self, project_id: str, title: str) -> Epic:
-    with self.uow:
-        # ... operations ...
-        self.uow.commit()
-```
-
-**Not using context manager:**
-```python
-# epic_service.py: get_epic(), list_epics(), delete_epic()
-# issue_service.py: get_issue(), list_issues(), etc.
-# Most read operations don't use context
-```
-
-**Inconsistencies:**
-- Some write methods use `with self.uow:` and commit manually
-- Others rely on UnitOfWork auto-commit
-- Read operations vary in context manager usage
-- No clear pattern for when context manager should be used
-- CR-053 documents this partially but scope needs expansion
-
-### Affected Files
-- `src/dot_work/db_issues/services/issue_service.py`
-- `src/dot_work/db_issues/services/epic_service.py`
-- Other services in `db_issues/services/`
-
-### Importance
-**MEDIUM**: Inconsistent transaction handling causes:
-- Unpredictable transaction boundaries
-- Potential partial commits on errors
-- Inconsistent rollback behavior across operations
-- Developer confusion about transaction semantics
-- Risk of data corruption if patterns are inconsistent
-
-### Proposed Solution
-1. **Establish clear transaction pattern** documented in AGENTS.md:
-   - Write operations: always use `with self.uow:` context manager
-   - Read operations: never use context manager (use auto-commit)
-   - Multi-step operations: explicit context with manual commit
-2. **Refactor all services** to follow established pattern
-3. **Add unit tests** for transaction rollback behavior
-4. **Document transaction semantics** for each service method
-5. **Add linter or pre-commit check** for transaction usage patterns
-
-### Acceptance Criteria
-- [ ] Clear transaction pattern documented
-- [ ] All write operations use UnitOfWork context
-- [ ] All read operations avoid context manager
-- [ ] Tests for rollback behavior
-- [ ] Method-level transaction documentation
-- [ ] Linter check for pattern compliance
-
-### Notes
-This is an expansion of CR-053. Establishing a clear, consistent pattern is essential for maintainability and preventing data corruption bugs.
-
----
 id: "PERF-007@l7m8n9"
 title: "Multiple Statistics Queries in StatsService"
 description: "Statistics aggregation executes 15+ separate queries instead of single GROUP BY"
@@ -1999,110 +1834,7 @@ def cleanup_expired(self, max_workers: int = 4) -> int:
 - [ ] Error handling for concurrent operations
 
 ### Notes
-ThreadPoolExecutor approach is simpler and doesn't require async throughout. Should provide 4-10x speedup for cache operations on large directories.
 
----
-id: "PERF-012@q2r3s4"
-title: "No Memoization for Git Branch/Tag Lookups"
-description: "Branch and tag lookups performed repeatedly for same commits"
-created: 2024-12-27
-section: "git"
-tags: [performance, memoization, caching, git, branch-tag]
-type: refactor
-priority: medium
-status: proposed
-references:
-  - src/dot_work/git/services/git_service.py
----
-
-### Problem
-In `git_service.py:615-639`, branch and tag lookups have no caching:
-
-```python
-def _get_commit_branch(self, commit: gitpython.Commit) -> str:
-    # No caching - performs full traversal every time
-    for branch in self.repo.branches:
-        if commit.hexsha in [c.hexsha for c in self.repo.iter_commits(branch.name)]:
-            return branch.name
-    return "unknown"
-
-def _get_commit_tags(self, commit: gitpython.Commit) -> list[str]:
-    # No caching - iterates all tags every time
-    tags = []
-    for tag in self.repo.tags:
-        if tag.commit.hexsha == commit.hexsha:
-            tags.append(tag.name)
-    return tags
-```
-
-**Performance issue:**
-- Same commit queried multiple times during analysis
-- Branch lookup: Full branch traversal per commit
-- Tag lookup: Full tag iteration per commit
-- Called for EVERY commit in comparison (100-1000+ times)
-- Redundant work across analyses
-
-**Impact:**
-- Git comparison becomes progressively slower
-- Redundant work for same commits across analyses
-- Analysis time scales quadratically with commit count
-- 100 commits × full traversal each = massive waste
-
-### Affected Files
-- `src/dot_work/git/services/git_service.py` (lines 615-639)
-
-### Importance
-**MEDIUM**: Visible in multi-commit analyses:
-- Repeated full traversals for same commits
-- Wasted CPU cycles and I/O
-- Makes repeated analyses slower
-- Easy optimization with large impact
-
-### Proposed Solution
-Memoize branch/tag lookups once per comparison:
-
-```python
-def compare_refs(self, from_ref: str, to_ref: str) -> ComparisonResult:
-    # Clear and build caches once per comparison
-    self._commit_to_branch = {}
-    self._commit_to_tags = {}
-
-    commits = self._get_commits_between_refs(from_ref, to_ref)
-
-    # Pre-build commit → branch mapping
-    for branch in self.repo.branches:
-        for commit in self.repo.iter_commits(branch.name):
-            self._commit_to_branch[commit.hexsha] = branch.name
-
-    # Pre-build commit → tags mapping
-    for tag in self.repo.tags:
-        commit_hash = tag.commit.hexsha
-        if commit_hash not in self._commit_to_tags:
-            self._commit_to_tags[commit_hash] = []
-        self._commit_to_tags[commit_hash].append(tag.name)
-
-    # Now O(1) lookups in analyze_commit()
-    for commit in commits:
-        analysis = self.analyze_commit(commit)  # Uses cached maps
-
-def _get_commit_branch(self, commit: gitpython.Commit) -> str:
-    return self._commit_to_branch.get(commit.hexsha, "unknown")
-
-def _get_commit_tags(self, commit: gitpython.Commit) -> list[str]:
-    return self._commit_to_tags.get(commit.hexsha, [])
-```
-
-### Acceptance Criteria
-- [ ] Commit-to-branch mapping built once per comparison
-- [ ] Commit-to-tags mapping built once per comparison
-- [ ] O(1) lookups in `_get_commit_branch()` and `_get_commit_tags()`
-- [ ] Performance test: 1000 commits < 5 seconds vs current 30+ seconds
-- [ ] Caches cleared between comparisons
-
-### Notes
-This optimization should provide 10-100x speedup for multi-commit analyses. Memory overhead is minimal (dict with commit hash keys).
-
----
 id: "PERF-013@r3s4t5"
 title: "Redundant Scope Set Computations"
 description: "Search scope sets recomputed for every search operation"
@@ -2722,7 +2454,6 @@ Integration tests in `tests/integration/db_issues/` were migrated from another p
 
 **Remaining work:** Update 4 more test files with same pattern.
 
----
 ---
 id: "CR-085@e3f1g2"
 title: "Missing Type Annotation for FileAnalyzer config Parameter"

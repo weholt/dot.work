@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+import os
 
 import pytest
 
@@ -584,6 +585,62 @@ Content"""
 
             assert output_dir.exists()
             assert output_path.exists()
+
+    def test_extract_writes_to_env_target_relative(self) -> None:
+        """If output_dir is not provided, write to the environment target (relative to CWD)."""
+        content = """---
+meta:
+  title: "Test Prompt"
+  description: "Test"
+environments:
+  copilot:
+    target: ".github/prompts/"
+    filename_suffix: ".prompt.md"
+---
+
+Test content"""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cwd = Path.cwd()
+            try:
+                # Change cwd so relative target resolves under temp_dir
+                os.chdir(temp_dir)
+
+                prompt_file = Path(temp_dir) / "test.canonical.md"
+                prompt_file.write_text(content, encoding="utf-8")
+
+                output_path = extract_environment_file(prompt_file, "copilot")
+
+                expected = Path(temp_dir) / ".github" / "prompts" / "test-prompt.prompt.md"
+                assert output_path.exists()
+                assert output_path == expected
+            finally:
+                os.chdir(cwd)
+
+    def test_extract_writes_to_env_target_absolute(self) -> None:
+        """Absolute env target should be used as-is when output_dir is not provided."""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            abs_target = Path(temp_dir) / "absolute_target"
+            content = f"""---
+meta:
+  title: "Abs"
+environments:
+  abs:
+    target: "{abs_target}"
+    filename_suffix: ".md"
+---
+
+Content"""
+
+            prompt_file = Path(temp_dir) / "abs.md"
+            prompt_file.write_text(content, encoding="utf-8")
+
+            output_path = extract_environment_file(prompt_file, "abs")
+
+            expected = abs_target / "abs.md"
+            assert output_path.exists()
+            assert output_path == expected
 
 
 class TestGlobalConfig:

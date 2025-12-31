@@ -85,18 +85,6 @@ def get_prompts_dir() -> Path:
     except (TypeError, FileNotFoundError):
         pass
 
-    # Fallback: look relative to this file (for development)
-    module_dir = Path(__file__).parent
-    prompts_dir = module_dir / "prompts"
-    if prompts_dir.exists():
-        return prompts_dir
-
-    # Try project root (for development)
-    project_root = module_dir.parent.parent.parent
-    prompts_dir = project_root / "prompts"
-    if prompts_dir.exists():
-        return prompts_dir
-
     raise FileNotFoundError(
         "Could not find prompts directory. Make sure the package is installed correctly."
     )

@@ -4,20 +4,6 @@ Blockers, security issues, data loss risks.
 
 ---
 
-id: "CODE-Q-001@completed"
-title: "Code quality regressions after commit c2f2191"
-description: "Build failures: formatting, linting, type checking, test failures"
-created: 2024-12-28
-section: "code-quality"
-tags: [regression, build-failures, linting, type-checking, tests]
-type: bug
-priority: critical
-status: completed
-resolution: "All quality gates now passing"
-completed: 2024-12-28
-
----
-
 ### Problem
 After commit c2f2191 (migration cleanup), multiple build quality regressions detected:
 
@@ -84,21 +70,6 @@ After commit c2f2191 (migration cleanup), multiple build quality regressions det
 
 ---
 
-id: "CR-001@resolved"
-title: "Plaintext git credentials in container/provision"
-description: "Bash script writes credentials to disk in plaintext"
-created: 2024-12-27
-section: "container"
-tags: [security, credentials, git, docker]
-type: bug
-priority: critical
-status: completed
-resolution: "Already uses GIT_ASKPASS - no credentials written to disk"
-completed: 2024-12-28
-references:
-  - src/dot_work/container/provision/core.py
----
-
 ### Problem (RESOLVED)
 In `core.py:591-592`, the embedded bash script writes GitHub credentials to `~/.git-credentials` in plaintext:
 ```bash
@@ -131,22 +102,6 @@ No credentials are written to disk.
 
 ---
 
-id: "CR-002@completed"
-title: "Missing test coverage in container/provision"
-description: "Core business logic lacks unit tests"
-created: 2024-12-27
-section: "container"
-tags: [testing, coverage, docker]
-type: bug
-priority: critical
-status: completed
-resolution: "Added 31 comprehensive tests for core business logic"
-completed: 2024-12-28
-references:
-  - src/dot_work/container/provision/core.py
-  - tests/unit/container/provision/test_core.py
----
-
 ### Problem (RESOLVED)
 The `container/provision/core.py` module (889 lines) handles critical Docker orchestration including:
 - Configuration resolution (`_resolve_config()` - 172 lines)
@@ -176,21 +131,6 @@ Total: 191 tests passing (including 31 new tests)
 
 ---
 
-id: "CR-003@completed"
-title: "Missing logging in container/provision"
-description: "No structured logging for debugging failures"
-created: 2024-12-27
-section: "container"
-tags: [logging, observability, debugging]
-type: bug
-priority: critical
-status: completed
-resolution: "Already has comprehensive logging throughout"
-completed: 2024-12-28
-references:
-  - src/dot_work/container/provision/core.py
----
-
 ### Problem (RESOLVED)
 The `container/provision/core.py` module (889 lines) has zero logging statements. For a tool that orchestrates Docker, git, and external tools, logging is essential for debugging failures.
 
@@ -217,21 +157,6 @@ Examples:
 - Docker commands: `logger.info(f"Running Docker container with image: {cfg.docker_image}")`
 - Success: `logger.info(f"repo-agent workflow completed successfully for {cfg.repo_url}")`
 
----
-id: "PERF-001@f1a2b3"
-title: "N+1 Query in IssueGraphRepository.has_cycle()"
-description: "Cycle detection performs O(N) database queries for single check"
-created: 2024-12-27
-section: "db_issues"
-tags: [performance, database, n-plus-one, cycle-detection, algorithm]
-type: refactor
-priority: critical
-status: completed
-resolution: "Fixed by loading all dependencies in single query and using in-memory DFS"
-completed: 2024-12-28
-references:
-  - src/dot_work/db_issues/adapters/sqlite.py
-  - tests/unit/db_issues/test_cycle_detection_n_plus_one.py
 ---
 
 ### Problem (COMPLETED)
@@ -308,21 +233,6 @@ This is a classic N+1 query problem. The optimization eliminates O(N) database r
 
 ---
 
-id: "PERF-002@completed"
-title: "O(n²) git branch lookup"
-description: "Nested loop for branch lookup causes exponential slowdown"
-created: 2024-12-27
-section: "git"
-tags: [performance, algorithm, git, optimization]
-type: refactor
-priority: critical
-status: completed
-resolution: "Already uses pre-built cache for O(1) lookup"
-completed: 2024-12-28
-references:
-  - src/dot_work/git/services/git_service.py
----
-
 ### Problem (RESOLVED)
 In `git_service.py:621-622`, `_get_commit_branch()` has O(n²) nested loop:
 
@@ -376,7 +286,6 @@ def _build_commit_branch_mapping(self) -> dict[str, str]:
 
 Performance: O(B×C) once vs O(B×C) per commit, where B=branches, C=commits.
 
----
 ---
 
 id: "DOGFOOD-001@foa1hu"

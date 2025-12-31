@@ -1,101 +1,7 @@
 # High Priority Issues (P1)
 
 ---
-id: "AUDIT-GAP-004@d3e6f2"
-title: "Missing integration tests from db_issues migration"
-description: "11 integration test files from source were not migrated to db_issues module"
-created: 2024-12-28
-section: "db_issues"
-tags: [testing, migration, db_issues, integration-tests]
-type: test
-priority: high
-status: proposed
-references:
-  - .work/agent/issues/references/AUDIT-DBISSUES-010-investigation.md
-  - tests/unit/db_issues/
-  - /home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/tests/
----
 
-### Problem
-During AUDIT-DBISSUES-010, it was discovered that 11 integration test files from the source (glorious agents issues skill) were NOT migrated to the destination (db_issues module).
-
-**Missing Integration Tests:**
-1. test_advanced_filtering.py
-2. test_agent_workflows.py
-3. test_bulk_operations.py
-4. test_comment_repository.py
-5. test_dependency_model.py
-6. test_issue_graph_repository.py
-7. test_issue_lifecycle.py
-8. test_issue_repository.py
-9. test_team_collaboration.py
-10. test_daemon_integration.py (excluded, OK)
-11. test_integration.py (general integration tests)
-
-**Current State:**
-- Source: 50 test files (38 unit + 11 integration)
-- Destination: 13 test files (12 unit + 1 conftest)
-- Only unit tests were migrated (277 tests passing)
-- Integration tests provide end-to-end validation
-
-### Affected Files
-- `tests/unit/db_issues/` (only unit tests exist here)
-- Missing: `tests/integration/db_issues/` directory
-
-### Importance
-**HIGH**: Integration tests provide critical confidence that:
-- Database operations work correctly at integration level
-- Service interactions are verified
-- Full workflows (bulk operations, dependencies, cycles) are validated
-- Multi-service scenarios work as expected
-
-Without integration tests, we have:
-- Unit tests proving components work in isolation
-- No verification that components work together
-- Risk of integration bugs that won't be caught
-
-### Proposed Solution
-1. Create `tests/integration/db_issues/` directory
-2. Migrate integration test files from source:
-   ```
-   /home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/tests/test_*.py
-   ```
-3. Update imports to match db_issues module structure
-4. Exclude daemon-related tests (intentionally not migrated)
-5. Add test fixtures for database setup/teardown
-
-### Acceptance Criteria
-- [ ] Integration test directory created
-- [ ] 10 integration test files migrated (excluding daemon)
-- [ ] All tests pass with new structure
-- [ ] Bulk operations tested end-to-end
-- [ ] Dependency cycle detection tested
-- [ ] Issue lifecycle workflows tested
-
-### Validation Plan
-1. Create `tests/integration/db_issues/` directory
-2. Copy source test files from `/home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/tests/`
-3. Update imports to match `src/dot_work/db_issues/` module structure
-4. Run `uv run pytest tests/integration/db_issues/ -v` to verify all tests pass
-5. Verify coverage includes bulk operations, dependencies, cycles, and issue lifecycles
-
-### Dependencies
-- Source tests must be accessible at `/home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/tests/`
-- Existing db_issues module structure (already migrated)
-
-### Clarifications Needed
-None.
-
-### Notes
-- Source location: `/home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/tests/`
-- Destination should follow pytest conventions for integration tests
-- Tests may need fixture updates to match consolidated db_issues structure
-- See investigation report for full details: `.work/agent/issues/references/AUDIT-DBISSUES-010-investigation.md`
-
-
----
-
----
 id: "CR-005@e7f3a1"
 title: "Duplicate generate_cache_key function in git module"
 description: "Same function defined twice in utils.py and cache.py creates maintenance risk"
@@ -208,20 +114,6 @@ Dead code increases cognitive load, test surface, and maintenance burden. It sug
 ---
 
 ---
-id: "CR-008@c6d8e4"
-title: "No unit tests for git_service.py core business logic"
-description: "853-line core service has zero direct test coverage"
-created: 2024-12-27
-section: "git"
-tags: [testing, quality]
-type: test
-priority: high
-status: completed
-completed: 2024-12-28
-references:
-  - src/dot_work/git/services/git_service.py
-  - tests/unit/git/
----
 
 ### Problem
 `git_service.py` (853 lines) is the core git analysis service. No tests exist for this service, `services/cache.py`, or `services/llm_summarizer.py`. Critical business logic is untested.
@@ -308,20 +200,6 @@ Using `print()` prevents log level control. `SystemExit` is a control flow excep
 
 ---
 
----
-id: "CR-010@e8f0a6"
-title: "Harness module has zero test coverage"
-description: "No test files exist for harness module"
-created: 2024-12-27
-section: "harness"
-tags: [testing, quality]
-type: test
-priority: high
-status: completed
-completed: 2024-12-28
-references:
-  - src/dot_work/harness/
-  - tests/unit/harness/
 ---
 
 ### Problem
@@ -418,21 +296,6 @@ Consider splitting into focused repositories:
 ---
 
 ---
-id: "CR-012@a0b2c8"
-title: "Duplicated scope filtering code in knowledge_graph search modules"
-description: "ScopeFilter and _build_scope_sets duplicated in search_fts.py and search_semantic.py"
-created: 2024-12-27
-section: "knowledge_graph"
-tags: [duplicate-code, refactor]
-type: refactor
-priority: high
-status: completed
-completed: 2024-12-28
-references:
-  - src/dot_work/knowledge_graph/scope.py
-  - src/dot_work/knowledge_graph/search_fts.py
-  - src/dot_work/knowledge_graph/search_semantic.py
----
 
 ### Problem
 Both `search_fts.py` and `search_semantic.py` contain nearly identical `ScopeFilter` dataclass (lines 34-48 and 31-45) and `_build_scope_sets()` / `_node_matches_scope()` functions (90%+ code duplication).
@@ -471,20 +334,6 @@ Updated both `search_fts.py` and `search_semantic.py` to:
 
 ---
 
----
-id: "CR-013@b1c3d9"
-title: "Mutable dimensions state in embedders causes unpredictable behavior"
-description: "Embedding dimension mutated during embed() calls can cause race conditions"
-created: 2024-12-27
-section: "knowledge_graph"
-tags: [bug, state-management, concurrency]
-type: bug
-priority: high
-status: completed
-completed: 2024-12-28
-references:
-  - src/dot_work/knowledge_graph/embed/ollama.py
-  - src/dot_work/knowledge_graph/embed/openai.py
 ---
 
 ### Problem
@@ -527,20 +376,6 @@ if not self._dimensions_discovered and self._dimensions is None:
 
 ---
 
----
-id: "CR-014@c2d4e0"
-title: "No logging in knowledge_graph graph.py and db.py"
-description: "Graph building and database operations are invisible without logging"
-created: 2024-12-27
-section: "knowledge_graph"
-tags: [observability, logging]
-type: enhancement
-priority: high
-status: completed
-completed: 2024-12-28
-references:
-  - src/dot_work/knowledge_graph/graph.py
-  - src/dot_work/knowledge_graph/db.py
 ---
 
 ### Problem
@@ -590,19 +425,6 @@ All logging uses appropriate levels:
 ---
 
 ---
-id: "CR-015@d3e5f1"
-title: "overview/cli.py is dead code"
-description: "The overview CLI module is never used - main CLI imports directly from pipeline"
-created: 2024-12-27
-section: "overview"
-tags: [dead-code, cleanup]
-type: refactor
-priority: high
-status: completed
-completed: 2024-12-28
-references:
-  - src/dot_work/cli.py
----
 
 ### Problem
 `overview/cli.py` defined its own Typer app, but `src/dot_work/cli.py` imports and uses `analyze_project` and `write_outputs` directly from the pipeline. The overview-specific CLI was never registered as a subcommand or used.
@@ -629,21 +451,6 @@ All 54 overview tests still pass. No imports of the deleted file were found in t
 
 ---
 
----
-id: "CR-016@e4f6a2"
-title: "No logging in overview code_parser.py makes debugging impossible"
-description: "Parse failures, metric calculations, and errors are silent"
-created: 2024-12-27
-section: "overview"
-tags: [observability, logging]
-type: enhancement
-priority: high
-status: completed
-completed: 2024-12-28
-references:
-  - src/dot_work/overview/code_parser.py
-  - src/dot_work/overview/pipeline.py
-  - src/dot_work/overview/scanner.py
 ---
 
 ### Problem
@@ -689,19 +496,6 @@ All 54 overview tests still pass.
 ---
 
 ---
-id: "CR-017@f5a7b3"
-title: "Bare exception handlers swallow errors in review/server.py"
-description: "Multiple except Exception blocks silently return empty values"
-created: 2024-12-27
-section: "review"
-tags: [error-handling, observability]
-type: bug
-priority: high
-status: completed
-completed: 2024-12-28
-references:
-  - src/dot_work/review/server.py
----
 
 ### Problem
 In `server.py:90-93` and `server.py:131-135`, multiple `except Exception` blocks silently swallow errors and return empty values. AGENTS.md prohibits bare `except:`. These silent failures make debugging impossible when file reads fail.
@@ -737,20 +531,6 @@ Both functions now catch specific I/O exceptions and log warnings before returni
 
 ---
 
----
-id: "CR-018@a6b8c4"
-title: "SearchService uses raw Session breaking architectural consistency"
-description: "SearchService takes Session instead of UnitOfWork unlike all other services"
-created: 2024-12-27
-section: "db_issues"
-tags: [architecture, consistency]
-type: refactor
-priority: high
-status: completed
-completed: 2024-12-28
-references:
-  - src/dot_work/db_issues/services/search_service.py
-  - src/dot_work/db_issues/adapters/sqlite.py
 ---
 
 ### Problem
@@ -794,19 +574,6 @@ Fixed architectural inconsistency by:
 ---
 
 ---
-id: "CR-019@b7c9d5"
-title: "IssueService merge_issues method is 148 lines"
-description: "Single method handles too many responsibilities, violates <15 lines guideline"
-created: 2024-12-27
-section: "db_issues"
-tags: [code-quality, refactor]
-type: refactor
-priority: high
-status: completed
-completed: 2025-12-28
-references:
-  - src/dot_work/db_issues/services/issue_service.py
----
 
 ### Problem
 `merge_issues` method (lines 843-991) is 148 lines long, handling labels, descriptions, dependencies, comments, and source issue disposal. This violates the "Functions <15 lines" standard from AGENTS.md.
@@ -836,21 +603,6 @@ Main method reduced from 148 to 38 lines (74% reduction).
 ---
 
 ---
-id: "CR-020@c8d0e6"
-title: "Missing tests for StatsService and SearchService"
-description: "Services with raw SQL queries have no test coverage"
-created: 2024-12-27
-section: "db_issues"
-tags: [testing, quality]
-type: test
-priority: high
-status: completed
-completed: 2025-12-28
-references:
-  - src/dot_work/db_issues/services/stats_service.py
-  - src/dot_work/db_issues/services/search_service.py
-  - tests/unit/db_issues/
----
 
 ### Problem
 No tests found for `StatsService` or `SearchService`. Given these contain raw SQL queries, this is a high-risk area that needs test coverage.
@@ -878,21 +630,6 @@ Raw SQL without tests is high risk. FTS5 behavior varies and needs verification.
 ---
 
 ---
-id: "CR-021@d9e1f7"
-title: "Epic and label services load all issues into memory"
-description: "Methods use limit=1000000 causing potential OOM on large datasets"
-created: 2024-12-27
-section: "db_issues"
-tags: [performance, memory]
-type: bug
-priority: high
-status: completed
-completed: 2025-12-28
-references:
-  - src/dot_work/db_issues/services/epic_service.py
-  - src/dot_work/db_issues/services/label_service.py
-  - src/dot_work/db_issues/adapters/sqlite.py
----
 
 ### Problem
 `get_all_epics_with_counts`, `get_epic_issues`, `get_epic_tree` (epic_service.py lines 346-373, 397-399, 427-429) and `get_all_labels_with_counts` (label_service.py line 410) all load ALL issues into memory with `limit=1000000`. For large datasets, this will cause memory issues.
@@ -919,20 +656,6 @@ Memory exhaustion on large projects. Silent degradation as project grows.
 ---
 
 ---
-id: "CR-022@e0f2a8"
-title: "Uncaught exception on malformed version string in version/manager.py"
-description: "calculate_next_version uses int(parts[X]) without validation"
-created: 2024-12-27
-section: "version"
-tags: [error-handling, robustness]
-type: bug
-priority: high
-status: completed
-completed: 2025-12-28
-references:
-  - src/dot_work/version/manager.py
-  - tests/unit/version/test_manager.py
----
 
 ### Problem
 In `manager.py:80-83`, `calculate_next_version()` uses `int(parts[X])` without validation. If `current.version` is malformed (e.g., "1.2" instead of "2025.01.00001"), this raises an uncaught `IndexError` or `ValueError` with no helpful message.
@@ -957,19 +680,6 @@ Users with custom or legacy version strings will get cryptic errors.
 
 ---
 
----
-id: "CR-023@f1a3b9"
-title: "freeze_version is 72 lines with multiple responsibilities"
-description: "Method handles reading, parsing, changelog, git tagging, file writing"
-created: 2024-12-27
-section: "version"
-tags: [code-quality, refactor]
-type: refactor
-priority: high
-status: completed
-completed: 2025-12-28
-references:
-  - src/dot_work/version/manager.py
 ---
 
 ### Problem
@@ -999,19 +709,6 @@ Main method reduced from 72 to 36 lines (50% reduction).
 
 ---
 
----
-id: "CR-024@a2b4c0"
-title: "Git operations in freeze_version have no transaction/rollback"
-description: "Failed tag creation followed by successful file write leaves inconsistent state"
-created: 2024-12-27
-section: "version"
-tags: [error-handling, consistency]
-type: bug
-priority: high
-status: completed
-completed: 2025-12-28
-references:
-  - src/dot_work/version/manager.py
 ---
 
 ### Problem
@@ -1403,84 +1100,7 @@ This is similar to CR-001 (plaintext git credentials) - both involve secrets han
 ---
 
 ---
-id: "CR-078@f3a9b7"
-title: "Test Collection Failures Masking Real Issues"
-description: "103 test collection errors prevent test suite execution, hiding bugs"
-created: 2024-12-27
-section: "testing"
-tags: [testing, infrastructure, quality]
-type: bug
-priority: high
-status: proposed
-references:
-  - incoming/kg/tests/unit/
-  - tests/
----
 
-### Problem
-The test suite has 103 collection errors during `pytest --collect-only`:
-
-```
-!!!!!!!!!!!!!!!!!! Interrupted: 103 errors during collection !!!!!!!!!!!!!!!!!!
-================== 1555 tests collected, 103 errors in 2.63s ===================
-```
-
-**Implications:**
-1. Tests cannot even be executed (1555 collected but 103 errors)
-2. Test infrastructure issues mask real bugs in code
-3. False confidence in test coverage metrics
-4. CI may pass or fail unpredictably depending on test execution order
-5. Broken test references prevent catching regressions
-
-**Root causes identified:**
-- Tests from `incoming/kg/tests/unit/` are causing import/collection errors
-- 75 test files exist but collection failures prevent execution
-- References to modules/packages that no longer exist or moved
-
-### Affected Files
-- `incoming/kg/tests/unit/` (multiple files with errors)
-- `tests/` (indirectly affected by infrastructure issues)
-
-### Importance
-**HIGH**: Broken test suite causes:
-- Inability to verify code correctness
-- Undetected bugs reaching production
-- False sense of security from "1555 tests"
-- CI/CD pipeline unreliability
-- Developer time wasted investigating why tests fail
-
-A test suite that cannot run provides zero value and hides real problems.
-
-### Proposed Solution
-1. Delete the obsolete `incoming/kg/tests/unit/` test files causing collection errors
-2. Verify `pytest --collect-only` completes with 0 errors
-3. Add CI gate to fail fast on collection errors
-4. Ensure all remaining tests can execute successfully
-
-**User decision:** Delete obsolete code (incoming/kg/tests/unit/)
-
-### Acceptance Criteria
-- [ ] `incoming/kg/tests/unit/` directory deleted
-- [ ] `pytest --collect-only` completes with 0 errors
-- [ ] All remaining tests can execute successfully
-- [ ] CI gate fails on collection errors (if not already present)
-
-### Validation Plan
-1. Delete `incoming/kg/tests/unit/` directory
-2. Run `uv run pytest --collect-only` and verify 0 errors
-3. Run full test suite to ensure all tests pass
-4. Verify no broken imports remain
-
-### Dependencies
-None.
-
-### Clarifications Needed
-None. Decision received: Delete obsolete test code.
-
-### Notes
-This is a critical quality issue. The existence of 103 collection errors suggests significant technical debt in the test infrastructure. Addressing this should be a priority before adding new features.
-
----
 id: "PERF-003@h3i4j5"
 title: "Missing Database Indexes on Edge Type Column"
 description: "FTS edge queries perform full table scans due to missing index"
@@ -1927,22 +1547,6 @@ User explicitly requested this feature during dogfooding review. This is gap #4 
 
 ---
 
----
-
-id: "DOGFOOD-003@foa1hu"
-title: "Implement status CLI command"
-description: "The /status prompt instruction should be a CLI command showing focus + issue counts"
-created: 2024-12-29
-section: "dogfooding"
-tags: [cli, feature, workflow, dogfooding]
-type: feature
-priority: high
-status: completed
-completed: 2024-12-30
-references:
-  - docs/dogfood/gaps-and-questions.md
-  - src/dot_work/cli.py
-  - .work/agent/focus.md
 ---
 
 ### Problem

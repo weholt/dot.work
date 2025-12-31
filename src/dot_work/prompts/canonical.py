@@ -26,16 +26,39 @@ Canonical prompt body content...
 
 from __future__ import annotations
 
+
 import io
-import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
 import yaml
+import copy
 
-logger = logging.getLogger(__name__)
+# Path to global defaults file
+GLOBAL_DEFAULTS_PATH = Path(__file__).parent / "global.yml"
+
+def _deep_merge(a: dict, b: dict) -> dict:
+    """Recursively merge dict b into dict a (a is not mutated, returns new dict)."""
+    result = copy.deepcopy(a)
+    for k, v in b.items():
+        if (
+            k in result
+            and isinstance(result[k], dict)
+            and isinstance(v, dict)
+        ):
+            result[k] = _deep_merge(result[k], v)
+        else:
+            result[k] = copy.deepcopy(v)
+    return result
+
+def _load_global_defaults() -> dict:
+    """Load global.yml defaults if present, else return empty dict."""
+    if GLOBAL_DEFAULTS_PATH.exists():
+        with GLOBAL_DEFAULTS_PATH.open("r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+            return data.get("defaults", {}) if isinstance(data, dict) else {}
+    return {}
 
 
 class CanonicalPromptError(Exception):
@@ -122,101 +145,22 @@ class CanonicalPromptParser:
     """
 
     FRONTMATTER_PATTERN = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
-    _global_defaults: dict[str, Any] | None = None
-    _global_defaults_file: Path | None = None
+
 
     def parse(self, file_path: str | Path) -> CanonicalPrompt:
-        """Parse a canonical prompt file."""
+        """Parse a canonical prompt file, merging with global defaults if present."""
         file_path = Path(file_path)
-
         if not file_path.exists():
             raise FileNotFoundError(f"Canonical prompt file not found: {file_path}")
-
         content = file_path.read_text(encoding="utf-8").strip()
-        return self._parse_content(content, source_file=file_path, prompts_dir=file_path.parent)
+        return self._parse_content(content, source_file=file_path)
 
-    def parse_content(self, content: str, prompts_dir: Path | None = None) -> CanonicalPrompt:
-        """Parse canonical prompt content directly.
+    def parse_content(self, content: str) -> CanonicalPrompt:
+        """Parse canonical prompt content directly, merging with global defaults if present."""
+        return self._parse_content(content.strip())
 
-        Args:
-            content: The prompt content to parse
-            prompts_dir: Directory containing global.yml. If None, uses the module's directory.
-        """
-        if prompts_dir is None:
-            # Default to the module's directory where global.yml is located
-            prompts_dir = Path(__file__).parent.resolve()
-        return self._parse_content(content.strip(), prompts_dir=prompts_dir)
-
-    def _load_global_defaults(self, prompts_dir: Path) -> dict[str, Any]:
-        """Load global defaults from global.yml if available.
-
-        Args:
-            prompts_dir: Directory containing the prompt files and global.yml
-
-        Returns:
-            Global defaults dict, or empty dict if no global.yml found
-        """
-        global_file = prompts_dir / "global.yml"
-
-        # Return cached defaults if available for this file
-        if self._global_defaults is not None and self._global_defaults_file == global_file:
-            return self._global_defaults
-
-        # Try to load global.yml
-        if global_file.exists():
-            try:
-                content = global_file.read_text(encoding="utf-8")
-                data = yaml.safe_load(content)
-                if isinstance(data, dict) and "defaults" in data:
-                    self._global_defaults = data["defaults"]
-                    self._global_defaults_file = global_file
-                    logger.debug(f"Loaded global defaults from {global_file}")
-                    return self._global_defaults
-            except (OSError, yaml.YAMLError) as e:
-                logger.warning(f"Failed to load global.yml from {global_file}: {e}")
-
-        # No global.yml found or failed to load - return empty defaults
-        self._global_defaults = {}
-        self._global_defaults_file = global_file
-        return {}
-
-    @staticmethod
-    def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-        """Deep merge two dictionaries.
-
-        Values in `override` take precedence over values in `base`.
-        Nested dictionaries are merged recursively.
-
-        Special case: 'environments' key is merged non-recursively - local
-        environment definitions completely replace global ones.
-
-        Args:
-            base: Base dictionary with default values
-            override: Dictionary with override values
-
-        Returns:
-            Merged dictionary
-        """
-        result = base.copy()
-
-        for key, value in override.items():
-            if key == "environments" and key in result:
-                # For environments, merge non-recursively - local envs replace global envs
-                result[key] = {**result[key], **value}
-            elif key in result and isinstance(result[key], dict) and isinstance(value, dict):
-                result[key] = CanonicalPromptParser._deep_merge(result[key], value)
-            else:
-                result[key] = value
-
-        return result
-
-    def _parse_content(
-        self,
-        content: str,
-        source_file: Path | None = None,
-        prompts_dir: Path | None = None,
-    ) -> CanonicalPrompt:
-        """Parse content string into CanonicalPrompt."""
+    def _parse_content(self, content: str, source_file: Path | None = None) -> CanonicalPrompt:
+        """Parse content string into CanonicalPrompt, merging with global defaults."""
         # Extract frontmatter and content
         match = self.FRONTMATTER_PATTERN.match(content)
         if not match:
@@ -232,48 +176,26 @@ class CanonicalPromptParser:
         except yaml.YAMLError as e:
             raise ValueError(f"Invalid YAML in frontmatter: {e}") from e
 
-        # Load and merge global defaults if prompts_dir is provided
-        if prompts_dir is not None:
-            global_defaults = self._load_global_defaults(prompts_dir)
-            if global_defaults:
-                frontmatter = self._deep_merge(global_defaults, frontmatter)
+        # Load and merge global defaults (deep merge, local overrides global)
+        global_defaults = _load_global_defaults()
+        merged_frontmatter = _deep_merge(global_defaults, frontmatter)
 
         # Validate frontmatter structure
-        self._validate_frontmatter(frontmatter, has_global_defaults=bool(prompts_dir))
+        self._validate_frontmatter(merged_frontmatter)
 
         # Extract and parse environments
-        meta = frontmatter.get("meta", {})
-        environments_raw = frontmatter.get("environments", {})
+        meta = merged_frontmatter.get("meta", {})
+        environments_raw = merged_frontmatter.get("environments", {})
         environments = self._parse_environments(environments_raw)
 
         return CanonicalPrompt(
             meta=meta, environments=environments, content=prompt_content, source_file=source_file
         )
 
-    def _validate_frontmatter(
-        self, frontmatter: dict[str, Any], has_global_defaults: bool = False
-    ) -> None:
-        """Validate frontmatter structure.
-
-        Args:
-            frontmatter: The parsed frontmatter dict
-            has_global_defaults: Whether global defaults were loaded and merged
-        """
-        # If global defaults were loaded, environments may have come from there
-        # Otherwise, environments must be present in the frontmatter
+    def _validate_frontmatter(self, frontmatter: dict[str, Any]) -> None:
+        """Validate frontmatter structure."""
         if "environments" not in frontmatter:
-            if not has_global_defaults:
-                raise ValueError(
-                    "Frontmatter must contain 'environments' section. "
-                    "Add an 'environments' section to the prompt frontmatter, "
-                    "or create a global.yml file with default environments."
-                )
-            else:
-                # This shouldn't happen if global.yml was properly loaded, but check anyway
-                raise ValueError(
-                    "No 'environments' section found in prompt or global defaults. "
-                    "Ensure global.yml contains a 'defaults.environments' section."
-                )
+            raise ValueError("Frontmatter must contain 'environments' section")
 
         if not isinstance(frontmatter["environments"], dict):
             raise ValueError("'environments' must be a dictionary")
@@ -517,23 +439,34 @@ def extract_environment_file(
     Args:
         prompt_file: Path to canonical prompt file
         env_name: Target environment name
-        output_dir: Optional output directory (defaults to current directory)
+        output_dir: Optional output directory. If None, the environment's `target` is used
+        (relative targets are resolved against the current working directory).
 
     Returns:
-        Path to generated environment file
+        Path to generated environment file (under the environment target or specified output_dir)
 
     Raises:
         CanonicalPromptError: If extraction fails
     """
     prompt = parse_canonical_prompt(prompt_file)
-    # Validate that the environment exists
-    prompt.get_environment(env_name)
+    # Retrieve environment config (raises if missing)
+    env_config = prompt.get_environment(env_name)
 
-    # Determine output path
+    # Determine output path: prefer explicit output_dir parameter; otherwise use env target
     if output_dir is None:
-        output_dir = Path.cwd()
-    else:
-        output_dir.mkdir(parents=True, exist_ok=True)
+        target = env_config.target
+        if not target or not str(target).strip():
+            raise CanonicalPromptError(
+                f"Environment '{env_name}' has an empty or missing 'target' path."
+            )
+        target_path = Path(target)
+        # Resolve relative targets against CWD (repository root)
+        if not target_path.is_absolute():
+            output_dir = Path.cwd() / target_path
+        else:
+            output_dir = target_path
+    # Ensure the output directory exists
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     filename, content = generate_environment_prompt(prompt, env_name)
     output_path = output_dir / filename
