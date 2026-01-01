@@ -28,10 +28,14 @@ logger = logging.getLogger(__name__)
 SENSITIVE_PATTERNS = [
     # Database connection strings (most specific - check first)
     r"(postgresql|mysql|sqlite)://[^\s]+",
-    # GitHub/Stripe/AWS tokens (very specific)
-    r"ghp_[a-zA-Z0-9]{36}",  # GitHub personal access tokens
-    r"sk-[a-zA-Z0-9]{48,}",  # Stripe API keys
-    r"AKIA[0-9A-Z]{16}",  # AWS access keys
+    # API keys with sk- prefix (OpenAI, Stripe, etc.)
+    r"sk-[a-zA-Z0-9_-]{20,}",
+    r"sk-ant-[a-zA-Z0-9_-]{20,}",
+    # GitHub tokens (all variants)
+    r"gh[pou][r]_[a-zA-Z0-9]{36}",
+    r"github_pat_[a-zA-Z0-9_]{82}",
+    # AWS keys
+    r"AKIA[0-9A-Z]{16}",
     # Email addresses (before general path matching)
     r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
     # Credentials and secrets
@@ -102,8 +106,12 @@ def _replacement_for_pattern(pattern: str) -> str:
     # Match pattern ordering from SENSITIVE_PATTERNS
     if "postgresql" in pattern_lower or "mysql" in pattern_lower or "sqlite" in pattern_lower:
         return "[connection string]"
-    elif "ghp_" in pattern_lower or "sk-" in pattern_lower or "AKIA" in pattern:
+    elif "sk-" in pattern or "sk-ant" in pattern:
+        return "[api key]"
+    elif "ghp_" in pattern_lower or "gho_" in pattern_lower or "ghu_" in pattern_lower or "ghs_" in pattern_lower or "ghr_" in pattern_lower or "github_pat_" in pattern_lower:
         return "[token]"
+    elif "AKIA" in pattern:
+        return "[key]"
     elif "@" in pattern and "." in pattern:  # Email
         return "[email]"
     elif "password" in pattern_lower:

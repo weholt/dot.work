@@ -3,44 +3,6 @@
 Enhancements, technical debt, code quality improvements.
 
 ---
----
----
-### Affected Files
-- `src/dot_work/installer.py`
-
-### Security Impact
-- **OWASP Top 10**: Cross-Site Scripting (A03:2021)
-- Currently low risk (markdown output, internal templates)
-- Template injection if users can modify prompt files (not the case)
-
-### Proposed Solution
-1. Add comprehensive docstring explaining why autoescape is disabled
-2. Add comment warning if HTML output is ever added
-3. Add tests to verify template content is treated as trusted
-4. Document security decision in code
-
-### Acceptance Criteria
-- [ ] Comprehensive docstring added explaining autoescape decision
-- [ ] Comment warning added if HTML output is ever planned
-- [ ] Tests verify templates are from trusted internal source
-- [ ] Security decision documented in code comments
-
-### Validation Plan
-1. Review create_jinja_env function
-2. Verify documentation mentions trusted source and markdown-only output
-3. Verify tests pass
-
-### Dependencies
-None.
-
-### Clarifications Needed
-None. Decision documented: no HTML output planned, add documentation.
-
-### Notes
-See `.work/agent/issues/references/medium-issue-clarifications-2025-01-01.md` for full analysis.
-
----
----
 id: "SEC-007@security-review-2026"
 title: "No secrets management strategy for API keys and tokens"
 description: "Hardcoded or environment-based secrets handling lacks proper validation and rotation"
