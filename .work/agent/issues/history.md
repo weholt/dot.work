@@ -4,6 +4,41 @@ Issues that have been completed and validated.
 
 ---
 ---
+id: "FEAT-025@c9d5e1"
+title: "Docker image provisioning with OpenCode webui and dynamic port assignment"
+description: "Create containerized OpenCode environment with pre-registered providers, safe credential handling, dynamic ports, and optional GitHub repo cloning"
+completed: 2026-01-01
+section: "container/docker"
+tags: [feature, docker, containerization, opencode, webui, security, dynamic-ports]
+type: enhancement
+priority: high
+status: completed
+references:
+  - src/dot_work/container/provision/core.py
+  - src/dot_work/container/provision/cli.py
+
+### Outcome
+Implemented complete Docker provisioning enhancements:
+- Added `find_available_port()` function for dynamic port assignment (8000-9000 range)
+- Added PORT_RANGE_MIN/MAX environment variable support for port range customization
+- Added credential injection via volume mount for OpenCode auth.json
+- Added GitHub repo cloning with --clone option
+- Added WebUI URL output after container start
+- Added background mode support with container ID return
+- Added CLI options: --port, --clone, --background/--foreground
+- Updated RunConfig dataclass with new fields (port, clone_repo, background)
+- Updated _resolve_config() to handle new parameters
+- Updated _build_volume_args() to mount OpenCode auth.json
+- Updated _build_docker_run_cmd() to return tuple (cmd, container_name) with port mapping
+- Updated run_from_markdown() to print WebUI URL and handle background mode
+- All code passes ruff linting and mypy type checking
+
+Remaining work (deferred to follow-up issues):
+- Unit tests for port allocation function
+- Integration tests for container provisioning
+
+---
+---
 id: "FEAT-024@b8c4d0"
 title: "Implement cross-environment Subagent/Custom Agent support"
 description: "Add subagent definition, parsing, and deployment across Claude Code, OpenCode, and GitHub Copilot"

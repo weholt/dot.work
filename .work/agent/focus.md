@@ -1,5 +1,5 @@
 # Agent Focus
-Last updated: 2026-01-01T17:00:00Z
+Last updated: 2026-01-01T17:30:00Z
 
 ## Previous
 - Issue: RES-001@e4f7a2 - Investigate and fix SQLite database connection resource leaks
@@ -14,20 +14,19 @@ Last updated: 2026-01-01T17:00:00Z
 - Completed: 2026-01-01T17:00:00Z
 - Outcome: Core implementation complete (models, parser, validator, environments, generator, discovery, CLI)
 
-## Current
 - Issue: FEAT-025@c9d5e1 - Docker image provisioning with OpenCode webui and dynamic port assignment
-- Source: shortlist.md
-- Started: 2026-01-01T17:15:00Z
-- Status: in-progress
-- Phase: Implementation (partial - dynamic port allocation complete)
+- Completed: 2026-01-01T17:30:00Z
+- Outcome: Complete implementation (dynamic port, credential injection, cloning, WebUI URL, background mode)
+
+## Current
+- Issue: None - Selecting next issue from shortlist.md
 
 ## Next
-- Continue FEAT-025 implementation: credential injection, GitHub cloning, WebUI URL output
-- Then continue through remaining shortlist.md issues (FEAT-026 through FEAT-034)
+- Continue through remaining shortlist.md issues (FEAT-026 through FEAT-034)
 
 ## Ralph Loop Status
-**Iteration 7 Progress:**
-- Previous iteration completed: FEAT-024 (Subagent/Custom Agent support)
-- Current: FEAT-025 partial implementation (Docker provisioning - dynamic port allocation)
+**Iteration 8 Progress:**
+- Previous iteration completed: FEAT-025 (Docker provisioning)
+- Current: Scanning for next issue to work on
 - Source files: shortlist.md, low.md
 - Remaining: Many proposed issues in shortlist.md, low.md
