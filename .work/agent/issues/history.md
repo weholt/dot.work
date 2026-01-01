@@ -3326,3 +3326,30 @@ references:
 - Commit: ce2a2e5
 
 ---
+---
+---
+id: "PERF-014@s4t5u6"
+title: "Parallel commit analysis with auto-detection"
+description: "Implemented parallel commit analysis for large comparisons (>50 commits)"
+completed: 2025-01-01
+section: "git"
+tags: [performance, parallelism, git, commit-analysis, cpu]
+type: refactor
+priority: medium
+status: completed
+references:
+  - src/dot_work/git/services/git_service.py
+---
+
+### Outcome
+- Added auto-detection: parallel for >50 commits, sequential for ≤50
+- Created _analyze_commit_parallel() standalone function for multiprocessing
+- Implemented ProcessPoolExecutor with max_workers=os.cpu_count()
+- Config converted to dict for pickling across process boundaries
+- Results sorted by original commit order after parallel processing
+- Added logging for parallel vs sequential mode selection
+- Expected performance: 100 commits on 8-core ~6-7x speedup
+- All 1778 unit tests passed
+- Commit: 9635259
+
+---
