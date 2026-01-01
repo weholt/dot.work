@@ -4,26 +4,6 @@ Enhancements, technical debt, code quality improvements.
 
 ---
 ---
-
-- [ ] Sensitive data filtered from all exception messages
-- [ ] Detailed errors logged to file only
-- [ ] Sanitization function created and used across all CLI modules
-
-### Validation Plan
-1. Create error messages with paths/secrets
-2. Verify non-verbose output shows generic message only
-3. Verify verbose output shows full traceback
-4. Verify log file contains full details
-
-### Dependencies
-None.
-
-### Clarifications Needed
-None. Decision documented: verbose mode tracebacks OK, sanitize base messages.
-
-### Notes
-See `.work/agent/issues/references/medium-issue-clarifications-2025-01-01.md` for full analysis.
-
 ---
 ---
 id: "SEC-005@security-review-2026"

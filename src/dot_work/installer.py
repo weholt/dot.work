@@ -13,6 +13,7 @@ from rich.console import Console
 from rich.table import Table
 
 from dot_work.environments import ENVIRONMENTS, Environment
+from dot_work.utils.path import safe_path_join, PathTraversalError, safe_write_path
 
 
 class BatchChoice(Enum):
@@ -312,7 +313,13 @@ def install_prompts_generic(
 
     # Combined file mode (claude, aider, amazon-q)
     if config.combined:
-        combined_path = target / config.combined_path
+        try:
+            combined_path = safe_path_join(target, config.combined_path)
+        except PathTraversalError as e:
+            console.print(f"  [red]❌ Invalid combined path:[/red] {config.combined_path}")
+            console.print(f"  [dim]Error: {e}[/dim]")
+            console.print("  [dim]Combined paths must be within the target directory[/dim]")
+            raise typer.Exit(1) from None
 
         # Create parent directory if needed (skip in dry-run)
         if not dry_run:
@@ -390,7 +397,12 @@ def install_prompts_generic(
 
     # Add auxiliary files to scan
     for aux_path, _aux_content in config.auxiliary_files:
-        aux_full_path = target / aux_path
+        try:
+            aux_full_path = safe_path_join(target, aux_path)
+        except PathTraversalError:
+            # Skip unsafe auxiliary paths
+            console.print(f"  [yellow]⚠[/yellow] Skipping unsafe auxiliary path: {aux_path}")
+            continue
         if aux_full_path.exists():
             state.existing_files.append(aux_full_path)
         else:
