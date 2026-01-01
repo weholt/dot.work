@@ -29,7 +29,7 @@ section: "container/docker"
 tags: [feature, docker, containerization, opencode, webui, security, dynamic-ports, has-deps]
 type: enhancement
 priority: high
-status: proposed
+status: in-progress
 references:
   - README.md
   - src/dot_work/container/provision/core.py

@@ -15,14 +15,19 @@ Last updated: 2026-01-01T17:00:00Z
 - Outcome: Core implementation complete (models, parser, validator, environments, generator, discovery, CLI)
 
 ## Current
-- Issue: None - Selecting next issue from shortlist.md
+- Issue: FEAT-025@c9d5e1 - Docker image provisioning with OpenCode webui and dynamic port assignment
+- Source: shortlist.md
+- Started: 2026-01-01T17:15:00Z
+- Status: in-progress
+- Phase: Implementation (partial - dynamic port allocation complete)
 
 ## Next
-- Continue through remaining shortlist.md issues (FEAT-025 through FEAT-034)
+- Continue FEAT-025 implementation: credential injection, GitHub cloning, WebUI URL output
+- Then continue through remaining shortlist.md issues (FEAT-026 through FEAT-034)
 
 ## Ralph Loop Status
 **Iteration 7 Progress:**
 - Previous iteration completed: FEAT-024 (Subagent/Custom Agent support)
-- Current: Scanning for next issue to work on
+- Current: FEAT-025 partial implementation (Docker provisioning - dynamic port allocation)
 - Source files: shortlist.md, low.md
 - Remaining: Many proposed issues in shortlist.md, low.md
