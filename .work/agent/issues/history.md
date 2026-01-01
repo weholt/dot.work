@@ -128,6 +128,33 @@ references:
 
 ---
 ---
+id: "SEC-007@security-review-2026"
+title: "Secrets management utility"
+description: "Created validation and management utilities for API keys and tokens"
+completed: 2025-01-01
+section: "security"
+tags: [security, secrets-management]
+type: security
+priority: medium
+status: completed
+references:
+  - src/dot_work/utils/secrets.py
+  - src/dot_work/utils/sanitization.py
+  - tests/unit/utils/test_secrets.py
+---
+
+### Outcome
+- Created secrets.py with get_secret(), validate_secret_format(), require_secrets()
+- Validates format for OPENAI_API_KEY, ANTHROPIC_API_KEY, GITHUB_TOKEN
+- Integration with sanitize_log_message() prevents secrets in logs
+- Added SecretValidationError for clear error messages
+- Added mask_secret() for safe display of partial secrets
+- Updated sanitization patterns to catch sk-* and ghp_* patterns
+- 20 tests added for secrets validation and masking
+- Commit: 3026fb2
+
+---
+---
 id: "MIGRATE-013@a7f3b2"
 title: "Create knowledge_graph module structure in dot-work"
 description: "Copy kgshred source files to src/dot_work/knowledge_graph/"
