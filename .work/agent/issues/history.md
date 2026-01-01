@@ -50,6 +50,34 @@ references:
 - Commit: 5f11096
 
 ---
+---
+id: "SEC-004@security-review-2026"
+title: "Error handling sanitization"
+description: "Created sanitization utility and updated CLI modules to prevent information disclosure"
+completed: 2025-01-01
+section: "security"
+tags: [security, error-handling, information-disclosure]
+type: security
+priority: medium
+status: completed
+references:
+  - src/dot_work/utils/sanitization.py
+  - src/dot_work/cli.py
+  - src/dot_work/git/cli.py
+  - src/dot_work/db_issues/cli.py
+  - tests/unit/utils/test_sanitization.py
+---
+
+### Outcome
+- Created sanitize_error_message() function in src/dot_work/utils/sanitization.py
+- Updated cli.py, git/cli.py, db_issues/cli.py to use sanitization
+- Non-verbose error messages sanitized (paths, secrets, emails removed)
+- Verbose mode keeps traceback display for debugging
+- Full errors logged server-side for troubleshooting
+- 13 tests added verifying sanitization patterns
+- Commit: 0cf5aac
+
+---
 
 ---
 id: "MIGRATE-013@a7f3b2"
