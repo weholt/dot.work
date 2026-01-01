@@ -4,6 +4,38 @@ Issues that have been completed and validated.
 
 ---
 ---
+id: "FEAT-024@b8c4d0"
+title: "Implement cross-environment Subagent/Custom Agent support"
+description: "Add subagent definition, parsing, and deployment across Claude Code, OpenCode, and GitHub Copilot"
+completed: 2026-01-01
+section: "subagents"
+tags: [feature, subagents, custom-agents, claude-code, opencode, copilot, multi-environment]
+type: enhancement
+priority: medium
+status: completed
+references:
+  - .work/agent/issues/references/subagents_spec.md
+  - src/dot_work/subagents/
+
+### Outcome
+Implemented complete Subagent module following subagents_spec.md:
+- Created models.py with SubagentMetadata, SubagentConfig, SubagentEnvironmentConfig, CanonicalSubagent dataclasses with validation
+- Created parser.py for markdown + YAML frontmatter subagent file extraction (canonical and native formats)
+- Created validator.py with error collection and validation rules
+- Created environments/ module with base adapter and implementations for Claude Code, OpenCode, GitHub Copilot
+- Created generator.py for canonical to native conversion with tool/model name mapping
+- Created discovery.py for finding subagents in configured paths
+- Created cli.py with subagents management commands (list, validate, show, generate, sync, init, envs)
+- Registered subagents subcommand in main CLI
+- All code passes ruff linting and mypy type checking
+
+Remaining work (deferred to follow-up issues):
+- Unit tests for subagents module
+- Integration tests for environment adapters
+- Bundled starter subagents (code-reviewer, test-runner, etc.)
+
+---
+---
 id: "FEAT-023@a7b3c9"
 title: "Implement Agent Skills support per agentskills.io specification"
 description: "Add skills discovery, parsing, validation, and prompt generation for agent capabilities"
