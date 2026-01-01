@@ -135,6 +135,8 @@ ignore = ["E501"]
 "src/dot_work/version/cli.py" = ["B008", "B904"]
 "src/dot_work/overview/cli.py" = ["B008", "B904"]
 "src/dot_work/harness/cli.py" = ["B008"]
+# B904: review server - HTTPException without exception chaining (intentional clean API error)
+"src/dot_work/review/server.py" = ["B904"]
 # import-untyped: frontmatter library has no type stubs
 "src/dot_work/container/provision/core.py" = ["S603"]
 "src/dot_work/container/provision/validation.py" = []
