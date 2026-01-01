@@ -1,7 +1,5 @@
 """Tag generation for git commits based on analysis."""
 
-from collections import Counter
-
 from dot_work.git.models import ChangeAnalysis, ChangeType, FileCategory
 
 
@@ -541,4 +539,3 @@ class TagGenerator:
             return set(final_tags)
 
         return filtered
-

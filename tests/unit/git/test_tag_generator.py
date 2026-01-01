@@ -230,15 +230,6 @@ class TestTagGenerator:
 
         assert "feature" in tags
 
-    def test_generate_tag_suggestions(self):
-        """Test generating tag suggestions for a commit message."""
-        generator = TagGenerator()
-
-        suggestions = generator.generate_tag_suggestions(
-            "Add new authentication system with OAuth support"
-        )
-
-        assert len(suggestions) > 0
 
     def test_filter_tags_removes_duplicates(self):
         """Test that tag filtering removes duplicates."""
@@ -322,67 +313,6 @@ class TestTagGenerator:
         assert "security" in tags
         assert "breaking" in tags
 
-    def test_get_tag_statistics(self):
-        """Test generating statistics about tag usage."""
-        generator = TagGenerator()
-
-        analyses = [
-            ChangeAnalysis(
-                commit_hash="abc123",
-                author="Dev1",
-                email="dev1@example.com",
-                timestamp=datetime.now(),
-                branch="main",
-                message="feat: add feature",
-                short_message="feat: add feature",
-                files_changed=[],
-                lines_added=10,
-                lines_deleted=0,
-                files_added=1,
-                files_deleted=0,
-                files_modified=0,
-                complexity_score=10.0,
-                summary="Add feature",
-                tags=["feature", "add"],
-                impact_areas=[],
-            ),
-            ChangeAnalysis(
-                commit_hash="def456",
-                author="Dev2",
-                email="dev2@example.com",
-                timestamp=datetime.now(),
-                branch="main",
-                message="fix: fix bug",
-                short_message="fix: fix bug",
-                files_changed=[],
-                lines_added=5,
-                lines_deleted=2,
-                files_added=0,
-                files_deleted=0,
-                files_modified=1,
-                complexity_score=5.0,
-                summary="Fix bug",
-                tags=["fix"],
-                impact_areas=[],
-            ),
-        ]
-
-        stats = generator.get_tag_statistics(analyses)
-
-        assert stats["total_commits"] == 2
-        assert stats["total_tags"] == 3
-        assert stats["unique_tags"] == 3
-        assert stats["average_tags_per_commit"] == 1.5
-
-    def test_suggest_related_tags(self):
-        """Test suggesting related tags based on existing tags."""
-        generator = TagGenerator()
-
-        existing_tags = ["feature"]
-        suggestions = generator.suggest_related_tags(existing_tags)
-
-        assert len(suggestions) > 0
-        assert any(tag in suggestions for tag in ["enhancement", "add", "new"])
 
     def test_empty_analysis_returns_misc(self):
         """Test that an analysis with no clear tags returns 'misc'."""

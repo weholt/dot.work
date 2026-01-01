@@ -38,40 +38,6 @@ Consider dependency injection for console.
 - [ ] Testable CLI output
 
 ---
-
----
-id: "CR-065@b0c2d4"
-title: "Full page reload on comment submission loses scroll position"
-description: "UX could be improved with partial updates"
-created: 2024-12-27
-section: "review"
-tags: [ux, enhancement]
-type: enhancement
-priority: low
-status: proposed
-references:
-  - src/dot_work/review/static/app.js
----
-
-### Problem
-`window.location.reload()` (line 43) after submitting a comment causes full page refresh, losing scroll position and potentially unsaved work.
-
-### Affected Files
-- `src/dot_work/review/static/app.js`
-
-### Importance
-UX improvement for review workflow.
-
-### Proposed Solution
-Dynamically update the DOM or use partial updates.
-
-### Acceptance Criteria
-- [ ] Scroll position preserved
-- [ ] Better UX on comment submission
-
----
-
----
 id: "CR-067@d2e4f6"
 title: "Collector class in overview/code_parser.py has too many responsibilities"
 description: "200 lines mixing AST visiting, docstrings, metrics, classification"

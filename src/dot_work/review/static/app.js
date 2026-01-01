@@ -28,6 +28,10 @@ async function submitComment() {
     const suggestion = document.getElementById("sug").value;
     if (!message) return;
 
+    // Preserve scroll position across reload
+    const scrollPos = window.scrollY || document.documentElement.scrollTop;
+    sessionStorage.setItem('review-scroll-pos', scrollPos.toString());
+
     const res = await fetch("/api/comment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -40,7 +44,13 @@ async function submitComment() {
         })
     });
 
-    if (res.ok) window.location.reload();
+    if (res.ok) {
+        window.location.reload();
+        // Scroll position will be restored in DOMContentLoaded handler
+    } else {
+        // Clear saved scroll position on error
+        sessionStorage.removeItem('review-scroll-pos');
+    }
 }
 
 // Handle Escape key to close modal
@@ -95,6 +105,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     // Initialize diff view from localStorage
     initDiffView();
+
+    // Restore scroll position after comment submission
+    const savedScroll = sessionStorage.getItem('review-scroll-pos');
+    if (savedScroll) {
+        const scrollPos = parseInt(savedScroll, 10);
+        if (!isNaN(scrollPos)) {
+            window.scrollTo(0, scrollPos);
+        }
+        sessionStorage.removeItem('review-scroll-pos');
+    }
 });
 
 // ============================================

@@ -2777,3 +2777,28 @@ Files modified:
 - src/dot_work/git/services/tag_generator.py - trimmed from 694 to 544 lines
 
 ---
+id: "CR-065@b0c2d4"
+title: "Full page reload on comment submission loses scroll position"
+description: "UX could be improved with partial updates"
+created: 2024-12-27
+completed: 2025-12-31
+section: "review"
+tags: [ux, enhancement]
+type: enhancement
+priority: low
+status: completed
+references:
+  - src/dot_work/review/static/app.js
+---
+
+### Outcome
+Implemented scroll position preservation using sessionStorage API:
+- submitComment() saves scroll position before reload
+- DOMContentLoaded handler restores scroll position after load
+- Scroll position cleared on error to prevent stale state
+- Minimal code changes with clean error handling
+
+Files modified:
+- src/dot_work/review/static/app.js
+
+---
