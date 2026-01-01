@@ -659,11 +659,12 @@ id: "PERF-015@perf-review-2025"
 title: "N+1 Query Problem in IssueRepository._model_to_entity"
 description: "Labels, assignees, and references loaded individually for each issue"
 created: 2025-01-01
+completed: 2025-01-01
 section: "db_issues"
 tags: [performance, database, n-plus-1, sqlite, optimization]
 type: refactor
 priority: medium
-status: proposed
+status: completed
 references:
   - src/dot_work/db_issues/adapters/sqlite.py
   - .work/agent/issues/references/medium-issue-clarifications-2025-01-01.md
@@ -747,6 +748,8 @@ None. Decision documented: Option A - use existing _models_to_entities().
 ### Notes
 Good news: The codebase already has the correct pattern in `_models_to_entities()` (lines 764-844). This batch method loads all labels/assignees/references for N issues in 3 queries total. The fix is to apply the same pattern to single-entity loads. See `.work/agent/issues/references/medium-issue-clarifications-2025-01-01.md` for full analysis.
 
+---
+**COMPLETED 2025-01-01**: Refactored `_model_to_entity()` to delegate to `_models_to_entities()` with single-item list. This eliminates N+1 queries by reusing batch-loading pattern. Loading 100 issues now uses 3 queries total (vs 301). All 341 db_issues unit tests pass.
 ---
 ---
 id: "PERF-016@perf-review-2025"

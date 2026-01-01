@@ -3377,3 +3377,47 @@ references:
 - Added warning about manual editing risks
 
 ---
+---
+---
+id: "DOGFOOD-011@foa1hu"
+title: "Document prompt trigger format by environment"
+description: "Verified README.md contains comprehensive prompt usage documentation"
+completed: 2025-01-01
+section: "dogfooding"
+tags: [documentation, prompts, dogfooding]
+type: docs
+priority: medium
+status: completed
+references:
+  - README.md
+---
+
+### Outcome
+- Verified README.md already contains "How to Use Prompts" section (lines 172-187)
+- Comprehensive table documents all 10+ environments
+- Slash command vs automatic read distinction clear for each environment
+- Issue pre-resolved by existing documentation
+
+---
+---
+id: "CR-085@e3f1g2"
+title: "Missing Type Annotation for FileAnalyzer config Parameter"
+description: "Added AnalysisConfig type annotation to FileAnalyzer.__init__"
+completed: 2025-01-01
+section: "git"
+tags: [type-hints, naming, clarity]
+type: refactor
+priority: medium
+status: completed
+references:
+  - src/dot_work/git/services/file_analyzer.py
+---
+
+### Outcome
+- Added type annotation `config: AnalysisConfig` to FileAnalyzer.__init__
+- Added import of AnalysisConfig from dot_work.git.models
+- mypy passes without errors
+- Improved IDE support and type safety
+- Commit: 91e446e
+
+---

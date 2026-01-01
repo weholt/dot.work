@@ -747,42 +747,13 @@ class IssueRepository:
         Returns:
             Issue domain entity
         """
-        # Load labels from junction table
-        statement = select(IssueLabelModel).where(IssueLabelModel.issue_id == model.id)
-        label_models = self.session.exec(statement).all()
-        labels = [label_model.label_name for label_model in label_models]
-
-        # Load assignees from junction table
-        assignee_statement = select(IssueAssigneeModel).where(
-            IssueAssigneeModel.issue_id == model.id
-        )
-        assignee_models = self.session.exec(assignee_statement).all()
-        assignees = [assignee_model.assignee for assignee_model in assignee_models]
-
-        # Load references from junction table
-        ref_statement = select(IssueReferenceModel).where(IssueReferenceModel.issue_id == model.id)
-        ref_models = self.session.exec(ref_statement).all()
-        references = [ref_model.reference for ref_model in ref_models]
-
-        return Issue(
-            id=model.id,
-            project_id=model.project_id,
-            title=model.title,
-            description=model.description or "",
-            status=IssueStatus(model.status),
-            priority=IssuePriority(model.priority),
-            type=IssueType(model.type),
-            assignees=assignees,
-            epic_id=model.epic_id,
-            labels=labels,
-            blocked_reason=model.blocked_reason,
-            source_url=model.source_url,
-            references=references,
-            created_at=model.created_at or utcnow_naive(),
-            updated_at=model.updated_at or utcnow_naive(),
-            closed_at=model.closed_at,
-            deleted_at=model.deleted_at,
-        )
+        # Delegate to batch method with single-item list to avoid N+1 queries
+        # This reuses the efficient batch-loading pattern that loads all
+        # labels/assignees/references in 3 total queries instead of 3 per issue.
+        # See PERF-015 for details.
+        entities = self._models_to_entities([model])
+        # Since we pass a non-empty list, we always get at least one entity back
+        return entities[0]
 
     def _models_to_entities(self, models: Sequence[IssueModel]) -> list[Issue]:
         """Convert multiple database models to Issue entities efficiently.
