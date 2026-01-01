@@ -15,6 +15,40 @@ This tool provides **12 AI agent prompts** for:
 
 The installer detects your AI coding environment and puts the prompts in the right place so they work as slash commands.
 
+## 🚫 Non-Goals
+
+dot-work is a **human-directed AI agent framework** for issue management and autonomous agent implementation. It does **NOT**:
+
+- Replace full project management tools (Jira, Linear, GitHub Projects, etc.)
+- Provide autonomous agents without human direction
+- Host prompts or provide cloud services
+- Manage dependencies or build systems
+- Replace git workflow tools
+- Provide CI/CD integration or deployment pipelines
+- Replace code review platforms (GitHub PRs, GitLab MRs)
+- Offer team collaboration features (comments, mentions, threads)
+- Perform automated testing or quality assurance
+
+### What dot-work Is
+
+A **local development tool** for AI-assisted coding workflows with human oversight:
+
+- Portable prompt templates for AI coding environments
+- File-based issue tracking for agent-driven development
+- Quality assurance workflows (baselines, reviews, audits)
+- Version control integration (not replacement)
+
+### What to Use Instead
+
+| For... | Use... |
+|--------|--------|
+| Project management | Jira, Linear, GitHub Projects |
+| CI/CD pipelines | GitHub Actions, GitLab CI, CircleCI |
+| Code review | GitHub PRs, GitLab MRs, Phabricator |
+| Automated testing | pytest, Jest, CI systems |
+| Team collaboration | Slack, Discord, email |
+| Dependency management | poetry, npm, cargo, pip-tools |
+
 ## 🚀 Quick Start
 
 ### Install with uv
