@@ -3043,3 +3043,61 @@ Identified 4 issues that are stale, partially addressed, or context-dependent. R
 
 ---
 
+---
+id: "ANALYSIS-002@issue-review-2025"
+title: "Issue analysis: CR-060, CR-067, PERF-012 validity review"
+description: "Review of additional proposed issues for autonomous work"
+completed: 2025-12-31
+section: "agent"
+tags: [maintenance, issue-cleanup, analysis]
+type: maintenance
+priority: low
+status: completed
+---
+
+### Analysis
+Reviewed additional proposed issues to identify autonomous work opportunities.
+
+**CR-060: Console singleton in CLI modules makes testing difficult**
+- **Status**: Invalid / Based on misunderstanding
+- **Issue**: Claims module-level `console = Console()` prevents output capture
+- **Finding**: Tests use `CliRunner` from typer.testing which successfully captures stdout/stderr
+- **Evidence**: `tests/unit/test_cli.py` has 500+ lines of working tests that capture CLI output
+- **Resolution**: Issue is based on misunderstanding of how Typer's CliRunner works
+
+**CR-067: Collector class in overview/code_parser.py has too many responsibilities**
+- **Status**: Not suitable for autonomous work
+- **Issue**: 180-line `_Collector` class mixes AST visiting, docstrings, metrics, classification
+- **Analysis**: Significant refactoring requiring:
+  - Deep understanding of codebase architecture
+  - Risk of introducing bugs
+  - Extensive testing
+- **Resolution**: Requires human architectural decision - not appropriate for autonomous work
+
+**PERF-012: No Memoization for Git Branch/Tag Lookups**
+- **Status**: Already implemented
+- **Issue**: Claims branch/tag lookups have no caching
+- **Finding**: Full memoization already implemented:
+  ```python
+  # Cache dictionaries
+  self._commit_to_branch_cache: dict[str, str] = {}
+  self._tag_to_commit_cache: dict[str, list[str]] = {}
+
+  # Built once per comparison
+  self._commit_to_branch_cache = self._build_commit_branch_mapping()
+  self._tag_to_commit_cache = self._build_tag_commit_mapping()
+
+  # O(1) lookups
+  return self._commit_to_branch_cache.get(commit.hexsha, "unknown")
+  ```
+- **Resolution**: Feature already implemented - issue can be closed
+
+### Outcome
+- CR-060: Invalid - CliRunner already captures output successfully
+- CR-067: Deferred - requires human architectural decision
+- PER-012: Already implemented - close issue
+
+Pattern: Many issues from earlier reviews are now stale due to code evolution.
+
+---
+
