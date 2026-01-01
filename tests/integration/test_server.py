@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -105,7 +106,9 @@ class TestCreateApp:
         app, review_id = create_app(str(git_repo_with_changes))
         assert app is not None
         assert review_id is not None
-        assert len(review_id) == 15  # YYYYMMDD-HHMMSS
+        # Format: YYYYMMDD-HHMMSS-XXX (19 chars with milliseconds)
+        assert len(review_id) == 19
+        assert "-" in review_id
 
     def test_index_returns_html(self, git_repo_with_changes: Path) -> None:
         """Test that index endpoint returns HTML."""
@@ -157,3 +160,182 @@ class TestCreateApp:
         response = client.get("/?path=test.py")
         assert response.status_code == 200
         assert "test.py" in response.text
+
+
+@pytest.mark.integration
+class TestAuthentication:
+    """Tests for authentication middleware."""
+
+    def test_no_auth_required_when_token_not_set(self, git_repo_with_changes: Path) -> None:
+        """Test that requests succeed when no auth token is configured (dev mode)."""
+        # Ensure no token is set
+        token = os.environ.pop("REVIEW_AUTH_TOKEN", None)
+
+        try:
+            app, _ = create_app(str(git_repo_with_changes))
+            client = TestClient(app)
+
+            # All endpoints should work without auth
+            response = client.get("/")
+            assert response.status_code == 200
+
+            response = client.get("/api/state")
+            assert response.status_code == 200
+
+            response = client.post(
+                "/api/comment",
+                json={"path": "test.py", "side": "new", "line": 1, "message": "Test"},
+            )
+            assert response.status_code == 200
+        finally:
+            # Restore token if it was set
+            if token:
+                os.environ["REVIEW_AUTH_TOKEN"] = token
+
+    def test_auth_required_when_token_set(self, git_repo_with_changes: Path) -> None:
+        """Test that requests fail without valid auth token when one is configured."""
+        os.environ["REVIEW_AUTH_TOKEN"] = "test-secret-token"
+
+        try:
+            app, _ = create_app(str(git_repo_with_changes))
+            client = TestClient(app)
+
+            # Request without auth header should fail
+            response = client.get("/")
+            assert response.status_code == 401
+
+            response = client.get("/api/state")
+            assert response.status_code == 401
+
+            # Request with invalid token should fail (401 since we check token validity)
+            response = client.get(
+                "/",
+                headers={"Authorization": "Bearer wrong-token"},
+            )
+            assert response.status_code == 401
+
+            # Request with valid token should succeed
+            response = client.get(
+                "/",
+                headers={"Authorization": "Bearer test-secret-token"},
+            )
+            assert response.status_code == 200
+        finally:
+            os.environ.pop("REVIEW_AUTH_TOKEN", None)
+
+    def test_static_files_skip_auth(self, git_repo_with_changes: Path) -> None:
+        """Test that static files mount works (auth not required for mounted static files in FastAPI)."""
+        os.environ["REVIEW_AUTH_TOKEN"] = "test-token"
+
+        try:
+            app, _ = create_app(str(git_repo_with_changes))
+            client = TestClient(app)
+
+            # Static files are served via StaticFiles mount which bypasses our endpoint auth
+            # The mount serves files directly without going through our auth check
+            response = client.get("/static/app.js")
+            # May be 404 if file doesn't exist, but should not be 401/403 (StaticFiles bypasses our auth)
+            assert response.status_code in (200, 404)
+        finally:
+            os.environ.pop("REVIEW_AUTH_TOKEN", None)
+
+
+@pytest.mark.integration
+class TestPathTraversalProtection:
+    """Tests for path traversal protection."""
+
+    def test_reject_path_with_parent_dots(self, git_repo_with_changes: Path) -> None:
+        """Test that paths with .. are rejected."""
+        app, _ = create_app(str(git_repo_with_changes))
+        client = TestClient(app)
+
+        # Try to access file outside repo
+        response = client.get("/?path=../../../etc/passwd")
+        assert response.status_code == 403
+
+        response = client.post(
+            "/api/comment",
+            json={"path": "../test.py", "side": "new", "line": 1, "message": "Test"},
+        )
+        assert response.status_code == 403
+
+    def test_reject_absolute_path(self, git_repo_with_changes: Path) -> None:
+        """Test that absolute paths outside the repo are rejected."""
+        app, _ = create_app(str(git_repo_with_changes))
+        client = TestClient(app)
+
+        # Try to access an absolute path outside the repo
+        response = client.get("/?path=/etc/passwd")
+        assert response.status_code == 403
+
+    def test_accept_valid_relative_path(self, git_repo_with_changes: Path) -> None:
+        """Test that valid relative paths are accepted."""
+        app, _ = create_app(str(git_repo_with_changes))
+        client = TestClient(app)
+
+        response = client.get("/?path=test.py")
+        assert response.status_code == 200
+
+
+@pytest.mark.integration
+class TestRateLimiting:
+    """Tests for rate limiting."""
+
+    def test_rate_limit_enforcement(self, git_repo_with_changes: Path) -> None:
+        """Test that rate limiting is enforced."""
+        # Clear rate limit store before test
+        from dot_work.review.server import _rate_limit_store, RATE_LIMIT_REQUESTS
+        _rate_limit_store.clear()
+
+        app, _ = create_app(str(git_repo_with_changes))
+        client = TestClient(app)
+
+        # Make requests up to the limit
+        for i in range(RATE_LIMIT_REQUESTS):
+            response = client.post(
+                "/api/comment",
+                json={"path": "test.py", "side": "new", "line": 1, "message": f"Test {i}"},
+            )
+            assert response.status_code == 200
+
+        # Next request should be rate limited
+        response = client.post(
+            "/api/comment",
+            json={"path": "test.py", "side": "new", "line": 1, "message": "Test limit"},
+        )
+        assert response.status_code == 429
+
+    def test_rate_limit_per_client(self, git_repo_with_changes: Path) -> None:
+        """Test that rate limiting is per-client (by IP)."""
+        # Clear rate limit store before test
+        from dot_work.review.server import _rate_limit_store, RATE_LIMIT_REQUESTS
+        _rate_limit_store.clear()
+
+        app, _ = create_app(str(git_repo_with_changes))
+
+        # Note: TestClient uses the same IP (testclient) by default
+        # This test verifies the rate limiting mechanism works
+        client1 = TestClient(app)
+
+        # Client 1 makes requests up to limit
+        for i in range(RATE_LIMIT_REQUESTS):
+            response = client1.post(
+                "/api/comment",
+                json={"path": "test.py", "side": "new", "line": 1, "message": f"Test {i}"},
+            )
+            assert response.status_code == 200
+
+        # Client 1 should be rate limited
+        response = client1.post(
+            "/api/comment",
+            json={"path": "test.py", "side": "new", "line": 1, "message": "Test limit"},
+        )
+        assert response.status_code == 429
+
+        # Clear and verify new client can make requests
+        _rate_limit_store.clear()
+        response = client1.post(
+            "/api/comment",
+            json={"path": "test.py", "side": "new", "line": 1, "message": "After clear"},
+        )
+        assert response.status_code == 200

@@ -2802,3 +2802,55 @@ Files modified:
 - src/dot_work/review/static/app.js
 
 ---
+id: "SEC-002@security-review-2026"
+title: "Review server binds to 127.0.0.1 without authentication"
+description: "FastAPI review server has no authentication mechanism, exposing code review comments to anyone with local access"
+created: 2026-01-01
+completed: 2025-12-31
+section: "security"
+tags: [security, authentication, fastapi, owasp]
+type: security
+priority: high
+status: completed
+references:
+  - src/dot_work/review/server.py
+  - src/dot_work/review/static/app.js
+  - tests/integration/test_server.py
+---
+
+### Outcome
+Implemented comprehensive security enhancements for the review server:
+
+**Authentication (Bearer Token):**
+- Added `REVIEW_AUTH_TOKEN` environment variable for optional authentication
+- When set, all API endpoints require valid Bearer token in Authorization header
+- Development mode (no token set) allows unrestricted access
+- Frontend JavaScript updated to include auth headers in API requests
+- Error handling for 401/403/429 responses with user-friendly alerts
+
+**Path Traversal Protection:**
+- Added `_verify_path_safe()` function that resolves paths and validates they stay within repo root
+- Applied to both GET / endpoint (path query param) and POST /api/comment (request body)
+- Uses Path.resolve() to normalize paths and relative_to() to verify containment
+- Returns 403 for paths outside repository root, 400 for invalid paths
+
+**Rate Limiting:**
+- Implemented in-memory rate limiting for comment submission endpoint
+- 60 requests per minute per client IP by default
+- Returns HTTP 429 (Too Many Requests) when limit exceeded
+- Configurable via RATE_LIMIT_REQUESTS and RATE_LIMIT_WINDOW constants
+- Automatic cleanup of stale timestamps
+
+**Tests:**
+- Added comprehensive security tests in test_server.py:
+  - TestAuthentication: 3 tests for token-based auth
+  - TestPathTraversalProtection: 3 tests for path validation
+  - TestRateLimiting: 2 tests for rate limiting enforcement
+- All 18 tests pass
+
+Files modified:
+- src/dot_work/review/server.py - Added auth, path validation, rate limiting
+- src/dot_work/review/static/app.js - Added auth headers and error handling
+- tests/integration/test_server.py - Added 8 security tests
+
+---

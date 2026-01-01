@@ -1,5 +1,13 @@
 // dot-work review frontend JavaScript
 
+const AUTH_TOKEN_KEY = 'review-auth-token';
+
+function getAuthHeaders() {
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    if (!token) return {};
+    return { 'Authorization': `Bearer ${token}` };
+}
+
 let current = { path: null, side: null, line: null };
 
 function openComment(el) {
@@ -32,9 +40,14 @@ async function submitComment() {
     const scrollPos = window.scrollY || document.documentElement.scrollTop;
     sessionStorage.setItem('review-scroll-pos', scrollPos.toString());
 
+    const headers = {
+        "Content-Type": "application/json",
+        ...getAuthHeaders()
+    };
+
     const res = await fetch("/api/comment", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
             path: current.path,
             side: current.side,
@@ -47,6 +60,15 @@ async function submitComment() {
     if (res.ok) {
         window.location.reload();
         // Scroll position will be restored in DOMContentLoaded handler
+    } else if (res.status === 401 || res.status === 403) {
+        // Authentication failed - clear token and notify user
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        sessionStorage.removeItem('review-scroll-pos');
+        alert('Authentication failed. Please refresh and enter a valid auth token.');
+    } else if (res.status === 429) {
+        // Rate limited
+        sessionStorage.removeItem('review-scroll-pos');
+        alert('Rate limit exceeded. Please wait before submitting more comments.');
     } else {
         // Clear saved scroll position on error
         sessionStorage.removeItem('review-scroll-pos');

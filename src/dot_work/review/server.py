@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+import os
 import socket
+import time
 from collections import defaultdict
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -27,6 +29,85 @@ from dot_work.review.models import ReviewComment
 from dot_work.review.storage import append_comment, load_comments, new_review_id
 
 logger = logging.getLogger(__name__)
+
+# Rate limiting: store request timestamps by client
+_rate_limit_store: dict[str, list[float]] = {}
+# Default rate limit: 60 requests per minute
+RATE_LIMIT_REQUESTS = 60
+RATE_LIMIT_WINDOW = 60
+
+
+def _get_auth_token() -> str | None:
+    """Get the authentication token from environment."""
+    return os.getenv("REVIEW_AUTH_TOKEN")
+
+
+def _verify_path_safe(root: Path | str, path: str) -> None:
+    """Verify that a path doesn't escape the repository root.
+
+    Args:
+        root: Repository root path.
+        path: File path to validate.
+
+    Raises:
+        HTTPException: If path escapes repository root.
+    """
+    if not path:
+        return
+
+    # Convert to Path if needed
+    if isinstance(root, str):
+        root = Path(root)
+
+    # Resolve paths to their absolute form
+    root_resolved = root.resolve()
+    try:
+        path_resolved = (root_resolved / path).resolve()
+    except (OSError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path",
+        )
+
+    # Check if the resolved path is within root
+    try:
+        path_resolved.relative_to(root_resolved)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Path outside repository root not allowed",
+        )
+
+
+def _check_rate_limit(client_id: str, max_requests: int = RATE_LIMIT_REQUESTS, window: int = RATE_LIMIT_WINDOW) -> bool:
+    """Check if client has exceeded rate limit.
+
+    Args:
+        client_id: Unique identifier for the client.
+        max_requests: Maximum requests allowed in window.
+        window: Time window in seconds.
+
+    Returns:
+        True if request is allowed, False if rate limited.
+    """
+    now = time.time()
+
+    # Clean old entries for this client
+    if client_id in _rate_limit_store:
+        _rate_limit_store[client_id] = [
+            ts for ts in _rate_limit_store[client_id]
+            if now - ts < window
+        ]
+    else:
+        _rate_limit_store[client_id] = []
+
+    # Check if limit exceeded
+    if len(_rate_limit_store[client_id]) >= max_requests:
+        return False
+
+    # Record this request
+    _rate_limit_store[client_id].append(now)
+    return True
 
 
 class AddCommentIn(BaseModel):
@@ -77,6 +158,16 @@ def create_app(workdir: str, base_ref: str = "HEAD") -> tuple[FastAPI, str]:
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request, path: str | None = None) -> HTMLResponse:
         """Render the main review UI."""
+        # Check authentication
+        token = _get_auth_token()
+        if token:
+            auth_header = request.headers.get("Authorization", "")
+            if not auth_header.startswith("Bearer ") or auth_header[7:] != token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid authentication token",
+                )
+
         if not path and files:
             path = next((p for p in files if p in all_changed), files[0])
 
@@ -87,6 +178,9 @@ def create_app(workdir: str, base_ref: str = "HEAD") -> tuple[FastAPI, str]:
         fd = None
 
         if path:
+            # Path traversal protection
+            _verify_path_safe(root, path)
+
             if file_is_changed:
                 diff_txt = get_unified_diff(root, path, base=base_ref)
                 fd = parse_unified_diff(path, diff_txt)
@@ -119,8 +213,18 @@ def create_app(workdir: str, base_ref: str = "HEAD") -> tuple[FastAPI, str]:
         )
 
     @app.get("/api/state")
-    def state() -> dict:
+    def state(request: Request) -> dict:
         """Get current review state."""
+        # Check authentication
+        token = _get_auth_token()
+        if token:
+            auth_header = request.headers.get("Authorization", "")
+            if not auth_header.startswith("Bearer ") or auth_header[7:] != token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid authentication token",
+                )
+
         return {
             "review_id": review_id,
             "base_ref": base_ref,
@@ -129,8 +233,29 @@ def create_app(workdir: str, base_ref: str = "HEAD") -> tuple[FastAPI, str]:
         }
 
     @app.post("/api/comment")
-    def add_comment(inp: AddCommentIn) -> JSONResponse:
+    def add_comment(request: Request, inp: AddCommentIn) -> JSONResponse:
         """Add a new comment."""
+        # Check authentication
+        token = _get_auth_token()
+        if token:
+            auth_header = request.headers.get("Authorization", "")
+            if not auth_header.startswith("Bearer ") or auth_header[7:] != token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid authentication token",
+                )
+
+        # Path traversal protection
+        _verify_path_safe(root, inp.path)
+
+        # Rate limiting by client IP
+        client_id = request.client.host if request.client else "unknown"
+        if not _check_rate_limit(client_id):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Rate limit exceeded: max {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW} seconds",
+            )
+
         # Collect context around the target line
         try:
             text = read_file_text(root, inp.path)
