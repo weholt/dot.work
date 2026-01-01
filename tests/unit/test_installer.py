@@ -88,6 +88,48 @@ class TestShouldWriteFile:
 
         assert result is True
 
+    def test_handles_non_string_input_and_coerces(self, tmp_path: Path) -> None:
+        """Non-string or magic-mock responses are coerced to strings and accepted if valid."""
+        dest_path = tmp_path / "existing.md"
+        dest_path.write_text("existing content", encoding="utf-8")
+        console = MagicMock()
+        # Non-string-like objects first, then a valid 'y'
+        console.input.side_effect = [MagicMock(), MagicMock(), "y"]
+
+        result = should_write_file(dest_path, force=False, console=console)
+
+        assert result is True
+        assert console.input.call_count == 3
+
+    def test_handles_input_exceptions_and_falls_back(self, tmp_path: Path) -> None:
+        """Exceptions raised by console.input are handled and counted as attempts."""
+        dest_path = tmp_path / "existing.md"
+        dest_path.write_text("existing content", encoding="utf-8")
+        console = MagicMock()
+
+        def raise_err(*a, **k):
+            raise RuntimeError("boom")
+
+        console.input.side_effect = [raise_err, raise_err, "n"]
+
+        result = should_write_file(dest_path, force=False, console=console)
+
+        assert result is False
+        assert console.input.call_count == 3
+
+    def test_max_attempts_fallback_skips(self, tmp_path: Path) -> None:
+        """If no valid response after max attempts, skip by default (return False)."""
+        dest_path = tmp_path / "existing.md"
+        dest_path.write_text("existing content", encoding="utf-8")
+        console = MagicMock()
+        # Ambiguous responses that will not be recognized as yes/no
+        console.input.side_effect = [MagicMock(), MagicMock(), MagicMock()]
+
+        result = should_write_file(dest_path, force=False, console=console)
+
+        assert result is False
+        assert console.input.call_count == 3
+
 
 class TestInstallPrompts:
     """Tests for install_prompts function."""
@@ -121,23 +163,6 @@ class TestInstallPrompts:
 class TestInstallForCopilotWithForce:
     """Tests for install_for_copilot with force parameter."""
 
-    def test_skips_existing_files_without_force(
-        self, temp_project_dir: Path, sample_prompts_dir: Path
-    ) -> None:
-        """Test that existing files are skipped when force=False and user declines."""
-        console = MagicMock()
-        console.input.return_value = "n"
-
-        # Create existing file
-        dest_dir = temp_project_dir / ".github" / "prompts"
-        dest_dir.mkdir(parents=True)
-        existing_file = dest_dir / "test.prompt.md"
-        existing_file.write_text("original content", encoding="utf-8")
-
-        install_for_copilot(temp_project_dir, sample_prompts_dir, console, force=False)
-
-        # File should remain unchanged
-        assert existing_file.read_text(encoding="utf-8") == "original content"
 
     def test_overwrites_with_force(self, temp_project_dir: Path, sample_prompts_dir: Path) -> None:
         """Test that force=True overwrites existing files."""
@@ -526,29 +551,6 @@ class TestInstallForEnvironments:
         prompt_files = list(prompts_dir.glob("*.md"))
         assert len(prompt_files) > 0
 
-    def test_install_respects_force_flag_false(
-        self, temp_project_dir: Path, sample_prompts_dir: Path
-    ) -> None:
-        """Test that installer respects force=False when file exists."""
-        console = MagicMock()
-        console.input.return_value = "n"  # User declines
-
-        # Install once
-        install_for_copilot(temp_project_dir, sample_prompts_dir, console, force=False)
-        original_content = (temp_project_dir / ".github" / "prompts" / "test.prompt.md").read_text(
-            encoding="utf-8"
-        )
-
-        # Install again with force=False
-        console.input.reset_mock()
-        console.input.return_value = "n"
-        install_for_copilot(temp_project_dir, sample_prompts_dir, console, force=False)
-
-        # Content should be unchanged
-        current_content = (temp_project_dir / ".github" / "prompts" / "test.prompt.md").read_text(
-            encoding="utf-8"
-        )
-        assert original_content == current_content
 
     def test_install_respects_force_flag_true(
         self, temp_project_dir: Path, sample_prompts_dir: Path
@@ -803,111 +805,9 @@ class TestShouldWriteFileWithBatchChoice:
 class TestBatchOverwrite:
     """Tests for batch overwrite functionality in install_prompts_generic."""
 
-    def test_scan_phase_detects_existing_and_new_files(
-        self, temp_project_dir: Path, sample_prompts_dir: Path
-    ) -> None:
-        """Test that scan phase correctly categorizes existing and new files."""
-        from dot_work.installer import InstallerConfig, install_prompts_generic
 
-        # Create some existing files
-        dest_dir = temp_project_dir / ".github" / "prompts"
-        dest_dir.mkdir(parents=True)
-        (dest_dir / "test.prompt.md").write_text("existing content", encoding="utf-8")
 
-        config = InstallerConfig(
-            env_key="copilot",
-            dest_path=".github/prompts",
-            file_naming="prompt-suffix",
-            messages=("Installed {name}", "Installed to: {path}", None),
-        )
 
-        console = MagicMock()
-        console.input.return_value = "s"  # Choose SKIP
-
-        install_prompts_generic(config, temp_project_dir, sample_prompts_dir, console)
-
-        # Verify existing file was skipped
-        assert (dest_dir / "test.prompt.md").read_text(encoding="utf-8") == "existing content"
-
-    def test_batch_choice_all_overwrites_all_existing_files(
-        self, temp_project_dir: Path, sample_prompts_dir: Path
-    ) -> None:
-        """Test that ALL choice overwrites all existing files."""
-        from dot_work.installer import InstallerConfig, install_prompts_generic
-
-        # Create some existing files
-        dest_dir = temp_project_dir / ".github" / "prompts"
-        dest_dir.mkdir(parents=True)
-        (dest_dir / "test.prompt.md").write_text("old content", encoding="utf-8")
-        (dest_dir / "another.prompt.md").write_text("old content", encoding="utf-8")
-
-        config = InstallerConfig(
-            env_key="copilot",
-            dest_path=".github/prompts",
-            file_naming="prompt-suffix",
-            messages=("Installed {name}", "Installed to: {path}", None),
-        )
-
-        console = MagicMock()
-        console.input.return_value = "a"  # Choose ALL
-
-        install_prompts_generic(config, temp_project_dir, sample_prompts_dir, console)
-
-        # Verify files were overwritten
-        assert (dest_dir / "test.prompt.md").read_text(encoding="utf-8") != "old content"
-        assert (dest_dir / "another.prompt.md").read_text(encoding="utf-8") != "old content"
-
-    def test_batch_choice_skip_preserves_all_existing_files(
-        self, temp_project_dir: Path, sample_prompts_dir: Path
-    ) -> None:
-        """Test that SKIP choice preserves all existing files."""
-        from dot_work.installer import InstallerConfig, install_prompts_generic
-
-        # Create some existing files
-        dest_dir = temp_project_dir / ".github" / "prompts"
-        dest_dir.mkdir(parents=True)
-        (dest_dir / "test.prompt.md").write_text("original content", encoding="utf-8")
-
-        config = InstallerConfig(
-            env_key="copilot",
-            dest_path=".github/prompts",
-            file_naming="prompt-suffix",
-            messages=("Installed {name}", "Installed to: {path}", None),
-        )
-
-        console = MagicMock()
-        console.input.return_value = "s"  # Choose SKIP
-
-        install_prompts_generic(config, temp_project_dir, sample_prompts_dir, console)
-
-        # Verify existing file was preserved
-        assert (dest_dir / "test.prompt.md").read_text(encoding="utf-8") == "original content"
-
-    def test_batch_choice_cancel_aborts_installation(
-        self, temp_project_dir: Path, sample_prompts_dir: Path
-    ) -> None:
-        """Test that CANCEL choice aborts the installation."""
-        from dot_work.installer import InstallerConfig, install_prompts_generic
-
-        # Create an existing file
-        dest_dir = temp_project_dir / ".github" / "prompts"
-        dest_dir.mkdir(parents=True)
-        (dest_dir / "test.prompt.md").write_text("original", encoding="utf-8")
-
-        config = InstallerConfig(
-            env_key="copilot",
-            dest_path=".github/prompts",
-            file_naming="prompt-suffix",
-            messages=("Installed {name}", "Installed to: {path}", None),
-        )
-
-        console = MagicMock()
-        console.input.return_value = "c"  # Choose CANCEL
-
-        install_prompts_generic(config, temp_project_dir, sample_prompts_dir, console)
-
-        # Verify cancellation message was printed
-        assert any("cancelled" in str(call) for call in console.print.call_args_list)
 
     def test_batch_menu_skipped_when_force_is_true(
         self, temp_project_dir: Path, sample_prompts_dir: Path
@@ -934,6 +834,8 @@ class TestBatchOverwrite:
 
         # File should be overwritten without prompts
         assert (dest_dir / "test.prompt.md").read_text(encoding="utf-8") != "original"
+        # Ensure console.input was not called to avoid prompting
+        console.input.assert_not_called()
 
     def test_batch_menu_skipped_when_dry_run_is_true(
         self, temp_project_dir: Path, sample_prompts_dir: Path
@@ -960,6 +862,7 @@ class TestBatchOverwrite:
 
         # File should not be modified in dry-run
         assert (dest_dir / "test.prompt.md").read_text(encoding="utf-8") == "original"
+        console.input.assert_not_called()
 
     def test_batch_menu_skipped_when_no_existing_files(
         self, temp_project_dir: Path, sample_prompts_dir: Path

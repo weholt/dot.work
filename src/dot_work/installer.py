@@ -206,10 +206,33 @@ def should_write_file(
             return False
         # PROMPT falls through to individual prompt below
 
-    # Prompt user for confirmation
+    # Prompt user for confirmation with limited attempts and safe coercion
     console.print(f"  [yellow]⚠[/yellow] File already exists: {dest_path.name}")
-    response = console.input("    Overwrite? [y/N]: ").strip().lower()
-    return response in ("y", "yes")
+
+    max_attempts = 3
+    attempts = 0
+    while attempts < max_attempts:
+        try:
+            raw = console.input("    Overwrite? [y/N]: ")
+        except Exception:
+            # Treat input errors as invalid responses and continue
+            raw = ""
+
+        try:
+            response = str(raw).strip().lower()
+        except Exception:
+            response = ""
+
+        if response in ("y", "yes"):
+            return True
+        if response in ("n", "no", ""):
+            return False
+
+        attempts += 1
+        console.print("[red]Invalid input; please enter y or n[/red]")
+
+    console.print("[yellow]No valid response; skipping by default.[/yellow]")
+    return False
 
 
 def _prompt_batch_choice(console: Console, state: InstallState) -> BatchChoice:
@@ -238,6 +261,8 @@ def _prompt_batch_choice(console: Console, state: InstallState) -> BatchChoice:
     console.print("  [bold cyan][p][/bold cyan] [bold]PROMPT[/bold] for each file individually")
     console.print("  [bold cyan][c][/bold cyan] [bold]CANCEL[/bold] installation\n")
 
+    max_attempts = 5
+    attempts = 0
     while True:
         response = console.input("Choice [a/s/p/c]: ").strip().lower()
         if response in ("a", "all"):
@@ -248,7 +273,11 @@ def _prompt_batch_choice(console: Console, state: InstallState) -> BatchChoice:
             return BatchChoice.PROMPT
         elif response in ("c", "cancel"):
             return BatchChoice.CANCEL
+        attempts += 1
         console.print("[red]Invalid choice. Please enter a, s, p, or c.[/red]")
+        if attempts >= max_attempts:
+            console.print("[yellow]Too many invalid attempts, cancelling installation.[/yellow]")
+            return BatchChoice.CANCEL
 
 
 def install_prompts(
