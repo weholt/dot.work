@@ -138,10 +138,28 @@ def run(
         "--dry-run",
         help="Print the docker command instead of executing it.",
     ),
-) -> None:
+    # FEAT-025: New CLI options
+    port: int | None = typer.Option(
+        None,
+        "--port",
+        "-p",
+        help="Dynamic port for WebUI access (default: auto-assign in 8000-9000 range).",
+    ),
+    clone_repo: str | None = typer.Option(
+        None,
+        "--clone",
+        "-c",
+        help="GitHub repo URL to clone into container after start.",
+    ),
+    background: bool = typer.Option(
+        True,
+        "--background/--foreground",
+        help="Run container in background mode (default: True).",
+    ),
+) -> str | None:
     """Run the agent with an instruction file."""
     try:
-        run_from_markdown(
+        container_id = run_from_markdown(
             instructions_path=instructions,
             repo_url=repo_url,
             branch=branch,
@@ -163,7 +181,13 @@ def run(
             git_user_email=git_user_email,
             tool_entrypoint=tool_entrypoint,
             dry_run=dry_run,
+            # FEAT-025: New parameters
+            port=port,
+            clone_repo=clone_repo,
+            background=background,
         )
+        # Return container ID for programmatic use
+        return container_id
     except RepoAgentError as exc:
         typer.echo(f"repo-agent error: {exc}", err=True)
         raise typer.Exit(code=EXIT_CODE_ERROR)

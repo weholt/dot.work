@@ -195,6 +195,9 @@ class RunConfig:
         prompt_header_agentic: Prompt header for agentic strategy.
         prompt_header_direct: Prompt header for direct strategy.
         dry_run: If True, print Docker command instead of executing.
+        port: Dynamic port number for WebUI access (optional).
+        clone_repo: Optional GitHub repo URL to clone into container.
+        background: Run container in background mode.
     """
 
     # Core
@@ -236,6 +239,11 @@ class RunConfig:
 
     # Misc
     dry_run: bool
+
+    # FEAT-025: Docker provisioning enhancements
+    port: int | None  # Dynamic port for WebUI
+    clone_repo: str | None  # GitHub repo URL to clone
+    background: bool = True  # Run in background mode
 
 
 def _bool_meta(meta: Mapping[str, Any], key: str, default: bool) -> bool:
@@ -425,6 +433,15 @@ def _resolve_config(
 
     dry_run = bool(cli_overrides.get("dry_run") or False)
 
+    # FEAT-025: Port, clone repo, background mode
+    port_val = cli_overrides.get("port")
+    port: int | None = None
+    if port_val is not None:
+        port = int(port_val) if port_val else None
+
+    clone_repo = cli_overrides.get("clone_repo")
+    background = bool(cli_overrides.get("background", True))
+
     cfg = RunConfig(
         instructions_path=instructions_path,
         repo_url=str(repo_url),
@@ -452,6 +469,9 @@ def _resolve_config(
         prompt_header_agentic=str(header_agentic),
         prompt_header_direct=str(header_direct),
         dry_run=dry_run,
+        port=port,
+        clone_repo=clone_repo,
+        background=background,
     )
     # Log final configuration (with sensitive values masked)
     logger.info(
@@ -604,6 +624,13 @@ def _build_volume_args(
             ["-v", f"{ssh_dir}:/root/.ssh:ro"],
         )
 
+    # FEAT-025: Mount OpenCode auth.json for credential injection
+    opencode_auth = Path(OPENCODE_AUTH_PATH).expanduser()
+    if opencode_auth.exists():
+        volume_args.extend(
+            ["-v", f"{opencode_auth}:/root/.local/share/opencode/auth.json:ro"],
+        )
+
     return volume_args
 
 
@@ -635,14 +662,16 @@ def _build_docker_run_cmd(
     cfg: RunConfig,
     workdir: Path,
     instructions_body_path: Path,
-) -> list[str]:
+) -> tuple[list[str], str | None]:
     """Build the complete Docker run command with all environment variables and volumes.
 
     Constructs a Docker run command that:
     - Sets up environment variables for the tool
     - Mounts workspace and instruction files
-    - Optionally mounts SSH keys and OpenCode config
+    - Optionally mounts SSH keys and OpenCode config/auth
     - Executes a bash script that clones the repo, runs the tool, and creates a PR
+    - Supports port mapping for WebUI access
+    - Supports background mode with container ID return
 
     Args:
         cfg: Configuration object with all settings.
@@ -650,7 +679,7 @@ def _build_docker_run_cmd(
         instructions_body_path: Path to the instructions content file.
 
     Returns:
-        Complete Docker run command as a list of strings.
+        Tuple of (Docker command as list of strings, container ID if background mode).
 
     Raises:
         ValueError: If docker image name is invalid.
@@ -669,18 +698,33 @@ def _build_docker_run_cmd(
     # Validate docker image name before using in command
     validate_docker_image(cfg.docker_image)
 
-    cmd = [
-        "docker",
-        "run",
-        "--rm",
+    # FEAT-025: Build command with port mapping and background mode support
+    cmd = ["docker", "run"]
+
+    # Background mode: remove --rm, add -d for detached mode
+    container_name = None
+    if cfg.background:
+        cmd.append("-d")
+        # Generate a unique container name
+        container_name = f"repo-agent-{os.getpid()}"
+        cmd.extend(["--name", container_name])
+    else:
+        cmd.append("--rm")
+
+    # Port mapping for WebUI
+    if cfg.port:
+        cmd.extend(["-p", f"{cfg.port}:8000"])  # Assuming WebUI runs on port 8000 in container
+
+    cmd.extend([
         *env_args,
         *volume_args,
         cfg.docker_image,
         "bash",
         "-lc",
         inner_script,
-    ]
-    return cmd
+    ])
+
+    return cmd, container_name
 
 
 def run_from_markdown(
@@ -706,7 +750,11 @@ def run_from_markdown(
     git_user_email: str | None = None,
     tool_entrypoint: str | None = None,
     dry_run: bool = False,
-) -> None:
+    # FEAT-025: New parameters
+    port: int | None = None,
+    clone_repo: str | None = None,
+    background: bool = True,
+) -> str | None:
     """Execute the full repo-agent workflow from a markdown instruction file.
 
     This is the main entry point for running repo-agent. It:
@@ -773,6 +821,10 @@ def run_from_markdown(
         "git_user_email": git_user_email,
         "tool_entrypoint": tool_entrypoint,
         "dry_run": dry_run,
+        # FEAT-025: New overrides
+        "port": port,
+        "clone_repo": clone_repo,
+        "background": background,
     }
 
     cfg, body = _resolve_config(instructions_path, overrides)
@@ -786,7 +838,7 @@ def run_from_markdown(
         instructions_body_path = workdir / "instructions_body.md"
         instructions_body_path.write_text(body, encoding="utf-8")
 
-        docker_cmd = _build_docker_run_cmd(cfg, workdir, instructions_body_path)
+        docker_cmd, container_name = _build_docker_run_cmd(cfg, workdir, instructions_body_path)
 
         if cfg.dry_run:
             logger.info("Dry run mode - printing Docker command")
@@ -794,11 +846,42 @@ def run_from_markdown(
             print("# Working directory:", workdir)
             print("# Docker command:")
             print(" ".join(shlex.quote(p) for p in docker_cmd))
-            return
+            if container_name:
+                print(f"# Container name: {container_name}")
+            if cfg.port:
+                print(f"# WebUI URL: http://localhost:{cfg.port}")
+            return None
 
         logger.info(f"Running Docker container with image: {cfg.docker_image}")
         logger.debug(f"Full command: {' '.join(shlex.quote(p) for p in docker_cmd)}")
 
         # Run Docker command without suppressing output so errors are visible
-        subprocess.run(docker_cmd, check=True)
+        result = subprocess.run(docker_cmd, check=True, capture_output=True, text=True)
+
+        # FEAT-025: Print WebUI URL and container info
+        container_id = None
+        if cfg.background:
+            # Container ID is the output when running in detached mode
+            container_id = result.stdout.strip()
+            if not container_id and container_name:
+                container_id = container_name
+
+            print(f"\nContainer started: {container_id or container_name}")
+
+            if cfg.port:
+                print(f"WebUI URL: http://localhost:{cfg.port}")
+
+            # Optional: Clone repo into container if specified
+            if cfg.clone_repo:
+                logger.info(f"Cloning repo {cfg.clone_repo} into container...")
+                container_ref = container_id or container_name
+                if container_ref:
+                    subprocess.run(
+                        ["docker", "exec", container_ref, "git", "clone", cfg.clone_repo, "/workspace/repo"],
+                        check=True,
+                    )
+                    print(f"Cloned {cfg.clone_repo} into container")
+
         logger.info(f"repo-agent workflow completed successfully for {cfg.repo_url}")
+
+        return container_id or container_name
