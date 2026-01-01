@@ -155,6 +155,29 @@ references:
 
 ---
 ---
+id: "PERF-012@q2r3s4"
+title: "Memoization for Git Branch/Tag Lookups"
+description: "Branch and tag lookups use caching for O(1) lookups"
+completed: 2025-01-01
+section: "git"
+tags: [performance, memoization, caching]
+type: refactor
+priority: medium
+status: completed
+references:
+  - src/dot_work/git/services/git_service.py
+---
+
+### Outcome
+Already implemented in git_service.py:
+- compare_refs() builds _commit_to_branch_cache once per comparison
+- compare_refs() builds _tag_to_commit_cache once per comparison
+- _get_commit_branch() uses O(1) cache lookup
+- _get_commit_tags() uses O(1) cache lookup
+- Issue was already resolved in codebase
+
+---
+---
 id: "MIGRATE-013@a7f3b2"
 title: "Create knowledge_graph module structure in dot-work"
 description: "Copy kgshred source files to src/dot_work/knowledge_graph/"
