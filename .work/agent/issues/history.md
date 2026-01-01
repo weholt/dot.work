@@ -2991,3 +2991,55 @@ Added comprehensive DEBUG-level logging to the TagGenerator class:
 
 ---
 
+---
+id: "ANALYSIS-001@issue-review-2025"
+title: "Issue analysis: TEST-001, CR-030, SEC-004-007 validity review"
+description: "Review of remaining proposed issues for accuracy and context"
+completed: 2025-12-31
+section: "agent"
+tags: [maintenance, issue-cleanup, analysis]
+type: maintenance
+priority: low
+status: completed
+---
+
+### Analysis
+Reviewed remaining proposed issues from security review to identify stale or already-addressed items.
+
+**TEST-001: Test coverage below 15% threshold**
+- **Status**: Stale / Inaccurate
+- **Issue**: Claims 15% threshold but build.py checks for 75%
+- **Resolution**: Issue created before threshold was updated, now inaccurate
+- **Files**: scripts/build.py (threshold is 75%, not 15%)
+
+**CR-030: TagGenerator is over-engineered at 695 lines**
+- **Status**: Partially addressed
+- **Issue**: Claims 695 lines, actual is 564 lines (reduced during CR-101)
+- **Analysis**: Most lines are data structures (keyword lists, emoji mappings), not complex logic
+- **Resolution**: File size reduced during dead code removal; remaining complexity provides value for accurate tag classification
+
+**SEC-004: Error handling may expose sensitive information**
+- **Status**: Low priority / Context-dependent
+- **Issue**: CLI error messages could expose paths/implementation details
+- **Context**: This is a CLI tool (not web service); users run commands on their own machines
+- **Analysis**: Traceback only shown in verbose mode; exception messages are useful for debugging
+- **Resolution**: Lower priority for CLI tools compared to web services
+
+**SEC-005: File operations lack path validation**
+- **Status**: Partially addressed
+- **Issue**: Multiple file operations don't validate paths are within expected directories
+- **Finding**: `review/git.py::read_file_text()` already has path traversal protection:
+  ```python
+  norm.relative_to(root_norm)  # Raises ValueError if path escapes root
+  ```
+- **Resolution**: Main concern (review server file access) already addressed in SEC-002
+
+### Outcome
+Identified 4 issues that are stale, partially addressed, or context-dependent. Recommended actions:
+- TEST-001: Update with correct threshold or mark as stale
+- CR-030: Update line count or mark as partially addressed
+- SEC-004: Document as CLI-specific (lower priority than web services)
+- SEC-005: Note that review/git.py already has protection, mark as partially addressed
+
+---
+
