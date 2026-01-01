@@ -13,7 +13,7 @@ from rich.console import Console
 from rich.table import Table
 
 from dot_work.environments import ENVIRONMENTS, Environment
-from dot_work.utils.path import safe_path_join, PathTraversalError, safe_write_path
+from dot_work.utils.path import PathTraversalError, safe_path_join
 
 
 class BatchChoice(Enum):

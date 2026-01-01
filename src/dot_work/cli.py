@@ -1,8 +1,8 @@
 """CLI entry point for dot-work."""
 
 import json
-import re
 import logging
+import re
 from pathlib import Path
 from typing import Annotated, Literal
 

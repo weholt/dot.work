@@ -17,9 +17,8 @@ the full error server-side for debugging.
 Reference: Issue SEC-004@security-review-2026
 """
 
-import re
 import logging
-from pathlib import Path
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -31,20 +30,22 @@ SENSITIVE_PATTERNS = [
     # API keys with sk- prefix (OpenAI, Stripe, etc.)
     r"sk-[a-zA-Z0-9_-]{20,}",
     r"sk-ant-[a-zA-Z0-9_-]{20,}",
-    # GitHub tokens (all variants)
-    r"gh[pou][r]_[a-zA-Z0-9]{36}",
+    # GitHub tokens (all variants) - more permissive pattern
+    r"gh[pou]_[a-zA-Z0-9]{36}",
     r"github_pat_[a-zA-Z0-9_]{82}",
     # AWS keys
     r"AKIA[0-9A-Z]{16}",
     # Email addresses (before general path matching)
     r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
-    # Credentials and secrets
-    r"password[=:]\s*[^\s]+",
-    r"token[=:]\s*[^\s]+",
-    r"secret[=:]\s*[^\s]+",
-    r"api[_-]?key[=:]\s*[^\s]+",
-    r"auth[=:]\s*[^\s]+",
-    r"key[=:]\s*[^\s]+",
+    # Credentials and secrets - match with optional space after separator
+    r"password[=:]\s*\S+",
+    r"token[=:]\s*\S+",
+    r"secret[=:]\s*\S+",
+    r"api[_-]?key[=:]\s*\S+",
+    r"auth[=:]\s*\S+",
+    r"key[=:]\s*\S+",
+    # Generic GitHub token prefix followed by many characters
+    r"gh[pou]_[a-zA-Z0-9_-]{10,}",
     # File paths (absolute and relative) - check last as they match many things
     r"[A-Z]:\\[\w\\\-._]+",  # Windows paths
     r"/[\w/\-._]+",  # Unix paths
@@ -108,7 +109,14 @@ def _replacement_for_pattern(pattern: str) -> str:
         return "[connection string]"
     elif "sk-" in pattern or "sk-ant" in pattern:
         return "[api key]"
-    elif "ghp_" in pattern_lower or "gho_" in pattern_lower or "ghu_" in pattern_lower or "ghs_" in pattern_lower or "ghr_" in pattern_lower or "github_pat_" in pattern_lower:
+    elif (
+        "ghp_" in pattern_lower
+        or "gho_" in pattern_lower
+        or "ghu_" in pattern_lower
+        or "ghs_" in pattern_lower
+        or "ghr_" in pattern_lower
+        or "github_pat_" in pattern_lower
+    ):
         return "[token]"
     elif "AKIA" in pattern:
         return "[key]"
@@ -173,12 +181,23 @@ def sanitize_log_message(message: str) -> str:
         Sanitized log message
     """
     sanitized = message
-    for pattern in SENSITIVE_PATTERNS[:8]:  # Use first 8 patterns (credentials)
-        sanitized = re.sub(
-            pattern,
-            lambda m: m.group(0).split("=")[0] + "=***",
-            sanitized,
-            flags=re.IGNORECASE,
-        )
+    # Use all patterns for comprehensive sanitization
+    for pattern in SENSITIVE_PATTERNS:
+        # For patterns with = or :, replace the value portion
+        if "=" in pattern or ":" in pattern:
+            sanitized = re.sub(
+                pattern,
+                lambda m: m.group(0).split("=")[0].split(":")[0] + "=***",
+                sanitized,
+                flags=re.IGNORECASE,
+            )
+        else:
+            # For patterns without separator (GitHub tokens, API keys, etc.)
+            sanitized = re.sub(
+                pattern,
+                "***",
+                sanitized,
+                flags=re.IGNORECASE,
+            )
 
     return sanitized

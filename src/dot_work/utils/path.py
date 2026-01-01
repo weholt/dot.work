@@ -90,11 +90,11 @@ def safe_path_join(target: Path, path: str | Path) -> Path:
     # Check if resolved path starts with target path
     try:
         resolved.relative_to(target_resolved)
-    except ValueError:
+    except ValueError as err:
         logger.warning(f"Path traversal detected: {path} -> {resolved}")
         raise PathTraversalError(
             f"Path escapes target directory: {path} (resolved to {resolved})"
-        )
+        ) from err
 
     return resolved
 

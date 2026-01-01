@@ -14,8 +14,8 @@ API keys and tokens require special handling to prevent security breaches:
 Reference: Issue SEC-007@security-review-2026
 """
 
-import os
 import logging
+import os
 import re
 from typing import Literal
 
@@ -39,9 +39,15 @@ class SecretValidationError(ValueError):
 
 # Format patterns for API key validation
 SECRET_PATTERNS: dict[SecretType, re.Pattern[str]] = {
-    "OPENAI_API_KEY": re.compile(r"^sk-[a-zA-Z0-9]{48,}$"),  # sk- followed by 48+ alphanumeric chars
-    "ANTHROPIC_API_KEY": re.compile(r"^sk-ant-[a-zA-Z0-9_-]{95,}$"),  # sk-ant-api03- followed by 95+ chars
-    "GITHUB_TOKEN": re.compile(r"^(ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|ghu_[a-zA-Z0-9]{36}|ghs_[a-zA-Z0-9]{36}|ghr_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{82})$"),  # Various GitHub token formats
+    "OPENAI_API_KEY": re.compile(
+        r"^sk-[a-zA-Z0-9]{48,}$"
+    ),  # sk- followed by 48+ alphanumeric chars
+    "ANTHROPIC_API_KEY": re.compile(
+        r"^sk-ant-[a-zA-Z0-9_-]{95,}$"
+    ),  # sk-ant-api03- followed by 95+ chars
+    "GITHUB_TOKEN": re.compile(
+        r"^(ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|ghu_[a-zA-Z0-9]{36}|ghs_[a-zA-Z0-9]{36}|ghr_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{82})$"
+    ),  # Various GitHub token formats
 }
 
 
@@ -174,9 +180,7 @@ def require_secrets(*secret_types: SecretType) -> dict[str, str]:
             errors.append(str(e))
 
     if errors:
-        raise SecretValidationError(
-            secret_types[0], f"Multiple secret errors: {'; '.join(errors)}"
-        )
+        raise SecretValidationError(secret_types[0], f"Multiple secret errors: {'; '.join(errors)}")
 
     return result
 
