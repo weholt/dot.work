@@ -3,6 +3,30 @@
 Issues that have been completed and validated.
 
 ---
+---
+id: "CR-030@c6d8e0"
+title: "Document TagGenerator complexity rationale"
+description: "Add module docstring and method comments explaining design rationale"
+completed: 2025-01-01
+section: "git"
+tags: [documentation, refactor]
+type: docs
+priority: medium
+status: completed
+references:
+  - src/dot_work/git/services/tag_generator.py
+  - tests/unit/git/test_tag_generator.py
+---
+
+### Outcome
+- Added comprehensive module docstring explaining TagGenerator design rationale
+- Documented emoji support, redundancy filtering, and priority limiting features
+- Added method comments for _extract_emoji_tags and _filter_tags
+- Referenced test coverage for each feature
+- Issue CR-030@c6d8e0 referenced for future consideration
+- Commit: b293813
+
+---
 
 ---
 id: "MIGRATE-013@a7f3b2"
