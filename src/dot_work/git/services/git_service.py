@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -28,6 +31,332 @@ from .complexity import ComplexityCalculator
 from .file_analyzer import FileAnalyzer
 from .llm_summarizer import LLMSummarizer
 from .tag_generator import TagGenerator
+
+# Threshold for parallel processing (PERF-014)
+_PARALLEL_COMMIT_THRESHOLD = 50
+
+
+def _analyze_commit_parallel(
+    commit_hash: str,
+    repo_path: str,
+    config_dict: dict,
+) -> ChangeAnalysis | None:
+    """
+    Standalone function for parallel commit analysis.
+
+    This function is designed to work with ProcessPoolExecutor for parallel
+    commit analysis. It creates its own service instances to avoid pickling
+    issues with the main service object.
+
+    Args:
+        commit_hash: Git commit hash to analyze
+        repo_path: Path to the git repository (as string for pickling)
+        config_dict: AnalysisConfig as a dict (for pickling)
+
+    Returns:
+        ChangeAnalysis if successful, None if analysis failed
+    """
+    try:
+        # Reconstruct config from dict
+        # Convert repo_path back to Path for AnalysisConfig
+        config_dict_copy = config_dict.copy()
+        config_dict_copy["repo_path"] = Path(repo_path)
+        if config_dict_copy.get("cache_dir"):
+            config_dict_copy["cache_dir"] = Path(config_dict_copy["cache_dir"])
+
+        config = AnalysisConfig(**config_dict_copy)
+
+        # Create new instances for parallel execution
+        repo = gitpython.Repo(repo_path)
+        cache = AnalysisCache(config.cache_dir or Path(repo_path) / ".git" / "git-analysis")
+        file_analyzer = FileAnalyzer(config)
+        complexity_calculator = ComplexityCalculator()
+        tag_generator = TagGenerator()
+        llm_summarizer = LLMSummarizer(config) if config.use_llm else None
+        logger = logging.getLogger(__name__)
+
+        # Check cache first
+        cache_key = f"commit_{commit_hash}"
+        cached_analysis = cache.get(cache_key)
+        if cached_analysis and not config.force_refresh:
+            return cached_analysis
+
+        # Get commit
+        commit = repo.commit(commit_hash)
+
+        # Get basic commit info with proper type handling
+        author_name = commit.author.name or "Unknown"
+        author_email = commit.author.email or "unknown@example.com"
+
+        # Handle message being bytes or str
+        message = commit.message
+        if isinstance(message, bytes):
+            message = message.decode("utf-8", errors="replace")
+        message_str = message.strip()
+
+        # Get branch and tags (simplified version for parallel execution)
+        branch = "unknown"  # Would need full mapping for accurate branch
+        tags: list[str] = []  # Would need full tag mapping for accurate tags
+
+        # Analyze file changes
+        files_changed = _analyze_commit_files_parallel(commit, repo, file_analyzer, logger)
+
+        # Calculate basic metrics
+        lines_added = sum(f.lines_added for f in files_changed)
+        lines_deleted = sum(f.lines_deleted for f in files_changed)
+        files_added = sum(1 for f in files_changed if f.change_type == ChangeType.ADDED)
+        files_deleted = sum(1 for f in files_changed if f.change_type == ChangeType.DELETED)
+        files_modified = sum(1 for f in files_changed if f.change_type == ChangeType.MODIFIED)
+
+        # Create base analysis
+        analysis = ChangeAnalysis(
+            commit_hash=commit.hexsha,
+            author=author_name,
+            email=author_email,
+            timestamp=datetime.fromtimestamp(commit.committed_date),
+            branch=branch,
+            message=message_str,
+            short_message=_extract_short_message_parallel(message_str),
+            files_changed=files_changed,
+            lines_added=lines_added,
+            lines_deleted=lines_deleted,
+            files_added=files_added,
+            files_deleted=files_deleted,
+            files_modified=files_modified,
+            complexity_score=0.0,
+            summary="",
+            tags=[],
+            impact_areas=[],
+        )
+
+        # Calculate complexity
+        complexity_score = complexity_calculator.calculate_complexity(analysis)
+        analysis.complexity_score = complexity_score
+
+        # Generate tags
+        tags = tag_generator.generate_tags(analysis)
+        analysis.tags = tags
+
+        # Identify impact areas
+        impact_areas = _identify_impact_areas_parallel(files_changed)
+        analysis.impact_areas = impact_areas
+
+        # Check for breaking changes
+        breaking_change = _is_breaking_change_parallel(message_str, files_changed)
+        analysis.breaking_change = breaking_change
+
+        # Security relevance
+        security_relevant = _is_security_relevant_parallel(message_str, files_changed)
+        analysis.security_relevant = security_relevant
+
+        # Generate summary
+        if llm_summarizer:
+            summary = llm_summarizer.summarize_commit_sync(analysis)
+        else:
+            summary = _generate_basic_summary_parallel(analysis)
+        analysis.summary = summary
+
+        # Cache the analysis
+        cache.set(cache_key, analysis)
+
+        return analysis
+
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Failed to analyze commit {commit_hash}: {e}")
+        return None
+
+
+def _analyze_commit_files_parallel(
+    commit: gitpython.Commit,
+    repo: gitpython.Repo,
+    file_analyzer: FileAnalyzer,
+    logger: logging.Logger,
+) -> list[FileChange]:
+    """Analyze file changes in a commit (parallel version)."""
+    files_changed = []
+
+    try:
+        # Get diff between commit and parent
+        if commit.parents:
+            parent = commit.parents[0]
+            diffs = parent.diff(commit, create_patch=True)
+        else:
+            # First commit - diff against empty tree
+            empty_tree = repo.git.hash_object("-t", "tree", "/dev/null")
+            diffs = commit.diff(empty_tree, create_patch=True)
+
+        for diff in diffs:
+            file_change = _analyze_file_diff_parallel(diff, file_analyzer)
+            files_changed.append(file_change)
+
+    except Exception as e:
+        logger.error(f"Failed to analyze files for commit {commit.hexsha}: {e}")
+
+    return files_changed
+
+
+def _analyze_file_diff_parallel(diff, file_analyzer: FileAnalyzer) -> FileChange:
+    """Analyze a single file diff (parallel version)."""
+    # Determine change type
+    if diff.new_file:
+        change_type = ChangeType.ADDED
+    elif diff.deleted_file:
+        change_type = ChangeType.DELETED
+    elif diff.renamed_file:
+        change_type = ChangeType.RENAMED
+    elif diff.copied_file:
+        change_type = ChangeType.COPIED
+    else:
+        change_type = ChangeType.MODIFIED
+
+    # Get file paths
+    path = diff.b_path if diff.b_path else diff.a_path
+    old_path = diff.a_path if diff.a_path != diff.b_path else None
+
+    # Determine file category
+    category = file_analyzer.categorize_file(path)
+
+    # Get line counts
+    lines_added = 0
+    lines_deleted = 0
+
+    if hasattr(diff, "diff") and diff.diff:
+        # Parse diff for line counts
+        diff_text = diff.diff.decode("utf-8", errors="ignore")
+        for line in diff_text.split("\n"):
+            if line.startswith("+") and not line.startswith("+++"):
+                lines_added += 1
+            elif line.startswith("-") and not line.startswith("---"):
+                lines_deleted += 1
+
+    # Check if binary file
+    binary_file = hasattr(diff, "diff") and diff.diff is None
+
+    return FileChange(
+        path=path,
+        old_path=old_path,
+        change_type=change_type,
+        category=category,
+        lines_added=lines_added,
+        lines_deleted=lines_deleted,
+        binary_file=binary_file,
+    )
+
+
+def _extract_short_message_parallel(message: str) -> str:
+    """Extract short message from full commit message (parallel version)."""
+    lines = message.strip().split("\n")
+    return lines[0] if lines else ""
+
+
+def _identify_impact_areas_parallel(files_changed: list[FileChange]) -> list[str]:
+    """Identify areas of impact based on file changes (parallel version)."""
+    areas = set()
+    for file_change in files_changed:
+        # Extract area from file path
+        path_parts = file_change.path.split("/")
+        if len(path_parts) > 1:
+            areas.add(path_parts[0])
+
+        # Check for specific patterns
+        if any(
+            pattern in file_change.path.lower()
+            for pattern in ["auth", "security", "permission", "role"]
+        ):
+            areas.add("security")
+        elif any(
+            pattern in file_change.path.lower()
+            for pattern in ["api", "endpoint", "route", "controller"]
+        ):
+            areas.add("api")
+        elif any(
+            pattern in file_change.path.lower()
+            for pattern in ["ui", "frontend", "component", "view"]
+        ):
+            areas.add("frontend")
+        elif any(
+            pattern in file_change.path.lower()
+            for pattern in ["model", "schema", "database", "migration"]
+        ):
+            areas.add("data")
+
+    return list(areas)
+
+
+def _is_breaking_change_parallel(message: str, files_changed: list[FileChange]) -> bool:
+    """Check if commit represents a breaking change (parallel version)."""
+    message_lower = message.lower()
+    breaking_indicators = [
+        "breaking",
+        "breaking change",
+        "break:",
+        "⚠️",
+        "deprecat",
+        "remove",
+        "delete",
+        "replace",
+        "migration",
+    ]
+
+    if any(indicator in message_lower for indicator in breaking_indicators):
+        return True
+
+    # Check file patterns
+    for file_change in files_changed:
+        if any(
+            pattern in file_change.path.lower()
+            for pattern in ["migration", "schema", "proto", "interface", "api"]
+        ):
+            return True
+
+    return False
+
+
+def _is_security_relevant_parallel(message: str, files_changed: list[FileChange]) -> bool:
+    """Check if commit is security-relevant (parallel version)."""
+    message_lower = message.lower()
+    security_indicators = [
+        "security",
+        "vulnerability",
+        "cve",
+        "exploit",
+        "patch",
+        "auth",
+        "permission",
+        "access",
+        "token",
+        "secret",
+        "key",
+    ]
+
+    if any(indicator in message_lower for indicator in security_indicators):
+        return True
+
+    # Check file patterns
+    for file_change in files_changed:
+        if any(
+            pattern in file_change.path.lower()
+            for pattern in ["auth", "security", "permission", "cert", "key", "secret"]
+        ):
+            return True
+
+    return False
+
+
+def _generate_basic_summary_parallel(analysis: ChangeAnalysis) -> str:
+    """Generate basic summary without LLM (parallel version)."""
+    parts = [
+        f"Changed {len(analysis.files_changed)} files",
+        f"added {analysis.lines_added} lines, deleted {analysis.lines_deleted} lines",
+    ]
+
+    if analysis.impact_areas:
+        parts.append(f"affecting {', '.join(analysis.impact_areas)}")
+
+    if analysis.tags:
+        parts.append(f"({', '.join(analysis.tags)})")
+
+    return ". ".join(parts) + "."
 
 
 class GitAnalysisService:
@@ -90,6 +419,20 @@ class GitAnalysisService:
         if not commits:
             raise ValueError(f"No commits found between {from_ref} and {to_ref}")
 
+        # Auto-detect: use parallel processing for >50 commits (PERF-014)
+        use_parallel = len(commits) > _PARALLEL_COMMIT_THRESHOLD
+
+        if use_parallel:
+            self.logger.info(
+                f"Using parallel commit analysis ({len(commits)} commits > "
+                f"{_PARALLEL_COMMIT_THRESHOLD} threshold)"
+            )
+        else:
+            self.logger.info(
+                f"Using sequential commit analysis ({len(commits)} commits ≤ "
+                f"{_PARALLEL_COMMIT_THRESHOLD} threshold)"
+            )
+
         # Analyze each commit
         # Note: estimated_remaining_seconds is a rough estimate (~2s per commit)
         # for progress display purposes only, not based on actual timing.
@@ -104,16 +447,64 @@ class GitAnalysisService:
         analyzed_commits = []
         failed_commits: list[tuple[str, str]] = []  # (commit_hash, error_message)
 
-        for commit in tqdm(commits, desc="Analyzing commits"):
-            try:
-                analysis = self.analyze_commit(commit.hexsha)
-                analyzed_commits.append(analysis)
-                progress.processed_commits += 1
-            except Exception as e:
-                error_msg = f"Failed to analyze commit {commit.hexsha}: {e}"
-                self.logger.error(error_msg)
-                failed_commits.append((commit.hexsha, str(e)))
-                continue
+        if use_parallel:
+            # Parallel processing for large comparisons (PERF-014)
+            # Convert config to dict for pickling in ProcessPoolExecutor
+            # Need to convert Path to str for pickling
+            config_dict = dataclasses.asdict(self.config)
+            config_dict["repo_path"] = str(self.config.repo_path)
+            if self.config.cache_dir:
+                config_dict["cache_dir"] = str(self.config.cache_dir)
+
+            # Track commit order for sorting results
+            commit_order = {c.hexsha: i for i, c in enumerate(commits)}
+
+            with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
+                futures = {
+                    executor.submit(
+                        _analyze_commit_parallel,
+                        commit.hexsha,
+                        str(self.config.repo_path),
+                        config_dict,
+                    ): commit.hexsha
+                    for commit in commits
+                }
+
+                for future in tqdm(
+                    as_completed(futures),
+                    total=len(futures),
+                    desc="Analyzing commits (parallel)",
+                ):
+                    commit_hash = futures[future]
+                    try:
+                        analysis = future.result()
+                        if analysis:
+                            analyzed_commits.append(analysis)
+                            progress.processed_commits += 1
+                        else:
+                            error_msg = f"Parallel analysis returned None for {commit_hash}"
+                            self.logger.error(error_msg)
+                            failed_commits.append((commit_hash, "Analysis returned None"))
+                    except Exception as e:
+                        error_msg = f"Failed to analyze commit {commit_hash}: {e}"
+                        self.logger.error(error_msg)
+                        failed_commits.append((commit_hash, str(e)))
+
+            # Sort by original commit order
+            analyzed_commits.sort(key=lambda a: commit_order.get(a.commit_hash, float("inf")))
+
+        else:
+            # Sequential processing for small comparisons
+            for commit in tqdm(commits, desc="Analyzing commits (sequential)"):
+                try:
+                    analysis = self.analyze_commit(commit.hexsha)
+                    analyzed_commits.append(analysis)
+                    progress.processed_commits += 1
+                except Exception as e:
+                    error_msg = f"Failed to analyze commit {commit.hexsha}: {e}"
+                    self.logger.error(error_msg)
+                    failed_commits.append((commit.hexsha, str(e)))
+                    continue
 
         # Log failure summary if any commits failed
         if failed_commits:

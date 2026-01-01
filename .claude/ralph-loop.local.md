@@ -1,6 +1,6 @@
 ---
 active: true
-iteration: 2
+iteration: 3
 max_iterations: 0
 completion_promise: "AGENT DONE."
 started_at: "2026-01-01T05:56:20Z"

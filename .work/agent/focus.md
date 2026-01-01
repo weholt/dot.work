@@ -1,33 +1,39 @@
 # Agent Focus
-Last updated: 2025-12-31T23:59:00Z
+Last updated: 2025-01-01T12:00:00Z
 
 ## Previous
-- Issue: ANALYSIS-002 - Additional issue review
-- Completed: 2025-12-31T23:59:00Z
+- Issue: Ralph Loop Iteration 2 - Issue analysis and cleanup
+- Completed: 2025-01-01T12:00:00Z
 - Outcome:
   - CR-060: Invalid (CliRunner already captures output)
   - CR-067: Deferred (requires architectural decision)
   - PERF-012: Already implemented (memoization exists)
-  - Committed: 951d4fa
+  - PERF-013: Completed (scope set caching)
+  - DOGFOOD-009: Completed (non-goals in README)
+  - Committed: b4afdd0
 
 ## Current
-- Issue: Ralph Loop Iteration 2 - Issue analysis and cleanup
-- Started: 2025-12-31T23:59:00Z
-- Status: **IN PROGRESS** - Analyzing remaining proposed issues
-- Work: Evaluated additional issues (CR-060, CR-067, PERF-012-014)
+- Issue: PERF-014 - Sequential Commit Processing
+- Started: 2025-01-01T12:00:00Z
+- Status: **IN PROGRESS** - Implementing parallel commit analysis
+- Work: Add auto-detection for parallelization (>50 commits = parallel)
+- Location: src/dot_work/git/services/git_service.py
 
 ## Next
-- Issue: Continue analysis or await human input for complex issues
-- Analysis Summary:
-  - CR-060: Invalid - CliRunner captures output fine
-  - CR-067: Deferred - 180-line class refactor needs human decision
-  - PERF-012: Already implemented - caching exists
-  - PERF-013: Valid but complex - cache invalidation needs design
-  - PERF-014: Valid but complex - parallelization needs human oversight
+- Issue: Continue with medium*.md issues
+- Remaining issues in medium*.md:
+  - DOGFOOD-010: Document issue editing workflow
+  - DOGFOOD-011: Document prompt trigger format by environment
+  - DOGFOOD-012: Document all undocumented CLI commands
+  - DOGFOOD-013: Add canonical prompt validation documentation
+  - TEST-040: db-issues integration tests need CLI interface updates
+  - CR-085: Missing Type Annotation for FileAnalyzer config Parameter
+  - PERF-015: N+1 Query Problem in IssueRepository._model_to_entity
+  - And more performance/security issues...
 
 ## Ralph Loop Status
-**Iteration 2 Progress:**
-- Completed: CR-102, ANALYSIS-001, ANALYSIS-002
-- Pattern identified: Many issues are stale or already addressed
-- Remaining: ~35 proposed issues, mostly require human decisions
-- Issue: Most remaining issues are complex architectural changes, not simple fixes
+**Iteration 3 Progress:**
+- Completed: PERF-013, DOGFOOD-009, SEC-007 (moved to history)
+- Current: PERF-014 - parallel commit analysis
+- Remaining: ~30+ proposed issues in medium*.md files
+- Status: Making progress on medium-priority issues
