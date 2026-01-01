@@ -71,3 +71,327 @@ Investigate current coverage percentage and add tests for uncovered code paths.
 - [ ] All tests pass
 
 ---
+---
+id: "TEST-002@critical-review-2025"
+title: "TagGenerator has zero test coverage for 694-line classification engine"
+description: "Complex keyword matching, emoji mappings, and filtering logic untested"
+created: 2025-01-01
+section: "git"
+tags: [testing, coverage, quality]
+type: test
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/services/tag_generator.py
+---
+
+### Problem
+The `TagGenerator` class (694 lines) is a complex commit classification engine with:
+- Multiple tag extraction strategies (message, file, impact, complexity, emoji)
+- Complex filtering and prioritization logic
+- 39 emoji-to-tag mappings
+- Redundancy resolution
+
+Despite this complexity, there are **zero test files** covering this functionality. Search for test files:
+```bash
+find tests/ -name "*tag*" -type f
+# No results found
+```
+
+### Affected Files
+- `src/dot_work/git/services/tag_generator.py` (untested)
+- Missing: `tests/unit/test_tag_generator.py` or similar
+
+### Importance
+- 694-line classification engine with no safety net
+- Complex logic (multiple extraction strategies, filtering) prone to edge cases
+- Regression risk when modifying tag generation behavior
+- Violates test strategy principle: "Are critical paths covered?"
+
+### Proposed Solution
+Add unit tests for TagGenerator covering:
+1. `generate_tags()` core logic with various commit messages
+2. Emoji-to-tag mappings (sample testing)
+3. Tag filtering behavior (priority system, limits)
+4. Edge cases (empty messages, unknown file types, no matches)
+
+### Acceptance Criteria
+- [ ] Unit tests created for TagGenerator
+- [ ] Coverage for `generate_tags()` method >= 80%
+- [ ] Edge cases tested (empty input, unknown types)
+- [ ] Emoji mappings sampled (not all 39 need individual tests)
+- [ ] Tag filtering logic tested (priority, limits)
+- [ ] All tests pass
+
+---
+---
+id: "CR-102@critical-review-2025"
+title: "TagGenerator lacks debug logging for complex classification logic"
+description: "No visibility into tag extraction and filtering decisions"
+created: 2025-01-01
+section: "git"
+tags: [observability, debuggability, logging]
+type: enhancement
+priority: medium
+status: proposed
+references:
+  - src/dot_work/git/services/tag_generator.py
+---
+
+### Problem
+The `TagGenerator` class has **zero logging statements** despite implementing complex classification logic:
+- Multiple extraction strategies (5 different methods)
+- Tag filtering and prioritization
+- Redundancy resolution
+
+When tag generation behaves unexpectedly, there is no way to trace:
+- Which extraction methods matched
+- What tags were filtered and why
+- Which keywords or emojis triggered tags
+- Final tag selection reasoning
+
+### Affected Files
+- `src/dot_work/git/services/tag_generator.py`
+
+### Importance
+- Cannot debug tag generation failures
+- Hard to understand why certain tags were selected
+- No visibility into filtering decisions
+- Violates observability principle: "Can failures be diagnosed without deep system knowledge?"
+
+### Proposed Solution
+Add debug-level logging for:
+1. Tag extraction matches (which methods fired)
+2. Tags before/after filtering
+3. Keywords or emojis that triggered matches
+4. Final tag selection with reasoning
+
+Use Python's `logging` module at DEBUG level to avoid impacting production performance.
+
+### Acceptance Criteria
+- [ ] Debug logging added to key extraction methods
+- [ ] Filter decisions logged (what was removed and why)
+- [ ] Final tag list logged with reasoning
+- [ ] Logging level set to DEBUG (not INFO or WARNING)
+- [ ] No performance impact in production
+
+---
+---
+id: "SEC-004@security-review-2026"
+title: "Error handling may expose sensitive information in stack traces"
+description: "Verbose error messages could reveal internal paths, database structure, or implementation details"
+created: 2026-01-01
+section: "security"
+tags: [security, error-handling, information-disclosure, owasp]
+type: security
+priority: medium
+status: proposed
+references:
+  - src/dot_work/cli.py
+  - src/dot_work/git/cli.py
+  - src/dot_work/db_issues/cli.py
+---
+
+### Problem
+Multiple CLI modules have verbose error handling that could expose sensitive information:
+
+1. **`src/dot_work/cli.py`**: Lines 108-114, 146-152, 173-179, 200-205, 229-234, 264-270 show patterns like:
+   ```python
+   except Exception as e:
+       console.print(f"[red]Error:[/red] {e}")
+       if verbose:
+           import traceback
+           console.print(traceback.format_exc())
+   ```
+   While traceback is only shown in verbose mode, the base exception `e` could still contain sensitive paths or implementation details.
+
+2. **`src/dot_work/git/cli.py`**: Similar patterns in exception handlers (lines 108-114, 146-152, etc.)
+
+3. **`src/dot_work/db_issues/cli.py`**: Likely similar patterns in CLI commands
+
+### Affected Files
+- `src/dot_work/cli.py`
+- `src/dot_work/git/cli.py`
+- `src/dot_work/db_issues/cli.py`
+
+### Security Impact
+- **OWASP Top 10**: Security Logging and Monitoring Failures (A09:2021)
+- Information disclosure in error messages
+- Could reveal file paths, database structure, or library versions
+- Aids attackers in reconnaissance
+
+### Proposed Solution
+1. Create a sanitization function for user-facing error messages
+2. Log detailed errors server-side while showing generic messages to users
+3. Use specific exception types instead of broad `Exception` catches
+4. Consider using `sanitizelog_message()` from `git/utils.py` (lines 105-127) more broadly
+
+### Acceptance Criteria
+- [ ] User-facing error messages sanitized (no paths, internal details)
+- [ ] Detailed errors logged to file only
+- [ ] Generic error messages for unexpected exceptions
+- [ ] Sensitive data filtered from all CLI output
+
+---
+---
+id: "SEC-005@security-review-2026"
+title: "File operations lack path validation throughout codebase"
+description: "Multiple file read/write operations don't validate paths are within expected directories"
+created: 2026-01-01
+section: "security"
+tags: [security, path-traversal, file-operations, owasp]
+type: security
+priority: medium
+status: proposed
+references:
+  - src/dot_work/installer.py
+  - src/dot_work/review/git.py
+  - src/dot_work/zip/uploader.py
+---
+
+### Problem
+The codebase has numerous file operations without path traversal validation:
+
+1. **`src/dot_work/installer.py`**:
+   - Line 348: `combined_path.write_text()` - writes to user-specified path
+   - Line 430: `dest_path.write_text()` - writes to potentially user-controlled path
+   - No validation that paths stay within target directory
+
+2. **`src/dot_work/review/git.py`**: File read operations based on user-provided paths
+   - `read_file_text()` could be vulnerable to `../../etc/passwd` attacks
+
+3. **`src/dot_work/zip/uploader.py`**:
+   - Line 36: `zip_path.exists()` check, but no validation that it's a zip file (could be symlink)
+
+### Affected Files
+- `src/dot_work/installer.py`
+- `src/dot_work/review/git.py`
+- `src/dot_work/zip/uploader.py`
+- Any file using `Path.write_text()` or `Path.read_text()` with user input
+
+### Security Impact
+- **OWASP Top 10**: Path Traversal (A01:2021)
+- Directory traversal attacks could read arbitrary files
+- Symlink attacks could write to unintended locations
+- In shared environments, users could read each other's data
+
+### Proposed Solution
+1. Add path validation utility to ensure paths are within expected directories
+2. Resolve symlinks and validate before file operations
+3. Use `Path.resolve()` and check result is within expected base directory
+4. Add tests for path traversal attempts
+
+### Acceptance Criteria
+- [ ] Path validation utility created and used
+- [ ] All write operations validate paths stay within target directory
+- [ ] Symlinks resolved before validation
+- [ ] Path traversal tests added (proving mitigation)
+- [ ] Documentation for safe file operations
+
+---
+---
+id: "SEC-006@security-review-2026"
+title: "Jinja2 autoescape disabled for markdown templates"
+description: "Jinja2 environment created with autoescape=False, trusting all template content"
+created: 2026-01-01
+section: "security"
+tags: [security, xss, jinja2, owasp]
+type: security
+priority: medium
+status: proposed
+references:
+  - src/dot_work/installer.py
+---
+
+### Problem
+In `src/dot_work/installer.py:106-112`:
+```python
+return JinjaEnvironment(  # noqa: S701 - autoescape disabled for markdown
+    loader=FileSystemLoader(prompts_dir),
+    keep_trailing_newline=True,
+    trim_blocks=False,
+    lstrip_blocks=False,
+    autoescape=False,  # Markdown templates, not HTML
+)
+```
+
+While the comment notes this is for markdown (not HTML), there are concerns:
+1. **Future HTML generation**: If the templates ever generate HTML (e.g., for web UI), XSS is possible
+2. **Template injection**: If template files can be modified by users, they could inject arbitrary code
+3. **Comment notes**: The `noqa: S701` suppresses security linter without ongoing validation
+
+### Affected Files
+- `src/dot_work/installer.py`
+
+### Security Impact
+- **OWASP Top 10**: Cross-Site Scripting (A03:2021)
+- Currently low risk (markdown output), but creates debt for future web features
+- Template injection if users can modify prompt files
+
+### Proposed Solution
+1. Add documentation explaining why autoescape is disabled
+2. Consider using a custom autoescape function for markdown
+3. Add tests to verify template content is sanitized
+4. Review if any templates could output HTML in the future
+
+### Acceptance Criteria
+- [ ] Documentation added explaining autoescape decision
+- [ ] Tests verify template content is safe
+- [ ] Security review if HTML output is planned
+- [ ] Template source validation (if user-modifiable)
+
+---
+---
+id: "SEC-007@security-review-2026"
+title: "No secrets management strategy for API keys and tokens"
+description: "Hardcoded or environment-based secrets handling lacks proper validation and rotation"
+created: 2026-01-01
+section: "security"
+tags: [security, secrets-management, owasp]
+type: security
+priority: medium
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/embed/openai.py
+  - src/dot_work/knowledge_graph/embed/ollama.py
+---
+
+### Problem
+The codebase lacks a comprehensive secrets management strategy:
+
+1. **No validation**: Environment variables for API keys are used without validation
+2. **No rotation strategy**: No mechanism for key rotation or expiry
+3. **Potential leakage**: Secrets could be logged or exposed in error messages
+4. **No encryption at rest**: Database credentials or API keys stored in plain text
+
+While the project is a developer tool (reducing exposure), proper secrets handling is still important for:
+- LLM API keys (OpenAI, Anthropic) used in knowledge graph embedding
+- Git tokens (if used for authenticated operations)
+- Database credentials
+
+### Affected Files
+- Any file using `os.getenv()` for sensitive data
+- `src/dot_work/knowledge_graph/embed/openai.py`
+- `src/dot_work/knowledge_graph/embed/ollama.py`
+
+### Security Impact
+- **OWASP Top 10**: Cryptographic Failures (A02:2021)
+- API keys could be leaked in logs or error messages
+- No mechanism to detect compromised keys
+- Credentials stored in plain text
+
+### Proposed Solution
+1. Create a secrets management utility with validation
+2. Ensure secrets are never logged (use `sanitize_log_message()`)
+3. Add `.env` file support with proper gitignore
+4. Document secrets management in CONTRIBUTING.md
+5. Consider adding key rotation support
+
+### Acceptance Criteria
+- [ ] Secrets validation utility created
+- [ ] Secrets never appear in logs or error messages
+- [ ] .env.example file provided (without actual secrets)
+- [ ] Documentation for secrets management
+- [ ] Tests verify secrets aren't leaked in output
+
+---

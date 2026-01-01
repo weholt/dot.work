@@ -693,3 +693,531 @@ class FileAnalyzer:
 - [ ] Documentation reflects typed parameter
 
 ---
+---
+id: "PERF-015@perf-review-2025"
+title: "N+1 Query Problem in IssueRepository._model_to_entity"
+description: "Labels, assignees, and references loaded individually for each issue"
+created: 2025-01-01
+section: "db_issues"
+tags: [performance, database, n-plus-1, sqlite, optimization]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/db_issues/adapters/sqlite.py
+---
+
+### Problem
+In `sqlite.py:718-762`, `_model_to_entity()` performs 3 separate database queries for EVERY issue:
+
+```python
+def _model_to_entity(self, model: IssueModel) -> Issue:
+    # Query 1: Load labels (N+1 problem)
+    statement = select(IssueLabelModel).where(IssueLabelModel.issue_id == model.id)
+    label_models = self.session.exec(statement).all()
+
+    # Query 2: Load assignees (N+1 problem)
+    assignee_statement = select(IssueAssigneeModel).where(
+        IssueAssigneeModel.issue_id == model.id
+    )
+    assignee_models = self.session.exec(assignee_statement).all()
+
+    # Query 3: Load references (N+1 problem)
+    ref_statement = select(IssueReferenceModel).where(IssueReferenceModel.issue_id == model.id)
+    ref_models = self.session.exec(ref_statement).all()
+```
+
+**Performance issue:**
+- Called for EVERY issue returned from queries
+- 100 issues = 300 additional database queries (3 per issue)
+- Each query has round-trip overhead to SQLite
+- List operations suffer from severe query amplification
+
+**Impact:**
+- `list_all()`, `list_by_status()`, `list_by_project()` all affected
+- Loading 100 issues: 1 main query + 300 sub-queries = 301 total queries
+- Noticeable latency on issue list operations
+- Database connection overhead multiplied
+
+### Affected Files
+- `src/dot_work/db_issues/adapters/sqlite.py` (lines 718-762)
+
+### Importance
+**MEDIUM**: Visible in list operations:
+- Issue list pages load slowly
+- API endpoints for listing issues have high latency
+- Wasted database round-trips
+- Easy optimization with large impact
+
+**Note:** The codebase already has `_models_to_entities()` (lines 764-844) that implements batch loading correctly! The single-entity method should reuse the batch logic or call it directly.
+
+### Proposed Solution
+**Option A: Batch-load in list methods (already implemented)**
+- The repository already has `_models_to_entities()` that batch-loads correctly
+- Single-row loads can use the batch method with single-item list
+- Or duplicate the batch-loading pattern for single-entity case
+
+**Option B: Pre-load with eager loading**
+- Use SQLAlchemy eager loading (`selectinload()`) for relationships
+- Automatically loads labels/assignees in single query
+- Requires SQLModel relationship configuration
+
+**Option C: Cache in UnitOfWork**
+- Build lookup tables once per transaction
+- O(1) access to labels/assignees/references
+- Trade memory for query reduction
+
+### Acceptance Criteria
+- [ ] Single-entity loading uses batch queries or cached lookups
+- [ ] Loading 100 issues uses ≤10 queries total (vs 301)
+- [ ] Performance test: 100 issues < 1 second (vs 3-5 seconds)
+- [ ] No regression in functionality
+- [ ] `_model_to_entity()` query count reduced to 1-2 per issue
+
+### Notes
+Good news: The codebase already has the correct pattern in `_models_to_entities()` (lines 764-844). This batch method:
+- Loads all labels for N issues in 1 query
+- Loads all assignees for N issues in 1 query
+- Loads all references for N issues in 1 query
+
+The fix is to apply the same pattern to single-entity loads or delegate to the batch method.
+
+---
+---
+id: "PERF-016@perf-review-2025"
+title: "Inefficient O(N²) String Concatenation in Search Snippets"
+description: "Multiple string concatenations in search result processing"
+created: 2025-01-01
+section: "knowledge_graph"
+tags: [performance, algorithm, string-operations, search]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/search_fts.py
+  - src/dot_work/knowledge_graph/search_semantic.py
+---
+
+### Problem
+In `search_fts.py:271-324` and `search_semantic.py`, snippet generation performs multiple string concatenations:
+
+```python
+def _generate_snippet(text: str, query: str, max_length: int = 150) -> str:
+    # Multiple string concatenations
+    if context_start > 0:
+        snippet = "..." + snippet  # Creates new string object
+    if context_end < len(text):
+        snippet = snippet + "..."  # Creates another new string object
+
+    # Highlight terms with more concatenations
+    for term in terms:
+        pattern = re.compile(re.escape(term), re.IGNORECASE)
+        result = pattern.sub(lambda m: f"<<{m.group(0)}>>", result)
+```
+
+**Performance issue:**
+- String concatenation in Python creates new objects (immutable strings)
+- Each "+" operation allocates a new string
+- Pattern compilation inside loop
+- Multiple passes over same text
+
+**Impact:**
+- For 100 search results × 5 terms = 500+ string allocations
+- O(n × m) where n = text length, m = number of terms
+- Unnecessary GC pressure
+- Search latency increases with result count
+
+### Affected Files
+- `src/dot_work/knowledge_graph/search_fts.py` (lines 271-324)
+- `src/dot_work/knowledge_graph/search_semantic.py` (uses similar patterns)
+
+### Importance
+**MEDIUM**: Visible in search operations:
+- FTS search snippet generation is slow
+- Multiple results compound the overhead
+- Easy optimization with string builder pattern or list joins
+
+### Proposed Solution
+**Optimize snippet generation:**
+```python
+def _generate_snippet(text: str, query: str, max_length: int = 150) -> str:
+    if not text:
+        return ""
+
+    # Use list for efficient building
+    parts = []
+
+    if context_start > 0:
+        parts.append("...")
+    parts.append(text[context_start:context_end])
+    if context_end < len(text):
+        parts.append("...")
+
+    # Single join instead of multiple concatenations
+    snippet = "".join(parts)
+
+    # Pre-compile pattern once, reuse for all terms
+    # Use single pass with alternation pattern
+    if terms:
+        pattern = re.compile("|".join(map(re.escape, terms)), re.IGNORECASE)
+        snippet = pattern.sub(lambda m: f"<<{m.group(0)}>>", snippet)
+
+    return snippet
+```
+
+### Acceptance Criteria
+- [ ] Snippet generation uses list join instead of concatenation
+- [ ] Regex pattern pre-compiled outside loop
+- [ ] Single-pass term replacement with alternation pattern
+- [ ] Performance test: 1000 snippets < 100ms (vs 500ms+)
+- [ ] No functional change in output
+
+---
+---
+id: "PERF-017@perf-review-2025"
+title: "Missing Database Index on Common Query Patterns"
+description: "No indexes on frequently queried columns in knowledge graph"
+created: 2025-01-01
+section: "knowledge_graph"
+tags: [performance, database, indexing, sqlite]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/db.py
+---
+
+### Problem
+The knowledge graph database lacks indexes on frequently queried columns:
+
+**Missing indexes:**
+1. `nodes(doc_id)` - queried in `get_nodes_by_doc_id()` (line 823-841)
+2. `nodes(kind)` - used in scope filtering
+3. `embeddings(full_id, model)` - has UNIQUE constraint but no index on full_id alone
+4. `collection_members(collection_id)` - queried in list operations
+5. `topic_links(topic_id)` - queried in topic operations
+
+**Performance issue:**
+- Full table scans on common queries
+- O(n) lookups instead of O(log n)
+- Compound queries slower than necessary
+- Scaling poorly with document/node count
+
+**Impact:**
+- Document loading slows linearly with node count
+- Topic operations scan entire topic_links table
+- Embedding lookups require full table scan
+- Noticeable latency with 1000+ nodes
+
+### Affected Files
+- `src/dot_work/knowledge_graph/db.py` (schema creation, lines 255-303)
+
+### Importance
+**MEDIUM**: Visible at scale:
+- Single document with 1000 nodes: full scan every time
+- Topic operations degrade with graph size
+- Embedding lookups don't scale
+- Indexes are low-cost, high-benefit
+
+**Note:** Some indexes exist (edges, nodes.primary keys), but coverage is incomplete.
+
+### Proposed Solution
+Add missing indexes in schema migration:
+
+```python
+# Add to migration (version 5)
+conn.executescript("""
+    -- Index on nodes.doc_id for document loading
+    CREATE INDEX IF NOT EXISTS idx_nodes_doc_id ON nodes(doc_id);
+
+    -- Index on nodes.kind for type filtering
+    CREATE INDEX IF NOT EXISTS idx_nodes_kind ON nodes(kind);
+
+    -- Covering index for embedding lookups
+    CREATE INDEX IF NOT EXISTS idx_embeddings_full_id_model
+        ON embeddings(full_id, model);
+
+    -- Index on collection members
+    CREATE INDEX IF NOT EXISTS idx_collection_members_collection
+        ON collection_members(collection_id);
+
+    -- Index on topic links
+    CREATE INDEX IF NOT EXISTS idx_topic_links_topic
+        ON topic_links(topic_id);
+""")
+```
+
+### Acceptance Criteria
+- [ ] Indexes added for doc_id, kind, full_id, collection_id, topic_id
+- [ ] Schema migration created (version 5)
+- [ ] Performance test: 1000 nodes loaded < 100ms (vs 500ms+)
+- [ ] No regression in write performance (indexes are read-optimized)
+
+---
+---
+id: "PERF-018@perf-review-2025"
+title: "Unbounded Memory Usage in get_all_embeddings_for_model"
+description: "Function can load unlimited embeddings into memory"
+created: 2025-01-01
+section: "knowledge_graph"
+tags: [performance, memory, database, safety]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/db.py
+---
+
+### Problem
+In `db.py:1098-1143`, `get_all_embeddings_for_model()` has dangerous default behavior:
+
+```python
+def get_all_embeddings_for_model(
+    self, model: str, limit: int = 10000  # Default allows loading 10k vectors
+) -> list[Embedding]:
+    # Loads ALL embeddings if limit=0
+    if limit > 0:
+        cur = conn.execute("SELECT ... LIMIT ?", (model, limit))
+    else:
+        # WARNING: Loads unlimited embeddings
+        logger.warning("Loading unlimited embeddings - may cause OOM")
+        cur = conn.execute("SELECT ... WHERE model = ?", (model,))
+```
+
+**Performance issue:**
+- Default limit of 10,000 embeddings
+- Each embedding is 384-1536 floats × 4 bytes = 1.5-6 KB
+- 10k embeddings = 15-60 MB of memory just for vectors
+- No enforcement of memory limits
+- Can cause OOM crashes on memory-constrained systems
+
+**Impact:**
+- Large knowledge bases (10k+ nodes) consume massive memory
+- No safety limit by default
+- OOM risk on systems with <4GB RAM
+- Memory spikes during semantic search
+
+### Affected Files
+- `src/dot_work/knowledge_graph/db.py` (lines 1098-1143)
+- `src/dot_work/knowledge_graph/search_semantic.py` (calls this function)
+
+### Importance
+**MEDIUM**: Risk at scale:
+- Production systems can crash from OOM
+- No safety railings on memory usage
+- Defaults should be safe, not dangerous
+- Easy fix with lower default limit
+
+**Good news:** The codebase has `stream_embeddings_for_model()` (lines 1175-1200) that implements bounded streaming correctly! The issue is that `get_all_embeddings_for_model()` is still used as the primary API.
+
+### Proposed Solution
+**Option A: Lower default limit**
+- Change default from `10000` to `1000`
+- Document the memory implications clearly
+- Encourage streaming API for large datasets
+
+**Option B: Enforce streaming API**
+- Deprecate `get_all_embeddings_for_model()`
+- Make `stream_embeddings_for_model()` the primary API
+- Add memory quota enforcement (e.g., 100 MB max)
+
+**Option C: Auto-stream based on size**
+- Check row count before loading
+- Automatically switch to streaming if >1000 embeddings
+- Maintain API compatibility
+
+### Acceptance Criteria
+- [ ] Default limit reduced to 1000 or streaming enforced
+- [ ] Memory usage documented in docstring
+- [ ] Warning logged when loading >1000 embeddings
+- [ ] Documentation recommends streaming for large datasets
+- [ ] No OOM crashes with default parameters
+
+---
+---
+id: "PERF-019@perf-review-2025"
+title: "Inefficient File Scanning Without Incremental Cache"
+description: "Python scanner reads all files on every scan, no incremental mode"
+created: 2025-01-01
+section: "python_scan"
+tags: [performance, caching, incremental, file-io]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - src/dot_work/python/scan/scanner.py
+  - src/dot_work/python/scan/cache.py
+  - src/dot_work/python/scan/service.py
+---
+
+### Problem
+The Python AST scanner has incremental scanning infrastructure but doesn't use it effectively:
+
+**In `scanner.py:42-57`:**
+```python
+def scan(self, incremental: bool = False) -> CodeIndex:
+    index = CodeIndex(root_path=self.root_path)
+
+    for file_path in self._find_python_files():  # Scans ALL files
+        file_entity = self._scan_file(file_path)  # Reads EVERY file
+        index.add_file(file_entity)
+
+    return index
+```
+
+**In `cache.py` (lines 1-139):**
+- Cache exists but is never used in scan logic
+- `is_cached()` method available but not called
+- Cache has mtime/size/hash for change detection
+
+**Performance issue:**
+- Every scan reads all Python files
+- File I/O is dominant cost (not AST parsing)
+- Large codebases (1000+ files) scan slowly
+- Incremental flag accepted but ignored
+- Cache infrastructure exists but unused
+
+**Impact:**
+- Scanning 1000-file codebase: 5-10 seconds every time
+- Unchanged files re-parsed unnecessarily
+- No benefit from cache infrastructure
+- Repeated scans waste CPU and I/O
+
+### Affected Files
+- `src/dot_work/python/scan/scanner.py` (lines 42-57)
+- `src/dot_work/python/scan/cache.py` (not used)
+- `src/dot_work/python/scan/service.py` (accepts incremental but doesn't implement)
+
+### Importance
+**MEDIUM**: Visible in large codebases:
+- Development workflows re-scan constantly
+- CI/CD runs full scan every time
+- Cache infrastructure exists but unused
+- Easy win with existing cache
+
+### Proposed Solution
+Implement incremental scanning:
+
+```python
+def scan(self, incremental: bool = False) -> CodeIndex:
+    index = CodeIndex(root_path=self.root_path)
+
+    # Load cache for incremental mode
+    if incremental:
+        self.cache.load()
+
+    for file_path in self._find_python_files():
+        # Check cache if incremental
+        if incremental and self.cache.is_cached(file_path):
+            continue  # Skip unchanged files
+
+        file_entity = self._scan_file(file_path)
+        index.add_file(file_entity)
+
+        # Update cache after scanning
+        if incremental:
+            self.cache.update(file_path)
+
+    # Save cache after scan
+    if incremental:
+        self.cache.save()
+
+    return index
+```
+
+### Acceptance Criteria
+- [ ] Incremental mode implemented using existing cache
+- [ ] Unchanged files skipped in incremental scans
+- [ ] Cache saved after each scan
+- [ ] Performance test: 1000 files, 10 changed = 10x faster (1s vs 10s)
+- [ ] No functional change in scan results
+
+---
+---
+id: "PERF-020@perf-review-2025"
+title: "No Query Result Caching for Repeated Searches"
+description: "Search results not cached despite high repetition probability"
+created: 2025-01-01
+section: "knowledge_graph"
+tags: [performance, caching, search, database]
+type: refactor
+priority: low
+status: proposed
+references:
+  - src/dot_work/knowledge_graph/search_fts.py
+  - src/dot_work/knowledge_graph/search_semantic.py
+---
+
+### Problem
+Search operations in knowledge graph have no caching:
+
+**In `search_fts.py:48-131`:**
+```python
+def search(db: Database, query: str, k: int = 20, ...) -> list[SearchResult]:
+    # Performs FTS search every time
+    results = db.fts_search(safe_query, limit=fetch_limit)
+
+    # For each result, fetches document text again
+    for node, score in results:
+        text = _get_node_text(db, node)  # Additional database query per result
+```
+
+**In `search_semantic.py:77-244`:**
+- Embedding lookup every search (no cache)
+- Vector similarity computed every time
+- Node lookups for each result
+
+**Performance issue:**
+- Same query repeated = redundant work
+- Document text fetched per result (N+1)
+- No memoization of embeddings
+- Common queries (e.g., "test", "config") repeated constantly
+
+**Impact:**
+- Repeated searches have same latency
+- No benefit from search repetition
+- Database queries repeated unnecessarily
+- User experience suffers from repeated searches
+
+### Affected Files
+- `src/dot_work/knowledge_graph/search_fts.py`
+- `src/dot_work/knowledge_graph/search_semantic.py`
+
+### Importance
+**LOW**: Nice-to-have optimization:
+- Most searches are unique
+- Cache invalidation complexity
+- Memory overhead for cache
+- Benefit depends on usage patterns
+
+**Recommendation:** Only implement if usage patterns show high repetition (same query repeated >5 times per session).
+
+### Proposed Solution
+**Option A: LRU cache for search results**
+```python
+from functools import lru_cache
+
+@lru_cache(maxsize=100)
+def search(db: Database, query: str, k: int = 20, ...):
+    # Cache based on query string
+    # Invalidate on document changes
+```
+
+**Option B: Application-level cache**
+- Cache in memory with TTL
+- Invalidate on database writes
+- Manual cache clearing
+
+**Option C: Database query cache**
+- Cache FTS results in database
+- Reuse across sessions
+- Persistent cache
+
+### Acceptance Criteria
+- [ ] Search results cached with LRU or TTL policy
+- [ ] Cache invalidation on document changes
+- [ ] Cache hit ratio >30% for typical workflows
+- [ ] Memory usage bounded (LRU size limit)
+- [ ] Performance test: cached searches <10ms (vs 100ms+)
+
+---

@@ -246,7 +246,7 @@ class BuildRunner:
 
         try:
             # Commands are build tools (pytest, ruff, mypy) - user controls execution
-            result = subprocess.run(  # noqa: S603, pylint: disable=subprocess-run-check
+            result = subprocess.run(
                 cmd,
                 capture_output=capture_output,
                 text=True,
@@ -254,6 +254,7 @@ class BuildRunner:
                 check=check,
                 encoding="utf-8",
                 errors="replace",
+                shell=False,
             )
             return True, result.stdout, result.stderr
         except subprocess.CalledProcessError as e:
