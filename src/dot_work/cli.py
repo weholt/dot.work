@@ -24,6 +24,7 @@ from dot_work.installer import (
 from dot_work.knowledge_graph.cli import app as kg_app
 from dot_work.overview.pipeline import analyze_project, write_outputs
 from dot_work.python import python_app
+from dot_work.skills.cli import app as skills_app
 from dot_work.utils.sanitization import sanitize_error_message
 from dot_work.version.cli import app as version_app
 from dot_work.zip.cli import app as zip_app
@@ -1205,6 +1206,9 @@ git_app.add_typer(history_app, name="history")
 
 # Register the provision subcommand under container
 container_app.add_typer(container_provision_app, name="provision")
+
+# Register the skills subcommand group
+app.add_typer(skills_app, name="skills")
 
 
 if __name__ == "__main__":
