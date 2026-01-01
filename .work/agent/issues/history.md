@@ -3274,3 +3274,55 @@ Pattern: Many issues from earlier reviews are now stale due to code evolution.
 
 ---
 
+---
+---
+id: "PERF-013@r3s4t5"
+title: "Add caching for search scope sets"
+description: "Implemented session-level caching with 60-second TTL for scope sets to reduce redundant database queries"
+completed: 2025-01-01
+section: "knowledge_graph"
+tags: [performance, caching, search, scope, knowledge-graph]
+type: refactor
+priority: medium
+status: completed
+references:
+  - src/dot_work/knowledge_graph/scope.py
+  - tests/unit/knowledge_graph/test_scope_caching.py
+  - src/dot_work/knowledge_graph/search_fts.py
+  - src/dot_work/knowledge_graph/search_semantic.py
+---
+
+### Outcome
+- Added session-level caching for scope sets with 60-second TTL in build_scope_sets()
+- Created _SCOPE_CACHE and _SCOPE_CACHE_TIMESTAMPS dictionaries for cache management
+- Added use_cache parameter (default: True) to bypass caching when needed
+- Added clear_scope_cache() and get_cache_stats() helper functions
+- Cache key includes: project, topics (sorted), exclude_topics (sorted), include_shared
+- Created 7 comprehensive unit tests for cache hit, miss, TTL expiry, clearing, and stats
+- All 1778 tests passing (1737 selected, 41 deselected)
+- Commit: 0f50a07
+
+---
+---
+id: "DOGFOOD-009@foa1hu"
+title: "Add non-goals section to main documentation"
+description: "Added comprehensive non-goals section to README.md clarifying what dot-work does NOT do"
+completed: 2025-01-01
+section: "dogfooding"
+tags: [documentation, clarity, dogfooding]
+type: docs
+priority: medium
+status: completed
+references:
+  - README.md
+  - docs/dogfood/baseline.md
+---
+
+### Outcome
+- Added "Non-Goals" section to README.md after "What This Does"
+- Documented that dot-work does NOT: replace project management tools, provide autonomous agents without human direction, host prompts/cloud services, manage dependencies/build systems, replace git workflow tools, provide CI/CD, replace code review platforms, offer team collaboration, perform automated testing
+- Clarified what dot-work IS: human-directed AI agent framework for issue management and autonomous agent implementation
+- Added "What to Use Instead" table with alternative tools for each non-goal
+- Commit: ce2a2e5
+
+---

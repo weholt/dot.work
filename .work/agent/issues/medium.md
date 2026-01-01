@@ -2,6 +2,4 @@
 
 Enhancements, technical debt, code quality improvements.
 
----
-id: "SEC-007@security-review-2026"
-title: "No secrets management strategy for API keys and tokens"
+(All completed issues moved to history.md)
