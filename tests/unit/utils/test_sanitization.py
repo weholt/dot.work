@@ -1,6 +1,5 @@
 """Tests for error message sanitization utilities."""
 
-import pytest
 
 from dot_work.utils.sanitization import (
     sanitize_error_message,
@@ -27,7 +26,7 @@ class TestSanitizeErrorMessage:
 
     def test_removes_file_paths_from_exception(self) -> None:
         """Test that file paths are redacted from error messages."""
-        error = IOError("Failed to open /home/user/.ssh/id_rsa")
+        error = OSError("Failed to open /home/user/.ssh/id_rsa")
         sanitized = sanitize_error_message(error)
         assert "/home/user/.ssh/id_rsa" not in sanitized
         assert "[path]" in sanitized

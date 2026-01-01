@@ -1,7 +1,6 @@
 """Tests for scope caching (PERF-013)."""
 
 import time
-import pytest
 from unittest.mock import MagicMock
 
 from dot_work.knowledge_graph.scope import (

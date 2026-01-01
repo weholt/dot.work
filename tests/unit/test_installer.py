@@ -1076,7 +1076,6 @@ class TestJinjaSecurity:
         self, sample_prompts_dir: Path
     ) -> None:
         """Test that template rendering works correctly in markdown context."""
-        from dot_work.environments import ENVIRONMENTS
 
         # Create a test template
         test_template = sample_prompts_dir / "test_template.md"

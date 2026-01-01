@@ -1,15 +1,14 @@
 """Tests for secrets management utilities."""
 
-import os
 import pytest
 
 from dot_work.utils.secrets import (
-    get_secret,
-    validate_secret_format,
-    get_safe_log_message,
-    require_secrets,
-    mask_secret,
     SecretValidationError,
+    get_safe_log_message,
+    get_secret,
+    mask_secret,
+    require_secrets,
+    validate_secret_format,
 )
 
 

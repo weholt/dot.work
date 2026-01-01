@@ -3,8 +3,6 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from dot_work.review.models import ReviewComment
 from dot_work.review.storage import (
     append_comment,

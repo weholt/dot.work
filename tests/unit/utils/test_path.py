@@ -1,15 +1,14 @@
 """Tests for path validation utilities."""
 
-import pytest
 from pathlib import Path
-import tempfile
-import os
+
+import pytest
 
 from dot_work.utils.path import (
-    safe_path_join,
-    validate_path_safe,
-    safe_write_path,
     PathTraversalError,
+    safe_path_join,
+    safe_write_path,
+    validate_path_safe,
 )
 
 
