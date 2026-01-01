@@ -195,7 +195,9 @@ def get_git_config_value(key: str, repo_path: Path | None = None) -> str | None:
         if repo_path:
             cmd.extend(["-C", str(repo_path)])
 
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, shell=False)
+        result = subprocess.run(  # noqa: S603 - shell=False prevents injection, cmd is literal list
+            cmd, capture_output=True, text=True, check=True, shell=False
+        )
         return result.stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None

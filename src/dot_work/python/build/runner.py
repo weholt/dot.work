@@ -246,7 +246,7 @@ class BuildRunner:
 
         try:
             # Commands are build tools (pytest, ruff, mypy) - user controls execution
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603 - shell=False prevents injection, cmd is controlled by BuildRunner
                 cmd,
                 capture_output=capture_output,
                 text=True,
