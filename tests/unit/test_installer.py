@@ -1201,4 +1201,3 @@ class TestJinjaSecurity:
         assert env.keep_trailing_newline is True  # Preserves markdown formatting
         assert env.trim_blocks is False  # Preserves markdown formatting
         assert env.lstrip_blocks is False  # Preserves markdown formatting
-

@@ -510,15 +510,32 @@ Add to `.gitignore`:
 
 ### Q: How do I validate my canonical file?
 
-**A:** The system validates automatically, but you can test:
+**A:** Use the canonical validate command to check your file before installing:
 
 ```bash
-# This will error if the file is invalid:
-dot-work prompts install my-prompt.canon.md --target copilot
+# Validate without installing (checks syntax and schema)
+dot-work canonical validate my-prompt.canon.md
 
-# Check for issues without installing:
-dot-work prompts validate my-prompt.canon.md
+# Strict validation mode (fails on warnings)
+dot-work canonical validate --strict my-prompt.canon.md
+
+# Test installation with dry-run
+dot-work canonical install my-prompt.canon.md --env copilot --dry-run
 ```
+
+**What gets validated:**
+- YAML frontmatter syntax
+- Required fields (meta.title, environments section)
+- Environment configuration (target paths, filename options)
+- File path validity and accessibility
+
+**Common validation errors:**
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `Missing required field: meta.title` | No title in frontmatter | Add `meta.title` to YAML |
+| `Invalid environment: unknown` | Unknown environment key | Use valid: copilot, claude, cursor, etc. |
+| `Target path not found: .custom/` | Invalid target directory | Use existing path or create directory |
+| `Filename conflict with existing file` | File already exists | Use `--force` to overwrite |
 
 ### Q: Can I reference other files in my prompt?
 

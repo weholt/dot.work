@@ -230,7 +230,6 @@ class TestTagGenerator:
 
         assert "feature" in tags
 
-
     def test_filter_tags_removes_duplicates(self):
         """Test that tag filtering removes duplicates."""
         generator = TagGenerator()
@@ -312,7 +311,6 @@ class TestTagGenerator:
         assert "feature" in tags
         assert "security" in tags
         assert "breaking" in tags
-
 
     def test_empty_analysis_returns_misc(self):
         """Test that an analysis with no clear tags returns 'misc'."""

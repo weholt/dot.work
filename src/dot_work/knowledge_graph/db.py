@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Current schema version
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 class DatabaseError(Exception):
@@ -418,6 +418,29 @@ class Database:
             )
             conn.commit()
             logger.info("Schema migration to version 4 completed (composite index on edges type)")
+
+        if from_version < 5:
+            # Add missing performance indexes (PERF-017)
+            conn.executescript("""
+                -- Index on nodes.kind for type filtering in scope operations
+                CREATE INDEX IF NOT EXISTS idx_nodes_kind ON nodes(kind);
+
+                -- Covering index on embeddings(full_id, model) for efficient lookups
+                -- This is a composite index that covers both columns together
+                -- Replaces the need for separate single-column indexes in most queries
+                CREATE INDEX IF NOT EXISTS idx_embeddings_full_id_model
+                    ON embeddings(full_id, model);
+            """)
+
+            # Record migration
+            conn.execute(
+                "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
+                (5, int(time.time())),
+            )
+            conn.commit()
+            logger.info(
+                "Schema migration to version 5 completed (performance indexes for nodes.kind and embeddings)"
+            )
 
         logger.info("Schema migrations completed, current version: %d", SCHEMA_VERSION)
 
@@ -1095,15 +1118,18 @@ class Database:
 
         return self._row_to_embedding(row)
 
-    def get_all_embeddings_for_model(self, model: str, limit: int = 10000) -> list[Embedding]:
+    def get_all_embeddings_for_model(self, model: str, limit: int = 1000) -> list[Embedding]:
         """Get all embeddings for a specific model with safety limit.
 
-        Warning: For large datasets (>10k embeddings), use
-        stream_embeddings_for_model() instead to avoid OOM crashes.
+        Memory usage: ~1.5-6 KB per embedding (384-1536 floats × 4 bytes).
+        Default limit of 1000 = ~1.5-6 MB memory.
+
+        For large datasets (>1000 embeddings), use stream_embeddings_for_model()
+        instead to avoid OOM crashes.
 
         Args:
             model: Embedding model name.
-            limit: Maximum number of embeddings to load (default: 10000).
+            limit: Maximum number of embeddings to load (default: 1000).
                    Set to 0 for unlimited (not recommended for production).
 
         Returns:
@@ -1114,6 +1140,14 @@ class Database:
         """
         if limit < 0:
             raise ValueError("limit must be non-negative")
+
+        # Warn for large loads that may cause memory issues
+        if limit > 1000:
+            estimated_mb = limit * 6 / 1024
+            logger.warning(
+                f"Loading {limit} embeddings - estimated {estimated_mb:.1f}+ MB memory. "
+                "Consider using stream_embeddings_for_model() for large datasets."
+            )
 
         conn = self._get_connection()
         if limit > 0:

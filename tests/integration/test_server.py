@@ -285,6 +285,7 @@ class TestRateLimiting:
         """Test that rate limiting is enforced."""
         # Clear rate limit store before test
         from dot_work.review.server import RATE_LIMIT_REQUESTS, _rate_limit_store
+
         _rate_limit_store.clear()
 
         app, _ = create_app(str(git_repo_with_changes))
@@ -309,6 +310,7 @@ class TestRateLimiting:
         """Test that rate limiting is per-client (by IP)."""
         # Clear rate limit store before test
         from dot_work.review.server import RATE_LIMIT_REQUESTS, _rate_limit_store
+
         _rate_limit_store.clear()
 
         app, _ = create_app(str(git_repo_with_changes))

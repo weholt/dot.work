@@ -79,6 +79,7 @@ class TestScopeCaching:
 
         # Manually expire the cache by setting old timestamp
         from dot_work.knowledge_graph.scope import _SCOPE_CACHE_TIMESTAMPS
+
         old_time = time.time() - 100  # 100 seconds ago (beyond 60s TTL)
         for key in list(_SCOPE_CACHE_TIMESTAMPS.keys()):
             _SCOPE_CACHE_TIMESTAMPS[key] = old_time

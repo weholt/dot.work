@@ -1227,3 +1227,173 @@ cp -f CLAUDE.md CONVENTIONS.md AGENTS.md backup/prompts/ 2>/dev/null || true
 ```
 
 **Note:** As of this version, there is no `dot-work uninstall` command. Manual file removal is required.
+
+---
+
+## Additional CLI Commands
+
+### `canonical` – Validate and Install Canonical Prompts
+
+Manage canonical prompt files (.canon.md) for distribution across multiple AI environments.
+
+```bash
+dot-work canonical [COMMAND] [OPTIONS]
+```
+
+**Subcommands:**
+- `validate` – Validate a canonical prompt file
+- `install` – Install a canonical prompt to an environment
+- `extract` – Extract environment-specific prompts from a canonical file
+
+#### `canonical validate`
+
+Validate a canonical prompt file for syntax and schema errors.
+
+```bash
+dot-work canonical validate [OPTIONS] PROMPT_FILE
+```
+
+| Option | Short | Type | Default | Description |
+|--------|-------|------|---------|-------------|
+| `--strict` | `-s` | flag | false | Use strict validation mode |
+
+**Example:**
+```bash
+dot-work canonical validate my-prompts/custom.canon.md
+dot-work canonical validate --strict my-prompts/custom.canon.md
+```
+
+#### `canonical install`
+
+Install a canonical prompt file to a specific AI environment.
+
+```bash
+dot-work canonical install [OPTIONS] PROMPT_FILE
+```
+
+| Option | Short | Type | Default | Description |
+|--------|-------|------|---------|-------------|
+| `--env` | `-e` | TEXT | (prompt) | Target environment |
+| `--output` | `-o` | PATH | (auto) | Output directory |
+| `--force` | `-f` | flag | false | Overwrite existing files |
+
+**Example:**
+```bash
+dot-work canonical install my-prompts/custom.canon.md --env claude
+dot-work canonical install my-prompts/custom.canon.md --env copilot --output .github/prompts/
+```
+
+#### `canonical extract`
+
+Extract environment-specific prompts from a canonical file.
+
+```bash
+dot-work canonical extract [OPTIONS] PROMPT_FILE
+```
+
+| Option | Short | Type | Default | Description |
+|--------|-------|------|---------|-------------|
+| `--env` | `-e` | TEXT | (required) | Environment to extract |
+| `--output` | `-o` | PATH | `.` | Output directory |
+
+**Example:**
+```bash
+dot-work canonical extract my-prompts/custom.canon.md --env claude --output ./prompts/
+```
+
+---
+
+### `zip` – Zip Folders Respecting .gitignore
+
+Create zip archives of folders while respecting .gitignore patterns.
+
+```bash
+dot-work zip [OPTIONS] SOURCE [OUTPUT]
+```
+
+**Features:**
+- Automatically excludes files matching .gitignore patterns
+- Preserves directory structure
+- Creates clean archives without temporary files
+
+**Example:**
+```bash
+# Create zip from current directory
+dot-work zip . my-project.zip
+
+# Create zip from specific folder
+dot-work zip src/ src.zip
+```
+
+---
+
+### `container` – Container-Based Operations
+
+Container operations for Docker and containerized development environments.
+
+```bash
+dot-work container [COMMAND] [OPTIONS]
+```
+
+**Use Cases:**
+- Container environment detection
+- Container-optimized prompt installation
+- Docker-aware file operations
+
+---
+
+### `python` – Python Development Utilities
+
+Python-specific development utilities and helpers.
+
+```bash
+dot-work python [COMMAND] [OPTIONS]
+```
+
+**Features:**
+- Python environment detection
+- Package management helpers
+- Virtual environment operations
+
+---
+
+### `git` – Git Analysis Tools
+
+Git repository analysis and reporting tools.
+
+```bash
+dot-work git [COMMAND] [OPTIONS]
+```
+
+**Features:**
+- Commit analysis
+- Change pattern detection
+- Repository statistics
+- File categorization
+
+---
+
+### `harness` – Claude Agent SDK Harness
+
+Autonomous agent harness for Claude Agent SDK development and testing.
+
+```bash
+dot-work harness [COMMAND] [OPTIONS]
+```
+
+**Use Cases:**
+- Agent development and testing
+- Multi-agent orchestration
+- Agent workflow simulation
+- SDK feature validation
+
+**Example:**
+```bash
+# Run agent harness
+dot-work harness run --agent my-agent
+
+# Test agent configuration
+dot-work harness test --config agents/my-agent/config.yaml
+```
+
+---

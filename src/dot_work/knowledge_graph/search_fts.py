@@ -310,15 +310,18 @@ def _generate_snippet(
     context_start = max(0, first_pos - 30)
     context_end = min(len(text), first_pos + max_length - 30)
 
-    snippet = text[context_start:context_end]
-
-    # Add ellipsis if truncated
+    # Use list for efficient building (PERF-016)
+    parts = []
     if context_start > 0:
-        snippet = "..." + snippet
+        parts.append("...")
+    parts.append(text[context_start:context_end])
     if context_end < len(text):
-        snippet = snippet + "..."
+        parts.append("...")
 
-    # Highlight terms
+    # Single join instead of multiple concatenations
+    snippet = "".join(parts)
+
+    # Highlight terms (already optimized with single-pass pattern)
     snippet = _highlight_terms(snippet, terms)
 
     return snippet
@@ -340,15 +343,20 @@ def _extract_search_terms(query: str) -> list[str]:
 
 
 def _highlight_terms(text: str, terms: list[str]) -> str:
-    """Add highlight markers around terms."""
-    result = text
+    """Add highlight markers around terms.
 
-    for term in terms:
-        # Case-insensitive replacement with markers
-        pattern = re.compile(re.escape(term), re.IGNORECASE)
-        result = pattern.sub(lambda m: f"<<{m.group(0)}>>", result)
+    Uses single-pass replacement with pre-compiled alternation pattern
+    for efficiency (PERF-016).
+    """
+    if not terms:
+        return text
 
-    return result
+    # Single pre-compiled alternation pattern for all terms
+    # This avoids N pattern compilations and N passes over text
+    pattern = re.compile("|".join(map(re.escape, terms)), re.IGNORECASE)
+
+    # Single-pass replacement with markers
+    return pattern.sub(lambda m: f"<<{m.group(0)}>>", text)
 
 
 def _truncate(text: str, max_length: int) -> str:

@@ -202,7 +202,9 @@ class TestLoadComments:
         assert comments[0].path == "file1.py"
 
     @patch("dot_work.review.storage.get_config")
-    def test_load_comments_returns_all_when_no_filter(self, mock_config: MagicMock, tmp_path: Path) -> None:
+    def test_load_comments_returns_all_when_no_filter(
+        self, mock_config: MagicMock, tmp_path: Path
+    ) -> None:
         """Test that load_comments returns all comments when no path filter.
 
         Args:
@@ -245,7 +247,9 @@ class TestLatestReviewId:
     """Tests for latest_review_id function."""
 
     @patch("dot_work.review.storage.get_config")
-    def test_latest_review_id_returns_none_when_empty(self, mock_config: MagicMock, tmp_path: Path) -> None:
+    def test_latest_review_id_returns_none_when_empty(
+        self, mock_config: MagicMock, tmp_path: Path
+    ) -> None:
         """Test that latest_review_id returns None when no reviews exist.
 
         Args:
@@ -260,7 +264,9 @@ class TestLatestReviewId:
         assert review_id is None
 
     @patch("dot_work.review.storage.get_config")
-    def test_latest_review_id_returns_most_recent(self, mock_config: MagicMock, tmp_path: Path) -> None:
+    def test_latest_review_id_returns_most_recent(
+        self, mock_config: MagicMock, tmp_path: Path
+    ) -> None:
         """Test that latest_review_id returns the most recent review.
 
         Args:

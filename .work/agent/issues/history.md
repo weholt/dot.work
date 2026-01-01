@@ -3421,3 +3421,173 @@ references:
 - Commit: 91e446e
 
 ---
+---
+id: "PERF-016@perf-review-2025"
+title: "Inefficient O(N²) String Concatenation in Search Snippets"
+description: "Optimized snippet generation to use list join and single-pass regex"
+completed: 2025-01-01
+section: "knowledge_graph"
+tags: [performance, algorithm, string-operations, search]
+type: refactor
+priority: medium
+status: completed
+references:
+  - src/dot_work/knowledge_graph/search_fts.py
+---
+
+### Outcome
+- Optimized `_generate_snippet()` to use list join pattern instead of string concatenation
+- Optimized `_highlight_terms()` to use single pre-compiled alternation pattern
+- Changed from N regex compilations + N passes to 1 compilation + 1 pass
+- Reduced string allocations from O(n × m) to O(n) where n = text length, m = number of terms
+- All 99 knowledge_graph tests pass
+- Commit: (to be added)
+
+---
+---
+---
+id: "PERF-017@perf-review-2025"
+title: "Missing Database Index on Common Query Patterns"
+description: "Added missing database indexes for better query performance"
+completed: 2025-01-01
+section: "knowledge_graph"
+tags: [performance, database, indexing, sqlite]
+type: refactor
+priority: medium
+status: completed
+references:
+  - src/dot_work/knowledge_graph/db.py
+---
+
+### Outcome
+- Added schema migration 5 with performance indexes
+- Created idx_nodes_kind for type filtering in scope operations
+- Created idx_embeddings_full_id_model as covering index for efficient lookups
+- Updated SCHEMA_VERSION from 4 to 5
+- Migration applies indexes on startup if not present
+- All 386 knowledge_graph tests pass
+- Commit: (to be added)
+
+---
+---
+---
+id: "DOGFOOD-012@foa1hu"
+title: "Document all undocumented CLI commands"
+description: "Added comprehensive documentation for all CLI commands"
+completed: 2025-01-01
+section: "dogfooding"
+tags: [documentation, cli, dogfooding]
+type: docs
+priority: medium
+status: completed
+references:
+  - docs/dogfood/tooling-reference.md
+---
+
+### Outcome
+- Added documentation for canonical command (validate/install/extract subcommands)
+- Added documentation for zip, container, python, git, and harness commands
+- Updated docs/dogfood/tooling-reference.md with usage examples and option descriptions
+- All 6 previously undocumented commands now have complete documentation
+- Commit: (to be added)
+
+---
+---
+---
+id: "DOGFOOD-013@foa1hu"
+title: "Add canonical prompt validation documentation"
+description: "Added comprehensive validation documentation for canonical prompts"
+completed: 2025-01-01
+section: "dogfooding"
+tags: [documentation, prompts, validation, dogfooding]
+type: docs
+priority: medium
+status: completed
+references:
+  - docs/prompt-authoring.md
+---
+
+### Outcome
+- Updated prompt-authoring.md with validation documentation
+- Documented `dot-work canonical validate` command with options
+- Added validation rules: YAML syntax, required fields, environment config, file paths
+- Added dry-run mode documentation
+- Added common error table with causes and fixes
+- Commit: (to be added)
+
+---
+---
+---
+id: "PERF-018@perf-review-2025"
+title: "Unbounded Memory Usage in get_all_embeddings_for_model"
+description: "Fixed unbounded memory usage by reducing default limit and adding warnings"
+completed: 2025-01-01
+section: "knowledge_graph"
+tags: [performance, memory, database, safety]
+type: refactor
+priority: medium
+status: completed
+references:
+  - src/dot_work/knowledge_graph/db.py
+---
+
+### Outcome
+- Changed default limit from 10000 to 1000 embeddings
+- Added memory usage documentation: ~1.5-6 KB per embedding
+- Added warning for loads >1000 embeddings with estimated memory usage
+- Updated docstring to recommend streaming for large datasets
+- All embedding tests pass
+- Commit: (to be added)
+
+---
+---
+---
+id: "PERF-019@perf-review-2025"
+title: "Inefficient File Scanning Without Incremental Cache"
+description: "Implemented incremental scanning using existing cache infrastructure"
+completed: 2025-01-01
+section: "python_scan"
+tags: [performance, caching, incremental, file-io]
+type: refactor
+priority: medium
+status: completed
+references:
+  - src/dot_work/python/scan/scanner.py
+---
+
+### Outcome
+- Implemented incremental scanning in ASTScanner.scan() method
+- Added cache parameter to __init__ with ScanConfig support
+- Modified scan() to load cache and skip unchanged files via cache.is_cached()
+- Added cache.update() after scanning each file
+- Added cache.save() at end of incremental scan
+- Added debug logging for scanned/skipped file counts
+- All 44 scan tests pass
+- Commit: (to be added)
+
+---
+---
+---
+id: "TEST-040@7a277f"
+title: "db-issues integration tests need CLI interface updates"
+description: "Integration tests --json flag issue investigation and resolution"
+completed: 2025-01-01
+section: "db_issues"
+tags: [tests, integration, cli-compatibility]
+type: test
+priority: medium
+status: completed
+references:
+  - tests/integration/db_issues/test_agent_workflows.py
+  - src/dot_work/db_issues/cli.py
+---
+
+### Outcome
+- Investigation revealed --json flag already exists in CLI
+- Flag available in create, update, close, deps list, deps add commands
+- All agent workflow tests (5/5) pass with --json flag
+- Other skipped tests due to missing CLI features (labels add), not --json issue
+- Issue effectively resolved - existing implementation works correctly
+- Commit: (to be added)
+
+---

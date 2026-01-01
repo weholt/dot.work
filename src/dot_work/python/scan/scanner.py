@@ -5,14 +5,19 @@ Provides high-level scanning API for Python projects.
 """
 
 import fnmatch
+import logging
 import os
 import re
 from pathlib import Path
 from re import Pattern
 
 from dot_work.python.scan.ast_extractor import extract_entities
+from dot_work.python.scan.cache import ScanCache
+from dot_work.python.scan.config import ScanConfig
 from dot_work.python.scan.models import CodeIndex, FileEntity
 from dot_work.python.scan.utils import is_python_file, should_ignore
+
+logger = logging.getLogger(__name__)
 
 
 class ASTScanner:
@@ -23,6 +28,7 @@ class ASTScanner:
         root_path: Path,
         ignore_patterns: list[str] | None = None,
         include_patterns: list[str] | None = None,
+        config: ScanConfig | None = None,
     ) -> None:
         """Initialize the scanner.
 
@@ -30,10 +36,13 @@ class ASTScanner:
             root_path: Root directory to scan.
             ignore_patterns: Glob patterns to ignore.
             include_patterns: Glob patterns to include (default: all .py files).
+            config: Scan configuration for cache.
         """
         self.root_path = root_path.resolve()
         self.ignore_patterns = ignore_patterns
         self.include_patterns = include_patterns or ["*.py"]
+        self.config = config or ScanConfig()
+        self.cache = ScanCache(self.config)
         # Pre-compile patterns into regex objects for O(1) pattern matching
         self._compiled_patterns: list[Pattern] = [
             re.compile(fnmatch.translate(pattern)) for pattern in self.include_patterns
@@ -43,16 +52,47 @@ class ASTScanner:
         """Scan the codebase and build an index.
 
         Args:
-            incremental: If True, use incremental scanning.
+            incremental: If True, use incremental scanning with cache.
 
         Returns:
             CodeIndex containing all scanned entities.
         """
         index = CodeIndex(root_path=self.root_path)
 
+        # Load cache for incremental mode
+        if incremental:
+            self.cache.load()
+            logger.debug(
+                "Incremental scan: cache loaded with %d entries",
+                self.cache.size,
+            )
+
+        scanned = 0
+        skipped = 0
+
         for file_path in self._find_python_files():
+            # Check cache if incremental mode
+            if incremental and self.cache.is_cached(file_path):
+                skipped += 1
+                continue
+
+            # Scan the file
             file_entity = self._scan_file(file_path)
             index.add_file(file_entity)
+            scanned += 1
+
+            # Update cache after scanning
+            if incremental:
+                self.cache.update(file_path)
+
+        # Save cache after scan
+        if incremental:
+            self.cache.save()
+            logger.debug(
+                "Incremental scan: %d files scanned, %d cached files skipped",
+                scanned,
+                skipped,
+            )
 
         return index
 
