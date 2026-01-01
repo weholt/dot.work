@@ -331,7 +331,9 @@ class TagGenerator:
 
         # Generate complexity-based tags
         complexity_tags = self._extract_complexity_tags(analysis.complexity_score)
-        logger.debug("Complexity tags extracted (score=%s): %s", analysis.complexity_score, complexity_tags)
+        logger.debug(
+            "Complexity tags extracted (score=%s): %s", analysis.complexity_score, complexity_tags
+        )
         tags.update(complexity_tags)
 
         # Generate special tags for breaking changes and security
@@ -557,7 +559,11 @@ class TagGenerator:
             # Add remaining tags up to limit
             remaining = [tag for tag in filtered if tag not in prioritized]
             final_tags = prioritized + remaining[: 5 - len(prioritized)]
-            logger.debug("Non-priority tags (limit 5-%d): %s", len(prioritized), remaining[: 5 - len(prioritized)])
+            logger.debug(
+                "Non-priority tags (limit 5-%d): %s",
+                len(prioritized),
+                remaining[: 5 - len(prioritized)],
+            )
 
             return set(final_tags)
 

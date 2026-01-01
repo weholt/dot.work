@@ -79,7 +79,9 @@ def _verify_path_safe(root: Path | str, path: str) -> None:
         )
 
 
-def _check_rate_limit(client_id: str, max_requests: int = RATE_LIMIT_REQUESTS, window: int = RATE_LIMIT_WINDOW) -> bool:
+def _check_rate_limit(
+    client_id: str, max_requests: int = RATE_LIMIT_REQUESTS, window: int = RATE_LIMIT_WINDOW
+) -> bool:
     """Check if client has exceeded rate limit.
 
     Args:
@@ -95,8 +97,7 @@ def _check_rate_limit(client_id: str, max_requests: int = RATE_LIMIT_REQUESTS, w
     # Clean old entries for this client
     if client_id in _rate_limit_store:
         _rate_limit_store[client_id] = [
-            ts for ts in _rate_limit_store[client_id]
-            if now - ts < window
+            ts for ts in _rate_limit_store[client_id] if now - ts < window
         ]
     else:
         _rate_limit_store[client_id] = []
