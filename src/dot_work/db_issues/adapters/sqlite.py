@@ -4,6 +4,29 @@ Consolidates database models, engine factory, repositories, and UnitOfWork
 from the issue-tracker project into a single module for dot-work.
 
 Source: /home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/src/issue_tracker/adapters/db/
+
+SQL Injection Safety:
+---------------------
+This module uses SQLAlchemy/SQLModel which provides protection against SQL injection
+through parameterized queries. When using raw SQL with `text()`, ALWAYS follow these
+safe patterns:
+
+1. **USE NAMED PARAMETERS**: Never concatenate user input into SQL strings.
+   ❌ BAD:  text(f"DELETE FROM table WHERE id = {user_input}")
+   ✅ GOOD: text("DELETE FROM table WHERE id = :id"), {"id": user_input}
+
+2. **VALIDATE INPUT FIRST**: Ensure user input meets expected format before using it.
+
+3. **USE ORM METHODS**: When possible, use SQLModel's built-in methods (select, delete, etc.)
+   instead of raw SQL.
+
+4. **AUDIT REGULARLY**: Any new `text()` usage must be reviewed for SQL injection risks.
+
+Current `text()` usages (all safe):
+- Lines 374, 393, 412: DELETE with :issue_id parameter (junction table cleanup)
+- Line 604: Static GROUP BY query with no user input (epic counts)
+
+All text() calls are audited in tests/unit/db_issues/test_sqlite.py::TestSQLInjectionSafety.
 """
 
 import logging

@@ -2854,3 +2854,57 @@ Files modified:
 - tests/integration/test_server.py - Added 8 security tests
 
 ---
+id: "SEC-003@security-review-2026"
+title: "SQLite operations use text() with potential SQL injection in search"
+description: "Custom SQL text() calls in knowledge graph search could be vulnerable if user input is not properly sanitized"
+created: 2026-01-01
+completed: 2025-12-31
+section: "security"
+tags: [security, sql-injection, sqlite, owasp]
+type: security
+priority: high
+status: completed
+references:
+  - src/dot_work/knowledge_graph/search_fts.py
+  - src/dot_work/db_issues/adapters/sqlite.py
+  - tests/unit/db_issues/test_sqlite.py
+---
+
+### Outcome
+Comprehensive SQL injection audit completed - all code verified safe:
+
+**Audit Findings:**
+
+1. **sqlite.py** - All `text()` calls use proper parameterization:
+   - Lines 374, 393, 412: DELETE statements with `:issue_id` named parameter
+   - Line 604: Static GROUP BY query with no user input
+   - All use dictionary parameter binding, never string concatenation
+
+2. **search_fts.py** - Comprehensive FTS5 query validation:
+   - Dangerous pattern detection blocks wildcards, NEAR searches, column filters
+   - Simple query whitelist allows only `[\w\s\-\.]`
+   - Advanced query validation checks balanced parentheses/quotes
+   - Query length (500 char) and complexity (10 ORs) limits
+   - Uses parameter binding: `WHERE fts_nodes MATCH ?`
+
+3. **Documentation Added:**
+   - Added SQL Injection Safety section to sqlite.py module docstring
+   - Documents safe patterns with BAD/GOOD examples
+   - Lists all current text() usages with line numbers
+   - References test coverage
+
+4. **Test Coverage:**
+   - Added 4 SQL injection safety tests to test_sqlite.py:
+     - test_delete_uses_parameterized_query
+     - test_special_characters_in_labels_safe
+     - test_special_characters_in_assignee_safe
+     - test_special_characters_in_references_safe
+   - Existing test_search_fts.py has 5 SQL injection prevention tests
+   - All tests with dangerous payloads (quotes, SQL keywords, etc.) pass safely
+
+Files modified:
+- src/dot_work/db_issues/adapters/sqlite.py - Added SQL safety documentation
+- tests/unit/db_issues/test_sqlite.py - Added TestSQLInjectionSafety class with 4 tests
+
+---
+

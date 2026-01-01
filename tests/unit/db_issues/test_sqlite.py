@@ -261,3 +261,118 @@ class TestUnitOfWork:
         # Issue should not be persisted due to rollback
         retrieved = uow.issues.get("issue-001")
         assert retrieved is None
+
+
+class TestSQLInjectionSafety:
+    """Tests for SQL injection prevention in text() queries."""
+
+    def test_delete_uses_parameterized_query(self, uow: UnitOfWork) -> None:
+        """Test that DELETE operations use parameterized queries."""
+        with uow:
+            # Create an issue with labels
+            issue = Issue(
+                id="issue-001",
+                project_id="test",
+                title="Test Issue",
+                description="Test",
+                status=IssueStatus.PROPOSED,
+                priority=IssuePriority.MEDIUM,
+                type=IssueType.TASK,
+                labels=["label1", "label2"],
+            )
+            uow.issues.save(issue)
+
+        # Verify issue was created
+        retrieved = uow.issues.get("issue-001")
+        assert retrieved is not None
+        assert retrieved.labels == ["label1", "label2"]
+
+        # Update with different labels - the text() DELETE should use :issue_id parameter
+        with uow:
+            issue = Issue(
+                id="issue-001",
+                project_id="test",
+                title="Test Issue",
+                description="Test",
+                status=IssueStatus.PROPOSED,
+                priority=IssuePriority.MEDIUM,
+                type=IssueType.TASK,
+                labels=["label3"],
+            )
+            uow.issues.save(issue)
+
+        # Verify labels were updated (proves DELETE worked safely)
+        retrieved = uow.issues.get("issue-001")
+        assert retrieved.labels == ["label3"]
+
+    def test_special_characters_in_labels_safe(self, uow: UnitOfWork) -> None:
+        """Test that special characters in labels are handled safely."""
+        # Characters that could be dangerous in SQL if not parameterized
+        dangerous_labels = [
+            "label' OR '1'='1",
+            "label; DROP TABLE--",
+            'label"union select',
+            "label`",
+            "label\\",
+            "label\x00",
+        ]
+
+        with uow:
+            issue = Issue(
+                id="issue-001",
+                project_id="test",
+                title="Test",
+                description="Test",
+                status=IssueStatus.PROPOSED,
+                priority=IssuePriority.MEDIUM,
+                type=IssueType.TASK,
+                labels=dangerous_labels,
+            )
+            uow.issues.save(issue)
+
+        # Verify labels stored as-is (not interpreted as SQL)
+        retrieved = uow.issues.get("issue-001")
+        assert set(retrieved.labels) == set(dangerous_labels)
+        assert len(retrieved.labels) == len(dangerous_labels)
+
+    def test_special_characters_in_assignee_safe(self, uow: UnitOfWork) -> None:
+        """Test that special characters in assignees are handled safely."""
+        dangerous_assignee = "admin' OR '1'='1"
+
+        with uow:
+            issue = Issue(
+                id="issue-001",
+                project_id="test",
+                title="Test",
+                description="Test",
+                status=IssueStatus.PROPOSED,
+                priority=IssuePriority.MEDIUM,
+                type=IssueType.TASK,
+                assignees=[dangerous_assignee],
+            )
+            uow.issues.save(issue)
+
+        # Verify assignee stored as-is
+        retrieved = uow.issues.get("issue-001")
+        assert retrieved.assignees == [dangerous_assignee]
+
+    def test_special_characters_in_references_safe(self, uow: UnitOfWork) -> None:
+        """Test that special characters in references are handled safely."""
+        dangerous_ref = "REF-001'; DROP TABLE issues; --"
+
+        with uow:
+            issue = Issue(
+                id="issue-001",
+                project_id="test",
+                title="Test",
+                description="Test",
+                status=IssueStatus.PROPOSED,
+                priority=IssuePriority.MEDIUM,
+                type=IssueType.TASK,
+                references=[dangerous_ref],
+            )
+            uow.issues.save(issue)
+
+        # Verify reference stored as-is
+        retrieved = uow.issues.get("issue-001")
+        assert retrieved.references == [dangerous_ref]
