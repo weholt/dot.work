@@ -27,6 +27,29 @@ references:
 - Commit: b293813
 
 ---
+---
+id: "TEST-001@cov001"
+title: "Add targeted tests to reach 15% coverage threshold"
+description: "Added tests for review/server.py and review/storage.py to increase coverage"
+completed: 2025-01-01
+section: "testing"
+tags: [coverage, testing]
+type: test
+priority: medium
+status: completed
+references:
+  - tests/unit/review/test_server.py
+  - tests/unit/review/test_storage.py
+---
+
+### Outcome
+- Created tests/unit/review/test_server.py with 21 tests
+- Created tests/unit/review/test_storage.py with 15 tests
+- Coverage increased from ~6% to ~25% (exceeds 15% threshold)
+- All tests pass with proper mocking patterns
+- Commit: 5f11096
+
+---
 
 ---
 id: "MIGRATE-013@a7f3b2"
