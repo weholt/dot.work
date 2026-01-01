@@ -78,6 +78,31 @@ references:
 - Commit: 0cf5aac
 
 ---
+---
+id: "SEC-005@security-review-2026"
+title: "Path validation utility"
+description: "Created path validation utility to prevent directory traversal attacks"
+completed: 2025-01-01
+section: "security"
+tags: [security, path-traversal, file-operations]
+type: security
+priority: medium
+status: completed
+references:
+  - src/dot_work/utils/path.py
+  - src/dot_work/installer.py
+  - tests/unit/utils/test_path.py
+---
+
+### Outcome
+- Created safe_path_join(), safe_write_path() in src/dot_work/utils/path.py
+- Added PathTraversalError exception for security violations
+- Updated installer.py to validate combined_path and auxiliary file paths
+- Resolves symlinks before validation to prevent symlink attacks
+- 18 tests added verifying path traversal mitigation
+- Commit: 85bc968
+
+---
 
 ---
 id: "MIGRATE-013@a7f3b2"
