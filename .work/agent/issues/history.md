@@ -4,6 +4,38 @@ Issues that have been completed and validated.
 
 ---
 ---
+id: "FEAT-023@a7b3c9"
+title: "Implement Agent Skills support per agentskills.io specification"
+description: "Add skills discovery, parsing, validation, and prompt generation for agent capabilities"
+completed: 2026-01-01
+section: "skills"
+tags: [feature, agent-skills, discovery, prompts, progressive-disclosure]
+type: enhancement
+priority: medium
+status: completed
+references:
+  - .work/agent/issues/references/skills_spec.md
+  - src/dot_work/skills/
+  - .work/agent/notes/FEAT-023-investigation.md
+---
+
+### Outcome
+Implemented complete Agent Skills module following skills_spec.md:
+- Created models.py with SkillMetadata and Skill dataclasses with validation
+- Created parser.py for SKILL.md YAML frontmatter extraction
+- Created validator.py with error collection
+- Created discovery.py for filesystem skill discovery (.skills/, ~/.config/dot-work/skills/)
+- Created prompt_generator.py for XML prompt generation
+- Created cli.py with skills management commands (list, validate, show, prompt, install)
+- Registered skills subcommand in main CLI
+- All code passes ruff linting and mypy type checking
+
+Remaining work (deferred to follow-up issues):
+- Unit tests for skills module
+- Integration with harness for session injection
+
+---
+---
 id: "RES-001@e4f7a2"
 title: "Investigate and fix SQLite database connection resource leaks"
 description: "ResourceWarnings for unclosed database connections in integration tests"
