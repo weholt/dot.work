@@ -1,4 +1,54 @@
-"""Tag generation for git commits based on analysis."""
+"""Tag generation for git commits based on analysis.
+
+## Design Rationale
+
+TagGenerator provides rich, semantic tagging for git commits through multiple
+extraction strategies. The complexity is justified by the need for accurate,
+actionable commit categorization in automated workflows.
+
+### Key Features and Their Purpose
+
+1. **Emoji Support** (_extract_emoji_tags):
+   - Maps emojis to semantic tags (🚀→feature, 🐛→fix, 🔒→security, etc.)
+   - Supports modern git commit conventions that use emoji for visual scanning
+   - Enables dual tagging: text keywords + emoji for redundancy
+   - See test_generate_tags_from_emoji in test_tag_generator.py for validation
+
+2. **Redundancy Filtering** (_filter_tags):
+   - Maps related keywords to canonical tags (enhancement→feature, debug→fix)
+   - Prevents tag proliferation from similar terms (e.g., "documentation" vs "docs")
+   - Ensures consistent tag vocabulary across repositories
+   - See test_filter_tags_removes_duplicates for validation
+
+3. **Priority Limiting** (_filter_tags):
+   - Limits output to 5 most relevant tags when >5 candidates exist
+   - Prioritizes high-impact tags (breaking, security, critical) over generic ones
+   - Prevents information overload while preserving signal
+   - See test_limit_tags_to_five for multi-tag generation validation
+
+### Why This Complexity?
+
+Each feature addresses a real-world pain point in automated commit analysis:
+
+- **Emoji**: Modern teams use emoji for commit categorization. Without this,
+  valuable semantic information is lost.
+
+- **Redundancy filtering**: Without normalization, "fix", "bug", "hotfix",
+  "patch", "debug", "error" would all appear as separate tags, reducing
+  aggregation quality.
+
+- **Priority limiting**: A complex commit touching security, database, API,
+  and UI could generate 10+ tags. Limiting to 5 prioritizes what matters.
+
+### Future Simplification Considerations
+
+Before simplifying this module, consider:
+- Tests explicitly validate each feature (emoji, deduplication, limiting)
+- Each feature serves a distinct purpose with proven value
+- Tag quality directly impacts downstream automated workflows
+
+Reference: Issue CR-030@c6d8e0 documents this design decision.
+"""
 
 import logging
 
@@ -8,7 +58,12 @@ logger = logging.getLogger(__name__)
 
 
 class TagGenerator:
-    """Generates tags for git commits based on analysis."""
+    """Generates tags for git commits based on analysis.
+
+    The class uses multiple extraction strategies (message keywords, file
+    categories, impact areas, emoji, complexity) to produce rich semantic
+    tags. Tags are deduplicated and prioritized before returning.
+    """
 
     def __init__(self):
         # Common tag patterns and their associated keywords
@@ -447,7 +502,13 @@ class TagGenerator:
         return tags
 
     def _extract_emoji_tags(self, message: str) -> set[str]:
-        """Extract semantic tags from emoji in commit message."""
+        """Extract semantic tags from emoji in commit message.
+
+        Supports modern git commit conventions using emoji for visual categorization.
+        Each emoji maps to a semantic tag for programmatic consumption.
+
+        Test: test_generate_tags_from_emoji validates this mapping.
+        """
         emoji_to_tag = {
             "🚀": "feature",  # Rocket - new feature
             "✨": "enhancement",  # Sparkles - improvement
@@ -496,7 +557,19 @@ class TagGenerator:
         return tags
 
     def _filter_tags(self, tags: set[str]) -> set[str]:
-        """Filter and prioritize tags."""
+        """Filter and prioritize tags.
+
+        Performs two key operations:
+        1. Redundancy filtering: Maps related terms to canonical tags
+           (enhancement→feature, debug→fix, documentation→docs) to prevent
+           tag proliferation and ensure consistent vocabulary.
+        2. Priority limiting: When >5 tags exist, keeps only the 5 most
+           relevant based on priority order (breaking, security, critical,
+           feature, fix, refactor, performance, ui, api, database, docs).
+
+        Tests: test_filter_tags_removes_duplicates validates deduplication.
+               test_limit_tags_to_five validates multi-tag generation.
+        """
         filtered = set()
 
         # Remove duplicate or redundant tags
