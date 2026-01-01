@@ -5,27 +5,6 @@ Enhancements, technical debt, code quality improvements.
 ---
 ---
 ---
----
-id: "SEC-005@security-review-2026"
-title: "File operations lack path validation throughout codebase"
-description: "Multiple file read/write operations don't validate paths are within expected directories"
-created: 2026-01-01
-section: "security"
-tags: [security, path-traversal, file-operations, owasp]
-type: security
-priority: medium
-status: proposed
-references:
-  - src/dot_work/installer.py
-  - src/dot_work/review/git.py
-  - src/dot_work/zip/uploader.py
-  - .work/agent/issues/references/medium-issue-clarifications-2025-01-01.md
----
-
-### Problem
-The codebase has numerous file operations without path traversal validation:
-
----
 id: "SEC-006@security-review-2026"
 title: "Jinja2 autoescape disabled for markdown templates"
 description: "Jinja2 environment created with autoescape=False, trusting all template content"

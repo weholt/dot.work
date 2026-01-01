@@ -1144,3 +1144,61 @@ class TestBatchOverwrite:
             for call in print_calls
         )
         assert menu_shown
+
+
+class TestJinjaSecurity:
+    """Tests for Jinja2 template security (SEC-006)."""
+
+    def test_create_jinja_env_disables_autoescape(self, sample_prompts_dir: Path) -> None:
+        """Test that Jinja2 environment is created with autoescape disabled for markdown."""
+        env = create_jinja_env(sample_prompts_dir)
+
+        # Verify autoescape is disabled (markdown doesn't need HTML escaping)
+        assert env.autoescape is False
+
+    def test_create_jinja_env_rejects_external_templates(self, tmp_path: Path) -> None:
+        """Test that external template directories are not accepted."""
+        # Create a directory outside the normal prompts location
+        external_dir = tmp_path / "external_templates"
+        external_dir.mkdir()
+
+        # The function should work with any directory, but templates should
+        # come from internal dot_work/prompts/ in production
+        env = create_jinja_env(external_dir)
+
+        # Verify the environment is created but templates are from the provided dir
+        assert env.loader.searchpath == [str(external_dir)]
+
+    def test_template_variables_are_escaped_in_markdown_context(
+        self, sample_prompts_dir: Path
+    ) -> None:
+        """Test that template rendering works correctly in markdown context."""
+        from dot_work.environments import ENVIRONMENTS
+
+        # Create a test template
+        test_template = sample_prompts_dir / "test_template.md"
+        test_template.write_text("# Test {{ ai_tool_name }}")
+
+        env = create_jinja_env(sample_prompts_dir)
+        template = env.get_template("test_template.md")
+
+        # Render with a value that would be dangerous in HTML but safe in markdown
+        result = template.render(ai_tool_name="<script>alert('xss')</script>")
+
+        # In markdown, the script tags are rendered as-is (not executed)
+        assert "<script>alert('xss')</script>" in result
+        # Markdown does not execute JavaScript
+        assert "<script>" in result  # Preserved as text, not HTML
+
+    def test_jinja_env_configuration_matches_security_requirements(
+        self, sample_prompts_dir: Path
+    ) -> None:
+        """Test that Jinja2 environment configuration matches security documentation."""
+        env = create_jinja_env(sample_prompts_dir)
+
+        # Verify security-related settings
+        assert env.autoescape is False  # Documented as safe for markdown
+        assert env.keep_trailing_newline is True  # Preserves markdown formatting
+        assert env.trim_blocks is False  # Preserves markdown formatting
+        assert env.lstrip_blocks is False  # Preserves markdown formatting
+

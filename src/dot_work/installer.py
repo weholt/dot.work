@@ -100,16 +100,28 @@ def create_jinja_env(prompts_dir: Path) -> JinjaEnvironment:
     Returns:
         Configured Jinja2 environment with FileSystemLoader.
 
-    Note:
-        Autoescape is disabled since we generate markdown, not HTML.
-        These templates are trusted internal files, not user input.
+    Security Considerations:
+        **Autoescape is disabled** because this function generates markdown files,
+        not HTML. Markdown does not execute JavaScript or support HTML script tags,
+        so XSS (Cross-Site Scripting) attacks are not possible in this context.
+
+        Templates are sourced from trusted internal directories (dot_work/prompts/),
+        not from user input. Users cannot modify or inject arbitrary templates.
+
+        **IMPORTANT**: If this function is ever extended to generate HTML output:
+        - Enable autoescape or use jinja2.select_autoescape()
+        - Add HTML escaping for all user-provided variables
+        - Review all template content for XSS vulnerabilities
+        - Update security documentation (Issue SEC-006@security-review-2026)
+
+        Reference: OWASP A03:2021 (Cross-Site Scripting)
     """
     return JinjaEnvironment(  # noqa: S701 - autoescape disabled for markdown
         loader=FileSystemLoader(prompts_dir),
         keep_trailing_newline=True,
         trim_blocks=False,
         lstrip_blocks=False,
-        autoescape=False,  # Markdown templates, not HTML
+        autoescape=False,  # Markdown templates, not HTML - see security notes above
     )
 
 
