@@ -44,40 +44,34 @@ For full workflow details, see `.github/prompts/setup-issue-tracker.prompt.md` a
 ```bash
 uv run python scripts/build.py              # Full build/format/lint/test
 uv run python scripts/build.py --fix        # Auto-fix formatting
-uv run pytest tests/unit/test_name.py -v    # Single test
-uv run python -m pytest tests/unit -v       # Unit tests only
 uv run mypy src/ && uv run ruff check .     # Type check + lint
 ```
 
-## Pytest Memory Quota Enforcement
+## Running Tests (MANDATORY: Use Memory Protection)
 
-To prevent system freezes from excessive memory usage during test runs, use the provided memory quota enforcement scripts:
+**NEVER run pytest directly.** Always use the memory-protected wrapper to prevent system freezes:
 
-### Recommended: Cgroup v2 (systemd-run)
 ```bash
-./scripts/pytest-with-cgroup.sh 8                    # 8GB limit, all tests
-./scripts/pytest-with-cgroup.sh 4 tests/unit/        # 4GB limit, unit tests only
-./scripts/pytest-with-cgroup.sh 12 -k "test_foo"     # 12GB limit, filtered tests
+# REQUIRED: Run tests with 30GB memory limit (default)
+./scripts/pytest-with-cgroup.sh                      # All tests, 30GB limit
+./scripts/pytest-with-cgroup.sh 30 tests/unit/ -v    # Unit tests only
+./scripts/pytest-with-cgroup.sh 30 tests/unit/test_name.py -v  # Single test
+
+# WRONG - Never run pytest directly (no memory protection)
+# uv run pytest                    # DO NOT USE
+# uv run python -m pytest          # DO NOT USE
 ```
 
-### Alternative: ulimit (simpler, per-session)
-```bash
-./scripts/pytest-with-ulimit.sh 8                    # 8GB limit, all tests
-./scripts/pytest-with-ulimit.sh 4 tests/unit/        # 4GB limit, unit tests only
-```
+**How it works:**
+- Uses systemd cgroup v2 to enforce hard 30GB memory limit
+- No sudo/password required (runs in user mode)
+- If tests exceed limit, process is killed (exit code 137)
+- OOM events logged to `pytest-oom-killed.log` in project root
 
-### Monitor and Kill Exceeding Processes
-```bash
-./scripts/monitor-memory.sh 8192 pytest              # Warn at 8GB
-./scripts/monitor-memory.sh 4096 pytest --kill        # Kill tests exceeding 4GB
-watch -n 5 './scripts/monitor-memory.sh 8192 pytest'  # Continuous monitoring
-```
-
-**When to use memory limits:**
-- CI environments with constrained resources
-- Local development with limited RAM
-- Running tests that may have memory leaks
-- Preventing system freezes from runaway test processes
+**If tests are OOM-killed:**
+1. Check `pytest-oom-killed.log` for details
+2. Check `test_logs/test_execution_log.txt` for the last running test
+3. Run tests in smaller batches to identify the memory-hungry test
 
 ## Code Standards
 - Type hints on ALL functions, Google docstrings for public APIs

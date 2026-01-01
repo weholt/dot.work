@@ -1,9 +1,9 @@
 ---
 active: true
-iteration: 13
+iteration: 1
 max_iterations: 0
 completion_promise: "AGENT DONE."
-started_at: "2025-12-31T13:21:00Z"
+started_at: "2026-01-01T05:56:20Z"
 ---
 
-Use the ./agent-loop.md for instructions --max-retries 64
+Use the ./agent-loop.md for instructions and focus on solving issues in the medium*.md issue files --max-retries 64

@@ -7,6 +7,7 @@ Source: /home/thomas/Workspace/glorious/src/glorious_agents/skills/issues/src/is
 
 import csv
 import json
+import logging
 import os
 import subprocess
 import tempfile
@@ -54,6 +55,9 @@ from dot_work.db_issues.services import (
     TemplateService,
 )
 from dot_work.db_issues.templates import TemplateManager
+from dot_work.utils.sanitization import sanitize_error_message
+
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(
     name="db-issues",
@@ -1489,7 +1493,8 @@ def edit(
             console.print("[yellow]Issue was not updated.[/yellow]")
             raise typer.Exit(1) from None
         except Exception as e:
-            console.print(f"[red]Error editing issue: {e}[/red]")
+            logger.error(f"Edit error: {e}", exc_info=True)
+            console.print(f"[red]Error editing issue: {sanitize_error_message(e)}[/red]")
             raise typer.Exit(1) from None
         finally:
             # Clean up temp file - errors are expected and ignorable

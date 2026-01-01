@@ -12,6 +12,7 @@ priority: medium
 status: proposed
 references:
   - src/dot_work/git/services/git_service.py
+  - .work/agent/issues/references/medium-issue-clarifications-2025-01-01.md
 ---
 
 ### Problem
@@ -46,6 +47,8 @@ def _get_commit_tags(self, commit: gitpython.Commit) -> list[str]:
 - Redundant work for same commits across analyses
 - Analysis time scales quadratically with commit count
 - 100 commits × full traversal each = massive waste
+
+**Decision (2025-01-01):** Clear cache per comparison (as proposed). Comparison is self-contained operation. Between comparisons, repo state may have changed (new branches/tags). Cache invalidation is simpler with per-comparison approach.
 
 ### Affected Files
 - `src/dot_work/git/services/git_service.py` (lines 615-639)
@@ -95,11 +98,22 @@ def _get_commit_tags(self, commit: gitpython.Commit) -> list[str]:
 - [ ] Commit-to-branch mapping built once per comparison
 - [ ] Commit-to-tags mapping built once per comparison
 - [ ] O(1) lookups in `_get_commit_branch()` and `_get_commit_tags()`
-- [ ] Performance test: 1000 commits < 5 seconds vs current 30+ seconds
 - [ ] Caches cleared between comparisons
+- [ ] Performance test: 1000 commits < 5 seconds vs current 30+ seconds
+
+### Validation Plan
+1. Run comparison on repo with 1000 commits
+2. Measure time before and after optimization
+3. Verify correct branch/tag assignment
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision documented: clear cache per comparison.
 
 ### Notes
-This optimization should provide 10-100x speedup for multi-commit analyses. Memory overhead is minimal (dict with commit hash keys).
+This optimization should provide 10-100x speedup for multi-commit analyses. Memory overhead is minimal (dict with commit hash keys). See `.work/agent/issues/references/medium-issue-clarifications-2025-01-01.md` for full analysis.
 
 ---
 id: "PERF-013@r3s4t5"
@@ -114,6 +128,7 @@ status: proposed
 references:
   - src/dot_work/knowledge_graph/search_fts.py
   - src/dot_work/knowledge_graph/search_semantic.py
+  - .work/agent/issues/references/medium-issue-clarifications-2025-01-01.md
 ---
 
 ### Problem
@@ -147,6 +162,8 @@ def _build_scope_sets(db, scope):
 - Noticeable latency on search-heavy workflows
 - Wasted database round-trips
 
+**Decision (2025-01-01):** Session-level cache with TTL (60 seconds). Scope rarely changes within session. TTL handles edge case of topic/collection modifications. 60 seconds balances freshness vs performance.
+
 ### Affected Files
 - `src/dot_work/knowledge_graph/search_fts.py` (lines 100-109)
 - `src/dot_work/knowledge_graph/search_semantic.py` (lines 128-137)
@@ -159,48 +176,52 @@ def _build_scope_sets(db, scope):
 - Easy optimization with caching
 
 ### Proposed Solution
-Cache scope sets with TTL or session-level caching:
+Cache scope sets with 60-second TTL:
 
 ```python
 from functools import lru_cache
-import hashlib
 import time
 
-@lru_cache(maxsize=32)
-def _build_scope_sets_cached(db_id: int, scope_hash: str, time_bucket: int):
-    """Cached version of _build_scope_sets."""
-    # This still needs to build real sets - just cached by parameters
-    # Need to pass actual db reference somehow
-    pass
+# Session-level cache with TTL
+_scope_cache = {}
+_scope_cache_timestamps = {}
 
-# Better: Scope object-level caching
-class SearchSession:
-    def __init__(self, db):
-        self.db = db
-        self._scope_cache = {}
+def get_cached_scope_sets(db, scope):
+    scope_key = (scope.project, tuple(scope.topics), tuple(scope.exclude_topics))
+    now = time.time()
 
-    def search(self, query, scope):
-        if scope is None:
-            return self._search_unscoped(query)
+    # Check cache with TTL
+    if scope_key in _scope_cache:
+        if now - _scope_cache_timestamps[scope_key] < 60:  # 60 second TTL
+            return _scope_cache[scope_key]
 
-        scope_key = (scope.project, tuple(scope.topics), tuple(scope.exclude_topics))
-        if scope_key not in self._scope_cache:
-            self._scope_cache[scope_key] = _build_scope_sets(self.db, scope)
-
-        # Use cached sets
-        scope_members, scope_topics, exclude_topic_ids, shared_topic_id = self._scope_cache[scope_key]
-
-        # ... rest of search
+    # Build and cache
+    sets = _build_scope_sets(db, scope)
+    _scope_cache[scope_key] = sets
+    _scope_cache_timestamps[scope_key] = now
+    return sets
 ```
 
 ### Acceptance Criteria
-- [ ] Scope sets cached across searches
-- [ ] Cache invalidation when data changes
+- [ ] Scope sets cached with 60-second TTL
+- [ ] Cache key based on scope parameters (project, topics, exclude_topics)
 - [ ] Performance test: 100 searches with same scope < 2 seconds vs current 5+ seconds
-- [ ] TTL or manual invalidation implemented
+- [ ] TTL-based cache invalidation implemented
+- [ ] Documentation of cache behavior
+
+### Validation Plan
+1. Run 100 searches with identical scope
+2. Verify performance improvement
+3. Verify cache respects TTL (invalidates after 60 seconds)
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision documented: 60-second TTL cache.
 
 ### Notes
-Search scope rarely changes within a session. Caching should provide 3-5x speedup for repeated searches with identical scope parameters.
+Search scope rarely changes within a session. Caching should provide 3-5x speedup for repeated searches with identical scope parameters. See `.work/agent/issues/references/medium-issue-clarifications-2025-01-01.md` for full analysis.
 
 ---
 id: "PERF-014@s4t5u6"
@@ -214,6 +235,7 @@ priority: medium
 status: proposed
 references:
   - src/dot_work/git/services/git_service.py
+  - .work/agent/issues/references/medium-issue-clarifications-2025-01-01.md
 ---
 
 ### Problem
@@ -244,8 +266,19 @@ for commit in tqdm(commits, desc="Analyzing commits"):
 - Analysis time scales linearly with commit count
 - 8-core machine using only 12.5% of capacity
 
+**Decision (2025-01-01):** Auto-detect based on commit count (>50 commits = parallel). Small comparisons (<50) don't benefit from parallelization overhead. Large comparisons (>50) see significant speedup. Auto-detection provides good UX without requiring flags.
+
+### Affected Files
+- `src/dot_work/git/services/git_service.py` (lines 94-102)
+
+### Importance
+**MEDIUM**: Visible in large comparisons:
+- CPU underutilized on multi-core systems
+- Large comparisons take unnecessarily long
+- Easy optimization with large impact
+
 ### Proposed Solution
-Parallelize commit analysis with ProcessPoolExecutor:
+Parallelize commit analysis with auto-detection:
 
 ```python
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -254,37 +287,62 @@ import os
 def compare_refs(self, from_ref: str, to_ref: str) -> ComparisonResult:
     commits = self._get_commits_between_refs(from_ref, to_ref)
 
-    # Parallelize CPU-bound commit analysis
-    analyzed_commits = []
-    with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
-        futures = {
-            executor.submit(_analyze_commit_impl, commit.hexsha, self.config.repo_path)
-            for commit in commits
-        }
+    # Auto-detect: parallel only for >50 commits
+    if len(commits) > 50:
+        # Parallelize CPU-bound commit analysis
+        analyzed_commits = []
+        with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
+            futures = {
+                executor.submit(_analyze_commit_impl, commit.hexsha, self.config.repo_path)
+                for commit in commits
+            }
 
-        for future in tqdm(as_completed(futures), total=len(commits), desc="Analyzing"):
+            for future in tqdm(as_completed(futures), total=len(commits), desc="Analyzing"):
+                try:
+                    analysis = future.result()
+                    analyzed_commits.append(analysis)
+                except Exception as e:
+                    self.logger.error(f"Failed to analyze commit: {e}")
+
+        # Sort by original commit order
+        commit_order = {c.hexsha: i for i, c in enumerate(commits)}
+        analyzed_commits.sort(key=lambda a: commit_order.get(a.commit_hash, float('inf')))
+    else:
+        # Sequential for small comparisons
+        analyzed_commits = []
+        for commit in tqdm(commits, desc="Analyzing commits"):
             try:
-                analysis = future.result()
+                analysis = self.analyze_commit(commit)
                 analyzed_commits.append(analysis)
             except Exception as e:
-                self.logger.error(f"Failed to analyze commit: {e}")
-
-    # Sort by original commit order
-    commit_order = {c.hexsha: i for i, c in enumerate(commits)}
-    analyzed_commits.sort(key=lambda a: commit_order.get(a.commit_hash, float('inf')))
+                self.logger.error(f"Failed to analyze commit {commit.hexsha}: {e}")
+                continue
 
     # ... rest of comparison
 ```
 
 ### Acceptance Criteria
-- [ ] Commit analysis parallelized with ProcessPoolExecutor
-- [ ] CPU utilization increased to 80%+ on multi-core
+- [ ] Commit analysis parallelized for >50 commits
+- [ ] Sequential processing for ≤50 commits
+- [ ] CPU utilization increased to 80%+ on multi-core for large comparisons
 - [ ] Performance test: 100 commits on 8-core < 30 seconds vs current 200+ seconds
 - [ ] Error handling preserves all successful analyses
 - [ ] Results sorted by original commit order
 
+### Validation Plan
+1. Test with 25 commits - verify sequential processing used
+2. Test with 100 commits - verify parallel processing used
+3. Measure CPU utilization on multi-core system
+4. Verify results maintain commit order
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision documented: auto-detect based on commit count (>50 = parallel).
+
 ### Notes
-This optimization should provide 4-8x speedup on multi-core machines (linear speedup with core count for CPU-bound analysis). Memory usage increases with worker count but is manageable.
+This optimization should provide 4-8x speedup on multi-core machines (linear speedup with core count for CPU-bound analysis). Memory usage increases with worker count but is manageable. See `.work/agent/issues/references/medium-issue-clarifications-2025-01-01.md` for full analysis.
 
 ------
 id: "DOGFOOD-009@foa1hu"
@@ -588,6 +646,7 @@ references:
   - tests/integration/db_issues/test_dependency_model.py
   - tests/integration/db_issues/test_advanced_filtering.py
   - src/dot_work/db_issues/cli.py
+  - .work/agent/issues/references/medium-issue-clarifications-2025-01-01.md
 ---
 
 ### Problem
@@ -604,13 +663,15 @@ Integration tests in `tests/integration/db_issues/` were migrated from another p
 - `test_dependency_model.py` - Uses `--json` flag, expects direct array output
 - `test_advanced_filtering.py` - PARTIALLY FIXED: One test updated, others still need fixes
 
+**Decision (2025-01-01):** Option C - Both: update tests AND add --json flag for future use. Tests should pass with current CLI (Option A). --json flag is useful for automation/scripting (Option B). Doing both provides immediate fix + future capability.
+
 ### Affected Files
 - `tests/integration/db_issues/test_bulk_operations.py`
 - `tests/integration/db_issues/test_team_collaboration.py`
 - `tests/integration/db_issues/test_agent_workflows.py`
 - `tests/integration/db_issues/test_dependency_model.py`
 - `tests/integration/db_issues/test_advanced_filtering.py` (partially fixed)
-- `src/dot_work/db_issues/cli.py` (may need --json flag added)
+- `src/dot_work/db_issues/cli.py`
 
 ### Importance
 **MEDIUM**: Integration tests provide valuable coverage but are currently blocked:
@@ -619,25 +680,37 @@ Integration tests in `tests/integration/db_issues/` were migrated from another p
 - Core bugs already fixed (SQLite URL format, session.commit()), but tests can't verify them
 
 ### Proposed Solution
-**Option A: Update tests to match current CLI**
-1. Remove `--json` flag usage (doesn't exist)
+**Step 1: Update tests to match current CLI**
+1. Remove `--json` flag usage from existing tests
 2. Parse wrapped output: `data = json.loads(result.stdout); issues = data["issues"]`
 3. Use regex for issue ID parsing: `re.search(r"issue-[\w]+", result.stdout)`
-4. Update all affected test files
+4. Update all 4 affected test files
 
-**Option B: Add --json flag to CLI commands**
-1. Add `--json` option to create, edit, and other commands
-2. Return issue objects directly in JSON format
-3. Update tests to use new flag
-
-**Recommendation**: Option A (update tests) is faster and matches current CLI design.
+**Step 2: Add --json flag to CLI commands**
+1. Add `--json` option to create, list, edit commands
+2. Return issue objects directly in JSON format when flag is used
+3. Add new tests for --json flag functionality
+4. Document --json flag in help text
 
 ### Acceptance Criteria
-- [ ] All db_issues integration tests pass
-- [ ] Tests parse CLI output correctly
+- [ ] All 4 affected db_issues integration tests pass with current CLI
+- [ ] Tests parse wrapped JSON output correctly
 - [ ] Issue IDs extracted with regex instead of split()
-- [ ] JSON output wrapper handled correctly
-- [ ] No reliance on non-existent --json flag
+- [ ] `--json` flag added to create/list/edit commands
+- [ ] New tests verify --json flag functionality
+- [ ] Documentation updated for --json flag
+
+### Validation Plan
+1. Run `./scripts/pytest-with-cgroup.sh 30 tests/integration/db_issues/ -v`
+2. Verify all tests pass
+3. Test --json flag manually with CLI commands
+4. Verify JSON output is valid and useful
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision documented: Option C - both update tests AND add --json flag.
 
 ### Notes
 **Core bugs already fixed in commit a28f145:**
@@ -648,7 +721,7 @@ Integration tests in `tests/integration/db_issues/` were migrated from another p
 **Already fixed:**
 - `test_advanced_filtering.py::test_filter_by_date_range` - Updated with regex and correct JSON parsing
 
-**Remaining work:** Update 4 more test files with same pattern.
+**Remaining work:** Update 4 more test files with same pattern, then add --json flag. See `.work/agent/issues/references/medium-issue-clarifications-2025-01-01.md` for full analysis.
 
 ---
 id: "CR-085@e3f1g2"
@@ -705,6 +778,7 @@ priority: medium
 status: proposed
 references:
   - src/dot_work/db_issues/adapters/sqlite.py
+  - .work/agent/issues/references/medium-issue-clarifications-2025-01-01.md
 ---
 
 ### Problem
@@ -739,6 +813,8 @@ def _model_to_entity(self, model: IssueModel) -> Issue:
 - Noticeable latency on issue list operations
 - Database connection overhead multiplied
 
+**Decision (2025-01-01):** Option A - Use existing `_models_to_entities()` for single-entity loads. Correct pattern already exists in codebase (lines 764-844). Single-row loads can call batch method with single-item list. Minimal code change required. Proven pattern (already tested).
+
 ### Affected Files
 - `src/dot_work/db_issues/adapters/sqlite.py` (lines 718-762)
 
@@ -752,35 +828,36 @@ def _model_to_entity(self, model: IssueModel) -> Issue:
 **Note:** The codebase already has `_models_to_entities()` (lines 764-844) that implements batch loading correctly! The single-entity method should reuse the batch logic or call it directly.
 
 ### Proposed Solution
-**Option A: Batch-load in list methods (already implemented)**
-- The repository already has `_models_to_entities()` that batch-loads correctly
-- Single-row loads can use the batch method with single-item list
-- Or duplicate the batch-loading pattern for single-entity case
+Use existing batch-loading pattern for single-entity loads:
 
-**Option B: Pre-load with eager loading**
-- Use SQLAlchemy eager loading (`selectinload()`) for relationships
-- Automatically loads labels/assignees in single query
-- Requires SQLModel relationship configuration
-
-**Option C: Cache in UnitOfWork**
-- Build lookup tables once per transaction
-- O(1) access to labels/assignees/references
-- Trade memory for query reduction
+```python
+def _model_to_entity(self, model: IssueModel) -> Issue:
+    """Convert single model to entity, reusing batch-loading logic."""
+    # Delegate to batch method with single-item list
+    entities = self._models_to_entities([model])
+    return entities[0] if entities else None
+```
 
 ### Acceptance Criteria
-- [ ] Single-entity loading uses batch queries or cached lookups
+- [ ] `_model_to_entity()` delegates to `_models_to_entities()` with single-item list
 - [ ] Loading 100 issues uses ≤10 queries total (vs 301)
 - [ ] Performance test: 100 issues < 1 second (vs 3-5 seconds)
 - [ ] No regression in functionality
-- [ ] `_model_to_entity()` query count reduced to 1-2 per issue
+- [ ] Existing batch-loading tests pass
+
+### Validation Plan
+1. Test loading 100 issues and measure query count
+2. Verify performance improvement
+3. Run all repository tests to ensure no regression
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision documented: Option A - use existing _models_to_entities().
 
 ### Notes
-Good news: The codebase already has the correct pattern in `_models_to_entities()` (lines 764-844). This batch method:
-- Loads all labels for N issues in 1 query
-- Loads all assignees for N issues in 1 query
-- Loads all references for N issues in 1 query
-
-The fix is to apply the same pattern to single-entity loads or delegate to the batch method.
+Good news: The codebase already has the correct pattern in `_models_to_entities()` (lines 764-844). This batch method loads all labels/assignees/references for N issues in 3 queries total. The fix is to apply the same pattern to single-entity loads. See `.work/agent/issues/references/medium-issue-clarifications-2025-01-01.md` for full analysis.
 
 ---
 ---
@@ -885,6 +962,7 @@ priority: medium
 status: proposed
 references:
   - src/dot_work/knowledge_graph/db.py
+  - .work/agent/issues/references/medium-issue-clarifications-2025-01-01.md
 ---
 
 ### Problem
@@ -908,6 +986,8 @@ The knowledge graph database lacks indexes on frequently queried columns:
 - Topic operations scan entire topic_links table
 - Embedding lookups require full table scan
 - Noticeable latency with 1000+ nodes
+
+**Decision (2025-01-01):** Add migration script (version 5). Migration script is standard practice. Allows smooth upgrade for existing databases. Indexes are read-optimized (minimal write impact). Version 5 indicates next schema version.
 
 ### Affected Files
 - `src/dot_work/knowledge_graph/db.py` (schema creation, lines 255-303)
@@ -948,10 +1028,26 @@ conn.executescript("""
 ```
 
 ### Acceptance Criteria
-- [ ] Indexes added for doc_id, kind, full_id, collection_id, topic_id
 - [ ] Schema migration created (version 5)
+- [ ] Indexes added for doc_id, kind, full_id, collection_id, topic_id
+- [ ] Migration applies indexes on startup if not present
 - [ ] Performance test: 1000 nodes loaded < 100ms (vs 500ms+)
-- [ ] No regression in write performance (indexes are read-optimized)
+- [ ] No regression in write performance
+
+### Validation Plan
+1. Run migration on test database
+2. Verify indexes created with `PRAGMA index_list`
+3. Test performance with 1000 nodes
+4. Verify write performance not degraded
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision documented: migration script (version 5).
+
+### Notes
+Indexes are read-optimized. Write impact is minimal since indexes are created once and updated incrementally. See `.work/agent/issues/references/medium-issue-clarifications-2025-01-01.md` for full analysis.
 
 ---
 ---
@@ -966,6 +1062,7 @@ priority: medium
 status: proposed
 references:
   - src/dot_work/knowledge_graph/db.py
+  - .work/agent/issues/references/medium-issue-clarifications-2025-01-01.md
 ---
 
 ### Problem
@@ -997,9 +1094,10 @@ def get_all_embeddings_for_model(
 - OOM risk on systems with <4GB RAM
 - Memory spikes during semantic search
 
+**Decision (2025-01-01):** Option A - Change default limit from 10000 to 1000 + document streaming for larger datasets. 1000 embeddings = 1.5-6 MB (reasonable default). Streaming API already exists for large datasets. Breaking API change (deprecation) not justified. Documentation guides users to streaming for large use cases.
+
 ### Affected Files
 - `src/dot_work/knowledge_graph/db.py` (lines 1098-1143)
-- `src/dot_work/knowledge_graph/search_semantic.py` (calls this function)
 
 ### Importance
 **MEDIUM**: Risk at scale:
@@ -1011,27 +1109,47 @@ def get_all_embeddings_for_model(
 **Good news:** The codebase has `stream_embeddings_for_model()` (lines 1175-1200) that implements bounded streaming correctly! The issue is that `get_all_embeddings_for_model()` is still used as the primary API.
 
 ### Proposed Solution
-**Option A: Lower default limit**
-- Change default from `10000` to `1000`
-- Document the memory implications clearly
-- Encourage streaming API for large datasets
+Change default limit and add documentation:
 
-**Option B: Enforce streaming API**
-- Deprecate `get_all_embeddings_for_model()`
-- Make `stream_embeddings_for_model()` the primary API
-- Add memory quota enforcement (e.g., 100 MB max)
+```python
+def get_all_embeddings_for_model(
+    self, model: str, limit: int = 1000  # Reduced from 10000
+) -> list[Embedding]:
+    """
+    Get all embeddings for a model.
 
-**Option C: Auto-stream based on size**
-- Check row count before loading
-- Automatically switch to streaming if >1000 embeddings
-- Maintain API compatibility
+    Memory usage: ~1.5-6 KB per embedding (384-1536 floats × 4 bytes).
+    Default limit of 1000 = ~1.5-6 MB memory.
+
+    For datasets >1000 embeddings, use stream_embeddings_for_model()
+    to avoid OOM errors.
+    """
+    if limit > 1000:
+        logger.warning(f"Loading {limit} embeddings - may use {limit * 6 / 1024:.1f}+ MB")
+    # ... rest of implementation
+```
 
 ### Acceptance Criteria
-- [ ] Default limit reduced to 1000 or streaming enforced
-- [ ] Memory usage documented in docstring
+- [ ] Default limit changed from 10000 to 1000
+- [ ] Memory usage documented in docstring (~1.5-6 KB per embedding)
 - [ ] Warning logged when loading >1000 embeddings
-- [ ] Documentation recommends streaming for large datasets
-- [ ] No OOM crashes with default parameters
+- [ ] Documentation recommends streaming for datasets >1000 embeddings
+- [ ] Tests verify OOM protection with default limit
+
+### Validation Plan
+1. Verify default limit is 1000
+2. Test with 1001 embeddings - verify warning logged
+3. Verify stream_embeddings_for_model() still works
+4. Document in docstring and README
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision documented: Option A - lower default to 1000 + document streaming.
+
+### Notes
+Streaming API already exists (lines 1175-1200). Use it for large datasets. See `.work/agent/issues/references/medium-issue-clarifications-2025-01-01.md` for full analysis.
 
 ---
 ---
@@ -1146,6 +1264,7 @@ status: proposed
 references:
   - src/dot_work/knowledge_graph/search_fts.py
   - src/dot_work/knowledge_graph/search_semantic.py
+  - .work/agent/issues/references/medium-issue-clarifications-2025-01-01.md
 ---
 
 ### Problem
@@ -1179,6 +1298,8 @@ def search(db: Database, query: str, k: int = 20, ...) -> list[SearchResult]:
 - Database queries repeated unnecessarily
 - User experience suffers from repeated searches
 
+**Decision (2025-01-01):** Defer until actual usage patterns are measured. Most searches are unique in typical workflows. Cache invalidation complexity may outweigh benefits. No evidence of high repetition in current usage. LOW priority indicates this is not urgent.
+
 ### Affected Files
 - `src/dot_work/knowledge_graph/search_fts.py`
 - `src/dot_work/knowledge_graph/search_semantic.py`
@@ -1190,7 +1311,7 @@ def search(db: Database, query: str, k: int = 20, ...) -> list[SearchResult]:
 - Memory overhead for cache
 - Benefit depends on usage patterns
 
-**Recommendation:** Only implement if usage patterns show high repetition (same query repeated >5 times per session).
+**Recommendation:** Revisit if cache hit ratio would be >30%.
 
 ### Proposed Solution
 **Option A: LRU cache for search results**
@@ -1199,6 +1320,34 @@ from functools import lru_cache
 
 @lru_cache(maxsize=100)
 def search(db: Database, query: str, k: int = 20, ...):
+```
+
+**Option B: Application-level cache**
+- Cache results in memory with TTL
+- Manual invalidation on data changes
+
+**DEFERRED:** Measure usage patterns first. If high repetition found, implement caching.
+
+### Acceptance Criteria
+- [ ] Issue marked as deferred pending usage analysis
+- [ ] Note added: "Revisit if cache hit ratio would be >30%"
+- [ ] No implementation at this time
+
+### Validation Plan
+1. Add logging to track search query repetition
+2. Analyze logs after 1 week of usage
+3. If >30% repetition rate, revisit this issue
+
+### Dependencies
+None.
+
+### Clarifications Needed
+None. Decision documented: defer until usage patterns measured.
+
+### Notes
+Issue marked LOW priority. Most searches are unique, so caching may not provide significant benefit. Cache invalidation complexity (data changes, schema updates) must be weighed against actual performance gains. See `.work/agent/issues/references/medium-issue-clarifications-2025-01-01.md` for full analysis.
+
+**Revisit trigger:** Cache hit ratio >30% OR user complaints about search latency.
     # Cache based on query string
     # Invalidate on document changes
 ```

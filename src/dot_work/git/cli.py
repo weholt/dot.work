@@ -1,6 +1,7 @@
 """Command-line interface for git history analysis."""
 
 import json
+import logging
 import sys
 from pathlib import Path
 
@@ -22,6 +23,9 @@ from dot_work.git.formatters import (
 from dot_work.git.models import AnalysisConfig
 from dot_work.git.services import GitAnalysisService
 from dot_work.git.utils import setup_logging
+from dot_work.utils.sanitization import sanitize_error_message
+
+logger = logging.getLogger(__name__)
 
 # Create Typer app for history subcommand
 history_app = typer.Typer(
@@ -106,7 +110,8 @@ def compare(
         display_risk_assessment(result)
 
     except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
+        logger.error(f"Git analysis error: {e}", exc_info=True)
+        console.print(f"[red]Error:[/red] {sanitize_error_message(e)}")
         if verbose:
             import traceback
 
@@ -144,7 +149,8 @@ def analyze(
             display_commit_analysis(analysis)
 
     except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
+        logger.error(f"Git analysis error: {e}", exc_info=True)
+        console.print(f"[red]Error:[/red] {sanitize_error_message(e)}")
         if verbose:
             import traceback
 
@@ -171,7 +177,8 @@ def diff_commits(
         display_commit_comparison(comparison)
 
     except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
+        logger.error(f"Git analysis error: {e}", exc_info=True)
+        console.print(f"[red]Error:[/red] {sanitize_error_message(e)}")
         if verbose:
             import traceback
 
@@ -197,7 +204,8 @@ def contributors(
         display_contributor_stats(result.contributors)
 
     except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
+        logger.error(f"Git analysis error: {e}", exc_info=True)
+        console.print(f"[red]Error:[/red] {sanitize_error_message(e)}")
         if verbose:
             import traceback
 
@@ -226,7 +234,8 @@ def complexity(
         display_complexity_analysis(result, threshold)
 
     except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
+        logger.error(f"Git analysis error: {e}", exc_info=True)
+        console.print(f"[red]Error:[/red] {sanitize_error_message(e)}")
         if verbose:
             import traceback
 
@@ -262,7 +271,8 @@ def releases(
         display_release_analysis(service, tags)
 
     except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
+        logger.error(f"Git analysis error: {e}", exc_info=True)
+        console.print(f"[red]Error:[/red] {sanitize_error_message(e)}")
         if verbose:
             import traceback
 

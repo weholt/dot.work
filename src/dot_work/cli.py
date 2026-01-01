@@ -2,6 +2,7 @@
 
 import json
 import re
+import logging
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -23,8 +24,11 @@ from dot_work.installer import (
 from dot_work.knowledge_graph.cli import app as kg_app
 from dot_work.overview.pipeline import analyze_project, write_outputs
 from dot_work.python import python_app
+from dot_work.utils.sanitization import sanitize_error_message
 from dot_work.version.cli import app as version_app
 from dot_work.zip.cli import app as zip_app
+
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(
     name="dot-work",
@@ -160,8 +164,10 @@ def install(
         console.print(f"\n[red]❌ Installation failed:[/red] {e}")
         raise typer.Exit(1) from None
     except Exception as e:
+        # Log full error for debugging
+        logger.error(f"Installation error: {e}", exc_info=True)
         console.print("\n[red]❌ Unexpected error during installation:[/red]")
-        console.print(f"[dim]{e}[/dim]")
+        console.print(f"[dim]{sanitize_error_message(e)}[/dim]")
         console.print("\n[dim]💡 Try running with --dry-run to preview changes[/dim]")
         console.print("[dim]💡 Report this issue if it persists[/dim]")
         raise typer.Exit(1) from None
@@ -862,7 +868,8 @@ def review_export(
     try:
         root = repo_root(".")
     except Exception as e:
-        console.print(f"[red]❌ Not in a git repository:[/red] {e}")
+        logger.error(f"Repository detection error: {e}", exc_info=True)
+        console.print(f"[red]❌ Not in a git repository:[/red] {sanitize_error_message(e)}")
         raise typer.Exit(1) from None
 
     # Determine review ID
@@ -925,7 +932,8 @@ def review_clear(
     try:
         root = repo_root(".")
     except Exception as e:
-        console.print(f"[red]❌ Not in a git repository:[/red] {e}")
+        logger.error(f"Repository detection error: {e}", exc_info=True)
+        console.print(f"[red]❌ Not in a git repository:[/red] {sanitize_error_message(e)}")
         raise typer.Exit(1) from None
 
     config = get_config()
@@ -986,7 +994,8 @@ def canonical_validate(
         validate_canonical_prompt_file(prompt_file, strict=strict)
         console.print(f"[green]✅[/green] {prompt_file} is a valid canonical prompt")
     except Exception as e:
-        console.print(f"[red]❌[/red] Validation failed: {e}")
+        logger.error(f"Validation error for {prompt_file}: {e}", exc_info=True)
+        console.print(f"[red]❌[/red] Validation failed: {sanitize_error_message(e)}")
         raise typer.Exit(1) from e
 
 
@@ -1026,7 +1035,8 @@ def canonical_install(
         install_canonical_prompt(prompt_file, env, target, console, force=force)
         console.print(f"[green]✅[/green] Installed {prompt_file} for {env}")
     except Exception as e:
-        console.print(f"[red]❌[/red] Installation failed: {e}")
+        logger.error(f"Canonical installation error for {prompt_file}: {e}", exc_info=True)
+        console.print(f"[red]❌[/red] Installation failed: {sanitize_error_message(e)}")
         raise typer.Exit(1) from e
 
 
@@ -1052,7 +1062,8 @@ def canonical_extract(
         output_path = extract_environment_file(prompt_file, env, output_dir)
         console.print(f"[green]✅[/green] Extracted {env} prompt to {output_path}")
     except Exception as e:
-        console.print(f"[red]❌[/red] Extraction failed: {e}")
+        logger.error(f"Extraction error for {prompt_file}: {e}", exc_info=True)
+        console.print(f"[red]❌[/red] Extraction failed: {sanitize_error_message(e)}")
         raise typer.Exit(1) from e
 
 
@@ -1153,7 +1164,8 @@ def prompt_create(
         raise typer.Exit(0) from None
 
     except Exception as e:
-        console.print(f"\n[red]Error creating prompt:[/red] {e}")
+        logger.error(f"Prompt creation error: {e}", exc_info=True)
+        console.print(f"\n[red]Error creating prompt:[/red] {sanitize_error_message(e)}")
         raise typer.Exit(1) from e
 
 
