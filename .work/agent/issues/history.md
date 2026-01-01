@@ -3353,3 +3353,27 @@ references:
 - Commit: 9635259
 
 ---
+---
+---
+id: "DOGFOOD-010@foa1hu"
+title: "Document issue editing workflow (AI-only)"
+description: "Created documentation clarifying that AI tools should edit issue files, not humans"
+completed: 2025-01-01
+section: "dogfooding"
+tags: [documentation, workflow, dogfooding]
+type: docs
+priority: medium
+status: completed
+references:
+  - .work/agent/issues/README.md
+---
+
+### Outcome
+- Created `.work/agent/issues/README.md` with comprehensive AI-only workflow documentation
+- Documented issue lifecycle: creation → selection → in-progress → completion → archival
+- Listed all prompt commands for issue management (/new-issue, /do-work, /focus on)
+- Explained why manual editing is not recommended (format consistency, YAML structure)
+- Provided issue file locations and status values reference
+- Added warning about manual editing risks
+
+---

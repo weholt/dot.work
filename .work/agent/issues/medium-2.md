@@ -303,11 +303,12 @@ id: "DOGFOOD-010@foa1hu"
 title: "Document issue editing workflow (AI-only)"
 description: "Clarify that AI tools should edit issue files, not humans"
 created: 2024-12-29
+completed: 2025-01-01
 section: "dogfooding"
 tags: [documentation, workflow, dogfooding]
 type: docs
 priority: medium
-status: proposed
+status: completed
 references:
   - docs/dogfood/gaps-and-questions.md
   - .work/agent/issues/
@@ -356,6 +357,8 @@ Direct file editing is NOT recommended. The AI manages issue state.
 ### Notes
 This is gap #4 in gaps-and-questions.md (Medium Priority). User explicitly provided feedback on this.
 
+---
+**COMPLETED 2025-01-01**: Created `.work/agent/issues/README.md` with comprehensive AI-only workflow documentation.
 ---
 
 ---
