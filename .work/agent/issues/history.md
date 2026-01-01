@@ -2942,3 +2942,52 @@ All tests pass. The issue was created before tests were added during CR-101 dead
 
 ---
 
+---
+id: "CR-102@critical-review-2025"
+title: "TagGenerator lacks debug logging for complex classification logic"
+description: "No visibility into tag extraction and filtering decisions"
+completed: 2025-12-31
+section: "git"
+tags: [observability, debuggability, logging]
+type: enhancement
+priority: medium
+status: completed
+references:
+  - src/dot_work/git/services/tag_generator.py
+---
+
+### Problem
+The `TagGenerator` class had zero logging statements despite implementing complex classification logic with multiple extraction strategies, tag filtering/prioritization, and redundancy resolution. When tag generation behaved unexpectedly, there was no way to trace which extraction methods matched, what tags were filtered and why, which keywords or emojis triggered tags, or the final tag selection reasoning.
+
+### Outcome
+Added comprehensive DEBUG-level logging to the TagGenerator class:
+
+**Changes Made:**
+- Added `import logging` and `logger = logging.getLogger(__name__)`
+- Enhanced `generate_tags()` with debug logging for each extraction phase:
+  - Message tags extraction
+  - File tags extraction
+  - Impact tags extraction
+  - Complexity tags extraction
+  - Breaking change detection
+  - Security-relevant detection
+  - Emoji tags extraction
+  - Final tag list output
+- Enhanced `_filter_tags()` with debug logging:
+  - Empty/invalid tag skipping
+  - Redundant tag mapping (e.g., "enhancement" -> "feature")
+  - Tags after redundancy filtering
+  - Priority tags kept
+  - Non-priority tags (with 5-tag limit logic)
+
+**Verification:**
+- All 11 existing tests pass
+- Logging at DEBUG level (no production performance impact)
+- Filter decisions now logged (what was mapped and why)
+- Final tag list logged with reasoning
+
+**Files Modified:**
+- `src/dot_work/git/services/tag_generator.py`
+
+---
+

@@ -1,6 +1,10 @@
 """Tag generation for git commits based on analysis."""
 
+import logging
+
 from dot_work.git.models import ChangeAnalysis, ChangeType, FileCategory
+
+logger = logging.getLogger(__name__)
 
 
 class TagGenerator:
@@ -307,34 +311,44 @@ class TagGenerator:
         Returns:
             List of tags
         """
+        logger.debug("Generating tags for commit %s", analysis.commit_hash)
         tags = set()
 
         # Generate tags from commit message
         message_tags = self._extract_message_tags(analysis.message)
+        logger.debug("Message tags extracted: %s", message_tags)
         tags.update(message_tags)
 
         # Generate tags from file changes
         file_tags = self._extract_file_tags(analysis.files_changed)
+        logger.debug("File tags extracted: %s", file_tags)
         tags.update(file_tags)
 
         # Generate tags from impact areas
         impact_tags = self._extract_impact_tags(analysis.impact_areas)
+        logger.debug("Impact tags extracted: %s", impact_tags)
         tags.update(impact_tags)
 
         # Generate complexity-based tags
         complexity_tags = self._extract_complexity_tags(analysis.complexity_score)
+        logger.debug("Complexity tags extracted (score=%s): %s", analysis.complexity_score, complexity_tags)
         tags.update(complexity_tags)
 
         # Generate special tags for breaking changes and security
         if analysis.breaking_change:
             tags.update(["breaking", "deprecation"])
+            logger.debug("Breaking change detected: breaking, deprecation")
 
         if analysis.security_relevant:
             tags.add("security")
+            logger.debug("Security-relevant commit detected")
 
         # Generate emoji-based tags
         emoji_tags = self._extract_emoji_tags(analysis.message)
+        logger.debug("Emoji tags extracted: %s", emoji_tags)
         tags.update(emoji_tags)
+
+        logger.debug("All tags before filtering: %s", tags)
 
         # Filter and finalize tags
         final_tags = self._filter_tags(tags)
@@ -342,7 +356,9 @@ class TagGenerator:
         # Ensure we have some tags
         if not final_tags:
             final_tags = {"misc"}
+            logger.debug("No tags generated, using 'misc'")
 
+        logger.debug("Final tags: %s", final_tags)
         return list(final_tags)
 
     def _extract_message_tags(self, message: str) -> set[str]:
@@ -506,11 +522,16 @@ class TagGenerator:
         for tag in tags:
             # Skip empty or invalid tags
             if not tag or len(tag.strip()) == 0:
+                logger.debug("Skipping empty/invalid tag")
                 continue
 
             # Use preferred mapping for redundant tags
             canonical_tag = redundant_mappings.get(tag.lower(), tag.lower())
+            if canonical_tag != tag.lower():
+                logger.debug("Mapping redundant tag '%s' -> '%s'", tag, canonical_tag)
             filtered.add(canonical_tag)
+
+        logger.debug("Tags after redundancy filtering: %s", filtered)
 
         # Ensure we don't have too many tags
         if len(filtered) > 5:
@@ -531,10 +552,12 @@ class TagGenerator:
 
             # Keep priority tags first
             prioritized = [tag for tag in priority_tags if tag in filtered]
+            logger.debug("Priority tags kept: %s", prioritized)
 
             # Add remaining tags up to limit
             remaining = [tag for tag in filtered if tag not in prioritized]
             final_tags = prioritized + remaining[: 5 - len(prioritized)]
+            logger.debug("Non-priority tags (limit 5-%d): %s", len(prioritized), remaining[: 5 - len(prioritized)])
 
             return set(final_tags)
 
