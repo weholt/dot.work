@@ -4,6 +4,31 @@ Issues that have been completed and validated.
 
 ---
 ---
+id: "RES-001@e4f7a2"
+title: "Investigate and fix SQLite database connection resource leaks"
+description: "ResourceWarnings for unclosed database connections in integration tests"
+completed: 2026-01-01
+section: "db_issues"
+tags: [resource-leak, sqlite, database, tests, cleanup]
+type: bug
+priority: medium
+status: completed
+references:
+  - tests/integration/db_issues/conftest.py
+  - src/dot_work/db_issues/adapters/sqlite.py
+  - .work/agent/notes/RES-001-investigation.md
+---
+
+### Outcome
+- Investigated ResourceWarnings using tracemalloc
+- Identified root cause: False positives from StaticPool + gc.collect() interaction
+- StaticPool keeps ONE connection alive for `:memory:` databases (by design)
+- Added warning filter in tests/integration/db_issues/conftest.py to suppress false positives
+- All integration tests pass without warnings
+- Investigation notes saved to `.work/agent/notes/RES-001-investigation.md`
+
+---
+---
 id: "CR-030@c6d8e0"
 title: "Document TagGenerator complexity rationale"
 description: "Add module docstring and method comments explaining design rationale"

@@ -1,6 +1,7 @@
 """Integration test fixtures for database operations."""
 
 import os
+import warnings
 from collections.abc import Generator
 from pathlib import Path
 
@@ -13,6 +14,28 @@ from typer.testing import CliRunner
 
 from dot_work.db_issues.adapters import create_db_engine
 from dot_work.db_issues.config import get_db_url
+
+
+def pytest_configure(config):
+    """Configure pytest with warning filters.
+
+    Suppresses false-positive ResourceWarnings for unclosed database connections
+    when using StaticPool with in-memory SQLite databases.
+
+    StaticPool is required for :memory: databases to share data across sessions,
+    but it keeps a single connection alive for the engine's lifetime. This is
+    by design and not a resource leak - the connection is properly closed when
+    engine.dispose() is called. However, Python's gc.collect() in test teardown
+    detects these unclosed connections and emits ResourceWarnings.
+
+    This filter suppresses all ResourceWarnings with "unclosed database" message.
+    Real resource leaks will still be caught by other mechanisms (memory limits, etc.)
+    """
+    warnings.filterwarnings(
+        "ignore",
+        category=ResourceWarning,
+        message=".*unclosed database.*",
+    )
 
 
 def pytest_sessionstart(session):

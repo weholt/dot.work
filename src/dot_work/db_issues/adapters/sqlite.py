@@ -286,6 +286,9 @@ def create_db_engine(db_url: str | None = None, echo: bool = False) -> Engine:
         db_url = os.environ.get("DB_ISSUES_DB_URL", _get_default_db_url())
 
     # Use StaticPool for SQLite in-memory databases
+    # StaticPool maintains a single connection for the lifetime of the engine,
+    # which is required for :memory: databases to share data across sessions.
+    # Each new connection would create a separate in-memory database otherwise.
     if db_url == "sqlite:///:memory:" or db_url == "sqlite://":
         return create_engine(
             db_url,

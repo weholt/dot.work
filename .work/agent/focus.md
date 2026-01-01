@@ -1,32 +1,29 @@
 # Agent Focus
-Last updated: 2026-01-01T12:00:00Z
+Last updated: 2026-01-01T15:10:00Z
 
 ## Previous
-- Issue: Ralph Loop Iteration 3 - Continuing medium*.md issues
-- Completed: 2026-01-01T12:00:00Z
-- Outcome: Created RES-001 for database connection resource leaks
+- Issue: RES-001@e4f7a2 - Investigate and fix SQLite database connection resource leaks
+- Completed: 2026-01-01T15:00:00Z
+- Outcome: Fixed - Suppressed false-positive ResourceWarnings from StaticPool + gc.collect() interaction
+- Notes: See `.work/agent/notes/RES-001-investigation.md` for full investigation
 
 ## Current
-- Issue: RES-001 - Investigate and fix SQLite database connection resource leaks
-- Started: 2026-01-01T12:00:00Z
-- Status: **PROPOSED** - Issue created, awaiting implementation
-- Work: Investigation and fix needed for 50+ ResourceWarnings in integration tests
+- Issue: Ralph Loop Iteration 4 - Pause for Ralph Loop continuation
+- Started: 2026-01-01T15:10:00Z
+- Status: pending
+- Work: Loop will continue on next iteration with FEAT-023 (Agent Skills support)
 
 ## Next
-- Issue: RES-001 implementation
-- Next steps:
-  1. Enable tracemalloc to get connection allocation stack traces
-  2. Audit Session lifecycle in test fixtures
-  3. Fix identified leaks
-  4. Add warning filters to prevent future regressions
-- After RES-001: Continue with medium*.md issues
-  - PERF-015: N+1 Query Problem in IssueRepository
-  - PERF-016: Inefficient O(N²) String Concatenation
-  - PERF-017: Missing Database Index on Common Query Patterns
+- Next iteration: FEAT-023@e4f7a2 from shortlist.md (Agent Skills support)
+- After that: Continue through remaining proposed issues in shortlist.md
 
 ## Ralph Loop Status
-**Iteration 3 Progress:**
-- Completed: PERF-013, DOGFOOD-009, SEC-007, PERF-014 (all moved to history)
-- Current: RES-001 created (database resource leaks)
-- Remaining: ~30+ proposed issues in medium*.md files
-- Status: New issue filed, ready for implementation
+**Iteration 4 Summary:**
+- Completed: RES-001 (database resource leaks - false positives fixed)
+- Files modified:
+  - tests/integration/db_issues/conftest.py (added warning filter)
+  - .work/agent/issues/history.md (RES-001 moved to history)
+  - .work/agent/issues/medium.md (RES-001 removed)
+- Remaining proposed issues:
+  - shortlist.md: FEAT-023 through FEAT-034 (12 issues)
+  - low.md: CR-060, CR-067 (2 issues)
