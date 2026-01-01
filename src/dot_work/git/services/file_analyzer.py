@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from dot_work.git.models import FileCategory
+from dot_work.git.models import AnalysisConfig, FileCategory
 
 # Type alias for compiled regex pattern
 Pattern = re.Pattern
@@ -24,7 +24,7 @@ class LanguageInfo:
 class FileAnalyzer:
     """Analyzes files and categorizes them based on type and content."""
 
-    def __init__(self, config):
+    def __init__(self, config: AnalysisConfig):
         self.config = config
         self.language_info = self._initialize_language_info()
         self.file_category_patterns = self._initialize_category_patterns()

@@ -103,11 +103,12 @@ id: "PERF-014@s4t5u6"
 title: "Sequential Commit Processing"
 description: "Git commits analyzed sequentially without parallelization"
 created: 2024-12-27
+completed: 2025-01-01
 section: "git"
 tags: [performance, parallelism, git, commit-analysis, cpu]
 type: refactor
 priority: medium
-status: proposed
+status: completed
 references:
   - src/dot_work/git/services/git_service.py
   - .work/agent/issues/references/medium-issue-clarifications-2025-01-01.md
@@ -366,11 +367,12 @@ id: "DOGFOOD-011@foa1hu"
 title: "Document prompt trigger format by environment"
 description: "How to use installed prompts varies by AI environment - undocumented"
 created: 2024-12-29
+completed: 2025-01-01
 section: "dogfooding"
 tags: [documentation, prompts, dogfooding]
 type: docs
 priority: medium
-status: proposed
+status: completed
 references:
   - docs/dogfood/gaps-and-questions.md
   - README.md
@@ -423,6 +425,8 @@ Add documentation section:
 ### Notes
 This is gap #9 in gaps-and-questions.md (Medium Priority).
 
+---
+**COMPLETED 2025-01-01**: README.md already contains "How to Use Prompts" section (lines 172-187) with comprehensive table for all 10+ environments. Issue pre-resolved by existing documentation.
 ---
 
 ---
@@ -609,11 +613,12 @@ id: "CR-085@e3f1g2"
 title: "Missing Type Annotation for FileAnalyzer config Parameter"
 description: "Parameter named 'config' but type is AnalysisConfig without annotation"
 created: 2024-12-31
+completed: 2025-01-01
 section: "git"
 tags: [type-hints, naming, clarity]
 type: refactor
 priority: medium
-status: proposed
+status: completed
 references:
   - src/dot_work/git/services/file_analyzer.py
 ---
@@ -646,6 +651,8 @@ class FileAnalyzer:
 - [ ] mypy passes without new errors
 - [ ] Documentation reflects typed parameter
 
+---
+**COMPLETED 2025-01-01**: Added type annotation `config: AnalysisConfig` to FileAnalyzer.__init__. Import added, mypy passes.
 ---
 ---
 id: "PERF-015@perf-review-2025"
