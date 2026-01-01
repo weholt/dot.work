@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import shlex
+import socket
 import subprocess
 import tempfile
 from collections.abc import Mapping
@@ -23,6 +24,10 @@ import frontmatter  # type: ignore[import-untyped]
 
 # Module logger
 logger = logging.getLogger(__name__)
+
+# Default port range for dynamic port assignment
+DEFAULT_PORT_RANGE_MIN = 8000
+DEFAULT_PORT_RANGE_MAX = 9000
 
 # Default values for configuration
 DEFAULT_DOCKER_IMAGE = "repo-agent:latest"
@@ -74,6 +79,53 @@ def validate_docker_image(image: str) -> None:
             f"Invalid docker image name: {image}. Expected format: [registry/]namespace/image[:tag]"
         )
     logger.debug(f"Docker image validation passed: {image}")
+
+
+def find_available_port(
+    port_min: int | None = None,
+    port_max: int | None = None,
+) -> int:
+    """Find an available port in the specified range.
+
+    Tests ports by attempting to bind to them. Returns the first available
+    port in the range [port_min, port_max).
+
+    Args:
+        port_min: Minimum port number (inclusive). Defaults to DEFAULT_PORT_RANGE_MIN.
+        port_max: Maximum port number (exclusive). Defaults to DEFAULT_PORT_RANGE_MAX.
+
+    Returns:
+        An available port number.
+
+    Raises:
+        ValueError: If no available port found in range, or if port range is invalid.
+    """
+    port_min = port_min if port_min is not None else int(os.getenv("PORT_RANGE_MIN", str(DEFAULT_PORT_RANGE_MIN)))
+    port_max = port_max if port_max is not None else int(os.getenv("PORT_RANGE_MAX", str(DEFAULT_PORT_RANGE_MAX)))
+
+    if port_min >= port_max:
+        raise ValueError(f"Invalid port range: min ({port_min}) must be less than max ({port_max})")
+
+    if not (1 <= port_min <= 65535):
+        raise ValueError(f"Invalid port_min: {port_min}. Must be between 1 and 65535.")
+
+    if not (1 <= port_max <= 65536):
+        raise ValueError(f"Invalid port_max: {port_max}. Must be between 1 and 65536.")
+
+    logger.debug(f"Searching for available port in range [{port_min}, {port_max})")
+
+    for port in range(port_min, port_max):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind(("127.0.0.1", port))
+                logger.debug(f"Found available port: {port}")
+                return port
+        except OSError:
+            # Port is in use, continue searching
+            continue
+
+    raise ValueError(f"No available port found in range [{port_min}, {port_max})")
 
 
 def validate_dockerfile_path(dockerfile: Path | None, project_root: Path) -> None:
