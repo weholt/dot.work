@@ -103,7 +103,30 @@ references:
 - Commit: 85bc968
 
 ---
+---
+id: "SEC-006@security-review-2026"
+title: "Jinja2 autoescape documentation"
+description: "Documented security rationale for Jinja2 autoescape disabled for markdown"
+completed: 2025-01-01
+section: "security"
+tags: [security, xss, jinja2, documentation]
+type: security
+priority: medium
+status: completed
+references:
+  - src/dot_work/installer.py
+  - tests/unit/test_installer.py
+---
 
+### Outcome
+- Enhanced create_jinja_env() docstring with comprehensive security notes
+- Documented why autoescape is disabled (markdown output, not HTML)
+- Added warning for future HTML output requirements
+- 4 tests added verifying template security behavior
+- Referenced OWASP A03:2021 (Cross-Site Scripting)
+- Commit: ff434d7
+
+---
 ---
 id: "MIGRATE-013@a7f3b2"
 title: "Create knowledge_graph module structure in dot-work"
