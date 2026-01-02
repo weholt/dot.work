@@ -83,8 +83,6 @@ dev = [
 
 [project.scripts]
 dot-work = "dot_work.cli:app"
-kg = "dot_work.knowledge_graph.cli:app"
-pybuilder = "dot_work.python.build.cli:main"
 
 [project.entry-points."dot_work.plugins"]
 # Register submodules as plugins (for future extraction to standalone packages)
@@ -109,16 +107,12 @@ packages = ["src/dot_work"]
 ignore-vcs = true
 artifacts = [
     "src/dot_work/prompts/*",
-    "src/dot_work/review/templates/*",
-    "src/dot_work/review/static/*",
 ]
 
 [tool.hatch.build.targets.sdist]
 include = [
     "src/dot_work",
     "src/dot_work/prompts/*",
-    "src/dot_work/review/templates/*",
-    "src/dot_work/review/static/*",
 ]
 
 [tool.uv]
@@ -136,24 +130,6 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 # S701: Autoescape disabled - intentional for markdown templates (not HTML)
 "src/dot_work/installer.py" = ["S701"]
-# S310: urllib.request calls - intentional HTTP API requests to embedding providers
-"src/dot_work/knowledge_graph/embed/ollama.py" = ["S310"]
-# B008, B904: Typer CLI patterns - function calls in defaults are standard Typer usage
-"src/dot_work/container/provision/cli.py" = ["B008", "B904"]
-"src/dot_work/python/build/cli.py" = ["B008", "B904"]
-"src/dot_work/python/__init__.py" = ["B008", "B904"]
-"src/dot_work/python/scan/cli.py" = ["B008", "B904"]
-"src/dot_work/version/cli.py" = ["B008", "B904"]
-"src/dot_work/overview/cli.py" = ["B008", "B904"]
-"src/dot_work/harness/cli.py" = ["B008"]
-# B904: review server - HTTPException without exception chaining (intentional clean API error)
-"src/dot_work/review/server.py" = ["B904"]
-# import-untyped: frontmatter library has no type stubs
-"src/dot_work/container/provision/core.py" = ["S603"]
-"src/dot_work/container/provision/validation.py" = []
-"src/dot_work/knowledge_graph/embed/openai.py" = ["S310"]
-# S112: Bare except-continue - intentional best-effort batch embedding storage
-"src/dot_work/knowledge_graph/search_semantic.py" = ["S112"]
 
 [tool.pytest.ini_options]
 addopts = ["-v", "--tb=short", "--strict-markers"]

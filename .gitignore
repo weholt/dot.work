@@ -26,19 +26,19 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Testing (if you run tests on this repo)
+# Testing
 .coverage
+coverage.xml
 htmlcov/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 test_logs/
 .test_execution_log.txt
+test.db
+*.db
+*.db-shm
+*.db-wal
 
 # uv
 uv.lock
-.coverage
-coverage.xml
-htmlcov/
-coverage.xml
-coverage.xml
