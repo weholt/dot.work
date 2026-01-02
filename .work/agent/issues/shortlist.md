@@ -490,3 +490,474 @@ None. All decisions resolved:
 
 ### Notes
 Symbiosis map should be auto-generated from prompt frontmatter (if `calls` field added). For now, maintain manually.
+
+---
+
+## Module Split / Plugin Architecture
+
+This section tracks the implementation of the dot-work submodule split plan (split.md). The goal is to extract 8 submodules into standalone packages with a plugin discovery system.
+
+**Related Issues in high.md and medium.md:**
+- SPLIT-001: Plugin discovery system (high.md)
+- SPLIT-002: Refactor cli.py for plugins (high.md)
+- SPLIT-003: Extract dot-issues (high.md)
+- SPLIT-004: Extract dot-kg (high.md)
+- SPLIT-005: Extract dot-review (high.md)
+- SPLIT-006: Extraction automation script (high.md)
+- SPLIT-007: Update pyproject.toml (high.md)
+- SPLIT-008: Extract dot-container (medium.md)
+- SPLIT-009: Extract dot-git (medium.md)
+- SPLIT-010: Extract dot-harness (medium.md)
+- SPLIT-011: Extract dot-overview (medium.md)
+- SPLIT-012: Extract dot-python (medium.md)
+- SPLIT-013: Extract dot-version (medium.md)
+- SPLIT-014: Integration test suite (medium.md)
+- SPLIT-015: Documentation updates (medium.md)
+
+---
+id: "SPLIT-100@a1b2c3"
+title: "Phase 1: Plugin infrastructure foundation"
+description: "Implement plugin discovery system and refactor core CLI for plugin architecture"
+created: 2026-01-02
+section: "split/phase1/infrastructure"
+tags: [split, phase1, infrastructure, plugins, blocking]
+type: refactor
+priority: critical
+status: proposed
+references:
+  - split.md
+  - .work/agent/issues/high.md:SPLIT-001
+  - .work/agent/issues/high.md:SPLIT-002
+  - .work/agent/issues/high.md:SPLIT-006
+
+### Problem
+Before extracting any submodules, the plugin infrastructure must be in place. Without a discovery system and CLI refactoring, extracted packages cannot be registered or used.
+
+### Affected Files
+- CREATE: `src/dot_work/plugins.py` (plugin discovery and registration)
+- MODIFY: `src/dot_work/cli.py` (remove submodule imports, add plugin discovery)
+- MODIFY: `pyproject.toml` (add entry-points group)
+- CREATE: `scripts/extract_plugin.py` (automation script for extractions)
+- CREATE: `EXPORTED_PROJECTS/` (target directory for all extracted projects)
+
+### Importance
+**CRITICAL**: This is the foundation for the entire split. All 15 SPLIT-* issues depend on this phase being completed first.
+
+### Proposed Solution
+Execute in order:
+1. **SPLIT-001** (high.md): Create plugin discovery system
+   - Implement `DotWorkPlugin` dataclass
+   - Implement `discover_plugins()` using `importlib.metadata.entry_points()`
+   - Implement `register_plugin_cli()` for Typer integration
+   - Add error handling for missing/broken plugins
+2. **SPLIT-002** (high.md): Refactor cli.py
+   - Identify core commands to keep (install, list, detect, init, validate, canonical, prompt)
+   - Remove direct imports from submodules
+   - Add plugin discovery loop
+   - Add `dot-work plugins` command
+3. **SPLIT-006** (high.md): Create extraction automation script
+   - Implement `scripts/extract_plugin.py`
+   - Target all extractions to `EXPORTED_PROJECTS/` folder in project root
+   - Add import rewriting logic (`dot_work.X` → `dot_X`)
+   - Add pyproject.toml generation from templates
+   - Add test file copying with structure preservation
+   - **Add validation**: Byte-for-byte comparison of source vs copied files
+   - **Add validation**: Hash verification (SHA256) for all copied Python files
+   - **Add validation**: File count matching (source vs destination)
+
+### Acceptance Criteria
+- [ ] `src/dot_work/plugins.py` created with discover/register functions
+- [ ] `discover_plugins()` returns empty list when no plugins installed
+- [ ] `discover_plugins()` returns plugin info for installed plugins
+- [ ] `register_plugin_cli()` adds Typer subcommand for plugins
+- [ ] Broken/missing plugins logged as warning, don't crash CLI
+- [ ] `dot-work plugins` command shows installed plugins
+- [ ] cli.py reduced to <15KB (core commands only)
+- [ ] All submodule imports removed from cli.py
+- [ ] Core commands work without any plugins installed
+- [ ] `scripts/extract_plugin.py` automates extraction with --dry-run
+- [ ] `EXPORTED_PROJECTS/` folder created in project root
+- [ ] **Validation**: Byte-for-byte comparison passes for all copied files
+- [ ] **Validation**: SHA256 hashes match for all Python files
+- [ ] **Validation**: File count matches between source and destination
+- [ ] Unit tests cover discovery, registration, and error cases
+- [ ] Existing tests pass (may need updates for mocking)
+
+### Dependencies
+Blocked by: None
+Blocks: SPLIT-101 (Phase 2 extractions)
+
+### Related Issues
+- SPLIT-001@a1b2c3 in high.md
+- SPLIT-002@b2c3d4 in high.md
+- SPLIT-006@f6g7h8 in high.md
+
+### Notes
+This phase establishes the plugin infrastructure. Once complete, all extractions can proceed in parallel.
+
+**EXPORTED_PROJECTS Folder Structure:**
+```
+dot-work/
+├── EXPORTED_PROJECTS/
+│   ├── dot-issues/
+│   ├── dot-kg/
+│   ├── dot-review/
+│   ├── dot-container/
+│   ├── dot-git/
+│   ├── dot-harness/
+│   ├── dot-overview/
+│   ├── dot-python/
+│   └── dot-version/
+└── ... (existing dot-work files)
+```
+
+**Validation Approach:**
+The extraction script (`scripts/extract_plugin.py`) will:
+1. Calculate SHA256 hashes of all source files before copying
+2. Copy files to `EXPORTED_PROJECTS/<package>/`
+3. Calculate SHA256 hashes of copied files
+4. Compare hashes and report any mismatches
+5. Output validation report with file counts and hash verification
+
+---
+id: "SPLIT-101@b2c3d4"
+title: "Phase 2A: Extract high-priority submodules (db-issues, knowledge-graph, review)"
+description: "Extract the three largest submodules first to validate the extraction process"
+created: 2026-01-02
+section: "split/phase2/extractions"
+tags: [split, phase2, extraction, high-priority, has-deps]
+type: refactor
+priority: high
+status: proposed
+references:
+  - split.md
+  - .work/agent/issues/high.md:SPLIT-003
+  - .work/agent/issues/high.md:SPLIT-004
+  - .work/agent/issues/high.md:SPLIT-005
+
+### Problem
+The high-priority submodules (db-issues, knowledge-graph, review) are the largest and most complex. Extracting them first validates the extraction process before tackling simpler modules.
+
+### Affected Files
+**Extraction targets (to `EXPORTED_PROJECTS/` folder):**
+- `src/dot_work/db_issues/` → `EXPORTED_PROJECTS/dot-issues/`
+- `src/dot_work/knowledge_graph/` → `EXPORTED_PROJECTS/dot-kg/`
+- `src/dot_work/review/` → `EXPORTED_PROJECTS/dot-review/`
+
+**Test migrations:**
+- `tests/unit/db_issues/` → `EXPORTED_PROJECTS/dot-issues/tests/unit/`
+- `tests/unit/knowledge_graph/` → `EXPORTED_PROJECTS/dot-kg/tests/unit/`
+- `tests/unit/review/` → `EXPORTED_PROJECTS/dot-review/tests/unit/`
+- Plus all integration tests for each module
+
+### Importance
+**HIGH**: These three extractions validate the full extraction pattern including complex dependencies, optional features, and static assets.
+
+### Proposed Solution
+Execute in order (can run in parallel after SPLIT-100):
+1. **SPLIT-003** (high.md): Extract dot-issues
+   - Extract to `EXPORTED_PROJECTS/dot-issues/`
+   - Copy 17 unit tests + 6 integration tests
+   - Add entry point for `dot_work.plugins`
+   - Rewire imports: `dot_work.db_issues` → `dot_issues`
+   - **Validate**: SHA256 hashes match for all copied files
+   - **Validate**: File count matches (23 test files)
+2. **SPLIT-004** (high.md): Extract dot-kg
+   - Extract to `EXPORTED_PROJECTS/dot-kg/`
+   - Copy 14 unit tests + 2 integration tests
+   - Handle optional dependencies (http, ann, vec)
+   - Preserve `kg` standalone command alias
+   - **Validate**: SHA256 hashes match for all copied files
+   - **Validate**: File count matches (16 test files)
+3. **SPLIT-005** (high.md): Extract dot-review
+   - Extract to `EXPORTED_PROJECTS/dot-review/`
+   - Copy 9 test files (keep both sets - complementary coverage)
+   - Handle static assets (JS/CSS) and Jinja2 templates
+   - Verify assets included in wheel build
+   - **Validate**: SHA256 hashes match for all copied files
+   - **Validate**: Static assets (JS/CSS) present and identical
+   - **Validate**: Templates directory structure preserved
+
+### Acceptance Criteria
+**dot-issues:**
+- [ ] Extracted to `EXPORTED_PROJECTS/dot-issues/`
+- [ ] Repository created with correct structure
+- [ ] All 17 unit tests pass in new package
+- [ ] All 6 integration tests pass in new package
+- [ ] `pip install dot-issues` works
+- [ ] `dot-work db-issues` works when plugin installed
+- [ ] **Validation**: SHA256 hashes match for all Python files
+- [ ] **Validation**: File count = 23 test files
+
+**dot-kg:**
+- [ ] Extracted to `EXPORTED_PROJECTS/dot-kg/`
+- [ ] Repository created with correct structure
+- [ ] All 14 unit tests pass
+- [ ] All 2 integration tests pass
+- [ ] `kg` command works standalone
+- [ ] Optional dependencies work (http, ann, vec)
+- [ ] **Validation**: SHA256 hashes match for all Python files
+- [ ] **Validation**: File count = 16 test files
+
+**dot-review:**
+- [ ] Extracted to `EXPORTED_PROJECTS/dot-review/`
+- [ ] Repository created with correct structure
+- [ ] All 9 test files pass
+- [ ] Static assets included in wheel package
+- [ ] Templates included in wheel package
+- [ ] Review UI loads in browser with CSS/JS
+- [ ] **Validation**: SHA256 hashes match for all Python files
+- [ ] **Validation**: Static assets (JS/CSS) identical to source
+- [ ] **Validation**: Templates directory structure preserved
+
+### Dependencies
+Blocked by: SPLIT-100 (plugin infrastructure)
+Blocks: SPLIT-102 (medium-priority extractions), SPLIT-103 (integration)
+
+### Related Issues
+- SPLIT-003@c3d4e5 in high.md
+- SPLIT-004@d4e5f6 in high.md
+- SPLIT-005@e5f6g7 in high.md
+
+### Notes
+These are the "pilot extractions" - they will reveal any issues in the extraction automation script (SPLIT-006).
+
+**EXPORTED_PROJECTS Structure (after SPLIT-101):**
+```
+dot-work/
+├── EXPORTED_PROJECTS/
+│   ├── dot-issues/
+│   ├── dot-kg/
+│   └── dot-review/
+└── ... (existing dot-work files)
+```
+
+---
+id: "SPLIT-102@c3d4e5"
+title: "Phase 2B: Extract medium-priority submodules (container, git, harness, overview, python, version)"
+description: "Extract the remaining six submodules after validating the extraction process"
+created: 2026-01-02
+section: "split/phase2/extractions"
+tags: [split, phase2, extraction, medium-priority, has-deps]
+type: refactor
+priority: medium
+status: proposed
+references:
+  - split.md
+  - .work/agent/issues/medium.md:SPLIT-008
+  - .work/agent/issues/medium.md:SPLIT-009
+  - .work/agent/issues/medium.md:SPLIT-010
+  - .work/agent/issues/medium.md:SPLIT-011
+  - .work/agent/issues/medium.md:SPLIT-012
+  - .work/agent/issues/medium.md:SPLIT-013
+
+### Problem
+After validating the extraction process with the high-priority submodules, extract the remaining six medium-priority submodules.
+
+### Affected Files
+**Extraction targets (to `EXPORTED_PROJECTS/` folder):**
+- `src/dot_work/container/` → `EXPORTED_PROJECTS/dot-container/`
+- `src/dot_work/git/` → `EXPORTED_PROJECTS/dot-git/`
+- `src/dot_work/harness/` → `EXPORTED_PROJECTS/dot-harness/`
+- `src/dot_work/overview/` → `EXPORTED_PROJECTS/dot-overview/`
+- `src/dot_work/python/` → `EXPORTED_PROJECTS/dot-python/`
+- `src/dot_work/version/` → `EXPORTED_PROJECTS/dot-version/`
+
+### Importance
+**MEDIUM**: These extractions complete the module split. Can proceed in parallel after SPLIT-101 validates the process.
+
+### Proposed Solution
+Execute in parallel (after SPLIT-101 completes):
+1. **SPLIT-008** (medium.md): Extract dot-container
+   - Extract to `EXPORTED_PROJECTS/dot-container/`
+   - Active development coordination (FEAT-027, FEAT-028)
+   - **Validate**: SHA256 hashes match for all copied files
+2. **SPLIT-009** (medium.md): Extract dot-git
+   - Extract to `EXPORTED_PROJECTS/dot-git/`
+   - Handle LLM optional dependencies
+   - **Validate**: SHA256 hashes match for all copied files
+3. **SPLIT-010** (medium.md): Extract dot-harness
+   - Extract to `EXPORTED_PROJECTS/dot-harness/`
+   - Smallest submodule (2 test files)
+   - **Validate**: SHA256 hashes match for all copied files
+4. **SPLIT-011** (medium.md): Extract dot-overview
+   - Extract to `EXPORTED_PROJECTS/dot-overview/`
+   - Isolate libcst dependency (~50MB)
+   - **Validate**: SHA256 hashes match for all copied files
+5. **SPLIT-012** (medium.md): Extract dot-python
+   - Extract to `EXPORTED_PROJECTS/dot-python/`
+   - Preserve `pybuilder` alias
+   - **Validate**: SHA256 hashes match for all copied files
+6. **SPLIT-013** (medium.md): Extract dot-version
+   - Extract to `EXPORTED_PROJECTS/dot-version/`
+   - Handle LLM optional dep for changelog
+   - **Validate**: SHA256 hashes match for all copied files
+
+### Acceptance Criteria
+- [ ] All 6 repositories created in `EXPORTED_PROJECTS/`
+- [ ] All unit tests pass in each new package
+- [ ] All integration tests pass in each new package
+- [ ] Each package works standalone
+- [ ] Each package registers as plugin correctly
+- [ ] Optional dependencies work where applicable
+- [ ] **Validation**: SHA256 hashes match for all copied files across all 6 packages
+- [ ] **Validation**: File counts match between source and destination
+- [ ] **Validation**: Validation report generated with no mismatches
+
+### Dependencies
+Blocked by: SPLIT-100, SPLIT-101 (validation of extraction process)
+Blocks: SPLIT-103 (integration), SPLIT-104 (final packaging)
+
+### Related Issues
+- SPLIT-008@h8i9j0 in medium.md
+- SPLIT-009@i9j0k1 in medium.md
+- SPLIT-010@j0k1l2 in medium.md
+- SPLIT-011@k1l2m3 in medium.md
+- SPLIT-012@l2m3n4 in medium.md
+- SPLIT-013@m3n4o5 in medium.md
+
+### Notes
+Coordinate with container module active development (FEAT-027, FEAT-028 in shortlist).
+
+**Final EXPORTED_PROJECTS Structure (after SPLIT-102):**
+```
+dot-work/
+├── EXPORTED_PROJECTS/
+│   ├── dot-issues/        (from SPLIT-101)
+│   ├── dot-kg/            (from SPLIT-101)
+│   ├── dot-review/        (from SPLIT-101)
+│   ├── dot-container/     (from SPLIT-102)
+│   ├── dot-git/           (from SPLIT-102)
+│   ├── dot-harness/       (from SPLIT-102)
+│   ├── dot-overview/      (from SPLIT-102)
+│   ├── dot-python/        (from SPLIT-102)
+│   └── dot-version/       (from SPLIT-102)
+└── ... (existing dot-work files)
+```
+
+**Validation Report:**
+After each extraction, the script generates `EXPORTED_PROJECTS/validation-report.md` containing:
+- Package name and version
+- Source file paths and hashes
+- Destination file paths and hashes
+- File count comparison
+- List of any mismatches (should be empty)
+
+---
+id: "SPLIT-103@d4e5f6"
+title: "Phase 3: Integration testing and core package updates"
+description: "Create integration tests and update core dot-work package for plugin architecture"
+created: 2026-01-02
+section: "split/phase3/integration"
+tags: [split, phase3, integration, testing, has-deps]
+type: test
+priority: high
+status: proposed
+references:
+  - split.md
+  - .work/agent/issues/high.md:SPLIT-007
+  - .work/agent/issues/medium.md:SPLIT-014
+
+### Problem
+After all extractions, need to verify the plugin ecosystem works correctly and update the core package dependencies.
+
+### Affected Files
+- CREATE: `tests/integration/test_plugin_ecosystem.py`
+- MODIFY: `pyproject.toml` (remove submodule deps, add optional plugin groups)
+- MODIFY: `src/dot_work/cli.py` (final cleanup)
+
+### Importance
+**HIGH**: Critical for release confidence. Verifies that the split maintains backward compatibility.
+
+### Proposed Solution
+Execute in order:
+1. **SPLIT-014** (medium.md): Create integration test suite
+   - Test core CLI with no plugins installed
+   - Test plugin discovery with mocked plugins
+   - Test graceful degradation
+   - Test full ecosystem with all plugins
+2. **SPLIT-007** (high.md): Update pyproject.toml
+   - Reduce base dependencies to 5 packages
+   - Add all 9 plugins as optional deps
+   - Add `dot-work[all]` convenience group
+   - Verify wheel size reduced by >50%
+
+### Acceptance Criteria
+- [ ] Integration tests pass for core without plugins
+- [ ] Integration tests pass for plugin discovery
+- [ ] Integration tests pass for plugin CLI registration
+- [ ] Integration tests pass for mixed plugin scenarios
+- [ ] Base dependencies reduced to 5 packages
+- [ ] All 9 plugins available as optional deps
+- [ ] `pip install dot-work` installs minimal package
+- [ ] `pip install dot-work[all]` installs everything
+- [ ] Wheel size reduced by >50%
+
+### Dependencies
+Blocked by: SPLIT-101, SPLIT-102 (all extractions complete)
+Blocks: SPLIT-104 (documentation and release)
+
+### Related Issues
+- SPLIT-007@g7h8i9 in high.md
+- SPLIT-014@n4o5p6 in medium.md
+
+### Notes
+Run full test suite in CI before proceeding to documentation.
+
+---
+id: "SPLIT-104@e5f6g7"
+title: "Phase 4: Documentation updates and release preparation"
+description: "Update all documentation and prepare for release of split packages"
+created: 2026-01-02
+section: "split/phase4/documentation"
+tags: [split, phase4, documentation, release]
+type: docs
+priority: medium
+status: proposed
+references:
+  - split.md
+  - .work/agent/issues/medium.md:SPLIT-015
+  - README.md
+
+### Problem
+After splitting, documentation must explain the new plugin installation patterns and migration path for existing users.
+
+### Affected Files
+- MODIFY: `README.md` (installation section)
+- CREATE: `docs/plugins.md` (plugin documentation)
+- CREATE: `docs/migration-to-plugins.md` (migration guide)
+- CREATE: Each extracted package README.md
+
+### Importance
+**MEDIUM**: Documentation is essential for adoption but can be done near end.
+
+### Proposed Solution
+1. **SPLIT-015** (medium.md): Update main dot-work documentation
+   - Update README.md installation section
+   - Create docs/plugins.md
+   - Create migration guide for existing users
+2. **Create package READMEs**: Each extracted package needs:
+   - Description and purpose
+   - Installation instructions
+   - Usage examples
+   - Link to main dot-work repo
+
+### Acceptance Criteria
+- [ ] README.md reflects plugin architecture
+- [ ] Installation examples for all patterns (core, all, selective)
+- [ ] docs/plugins.md created with all plugins documented
+- [ ] Migration guide created for existing users
+- [ ] All doc links work (link check passes)
+- [ ] Each extracted package has README.md
+
+### Dependencies
+Blocked by: SPLIT-103 (integration complete)
+Blocks: None (this is the final step)
+
+### Related Issues
+- SPLIT-015@o5p6q7 in medium.md
+
+### Notes
+After this phase, all packages are ready for release to PyPI.
+
+---
