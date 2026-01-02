@@ -4,6 +4,19 @@
 
 Works with: GitHub Copilot, Claude Code, Cursor, Windsurf, Aider, Continue.dev, Amazon Q, Zed AI, OpenCode, and more.
 
+> **Note:** The dot-work project is migrating to a plugin architecture. The following submodules have been extracted to standalone packages:
+> - **dot-issues**: SQLite-based issue tracking
+> - **dot-kg**: Knowledge graph with FTS5 search
+> - **dot-review**: Interactive code review with web UI
+> - **dot-container**: Docker provisioning for AI agents
+> - **dot-git**: Git history analysis and metrics
+> - **dot-harness**: Claude Agent SDK integration
+> - **dot-overview**: Codebase overview generation
+> - **dot-python**: Python build and scan utilities
+> - **dot-version**: Date-based version management
+>
+> See [docs/plugins.md](docs/plugins.md) for details on the plugin architecture.
+
 ## 🎯 What This Does
 
 This tool provides **12 AI agent prompts** for:
