@@ -11,23 +11,18 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from dot_work.container.provision.cli import app as container_provision_app
 from dot_work.environments import ENVIRONMENTS
-from dot_work.git.cli import history_app
-from dot_work.harness.cli import app as harness_app
 from dot_work.installer import (
     discover_available_environments,
     get_prompts_dir,
     initialize_work_directory,
     install_prompts,
 )
-from dot_work.knowledge_graph.cli import app as kg_app
 from dot_work.overview.pipeline import analyze_project, write_outputs
-from dot_work.python import python_app
+from dot_work.plugins import discover_plugins, register_all_plugins
 from dot_work.skills.cli import app as skills_app
 from dot_work.subagents.cli import app as subagents_app
 from dot_work.utils.sanitization import sanitize_error_message
-from dot_work.version.cli import app as version_app
 from dot_work.zip.cli import app as zip_app
 
 logger = logging.getLogger(__name__)
@@ -50,12 +45,6 @@ canonical_app = typer.Typer(help="Validate and install canonical prompt files.")
 
 # Create subcommand group for prompt management
 prompt_app = typer.Typer(help="Create and manage canonical prompt files.")
-
-# Create subcommand group for container operations
-container_app = typer.Typer(help="Container-based operations.")
-
-# Create subcommand group for git operations
-git_app = typer.Typer(help="Git analysis tools.")
 
 
 def detect_environment(target: Path) -> str | None:
@@ -551,6 +540,40 @@ def _status_simple(
         console.print(f"  {priority.capitalize()}: {count}")
 
     console.print(f"  Total: {total}")
+
+
+@app.command("plugins")
+def plugins_cmd() -> None:
+    """List installed dot-work plugins."""
+    plugins_list = discover_plugins()
+
+    if not plugins_list:
+        console.print("[yellow]⚠ No plugins installed[/yellow]")
+        console.print("\n[dim]Plugins can be installed with pip:[/dim]")
+        console.print("  pip install dot-issues    # Issue tracking")
+        console.print("  pip install dot-kg        # Knowledge graph")
+        console.print("  pip install dot-review    # Code review")
+        console.print("  pip install dot-container  # Docker containers")
+        console.print("  pip install dot-git       # Git analysis")
+        console.print("  pip install dot-python    # Python build tools")
+        console.print("  pip install dot-version   # Version management")
+        console.print("\n[dim]Or install all plugins:[/dim]")
+        console.print("  pip install 'dot-work[all]'")
+        return
+
+    table = Table(title="🔌 Installed Plugins")
+    table.add_column("Plugin", style="cyan")
+    table.add_column("Command", style="green")
+    table.add_column("Version", style="yellow")
+    table.add_column("Module", style="dim")
+
+    for plugin in plugins_list:
+        command = plugin.cli_group if plugin.cli_group else plugin.name
+        version = plugin.version if plugin.version else "-"
+        table.add_row(plugin.name, command, version, plugin.module)
+
+    console.print(table)
+    console.print(f"\n[green]✓ {len(plugins_list)} plugin(s) installed[/green]")
 
 
 def prompt_for_environment(discovered_envs: dict[str, set[str]] | None = None) -> str:
@@ -1181,38 +1204,27 @@ app.add_typer(prompt_app, name="prompts")
 # Register the review subcommand group
 app.add_typer(review_app, name="review")
 
-# Register the knowledge graph subcommand group
-app.add_typer(kg_app, name="kg")
-
-# Register the version subcommand group
-app.add_typer(version_app, name="version")
-
-# Register the zip subcommand group
+# Register the zip subcommand group (retained in core)
 app.add_typer(zip_app, name="zip")
 
-# Register the container subcommand group
-app.add_typer(container_app, name="container")
-
-# Register the python subcommand group
-app.add_typer(python_app, name="python")
-
-# Register the git subcommand group
-app.add_typer(git_app, name="git")
-
-# Register the harness subcommand group
-app.add_typer(harness_app, name="harness")
-
-# Register the history subcommand under git
-git_app.add_typer(history_app, name="history")
-
-# Register the provision subcommand under container
-container_app.add_typer(container_provision_app, name="provision")
-
-# Register the skills subcommand group
+# Register the skills subcommand group (retained in core)
 app.add_typer(skills_app, name="skills")
 
-# Register the subagents subcommand group
+# Register the subagents subcommand group (retained in core)
 app.add_typer(subagents_app, name="subagents")
+
+# Discover and register all plugins
+# This registers submodules that have been extracted as plugins:
+# - container (dot-container)
+# - git (dot-git)
+# - harness (dot-harness)
+# - knowledge_graph (dot-kg)
+# - python (dot-python)
+# - version (dot-version)
+# - review (dot-review)
+# - db_issues (dot-issues)
+# - overview (dot-overview)
+register_all_plugins(app)
 
 
 if __name__ == "__main__":
