@@ -18,55 +18,52 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development",
 ]
+# Core dependencies only - submodules are now optional plugins
 dependencies = [
     "typer>=0.12.0",
     "rich>=13.0.0",
     "pyyaml>=6.0.0",
-    # db-issues module dependencies
-    "sqlmodel>=0.0.22",
-    "jinja2>=3.1.0",
-    "radon>=6.0.0",
-    # knowledge graph module dependencies
-    "numpy>=1.24.0",
-    # version module dependencies
-    "GitPython>=3.1.0",
-    "python-dotenv>=1.0.0",
-    # zip module dependencies
-    "gitignore-parser>=0.1.0",
-    # review module dependencies
-    "fastapi>=0.115.0",
-    "uvicorn>=0.32.0",
-    "pydantic>=2.6.0",
-    # container provision module dependencies
-    "python-frontmatter>=1.1.0",
-    # overview module dependencies
-    "libcst>=1.1.0",
-    # git module dependencies
-    "tqdm>=4.66.0",
+    # Core features that remain in dot-work
+    "GitPython>=3.1.0",  # For prompts module (git operations)
+    "python-dotenv>=1.0.0",  # For version module
+    "gitignore-parser>=0.1.0",  # For zip module
 ]
 
 [project.optional-dependencies]
-# zip optional features (zip module upload)
+# Plugin bundles - install all or individual plugins
+# Note: These are placeholder groups for when plugins are published
+# To install plugins, use: pip install dot-issues dot-kg dot-review etc.
+all = [
+    # When plugins are published, install all with:
+    # pip install 'dot-work[all]' dot-issues dot-kg dot-review dot-container
+    #                      dot-git dot-harness dot-overview dot-python dot-version
+    "requests>=2.28.0",  # zip-upload
+    "httpx>=0.27.0",  # kg-http, version-llm
+    "hnswlib>=0.8.0",  # kg-ann
+    "sqlite-vec>=0.1.0",  # kg-vec
+    "openai>=1.0.0",  # git-llm
+    "anthropic>=0.3.0",  # git-llm
+    "networkx>=3.0",  # scan-graph
+    "pyvis>=0.3.0",  # scan-graph
+    "claude-agent-sdk>=0.1.0",  # harness
+    "anyio>=4.0.0",  # harness
+]
+# Individual plugin features (for backward compatibility during migration)
 zip-upload = ["requests>=2.28.0"]
-# kg optional features (knowledge graph module)
 kg-http = ["httpx>=0.27.0"]
 kg-ann = ["hnswlib>=0.8.0"]
-kg-vec = ["sqlite-vec>=0.1.0"]  # Zero-dep vector search for SQLite
+kg-vec = ["sqlite-vec>=0.1.0"]
 kg-all = [
     "httpx>=0.27.0",
     "hnswlib>=0.8.0",
     "sqlite-vec>=0.1.0",
 ]
-# git module optional features (LLM summarization)
 git-llm = [
     "openai>=1.0.0",
     "anthropic>=0.3.0",
 ]
-# version module optional features (LLM-enhanced changelog)
 version-llm = ["httpx>=0.24.0"]
-# scan optional features (dependency visualization)
 scan-graph = ["networkx>=3.0", "pyvis>=0.3.0"]
-# harness optional features (Claude Agent SDK)
 harness = [
     "claude-agent-sdk>=0.1.0",
     "anyio>=4.0.0",
