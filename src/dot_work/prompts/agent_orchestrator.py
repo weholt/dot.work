@@ -38,12 +38,8 @@ class OrchestratorState:
     last_issue: str | None = None
     cycles: int = 0
     completed_issues: list[str] = field(default_factory=list)
-    start_time: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
-    last_update: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    start_time: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    last_update: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def should_abort_infinite_loop(self) -> bool:
         """Check if orchestrator should abort due to infinite loop.
@@ -51,10 +47,7 @@ class OrchestratorState:
         Returns:
             True if 3+ cycles with no completed issues.
         """
-        return (
-            self.cycles >= MAX_CYCLES_BEFORE_ABORT
-            and len(self.completed_issues) == 0
-        )
+        return self.cycles >= MAX_CYCLES_BEFORE_ABORT and len(self.completed_issues) == 0
 
     def should_stop_cycle_limit(self, max_cycles: int) -> bool:
         """Check if orchestrator should stop due to cycle limit.

@@ -6,6 +6,7 @@ from multiple sources (native and canonical).
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from dot_work.subagents.environments import get_adapter
@@ -15,6 +16,8 @@ from dot_work.subagents.models import (
     SubagentMetadata,
 )
 from dot_work.subagents.parser import SUBAGENT_PARSER
+
+logger = logging.getLogger(__name__)
 
 
 class SubagentDiscovery:
@@ -74,8 +77,9 @@ class SubagentDiscovery:
             try:
                 config = self.adapter.parse_native(file_path.read_text(encoding="utf-8"))
                 subagents.append(config)
-            except Exception:
+            except Exception as e:
                 # Skip files that fail to parse
+                logger.debug(f"Skipping unparsable file {file_path}: {e}")
                 continue
 
         return subagents
@@ -101,8 +105,9 @@ class SubagentDiscovery:
                 try:
                     subagent = SUBAGENT_PARSER.parse(file_path)
                     subagents.append(subagent)
-                except Exception:
+                except Exception as e:
                     # Skip files that fail to parse
+                    logger.debug(f"Skipping unparsable canonical file {file_path}: {e}")
                     continue
 
         return subagents

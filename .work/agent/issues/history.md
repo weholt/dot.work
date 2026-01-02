@@ -4,6 +4,159 @@ Issues that have been completed and validated.
 
 ---
 ---
+id: "SPLIT-107@h9i0j1"
+title: "Validate main project works after submodule removal"
+description: "Comprehensive validation that main dot-work project functions correctly after removing all submodule source code and tests"
+completed: 2026-01-02
+section: "split/validation"
+tags: [split, validation, testing, critical, has-deps]
+type: test
+priority: critical
+status: completed
+references:
+  - scripts/validate-migration.py
+  - src/dot_work/cli.py
+  - validation-report.json
+
+### Outcome
+**COMPLETED 2026-01-02:** All validation checks passed after submodule removal.
+
+**Implementation:**
+- Created `scripts/validate-migration.py` comprehensive validation script with:
+  - Source structure validation (core modules remain, forbidden modules removed)
+  - Import validation (no broken imports, allows try/except wrapped imports)
+  - Core commands validation (all core commands work)
+  - Test structure validation (submodule tests removed)
+  - JSON report generation with detailed results
+  - CLI interface: --check, --verbose, --report options
+
+**Changes Made:**
+- Removed `overview` command from cli.py (imports from removed dot_work.overview)
+- Review commands remain with try/except blocks (safe fallback to ImportError message)
+- All 9 submodules successfully moved to `.temp-original-submodules/` in SPLIT-106
+
+**Validation Results (4/4 checks passed):**
+1. ✓ Source structure: Only core modules remain in src/dot_work/
+2. ✓ Imports: No broken imports (try/except wrapped imports allowed)
+3. ✓ Core commands: All 13 core commands work (install, list, detect, init, init-tracking, status, plugins, validate, canonical, prompt, prompts, zip, skills, subagents)
+4. ✓ Test structure: Submodule test directories removed
+
+**Generated Files:**
+- `scripts/validate-migration.py` - Validation script
+- `validation-report.json` - Validation results report
+
+**Verification:**
+- `uv run python -c "import dot_work"` ✓ PASS
+- `uv run python -m dot_work.cli --help` ✓ PASS
+- `uv run python -m dot_work.cli status` ✓ PASS
+- All core commands functional ✓ PASS
+
+---
+---
+id: "SPLIT-106@g8h9i0"
+title: "Create script to move original source folders to temp"
+description: "Create automation script to move original submodule folders from src/dot_work/ to a temporary folder after export"
+completed: 2026-01-02
+section: "split/cleanup"
+tags: [split, automation, cleanup, migration]
+type: refactor
+priority: medium
+status: completed
+references:
+  - scripts/move-original-submodules.py
+  - .temp-original-submodules/
+  - EXPORTED_PROJECTS/
+
+### Outcome
+**COMPLETED 2026-01-02:** Created automation script and successfully moved all 9 original submodules to temp folder.
+
+**Implementation:**
+- Created `scripts/move-original-submodules.py` with full feature set:
+  - Submodule discovery and validation
+  - Move operation with checksum verification
+  - CLI interface: --dry-run, --submodules, --dest, --yes, --force, --tests-only, --source-only, --rollback
+  - Safety checks: exported project existence, conflict detection
+  - Validation: SHA256 checksums, file counts, directory structure
+  - CSV report generation with move statistics
+  - Comprehensive logging
+
+**Results:**
+- All 9 source submodules moved from `src/dot_work/` to `.temp-original-submodules/`
+- Test directories were already moved to `tests.bak/` (from previous migration)
+- 215 total files moved (2.49 MB)
+- All checksums verified and matched
+- CSV report generated at `move-original-submodules-report.csv`
+- Log file generated at `move-original-submodules.log`
+- Core dot-work import still works correctly
+
+**Moved Submodules:**
+1. container: 18 files, 0.14 MB, 2 test dirs
+2. git: 24 files, 0.37 MB, 2 test dirs
+3. harness: 8 files, 0.04 MB, 1 test dir
+4. db_issues: 50 files, 1.09 MB, 2 test dirs
+5. knowledge_graph: 32 files, 0.35 MB, 2 test dirs
+6. overview: 14 files, 0.08 MB, 1 test dir
+7. python: 38 files, 0.22 MB, 2 test dirs
+8. review: 17 files, 0.11 MB, 2 test dirs
+9. version: 14 files, 0.09 MB, 1 test dir
+
+**Validation:**
+- Script created and executable
+- Dry run tested successfully
+- Full move executed with --yes flag
+- All 9/9 submodules moved successfully
+- Checksum verification passed for all files
+- Import test passed: `uv run python -c "import dot_work"`
+- Report and log files generated
+
+---
+---
+---
+id: "SPLIT-105@f7g8h9"
+title: "Add build.py script to all exported projects"
+description: "Copy and adapt build.py script to each exported project and validate build processes"
+completed: 2026-01-02
+section: "split/build-scripts"
+tags: [split, build, automation, validation, has-deps]
+type: refactor
+priority: high
+status: completed
+references:
+  - scripts/build.py
+  - split.md
+  - EXPORTED_PROJECTS/
+
+### Outcome
+Successfully added build.py scripts to all 9 exported projects and validated code quality.
+
+**Projects Validated:**
+1. dot-container - PASS
+2. dot-git - PASS
+3. dot-harness - PASS
+4. dot-issues - PASS
+5. dot-kg - PASS
+6. dot-overview - PASS
+7. dot-python - PASS
+8. dot-review - PASS
+9. dot-version - PASS
+
+**Issues Fixed During Validation:**
+- Added `types-PyYAML>=6.0.0` to dot-git, dot-python, dot-version, dot-issues
+- Added `jinja2>=3.1.0` to dot-version dependencies
+- Added mypy overrides for radon, jinja2, git, gitpython modules
+- Created local `sanitize_error_message()` utilities in dot-git and dot-issues
+- Removed invalid `# type: ignore[import-untyped]` comments
+
+**Validation Results:**
+- All 9 projects have scripts/build.py with correct source paths
+- All scripts are executable
+- All 9 projects run `uv sync` successfully
+- All 9 projects pass `uv run ruff format`
+- All 9 projects pass `uv run ruff check`
+- All 9 projects pass `uv run mypy`
+
+---
+---
 id: "FEAT-026@d0e6f2"
 title: "Context and file injection for Dockerized OpenCode containers"
 description: "Add support for injecting additional context, files, documentation, and configuration into OpenCode containers at runtime or build time"

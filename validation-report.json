@@ -1,0 +1,67 @@
+{
+  "timestamp": 1767374896.7775335,
+  "total_checks": 4,
+  "passed": 4,
+  "failed": 0,
+  "results": [
+    {
+      "check_name": "source_structure",
+      "passed": true,
+      "message": "Source structure is correct",
+      "details": {
+        "forbidden_found": 0,
+        "core_missing": 0,
+        "forbidden_list": [],
+        "missing_list": []
+      }
+    },
+    {
+      "check_name": "imports",
+      "passed": true,
+      "message": "No broken imports found",
+      "details": {
+        "import_ok": true,
+        "import_error": "",
+        "forbidden_count": 0,
+        "forbidden_imports": []
+      }
+    },
+    {
+      "check_name": "core_commands",
+      "passed": true,
+      "message": "All core commands available",
+      "details": {
+        "cli_ok": true,
+        "commands_found": 14,
+        "commands_missing": 0,
+        "found_list": [
+          "install",
+          "list",
+          "detect",
+          "init",
+          "init-tracking",
+          "status",
+          "plugins",
+          "validate",
+          "canonical",
+          "prompt",
+          "prompts",
+          "zip",
+          "skills",
+          "subagents"
+        ],
+        "missing_list": []
+      }
+    },
+    {
+      "check_name": "test_structure",
+      "passed": true,
+      "message": "Test directories properly cleaned up",
+      "details": {
+        "problems_found": 0,
+        "problem_list": [],
+        "temp_backup_exists": true
+      }
+    }
+  ]
+}

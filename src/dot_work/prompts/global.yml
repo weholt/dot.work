@@ -46,4 +46,4 @@ defaults:
 
     copilot:
       target: ".github/prompts/"
-      filename_suffix: ".prompt.md"
+      filename_suffix: ".md"

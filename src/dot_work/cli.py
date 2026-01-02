@@ -18,7 +18,6 @@ from dot_work.installer import (
     initialize_work_directory,
     install_prompts,
 )
-from dot_work.overview.pipeline import analyze_project, write_outputs
 from dot_work.plugins import discover_plugins, register_all_plugins
 from dot_work.skills.cli import app as skills_app
 from dot_work.subagents.cli import app as subagents_app
@@ -37,8 +36,7 @@ console = Console()
 # Create subcommand group for validate
 validate_app = typer.Typer(help="Validate files for syntax and schema errors.")
 
-# Create subcommand group for review
-review_app = typer.Typer(help="Interactive code review with AI-friendly export.")
+# Review subcommand group has been exported to dot-review plugin
 
 # Create subcommand group for canonical prompts
 canonical_app = typer.Typer(help="Validate and install canonical prompt files.")
@@ -284,49 +282,6 @@ def init_tracking(
 
     console.print("\n[bold green]✅ Work directory initialized![/bold green]")
     console.print("[dim]Next: Run 'generate-baseline' before making code changes[/dim]")
-
-
-@app.command("overview")
-def overview(
-    input_dir: Annotated[
-        Path,
-        typer.Argument(
-            ...,
-            exists=True,
-            resolve_path=True,
-            help="Folder containing the project to scan.",
-        ),
-    ],
-    output_dir: Annotated[
-        Path,
-        typer.Argument(
-            ...,
-            exists=False,
-            resolve_path=False,
-            help="Where to store the generated markdown and JSON files.",
-        ),
-    ],
-) -> None:
-    """Generate a bird's-eye overview of a codebase.
-
-    Scans the project for Python files and markdown documentation, then generates:
-    - birdseye_overview.md: Human-readable project guide
-    - features.json: Structured feature data for LLMs
-    - documents.json: Cross-referenceable documentation sections
-    """
-    console.print(f"[cyan]🔍 Scanning project:[/cyan] {input_dir}\n")
-
-    bundle = analyze_project(input_dir)
-    destinations = write_outputs(bundle, output_dir)
-
-    console.print("[green]✓ Scan complete. Deliverables:[/green]")
-    for label, path in destinations.items():
-        console.print(f"  [dim]{label}:[/dim] {path}")
-
-    console.print("\n[bold green]✅ Overview generated![/bold green]")
-    console.print(
-        f"[dim]Found {len(bundle.features)} features, {len(bundle.models)} models, {len(bundle.documents)} document sections[/dim]"
-    )
 
 
 @app.command("status")
@@ -807,198 +762,7 @@ def validate_yaml_cmd(
 app.add_typer(validate_app, name="validate")
 
 
-# =============================================================================
-# Review Subcommands
-# =============================================================================
-
-
-@review_app.command("start")
-def review_start(
-    port: Annotated[
-        int,
-        typer.Option(
-            "--port",
-            "-p",
-            help="Port to run the review server on",
-        ),
-    ] = 8765,
-    base: Annotated[
-        str | None,
-        typer.Option(
-            "--base",
-            "-b",
-            help="Base commit/branch to diff against (default: HEAD~1)",
-        ),
-    ] = None,
-    head: Annotated[
-        str | None,
-        typer.Option(
-            "--head",
-            help="Head commit/branch to diff (default: working tree)",
-        ),
-    ] = None,
-) -> None:
-    """Start the interactive code review server.
-
-    Opens a local web interface for reviewing changes in your git repository.
-    Add comments and suggestions, then export them for AI agents.
-    """
-    try:
-        from dot_work.review.server import run_server
-    except ImportError as e:
-        console.print(f"[red]❌ Review module dependencies missing:[/red] {e}")
-        console.print("[dim]Install with: pip install fastapi uvicorn[/dim]")
-        raise typer.Exit(1) from None
-
-    console.print(f"\n[bold blue]🔍 Starting code review server on port {port}...[/bold blue]\n")
-    console.print(f"[dim]Base: {base or 'HEAD~1'}, Head: {head or 'working tree'}[/dim]")
-    console.print(f"\n[green]→[/green] Open http://localhost:{port} in your browser\n")
-
-    run_server(host="127.0.0.1", port=port, base=base, head=head)
-
-
-@review_app.command("export")
-def review_export(
-    output: Annotated[
-        Path | None,
-        typer.Option(
-            "--output",
-            "-o",
-            help="Output file path (default: .work/reviews/review.md)",
-        ),
-    ] = None,
-    review_id: Annotated[
-        str | None,
-        typer.Option(
-            "--review-id",
-            "-r",
-            help="Specific review ID to export (default: latest)",
-        ),
-    ] = None,
-) -> None:
-    """Export review comments as agent-friendly markdown.
-
-    Generates a markdown file with all comments and suggestions that can
-    be used as context for AI coding agents.
-    """
-    try:
-        from dot_work.review.exporter import export_agent_md
-        from dot_work.review.git import repo_root
-        from dot_work.review.storage import latest_review_id, load_comments
-    except ImportError as e:
-        console.print(f"[red]❌ Review module dependencies missing:[/red] {e}")
-        raise typer.Exit(1) from None
-
-    # Get repository root
-    try:
-        root = repo_root(".")
-    except Exception as e:
-        logger.error(f"Repository detection error: {e}", exc_info=True)
-        console.print(f"[red]❌ Not in a git repository:[/red] {sanitize_error_message(e)}")
-        raise typer.Exit(1) from None
-
-    # Determine review ID
-    rid = review_id or latest_review_id(root)
-    if not rid:
-        console.print("[yellow]⚠ No reviews found[/yellow]")
-        console.print("[dim]Start a review with: dot-work review start[/dim]")
-        raise typer.Exit(1)
-
-    # Load comments
-    comments = load_comments(root, rid)
-    if not comments:
-        console.print(f"[yellow]⚠ No comments in review {rid}[/yellow]")
-        raise typer.Exit(1)
-
-    # Export
-    output_path = export_agent_md(root, rid)
-    if output:
-        # Copy to user-specified path
-        import shutil
-
-        shutil.copy(output_path, output)
-        output_path = output.resolve()
-
-    console.print(f"[green]✅ Exported {len(comments)} comments to:[/green] {output_path}")
-    console.print("[dim]Tip: Reference this file in your AI agent prompt[/dim]")
-
-
-@review_app.command("clear")
-def review_clear(
-    review_id: Annotated[
-        str | None,
-        typer.Option(
-            "--review-id",
-            "-r",
-            help="Specific review ID to clear (default: all reviews)",
-        ),
-    ] = None,
-    force: Annotated[
-        bool,
-        typer.Option(
-            "--force",
-            "-f",
-            help="Clear without confirmation",
-        ),
-    ] = False,
-) -> None:
-    """Clear review comments from storage.
-
-    Removes stored comments for a specific review or all reviews.
-    """
-    try:
-        from dot_work.review.config import get_config
-        from dot_work.review.git import repo_root
-    except ImportError as e:
-        console.print(f"[red]❌ Review module dependencies missing:[/red] {e}")
-        raise typer.Exit(1) from None
-
-    # Get repository root
-    try:
-        root = repo_root(".")
-    except Exception as e:
-        logger.error(f"Repository detection error: {e}", exc_info=True)
-        console.print(f"[red]❌ Not in a git repository:[/red] {sanitize_error_message(e)}")
-        raise typer.Exit(1) from None
-
-    config = get_config()
-    storage_dir = Path(root) / config.storage_dir / "reviews"
-
-    if not storage_dir.exists():
-        console.print("[yellow]⚠ No reviews directory found[/yellow]")
-        return
-
-    if review_id:
-        # Clear specific review
-        review_file = storage_dir / f"{review_id}.jsonl"
-        if not review_file.exists():
-            console.print(f"[yellow]⚠ Review not found:[/yellow] {review_id}")
-            raise typer.Exit(1)
-
-        if not force:
-            if not typer.confirm(f"Clear review {review_id}?"):
-                raise typer.Abort()
-
-        review_file.unlink()
-        console.print(f"[green]✅ Cleared review:[/green] {review_id}")
-    else:
-        # Clear all reviews
-        jsonl_files = list(storage_dir.glob("*.jsonl"))
-        if not jsonl_files:
-            console.print("[yellow]⚠ No reviews to clear[/yellow]")
-            return
-
-        if not force:
-            if not typer.confirm(f"Clear all {len(jsonl_files)} reviews?"):
-                raise typer.Abort()
-
-        for f in jsonl_files:
-            f.unlink()
-        console.print(f"[green]✅ Cleared {len(jsonl_files)} reviews[/green]")
-
-
-# Register the review subcommand group
-app.add_typer(review_app, name="review")
+# Review subcommands have been exported to dot-review plugin
 
 
 @canonical_app.command("validate")
@@ -1201,8 +965,7 @@ app.add_typer(canonical_app, name="canonical")
 app.add_typer(prompt_app, name="prompt")
 app.add_typer(prompt_app, name="prompts")
 
-# Register the review subcommand group
-app.add_typer(review_app, name="review")
+# Review subcommand group is registered via dot-review plugin
 
 # Register the zip subcommand group (retained in core)
 app.add_typer(zip_app, name="zip")

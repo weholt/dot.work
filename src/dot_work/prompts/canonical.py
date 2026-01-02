@@ -13,7 +13,7 @@ meta:
 environments:
   copilot:
     target: ".github/prompts/"
-    filename_suffix: ".prompt.md"
+    filename_suffix: ".md"
 
   claude:
     target: ".claude/"
@@ -45,16 +45,15 @@ def _deep_merge(a: dict, b: dict) -> dict:
     Special handling for environment configs: if local (b) specifies 'filename',
     any 'filename_suffix' from global (a) is removed, and vice versa.
 
-    Special case: If local value v is an empty dict {}, it overrides global
-    defaults completely (user's intent to explicitly disable).
+    Empty local dict {} does NOT override global defaults - global values are used.
+    This allows prompts to explicitly declare environments section while relying
+    on global defaults.
     """
     result = copy.deepcopy(a)
     for k, v in b.items():
         if k in result and isinstance(result[k], dict) and isinstance(v, dict):
-            # Special case: empty local dict overrides global defaults
-            if v == {}:
-                result[k] = {}
-            else:
+            # Recursively merge non-empty dicts (empty local dict preserves global defaults)
+            if v:
                 result[k] = _deep_merge(result[k], v)
                 # Handle filename/filename_suffix mutual exclusion for environment configs
                 if "filename" in v or "filename_suffix" in v:
@@ -414,8 +413,8 @@ def generate_environment_prompt(prompt: CanonicalPrompt, env_name: str) -> tuple
         base_name = re.sub(r"[^a-z0-9_-]", "-", base_name)
         filename = base_name + env_config.filename_suffix
     else:
-        # Default to environment name + .prompt.md
-        filename = f"{env_name}.prompt.md"
+        # Default to environment name + .md
+        filename = f"{env_name}.md"
 
     # Generate frontmatter for this environment
     env_frontmatter = {

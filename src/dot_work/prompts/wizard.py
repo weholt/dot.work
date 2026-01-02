@@ -66,7 +66,7 @@ PROMPT_TYPES: dict[str, PromptType] = {
 # Environment target configurations
 ENVIRONMENT_TARGETS: dict[str, tuple[str, str]] = {
     "claude": (".claude/commands/", ".md"),
-    "copilot": (".github/prompts/", ".prompt.md"),
+    "copilot": (".github/prompts/", ".md"),
     "cursor": (".cursor/rules/", ".mdc"),
     "windsurf": (".windsurf/rules/", ".md"),
     "cline": (".clinerules/", ".md"),
@@ -308,7 +308,7 @@ class PromptWizard:
 
         Args:
             title: Prompt title.
-            suffix: File suffix (e.g., ".prompt.md").
+            suffix: File suffix (e.g., ".md").
 
         Returns:
             Generated filename.
@@ -346,7 +346,7 @@ class PromptWizard:
         prompts_dir = get_prompts_dir()
 
         # Generate filename
-        filename = self._generate_filename(title, ".prompt.md")
+        filename = self._generate_filename(title, ".md")
         prompt_path = prompts_dir / filename
 
         # Check if file already exists

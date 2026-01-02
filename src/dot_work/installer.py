@@ -1263,6 +1263,9 @@ def install_canonical_prompt(
 
     # Build environment-specific frontmatter
     env_config_dict = dict(vars(env_config))
+    # Remove filename and filename_suffix from config since we computed output_filename
+    env_config_dict.pop("filename", None)
+    env_config_dict.pop("filename_suffix", None)
     frontmatter = {
         "meta": prompt.meta,
         "filename": output_filename,

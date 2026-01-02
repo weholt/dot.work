@@ -179,7 +179,7 @@ class TestBuildTemplateContext:
         assert context["prompt_path"] == ".github/prompts"
         assert context["ai_tool"] == "copilot"
         assert context["ai_tool_name"] == "GitHub Copilot (VS Code)"
-        assert context["prompt_extension"] == ".prompt.md"
+        assert context["prompt_extension"] == ".md"
 
     def test_claude_context_values(self) -> None:
         """Verify Claude environment produces correct context."""
@@ -252,7 +252,7 @@ class TestRenderPrompt:
         assert "Path: .github/prompts" in result
         assert "Tool: copilot" in result
         assert "Tool Name: GitHub Copilot (VS Code)" in result
-        assert "Extension: .prompt.md" in result
+        assert "Extension: .md" in result
         # No raw template syntax should remain
         assert "{{" not in result
         assert "}}" not in result
@@ -407,10 +407,10 @@ class TestRealPromptFiles:
         return get_prompts_dir()
 
     def test_setup_issue_tracker_renders_for_copilot(self, real_prompts_dir: Path) -> None:
-        """Verify the real setup-issue-tracker.prompt.md renders for Copilot."""
-        prompt_file = real_prompts_dir / "setup-issue-tracker.prompt.md"
+        """Verify the real setup-issue-tracker.md renders for Copilot."""
+        prompt_file = real_prompts_dir / "setup-issue-tracker.md"
         if not prompt_file.exists():
-            pytest.skip("setup-issue-tracker.prompt.md not found")
+            pytest.skip("setup-issue-tracker.md not found")
 
         result = render_prompt(real_prompts_dir, prompt_file, ENVIRONMENTS["copilot"])
 
@@ -421,10 +421,10 @@ class TestRealPromptFiles:
         assert "{{" not in result or "```" in result  # Allow in code examples
 
     def test_do_work_renders_for_cursor(self, real_prompts_dir: Path) -> None:
-        """Verify the real do-work.prompt.md renders for Cursor."""
-        prompt_file = real_prompts_dir / "do-work.prompt.md"
+        """Verify the real do-work.md renders for Cursor."""
+        prompt_file = real_prompts_dir / "do-work.md"
         if not prompt_file.exists():
-            pytest.skip("do-work.prompt.md not found")
+            pytest.skip("do-work.md not found")
 
         result = render_prompt(real_prompts_dir, prompt_file, ENVIRONMENTS["cursor"])
 

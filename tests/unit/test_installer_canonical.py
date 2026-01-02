@@ -54,20 +54,21 @@ Test prompt body content.
             validate_canonical_prompt_file(prompt_file)
 
     def test_validate_invalid_canonical_file(self) -> None:
-        """Test validating an invalid canonical prompt file."""
+        """Test validating an invalid canonical prompt file with malformed YAML."""
         content = """---
 meta:
   title: "Test"
-environments: {}
+environments: [invalid, yaml, structure]
 
 ---
 
 Content"""
+        # Environments must be a dict, not a list - this is truly invalid
         with tempfile.TemporaryDirectory() as temp_dir:
             prompt_file = Path(temp_dir) / "invalid.canon.md"
             prompt_file.write_text(content, encoding="utf-8")
 
-            with pytest.raises(ValueError, match="Canonical prompt validation failed"):
+            with pytest.raises(ValueError, match="'environments' must be a dictionary"):
                 validate_canonical_prompt_file(prompt_file)
 
     def test_validate_strict_mode_with_warnings(self) -> None:

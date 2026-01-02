@@ -6,10 +6,13 @@ supporting project-local, user-global, and bundled skills.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from dot_work.skills.models import Skill, SkillMetadata
 from dot_work.skills.parser import SKILL_PARSER
+
+logger = logging.getLogger(__name__)
 
 
 class SkillDiscovery:
@@ -94,9 +97,10 @@ class SkillDiscovery:
                 try:
                     metadata = SKILL_PARSER.parse_metadata_only(entry)
                     discovered.append(metadata)
-                except Exception:
+                except Exception as e:
                     # Skip invalid skills during discovery
                     # Use validate() for detailed error reporting
+                    logger.debug(f"Skipping invalid skill {entry}: {e}")
                     continue
 
         # Sort by name for deterministic output

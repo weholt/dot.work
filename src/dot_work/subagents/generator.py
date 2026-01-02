@@ -6,6 +6,7 @@ subagent files from canonical subagent definitions.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from dot_work.subagents.environments import get_adapter
@@ -13,6 +14,8 @@ from dot_work.subagents.models import (
     CanonicalSubagent,
     SubagentConfig,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SubagentGenerator:
@@ -112,8 +115,9 @@ class SubagentGenerator:
             try:
                 path = self.generate_native_file(subagent, env_name, project_root)
                 generated[env_name] = path
-            except Exception:
+            except Exception as e:
                 # Skip environments that fail to generate
+                logger.debug(f"Skipping environment {env_name} for {subagent.meta.name}: {e}")
                 continue
 
         return generated

@@ -7,7 +7,6 @@ system prompts, following the Agent Skills specification format.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from xml.dom import minidom
 
 from dot_work.skills.models import SkillMetadata
 
@@ -59,22 +58,15 @@ def generate_skills_prompt(
             license_elem = ET.SubElement(skill_elem, "license")
             license_elem.text = skill.license
 
-    # Generate pretty XML
-    xml_str = ET.tostring(root, encoding="unicode")
+    # Add indentation for readability (Python 3.9+)
+    ET.indent(root, space="  ")
 
-    # Add indentation for readability
-    dom = minidom.parseString(xml_str)
-    pretty_xml = dom.toprettyxml(indent="  ")
+    # Generate XML string
+    result = ET.tostring(root, encoding="unicode")
 
-    # Clean up XML declaration and extra blank lines
-    lines = [line for line in pretty_xml.split("\n") if line.strip()]
-    if lines and lines[0].startswith("<?xml"):
-        lines = lines[1:]  # Remove XML declaration
-
-    # Fix indentation (minidom adds extra spaces)
-    result = "\n".join(lines)
-    result = result.replace("  <skill>", "\n  <skill>")
-    result = result.replace("</skill>", "</skill>\n")
+    # Remove XML declaration if present
+    if result.startswith("<?xml"):
+        result = result.split("?>", 1)[1].lstrip()
 
     return result
 

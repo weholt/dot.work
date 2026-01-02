@@ -48,8 +48,8 @@ class TestPromptWizard:
 
     def test_generate_filename_from_title(self, wizard: PromptWizard) -> None:
         """Test filename generation from title."""
-        filename = wizard._generate_filename("My Cool Prompt", ".prompt.md")
-        assert filename == "my-cool-prompt.prompt.md"
+        filename = wizard._generate_filename("My Cool Prompt", ".md")
+        assert filename == "my-cool-prompt.md"
 
     def test_generate_filename_with_special_chars(self, wizard: PromptWizard) -> None:
         """Test filename generation with special characters."""
@@ -58,8 +58,8 @@ class TestPromptWizard:
 
     def test_generate_filename_with_spaces(self, wizard: PromptWizard) -> None:
         """Test filename generation with spaces."""
-        filename = wizard._generate_filename("  Spaces Everywhere  ", ".prompt.md")
-        assert filename == "spaces-everywhere.prompt.md"
+        filename = wizard._generate_filename("  Spaces Everywhere  ", ".md")
+        assert filename == "spaces-everywhere.md"
 
     @patch("dot_work.installer.get_prompts_dir")
     def test_create_prompt_file_creates_valid_canonical_prompt(
@@ -80,7 +80,7 @@ class TestPromptWizard:
 
         # Verify file was created
         assert prompt_path.exists()
-        assert prompt_path.name == "test-prompt.prompt.md"
+        assert prompt_path.name == "test-prompt.md"
 
         # Verify it parses as valid canonical prompt
         parser = CanonicalPromptParser()
@@ -172,7 +172,7 @@ class TestPromptWizardIntegration:
 
         # Verify file was created
         assert result.exists()
-        assert result.name == "non-interactive-test.prompt.md"
+        assert result.name == "non-interactive-test.md"
 
         # Verify content
         parser = CanonicalPromptParser()
@@ -220,7 +220,7 @@ class TestEnvironmentTargets:
         """Test Copilot environment target configuration."""
         target, suffix = ENVIRONMENT_TARGETS["copilot"]
         assert target == ".github/prompts/"
-        assert suffix == ".prompt.md"
+        assert suffix == ".md"
 
     def test_cursor_target_configuration(self) -> None:
         """Test Cursor environment target configuration."""
