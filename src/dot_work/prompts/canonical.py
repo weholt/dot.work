@@ -44,17 +44,24 @@ def _deep_merge(a: dict, b: dict) -> dict:
 
     Special handling for environment configs: if local (b) specifies 'filename',
     any 'filename_suffix' from global (a) is removed, and vice versa.
+
+    Special case: If local value v is an empty dict {}, it overrides global
+    defaults completely (user's intent to explicitly disable).
     """
     result = copy.deepcopy(a)
     for k, v in b.items():
         if k in result and isinstance(result[k], dict) and isinstance(v, dict):
-            result[k] = _deep_merge(result[k], v)
-            # Handle filename/filename_suffix mutual exclusion for environment configs
-            if "filename" in v or "filename_suffix" in v:
-                if "filename" in v:
-                    result[k].pop("filename_suffix", None)
-                elif "filename_suffix" in v:
-                    result[k].pop("filename", None)
+            # Special case: empty local dict overrides global defaults
+            if v == {}:
+                result[k] = {}
+            else:
+                result[k] = _deep_merge(result[k], v)
+                # Handle filename/filename_suffix mutual exclusion for environment configs
+                if "filename" in v or "filename_suffix" in v:
+                    if "filename" in v:
+                        result[k].pop("filename_suffix", None)
+                    elif "filename_suffix" in v:
+                        result[k].pop("filename", None)
         else:
             result[k] = copy.deepcopy(v)
     return result

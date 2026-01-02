@@ -17,7 +17,7 @@ class TestScopeCaching:
     def test_cache_key_identical_scopes(self) -> None:
         """Test that identical scopes generate the same cache key."""
         scope1 = ScopeFilter(project="test", topics=["a", "b"])
-        scope2 = ScopeFilter(project="test", topics=["b", "a"])  # Different order
+        _ = ScopeFilter(project="test", topics=["b", "a"])  # Different order
 
         # Both should generate same cache key since topics are sorted
         # We can't directly access the cache key, but we can verify caching works
@@ -27,7 +27,7 @@ class TestScopeCaching:
         db.get_topic_by_name.return_value = MagicMock(topic_id="topic1")
 
         # Mock to avoid actual DB calls
-        result1 = build_scope_sets(db, scope1, use_cache=False)
+        build_scope_sets(db, scope1, use_cache=False)
         assert get_cache_stats()["cache_entries"] == 0
 
     def test_cache_hit_returns_same_result(self) -> None:
@@ -73,7 +73,7 @@ class TestScopeCaching:
         db.get_topic_by_name.return_value = MagicMock(topic_id="topic1")
 
         # First call
-        result1 = build_scope_sets(db, scope, use_cache=True)
+        _ = build_scope_sets(db, scope, use_cache=True)
         call_count_after_first = db.list_collection_members.call_count
 
         # Manually expire the cache by setting old timestamp
@@ -84,7 +84,7 @@ class TestScopeCaching:
             _SCOPE_CACHE_TIMESTAMPS[key] = old_time
 
         # Second call should miss cache and rebuild
-        result2 = build_scope_sets(db, scope, use_cache=True)
+        _ = build_scope_sets(db, scope, use_cache=True)
 
         # Should have called DB again due to cache expiry
         # First call + rebuild after expiry = 2 calls

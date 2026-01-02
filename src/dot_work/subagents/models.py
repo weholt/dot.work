@@ -42,9 +42,7 @@ class SubagentMetadata:
             raise ValueError("Subagent name must be a string")
 
         if not (1 <= len(self.name) <= 64):
-            raise ValueError(
-                f"Subagent name must be 1-64 characters, got {len(self.name)} chars"
-            )
+            raise ValueError(f"Subagent name must be 1-64 characters, got {len(self.name)} chars")
 
         if not self.NAME_PATTERN.match(self.name):
             raise ValueError(

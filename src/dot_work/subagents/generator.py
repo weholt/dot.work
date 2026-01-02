@@ -153,9 +153,7 @@ class SubagentGenerator:
             permissions=base.permissions,  # Not overridable per env
             mode=env_config.mode if env_config.mode is not None else base.mode,
             temperature=(
-                env_config.temperature
-                if env_config.temperature is not None
-                else base.temperature
+                env_config.temperature if env_config.temperature is not None else base.temperature
             ),
             max_steps=env_config.max_steps if env_config.max_steps is not None else base.max_steps,
             skills=env_config.skills if env_config.skills is not None else base.skills,
@@ -194,17 +192,17 @@ class SubagentGenerator:
         for env in environments:
             if env == "claude":
                 lines.append("  claude:")
-                lines.append("    target: \".claude/agents/\"")
+                lines.append('    target: ".claude/agents/"')
                 lines.append("    model: sonnet")
                 lines.append("    permissionMode: default")
             elif env == "opencode":
                 lines.append("  opencode:")
-                lines.append("    target: \".opencode/agent/\"")
+                lines.append('    target: ".opencode/agent/"')
                 lines.append("    mode: subagent")
                 lines.append("    temperature: 0.1")
             elif env == "copilot":
                 lines.append("  copilot:")
-                lines.append("    target: \".github/agents/\"")
+                lines.append('    target: ".github/agents/"')
                 lines.append("    infer: true")
                 lines.append("    tools:")
                 lines.append("      - read")

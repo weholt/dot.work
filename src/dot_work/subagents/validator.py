@@ -82,9 +82,7 @@ class SubagentValidator:
 
         # Check file extension
         if subagent_file.suffix not in {".md", ".markdown"}:
-            warnings.append(
-                f"Subagent file has non-standard extension: {subagent_file.suffix}"
-            )
+            warnings.append(f"Subagent file has non-standard extension: {subagent_file.suffix}")
 
         # Try to parse the file
         from dot_work.subagents.parser import SUBAGENT_PARSER
@@ -287,7 +285,10 @@ class SubagentValidator:
                 f"Valid options: {', '.join(sorted(self.VALID_CLAUDE_MODELS))}"
             )
 
-        if env_config.permission_mode and env_config.permission_mode not in self.VALID_CLAUDE_PERMISSION_MODES:
+        if (
+            env_config.permission_mode
+            and env_config.permission_mode not in self.VALID_CLAUDE_PERMISSION_MODES
+        ):
             warnings.append(
                 f"Claude environment: Unknown permission_mode '{env_config.permission_mode}'"
             )
@@ -300,9 +301,7 @@ class SubagentValidator:
     ) -> None:
         """Validate OpenCode-specific environment configuration."""
         if env_config.mode and env_config.mode not in self.VALID_OPENCODE_MODES:
-            warnings.append(
-                f"OpenCode environment: Unknown mode '{env_config.mode}'"
-            )
+            warnings.append(f"OpenCode environment: Unknown mode '{env_config.mode}'")
 
         if env_config.temperature is not None and not (0.0 <= env_config.temperature <= 2.0):
             errors.append("OpenCode environment: temperature must be between 0.0 and 2.0")

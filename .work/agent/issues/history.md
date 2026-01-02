@@ -4,6 +4,46 @@ Issues that have been completed and validated.
 
 ---
 ---
+id: "FEAT-026@d0e6f2"
+title: "Context and file injection for Dockerized OpenCode containers"
+description: "Add support for injecting additional context, files, documentation, and configuration into OpenCode containers at runtime or build time"
+completed: 2026-01-02
+section: "container/docker/context"
+tags: [feature, docker, containerization, opencode, context-injection, volumes, configuration]
+type: enhancement
+priority: medium
+status: completed
+references:
+  - src/dot_work/container/provision/context.py
+  - src/dot_work/container/provision/cli.py
+  - src/dot_work/container/provision/core.py
+  - tests/unit/container/provision/test_context.py
+  - tests/integration/container/provision/test_context_integration.py
+
+### Outcome
+Implemented complete runtime context injection system:
+- Created `src/dot_work/container/provision/context.py` module with ContextSpec, resolve_context_spec, build_context_volume_args
+- Added CLI options: `--context`, `--context-allowlist`, `--context-denylist`, `--context-override`, `--context-mount-point`
+- Integrated context injection into core.py _build_volume_args
+- Auto-detection of common config files (.claude/, .opencode.json, .github/copilot-instructions.md)
+- Configurable allowlist/denylist via CLI flags or environment variables (CONTEXT_ALLOWLIST, CONTEXT_DENYLIST)
+- Override flag for controlling mount behavior when files exist
+- Default mount point: /root/.context/ (customizable)
+- 15 unit tests + 12 integration tests (all passing)
+- Updated README.md with usage examples and documentation
+
+### Test Results
+```
+tests/unit/container/provision/test_context.py ............ 15 passed
+tests/integration/container/provision/test_context_integration.py ... 12 passed
+```
+
+### Remaining Work
+Build-time context (`--build-context`) deferred as separate future feature.
+Runtime context injection is fully functional and validated.
+
+---
+---
 id: "FEAT-025@c9d5e1"
 title: "Docker image provisioning with OpenCode webui and dynamic port assignment"
 description: "Create containerized OpenCode environment with pre-registered providers, safe credential handling, dynamic ports, and optional GitHub repo cloning"
@@ -3713,5 +3753,67 @@ references:
 - Other skipped tests due to missing CLI features (labels add), not --json issue
 - Issue effectively resolved - existing implementation works correctly
 - Commit: (to be added)
+
+---
+---
+id: "FEAT-027@e1f7g3"
+title: "Runtime URL-based context injection for OpenCode containers"
+description: "Add support for injecting context files, directories, and archives from remote URLs into running containers"
+completed: 2026-01-02
+section: "container/docker/context"
+tags: [feature, docker, containerization, opencode, context-injection, urls, remote-content]
+type: enhancement
+priority: medium
+status: completed
+references:
+  - .work/agent/issues/shortlist.md:FEAT-026@d0e6f2
+  - src/dot_work/container/provision/fetch.py
+  - src/dot_work/container/provision/core.py
+  - src/dot_work/container/provision/cli.py
+
+### Outcome
+- Created `fetch.py` module with URL fetching, ZIP extraction, and caching
+- Added CLI options `--url` and `--url-token` for URL-based context injection
+- HTTPS-only enforcement for security
+- ETag/Last-Modified support for HTTP caching
+- 100MB file size limit with enforcement
+- Automatic .zip archive extraction with path traversal security checks
+- Cache directory at `~/.cache/dot-work/context/`
+- 30 tests passing (20 unit + 10 integration)
+- Uses stdlib urllib (no new dependencies)
+
+---
+---
+---
+---
+id: "FEAT-029@j6k2l8"
+title: "Create agent-loop orchestrator prompt for infinite autonomous operation"
+description: "Add dedicated orchestrator prompt that manages full agent-loop.md cycle with state persistence and recovery"
+completed: 2026-01-02
+section: "prompts/orchestration"
+tags: [feature, prompts, agent-loop, orchestration, autonomy, state-machine]
+type: enhancement
+priority: critical
+status: completed
+references:
+  - agent-loop.md
+  - src/dot_work/prompts/agent-orchestrator.md
+  - src/dot_work/prompts/agent_orchestrator.py
+  - tests/integration/prompts/test_orchestrator.py
+
+### Outcome
+- Created `agent-orchestrator.md` prompt with autonomous execution instructions
+- Created `agent_orchestrator.py` module with state persistence
+- State file schema: step, last_issue, cycles, completed_issues, timestamps
+- Interruption recovery: resume from any step after restart
+- Infinite loop detection: abort after 3 cycles with 0 completed issues
+- Cycle limiting: `--max-cycles N` flag for bounded execution
+- Error recovery: fail-fast default, `--resilient` flag for skip-and-continue
+- Error classification: critical, high, medium, low priority levels
+- Atomic state writes using temp file + rename
+- Error log at `.work/agent/error-log.txt` for escalations
+- Updated agent-loop.md with orchestrator reference
+- 26 integration tests passing
+- ruff ✓, mypy ✓
 
 ---

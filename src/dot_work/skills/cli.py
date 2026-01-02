@@ -56,7 +56,9 @@ def list_skills(
 
         if not skills:
             console.print("[yellow]No skills found.[/yellow]")
-            console.print("\n[dim]Create a .skills/ directory and add SKILL.md files to define skills.[/dim]")
+            console.print(
+                "\n[dim]Create a .skills/ directory and add SKILL.md files to define skills.[/dim]"
+            )
             raise typer.Exit(0)
 
         # Display skills in a table
@@ -68,7 +70,9 @@ def list_skills(
         for skill in skills:
             license_str = skill.license or "Unspecified"
             # Truncate description for table
-            desc = skill.description[:60] + "..." if len(skill.description) > 60 else skill.description
+            desc = (
+                skill.description[:60] + "..." if len(skill.description) > 60 else skill.description
+            )
             table.add_row(skill.name, desc, license_str)
 
         console.print()
@@ -214,7 +218,9 @@ def show_skill(
 
     except FileNotFoundError:
         console.print(f"[red]Error:[/red] Skill {name!r} not found")
-        console.print(f"\n[dim]Available skills: {', '.join(s.name for s in DEFAULT_DISCOVERY.discover())}[/dim]")
+        console.print(
+            f"\n[dim]Available skills: {', '.join(s.name for s in DEFAULT_DISCOVERY.discover())}[/dim]"
+        )
         raise typer.Exit(1) from None
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted.[/yellow]")

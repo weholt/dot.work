@@ -193,9 +193,7 @@ class SubagentParser:
 
         return self._extract_config(frontmatter, prompt_body, source_file)
 
-    def _extract_metadata(
-        self, frontmatter: dict[str, Any], source_file: Path
-    ) -> SubagentMetadata:
+    def _extract_metadata(self, frontmatter: dict[str, Any], source_file: Path) -> SubagentMetadata:
         """Extract and validate metadata from frontmatter.
 
         Args:
@@ -211,20 +209,14 @@ class SubagentParser:
         # Check for meta section
         meta_section = frontmatter.get("meta")
         if not isinstance(meta_section, dict):
-            raise SubagentParserError(
-                f"Missing or invalid 'meta' section in {source_file}"
-            )
+            raise SubagentParserError(f"Missing or invalid 'meta' section in {source_file}")
 
         # Check for required fields
         if "name" not in meta_section:
-            raise SubagentParserError(
-                f"Missing required field 'meta.name' in {source_file}"
-            )
+            raise SubagentParserError(f"Missing required field 'meta.name' in {source_file}")
 
         if "description" not in meta_section:
-            raise SubagentParserError(
-                f"Missing required field 'meta.description' in {source_file}"
-            )
+            raise SubagentParserError(f"Missing required field 'meta.description' in {source_file}")
 
         name = meta_section["name"]
         description = meta_section["description"]
@@ -318,7 +310,8 @@ class SubagentParser:
             environments[env_name] = SubagentEnvironmentConfig(
                 target=target,
                 model=env_config.get("model"),
-                permission_mode=env_config.get("permissionMode") or env_config.get("permission_mode"),
+                permission_mode=env_config.get("permissionMode")
+                or env_config.get("permission_mode"),
                 tools=env_config.get("tools"),
                 mode=env_config.get("mode"),
                 temperature=env_config.get("temperature"),

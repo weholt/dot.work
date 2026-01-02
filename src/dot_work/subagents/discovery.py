@@ -117,8 +117,7 @@ class SubagentDiscovery:
         """
         configs = self.discover_native()
         return [
-            SubagentMetadata(name=config.name, description=config.description)
-            for config in configs
+            SubagentMetadata(name=config.name, description=config.description) for config in configs
         ]
 
     def load_native(self, name: str) -> SubagentConfig:

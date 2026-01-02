@@ -40,8 +40,7 @@ def get_adapter(environment: str) -> SubagentEnvironmentAdapter:
     adapter_cls = _ADAPTERS.get(environment)
     if not adapter_cls:
         raise ValueError(
-            f"Unsupported environment: {environment}. "
-            f"Supported: {', '.join(sorted(_ADAPTERS))}"
+            f"Unsupported environment: {environment}. Supported: {', '.join(sorted(_ADAPTERS))}"
         )
     return adapter_cls()
 

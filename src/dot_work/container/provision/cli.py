@@ -156,6 +156,44 @@ def run(
         "--background/--foreground",
         help="Run container in background mode (default: True).",
     ),
+    # FEAT-026: Context injection options
+    context: list[Path] = typer.Option(
+        None,
+        "--context",
+        "-C",
+        help="Context files/directories to inject into container.",
+    ),
+    context_allowlist: list[str] | None = typer.Option(
+        None,
+        "--context-allowlist",
+        help="Glob patterns for auto-detecting context files.",
+    ),
+    context_denylist: list[str] | None = typer.Option(
+        None,
+        "--context-denylist",
+        help="Glob patterns to exclude from context.",
+    ),
+    context_override: bool = typer.Option(
+        False,
+        "--context-override",
+        help="Override existing files in container with context mounts.",
+    ),
+    context_mount_point: str = typer.Option(
+        "/root/.context",
+        "--context-mount-point",
+        help="Mount point for context files inside container.",
+    ),
+    # FEAT-027: URL-based context injection
+    url: list[str] | None = typer.Option(
+        None,
+        "--url",
+        help="Remote URL(s) to fetch and inject as context (HTTPS only).",
+    ),
+    url_token: str | None = typer.Option(
+        None,
+        "--url-token",
+        help="Bearer token for URL authentication (or set URL_TOKEN env var).",
+    ),
 ) -> str | None:
     """Run the agent with an instruction file."""
     try:
@@ -185,6 +223,15 @@ def run(
             port=port,
             clone_repo=clone_repo,
             background=background,
+            # FEAT-026: Context injection parameters
+            context_paths=context if context else None,
+            context_allowlist=context_allowlist,
+            context_denylist=context_denylist,
+            context_override=context_override,
+            context_mount_point=context_mount_point,
+            # FEAT-027: URL-based context injection
+            context_urls=url,
+            context_url_token=url_token,
         )
         # Return container ID for programmatic use
         return container_id

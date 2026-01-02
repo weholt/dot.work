@@ -234,7 +234,9 @@ def show_subagent(
         console.print(config.prompt)
 
     except FileNotFoundError:
-        console.print(f"[red]Error:[/red] Subagent {name!r} not found in environment '{environment}'")
+        console.print(
+            f"[red]Error:[/red] Subagent {name!r} not found in environment '{environment}'"
+        )
         console.print(
             f"\n[dim]Available subagents: {', '.join(discovery.list_available_names())}[/dim]"
         )
@@ -338,9 +340,7 @@ def sync_subagents(
         canonical = SUBAGENT_PARSER.parse(path)
 
         if not canonical.environments:
-            console.print(
-                "[yellow]Warning:[/yellow] No environments defined in canonical subagent"
-            )
+            console.print("[yellow]Warning:[/yellow] No environments defined in canonical subagent")
             raise typer.Exit(0)
 
         # Generate for all environments

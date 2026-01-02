@@ -6,6 +6,24 @@
 - DO NOT USE THE `rm -rf` COMMAND
 - The target source code is located in the ./src folder and the tests are in the ./tests folder. IMPORTANT! DO NOT PROCESS ANY SOURCE CODE OUTSIDE THESE FOLDERS UNLESS BECAUSE EXPLICIT REFERENCED.
 
+## Autonomous Execution
+
+For autonomous operation with state persistence and interruption recovery, use the **Agent Orchestrator**:
+
+- **Orchestrator Prompt:** `src/dot_work/prompts/agent-orchestrator.md`
+- **State File:** `.work/agent/orchestrator-state.json`
+- **Features:** State persistence, interruption recovery, infinite loop detection, cycle limiting
+
+The orchestrator implements the steps below with these enhancements:
+- State saved after each step (resume after interruption)
+- Infinite loop abort after 3 cycles with no completed issues
+- Optional `--max-cycles N` to limit execution
+- Optional `--resilient` for skip-and-continue error handling
+
+---
+
+## Manual Execution
+
 1. Follow the following prompts in src/dot_work/prompts in this sequence:
 
 2. Scan ALL issue files in ./work/agent/issues/; shortlist.md, critical.md, high.md, medium.md, and low.md for ANY completed issues and MOVE these to ./work/agent/issues/history.md before doing anything else.

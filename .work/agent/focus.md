@@ -1,32 +1,39 @@
 # Agent Focus
-Last updated: 2026-01-01T17:30:00Z
+Last updated: 2026-01-02T16:30:00Z
 
 ## Previous
-- Issue: RES-001@e4f7a2 - Investigate and fix SQLite database connection resource leaks
-- Completed: 2026-01-01T15:00:00Z
-- Outcome: Fixed - Suppressed false-positive ResourceWarnings from StaticPool + gc.collect() interaction
+- Issue: FEAT-026@d0e6f2 - Context and file injection for Dockerized OpenCode containers
+- Completed: 2026-01-02T14:30:00Z
+- Outcome: Complete implementation (runtime context injection with auto-detection, 27 tests passing, documentation updated)
 
-- Issue: FEAT-023@a7b3c9 - Implement Agent Skills support per agentskills.io specification
-- Completed: 2026-01-01T16:00:00Z
-- Outcome: Core implementation complete (models, parser, validator, discovery, prompt, CLI)
+- Issue: FEAT-027@e1f7g3 - Runtime URL-based context injection for OpenCode containers
+- Completed: 2026-01-02T14:50:00Z
+- Outcome: Complete implementation (HTTPS URL fetching, ZIP extraction, caching, 30 tests passing)
 
-- Issue: FEAT-024@b8c4d0 - Implement cross-environment Subagent/Custom Agent support
-- Completed: 2026-01-01T17:00:00Z
-- Outcome: Core implementation complete (models, parser, validator, environments, generator, discovery, CLI)
-
-- Issue: FEAT-025@c9d5e1 - Docker image provisioning with OpenCode webui and dynamic port assignment
-- Completed: 2026-01-01T17:30:00Z
-- Outcome: Complete implementation (dynamic port, credential injection, cloning, WebUI URL, background mode)
+- Issue: FEAT-029@j6k2l8 - Create agent-loop orchestrator prompt for infinite autonomous operation
+- Completed: 2026-01-02T16:30:00Z
+- Outcome: Complete implementation (agent-orchestrator.md prompt, state persistence, 26 tests passing)
 
 ## Current
-- Issue: None - Selecting next issue from shortlist.md
+- Ready for next issue
+- Source: shortlist.md
 
 ## Next
-- Continue through remaining shortlist.md issues (FEAT-026 through FEAT-034)
+- TBD (will select from shortlist.md)
 
 ## Ralph Loop Status
-**Iteration 8 Progress:**
-- Previous iteration completed: FEAT-025 (Docker provisioning)
-- Current: Scanning for next issue to work on
-- Source files: shortlist.md, low.md
-- Remaining: Many proposed issues in shortlist.md, low.md
+**Iteration 10 Progress:**
+- Completed: FEAT-029 (agent-loop orchestrator)
+- Test status: All FEAT-029 tests passing (26 integration tests)
+- Full suite: 1811 passed, 10 failed (pre-existing version module failures, unrelated to FEAT-029)
+- Code quality: ruff ✓, mypy ✓
+
+## Notes
+- FEAT-029 delivered: Autonomous orchestrator with state persistence, interruption recovery
+- State file: `.work/agent/orchestrator-state.json` with schema {step, last_issue, cycles, completed_issues, timestamps}
+- Infinite loop detection: abort after 3 cycles with 0 completed issues
+- Cycle limiting: `--max-cycles N` flag for bounded execution
+- Error recovery: fail-fast default, `--resilient` flag for skip-and-continue
+- Error log: `.work/agent/error-log.txt`
+- agent-loop.md updated with orchestrator reference
+- All 26 orchestrator tests passing

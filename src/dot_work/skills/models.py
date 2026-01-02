@@ -48,9 +48,7 @@ class SkillMetadata:
             raise ValueError("Skill name must be a string")
 
         if not (1 <= len(self.name) <= 64):
-            raise ValueError(
-                f"Skill name must be 1-64 characters, got {len(self.name)} chars"
-            )
+            raise ValueError(f"Skill name must be 1-64 characters, got {len(self.name)} chars")
 
         if not self.NAME_PATTERN.match(self.name):
             raise ValueError(
@@ -88,7 +86,9 @@ class SkillMetadata:
                 if not isinstance(key, str):
                     raise ValueError(f"Skill metadata key must be string, got {type(key).__name__}")
                 if not isinstance(value, str):
-                    raise ValueError(f"Skill metadata value must be string, got {type(value).__name__} for key {key!r}")
+                    raise ValueError(
+                        f"Skill metadata value must be string, got {type(value).__name__} for key {key!r}"
+                    )
 
         # Validate allowed_tools list if provided
         if self.allowed_tools is not None:
@@ -96,7 +96,9 @@ class SkillMetadata:
                 raise ValueError("Skill allowed_tools must be a list")
             for i, tool in enumerate(self.allowed_tools):
                 if not isinstance(tool, str):
-                    raise ValueError(f"Skill allowed_tools[{i}] must be string, got {type(tool).__name__}")
+                    raise ValueError(
+                        f"Skill allowed_tools[{i}] must be string, got {type(tool).__name__}"
+                    )
 
 
 @dataclass

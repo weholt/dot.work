@@ -100,8 +100,16 @@ def find_available_port(
     Raises:
         ValueError: If no available port found in range, or if port range is invalid.
     """
-    port_min = port_min if port_min is not None else int(os.getenv("PORT_RANGE_MIN", str(DEFAULT_PORT_RANGE_MIN)))
-    port_max = port_max if port_max is not None else int(os.getenv("PORT_RANGE_MAX", str(DEFAULT_PORT_RANGE_MAX)))
+    port_min = (
+        port_min
+        if port_min is not None
+        else int(os.getenv("PORT_RANGE_MIN", str(DEFAULT_PORT_RANGE_MIN)))
+    )
+    port_max = (
+        port_max
+        if port_max is not None
+        else int(os.getenv("PORT_RANGE_MAX", str(DEFAULT_PORT_RANGE_MAX)))
+    )
 
     if port_min >= port_max:
         raise ValueError(f"Invalid port range: min ({port_min}) must be less than max ({port_max})")
@@ -237,13 +245,24 @@ class RunConfig:
     prompt_header_agentic: str
     prompt_header_direct: str
 
-    # Misc
-    dry_run: bool
-
     # FEAT-025: Docker provisioning enhancements
-    port: int | None  # Dynamic port for WebUI
-    clone_repo: str | None  # GitHub repo URL to clone
+    port: int | None = None  # Dynamic port for WebUI
+    clone_repo: str | None = None  # GitHub repo URL to clone
     background: bool = True  # Run in background mode
+
+    # FEAT-026: Context injection
+    context_paths: list[Path] | None = None  # Context files/directories to inject
+    context_allowlist: list[str] | None = None  # Auto-detection allowlist
+    context_denylist: list[str] | None = None  # Auto-detection denylist
+    context_override: bool = False  # Override existing files
+    context_mount_point: str = "/root/.context"  # Mount point in container
+
+    # FEAT-027: URL-based context injection
+    context_urls: list[str] | None = None  # Remote URLs to fetch and inject
+    context_url_token: str | None = None  # Bearer token for URL auth
+
+    # Misc
+    dry_run: bool = False
 
 
 def _bool_meta(meta: Mapping[str, Any], key: str, default: bool) -> bool:
@@ -442,6 +461,19 @@ def _resolve_config(
     clone_repo = cli_overrides.get("clone_repo")
     background = bool(cli_overrides.get("background", True))
 
+    # FEAT-026: Context injection
+    context_paths_val = cli_overrides.get("context_paths")
+    context_paths: list[Path] | None = None
+    if context_paths_val:
+        context_paths = [Path(p) for p in context_paths_val]
+
+    context_allowlist = cli_overrides.get("context_allowlist")
+    context_denylist = cli_overrides.get("context_denylist")
+    context_override = bool(cli_overrides.get("context_override", False))
+    context_mount_point = str(cli_overrides.get("context_mount_point", "/root/.context"))
+    context_urls = cli_overrides.get("context_urls")
+    context_url_token = cli_overrides.get("context_url_token") or os.getenv("URL_TOKEN")
+
     cfg = RunConfig(
         instructions_path=instructions_path,
         repo_url=str(repo_url),
@@ -472,6 +504,13 @@ def _resolve_config(
         port=port,
         clone_repo=clone_repo,
         background=background,
+        context_paths=context_paths,
+        context_allowlist=context_allowlist,
+        context_denylist=context_denylist,
+        context_override=context_override,
+        context_mount_point=context_mount_point,
+        context_urls=context_urls,
+        context_url_token=context_url_token,
     )
     # Log final configuration (with sensitive values masked)
     logger.info(
@@ -591,7 +630,7 @@ def _build_volume_args(
     """Build Docker volume mount arguments.
 
     Creates volume mounts for workspace, instruction files, optional SSH keys,
-    and optional OpenCode configuration.
+    optional OpenCode configuration/auth, and context files.
 
     Args:
         cfg: Configuration object with all settings.
@@ -601,6 +640,11 @@ def _build_volume_args(
     Returns:
         List of Docker CLI volume arguments in format ['-v', 'host:container', ...].
     """
+    from dot_work.container.provision.context import (
+        build_context_volume_args,
+        resolve_context_spec,
+    )
+
     volume_args = [
         "-v",
         f"{workdir}:/workspace",
@@ -630,6 +674,50 @@ def _build_volume_args(
         volume_args.extend(
             ["-v", f"{opencode_auth}:/root/.local/share/opencode/auth.json:ro"],
         )
+
+    # FEAT-026: Context injection
+    if cfg.context_paths:
+        context_spec = resolve_context_spec(
+            explicit_paths=cfg.context_paths,
+            allowlist=cfg.context_allowlist,
+            denylist=cfg.context_denylist,
+            override=cfg.context_override,
+            mount_point=cfg.context_mount_point,
+            project_root=cfg.instructions_path.parent,
+        )
+        context_volume_args = build_context_volume_args(context_spec)
+        volume_args.extend(context_volume_args)
+
+    # FEAT-027: URL-based context injection
+    if cfg.context_urls:
+        from dot_work.container.provision.fetch import (
+            fetch_and_extract,
+        )
+
+        for url in cfg.context_urls:
+            logger.info(f"Fetching context from URL: {url}")
+            try:
+                result = fetch_and_extract(
+                    url=url,
+                    extract_to=Path("/tmp/dot-work-context"),
+                    token=cfg.context_url_token,
+                )
+
+                # Build volume args for fetched content
+                if result.local_path.is_file():
+                    # Single file
+                    target = f"{cfg.context_mount_point}/{result.local_path.name}"
+                    volume_args.extend(["-v", f"{result.local_path}:{target}"])
+                elif result.local_path.is_dir():
+                    # Directory (extracted archive)
+                    target = f"{cfg.context_mount_point}/{result.local_path.name}/"
+                    volume_args.extend(["-v", f"{result.local_path}:{target}"])
+
+                logger.info(f"Added context mount: {result.local_path}")
+
+            except Exception as e:
+                logger.error(f"Failed to fetch context from {url}: {e}")
+                raise
 
     return volume_args
 
@@ -715,14 +803,16 @@ def _build_docker_run_cmd(
     if cfg.port:
         cmd.extend(["-p", f"{cfg.port}:8000"])  # Assuming WebUI runs on port 8000 in container
 
-    cmd.extend([
-        *env_args,
-        *volume_args,
-        cfg.docker_image,
-        "bash",
-        "-lc",
-        inner_script,
-    ])
+    cmd.extend(
+        [
+            *env_args,
+            *volume_args,
+            cfg.docker_image,
+            "bash",
+            "-lc",
+            inner_script,
+        ]
+    )
 
     return cmd, container_name
 
@@ -754,6 +844,14 @@ def run_from_markdown(
     port: int | None = None,
     clone_repo: str | None = None,
     background: bool = True,
+    # FEAT-026: Context injection parameters
+    context_paths: list[Path] | None = None,
+    context_allowlist: list[str] | None = None,
+    context_denylist: list[str] | None = None,
+    context_override: bool = False,
+    context_mount_point: str = "/root/.context",
+    context_urls: list[str] | None = None,
+    context_url_token: str | None = None,
 ) -> str | None:
     """Execute the full repo-agent workflow from a markdown instruction file.
 
@@ -825,6 +923,12 @@ def run_from_markdown(
         "port": port,
         "clone_repo": clone_repo,
         "background": background,
+        # FEAT-026: Context injection overrides
+        "context_paths": context_paths,
+        "context_allowlist": context_allowlist,
+        "context_denylist": context_denylist,
+        "context_override": context_override,
+        "context_mount_point": context_mount_point,
     }
 
     cfg, body = _resolve_config(instructions_path, overrides)
@@ -877,7 +981,15 @@ def run_from_markdown(
                 container_ref = container_id or container_name
                 if container_ref:
                     subprocess.run(
-                        ["docker", "exec", container_ref, "git", "clone", cfg.clone_repo, "/workspace/repo"],
+                        [
+                            "docker",
+                            "exec",
+                            container_ref,
+                            "git",
+                            "clone",
+                            cfg.clone_repo,
+                            "/workspace/repo",
+                        ],
                         check=True,
                     )
                     print(f"Cloned {cfg.clone_repo} into container")

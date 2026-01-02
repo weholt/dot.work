@@ -192,7 +192,9 @@ class SkillParser:
             raise SkillParserError(f"Missing required field 'name' in {skill_dir / 'SKILL.md'}")
 
         if "description" not in frontmatter:
-            raise SkillParserError(f"Missing required field 'description' in {skill_dir / 'SKILL.md'}")
+            raise SkillParserError(
+                f"Missing required field 'description' in {skill_dir / 'SKILL.md'}"
+            )
 
         # Extract fields
         name = frontmatter["name"]
@@ -204,11 +206,15 @@ class SkillParser:
 
         # Validate metadata dict if provided
         if metadata is not None and not isinstance(metadata, dict):
-            raise SkillParserError(f"Field 'metadata' must be a dictionary in {skill_dir / 'SKILL.md'}")
+            raise SkillParserError(
+                f"Field 'metadata' must be a dictionary in {skill_dir / 'SKILL.md'}"
+            )
 
         # Validate allowed_tools list if provided
         if allowed_tools is not None and not isinstance(allowed_tools, list):
-            raise SkillParserError(f"Field 'allowed_tools' must be a list in {skill_dir / 'SKILL.md'}")
+            raise SkillParserError(
+                f"Field 'allowed_tools' must be a list in {skill_dir / 'SKILL.md'}"
+            )
 
         return SkillMetadata(
             name=name,

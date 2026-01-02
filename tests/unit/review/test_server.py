@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi import HTTPException
 
 from dot_work.review.server import (
     AddCommentIn,
@@ -45,7 +46,7 @@ class TestVerifyPathSafe:
         Args:
             tmp_path: Fixture providing temporary directory
         """
-        with pytest.raises(Exception):  # HTTPException
+        with pytest.raises(HTTPException):
             _verify_path_safe(tmp_path, "../etc/passwd")
 
     def test_verify_path_safe_rejects_absolute_path(self, tmp_path: Path) -> None:
@@ -54,7 +55,7 @@ class TestVerifyPathSafe:
         Args:
             tmp_path: Fixture providing temporary directory
         """
-        with pytest.raises(Exception):  # HTTPException
+        with pytest.raises(HTTPException):
             _verify_path_safe(tmp_path, "/etc/passwd")
 
 
