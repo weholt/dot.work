@@ -89,6 +89,20 @@ dot-work = "dot_work.cli:app"
 kg = "dot_work.knowledge_graph.cli:app"
 pybuilder = "dot_work.python.build.cli:main"
 
+[project.entry-points."dot_work.plugins"]
+# Register submodules as plugins (for future extraction to standalone packages)
+# These entry points allow extracted packages to register their CLI commands
+# Examples (when extracted):
+# issues = "dot_issues"
+# kg = "dot_kg"
+# review = "dot_review"
+# container = "dot_container"
+# git = "dot_git"
+# harness = "dot_harness"
+# overview = "dot_overview"
+# python = "dot_python"
+# version = "dot_version"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

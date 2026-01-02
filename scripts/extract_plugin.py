@@ -359,18 +359,23 @@ def extract_plugin(
         copy_and_rewrite_file(source_file, dest_file, source_module, target_module, report)
         print(f"  ✓ Source: {rel_path}")
 
-    # Copy __init__.py at module root if it doesn't exist
-    init_src = project_root / "src" / "dot_work" / source_module / "__init__.py"
-    if init_src.exists():
-        dest_init = target_src / "__init__.py"
-        if not dest_init.exists():
-            copy_and_rewrite_file(init_src, dest_init, source_module, target_module, report)
-            # Add CLI_GROUP to __init__.py
-            init_content = dest_init.read_text(encoding="utf-8")
-            if 'CLI_GROUP' not in init_content:
-                cli_group = str(config["cli_group"])
-                init_content = f'"""{target_module} module."""\n\nCLI_GROUP = "{cli_group}"\n' + init_content.split('"""', 1)[-1].lstrip()
-                dest_init.write_text(init_content, encoding="utf-8")
+    # Ensure CLI_GROUP is in __init__.py
+    dest_init = target_src / "__init__.py"
+    if dest_init.exists():
+        init_content = dest_init.read_text(encoding="utf-8")
+        if 'CLI_GROUP' not in init_content:
+            cli_group = str(config["cli_group"])
+            # Add CLI_GROUP after the docstring
+            if '"""' in init_content:
+                parts = init_content.split('"""', 2)
+                if len(parts) >= 3:
+                    init_content = parts[0] + parts[1] + '"""' + f'\n\nCLI_GROUP = "{cli_group}"' + parts[2]
+                else:
+                    # Fallback: add at the beginning
+                    init_content = f'"""{target_module} module."""\n\nCLI_GROUP = "{cli_group}"\n\n' + init_content
+            else:
+                init_content = f'"""{target_module} module."""\n\nCLI_GROUP = "{cli_group}"\n\n' + init_content
+            dest_init.write_text(init_content, encoding="utf-8")
 
     # Copy unit tests
     if test_source_dir.exists():
