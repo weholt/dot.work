@@ -288,11 +288,13 @@ def install_prompts(
     *,
     force: bool = False,
     dry_run: bool = False,
+    fallback_to_legacy: bool = True,
 ) -> None:
-    """Install prompts for the specified environment using canonical frontmatter.
+    """Install prompts for the specified environment.
 
-    Reads prompt frontmatter to discover supported environments and installs
-    using the paths specified in each prompt's environment configuration.
+    Tries canonical prompt installation first (reads frontmatter to discover
+    supported environments). Optionally falls back to legacy template-based
+    installation if no canonical prompts are found.
 
     Args:
         env_key: The environment key (e.g., 'copilot', 'claude').
@@ -301,26 +303,39 @@ def install_prompts(
         console: Rich console for output.
         force: If True, overwrite existing files without prompting.
         dry_run: If True, preview changes without writing files.
+        fallback_to_legacy: If True (default), try legacy installation when
+            canonical prompts are not found. If False, raise ValueError.
 
     Raises:
-        ValueError: If environment not found in any prompt prompts.
+        ValueError: If environment not found and fallback_to_legacy is False,
+            or if environment is unknown.
     """
-    # First try to use canonical prompt installation
+    # Try canonical prompt installation first
     try:
         install_canonical_prompts_by_environment(
             env_key, target, prompts_dir, console, force=force, dry_run=dry_run
         )
         return
     except ValueError as e:
-        # If no canonical prompts found, fall back to legacy installer
-        if "not found in any prompt files" in str(e):
+        # Check if error is "no canonical prompts found"
+        is_no_canonical = "not found in any prompt files" in str(e)
+
+        if is_no_canonical and fallback_to_legacy:
             console.print(
                 "[dim]⚠ No canonical prompts found, trying legacy installation...[/dim]\n"
             )
+        elif is_no_canonical:
+            # Re-raise if caller doesn't want fallback
+            raise
         else:
+            # Some other ValueError - re-raise
             raise
 
-    # Legacy fallback for non-canonical prompts
+    # Legacy fallback for non-canonical prompts (only if fallback_to_legacy=True)
+    if not fallback_to_legacy:
+        # This shouldn't be reached due to the raise above, but be defensive
+        return
+
     installer = INSTALLERS.get(env_key)
     if not installer:
         available = list(ENVIRONMENTS.keys())
@@ -1519,12 +1534,6 @@ def install_canonical_prompts_by_environment(
             f"Checked {len(prompt_files)} file(s). "
             f"Add 'environments.{env_name}' section to at least one prompt file."
         )
-    console.print(
-        f"  [dim]💡 Fix: Ensure the prompt file has an 'environments.{env_name}' section in its frontmatter[/dim]"
-    )
-    console.print(
-        "  [dim]💡 Fix: Run 'dot-work list' to see available environments and their expected frontmatter structure[/dim]"
-    )
 
     # Show batch menu if there are existing files and not in force/dry-run mode
     batch_choice: BatchChoice | None = None

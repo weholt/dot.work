@@ -4,4 +4,4 @@ Blockers, security issues, data loss risks.
 
 ---
 
-(No issues)
+(No critical issues)

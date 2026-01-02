@@ -232,15 +232,15 @@ def init_project(
         ),
     ] = Path("."),
 ) -> None:
-    """Initialize a new project with AI prompts and full setup.
+    """Install AI prompts to your project (alias for 'install' command).
 
-    This installs AI prompts to your project and sets up the complete development
-    environment. Use this for new projects or when you want to add AI-powered
-    development capabilities.
+    This is an alias for 'dot-work install' that installs AI coding prompts to your
+    project. Use this to add AI-powered development capabilities to existing projects.
 
-    For issue tracking only (without AI prompts), use 'init-tracking' instead.
+    For setting up issue tracking (without AI prompts), use 'init-tracking' instead.
+    For more control over installation, use the 'install' command directly.
     """
-    # This is an alias for install that's more intuitive
+    # This is an alias for install that's more intuitive for new users
     install(env=env, target=target, force=False)
 
 
@@ -531,20 +531,32 @@ def plugins_cmd() -> None:
     console.print(f"\n[green]✓ {len(plugins_list)} plugin(s) installed[/green]")
 
 
-def prompt_for_environment(discovered_envs: dict[str, set[str]] | None = None) -> str:
-    """Interactively ask the user which environment to use.
+def _build_environment_options(discovered_envs: dict[str, set[str]] | None) -> list[str]:
+    """Build list of environment options to show the user.
 
     Args:
-        discovered_envs: Optional dict of environments discovered from prompt frontmatter.
-            If provided, only show environments that have at least one prompt.
-            Keys are environment names, values are sets of prompt names.
+        discovered_envs: If provided, only include environments with prompts.
+
+    Returns:
+        List of environment keys (e.g., ['copilot', 'claude']).
+    """
+    if discovered_envs:
+        return sorted(discovered_envs.keys())
+    return list(ENVIRONMENTS.keys())
+
+
+def _display_environment_menu(
+    options: list[str], discovered_envs: dict[str, set[str]] | None
+) -> None:
+    """Display the environment selection menu.
+
+    Args:
+        options: List of environment keys to display.
+        discovered_envs: If provided, shows prompt counts.
     """
     console.print("\n[bold]🤖 Which AI coding environment are you using?[/bold]\n")
 
-    # Determine which environments to show
     if discovered_envs:
-        # Show only environments that prompts support
-        options = sorted(discovered_envs.keys())
         console.print("[dim]Available environments (from prompt frontmatter):[/dim]\n")
         for i, key in enumerate(options, 1):
             env = ENVIRONMENTS.get(key)
@@ -560,8 +572,6 @@ def prompt_for_environment(discovered_envs: dict[str, set[str]] | None = None) -
                     f"  [cyan][{i}][/cyan] {key} [dim]({len(discovered_envs[key])} prompts)[/dim]"
                 )
     else:
-        # Show all registered environments
-        options = list(ENVIRONMENTS.keys())
         for i, key in enumerate(options, 1):
             env = ENVIRONMENTS[key]
             console.print(f"  [cyan][{i}][/cyan] {env.name}")
@@ -570,34 +580,68 @@ def prompt_for_environment(discovered_envs: dict[str, set[str]] | None = None) -
 
     console.print()
 
+
+def _validate_environment_choice(
+    choice: str, options: list[str], discovered_envs: dict[str, set[str]] | None
+) -> str | None:
+    """Validate and process user's environment choice.
+
+    Args:
+        choice: User's input (number or environment key).
+        options: List of valid environment keys.
+        discovered_envs: If provided, warns when choice not in discovered.
+
+    Returns:
+        The validated environment key, or None if invalid/rejected.
+    """
+    # Try parsing as number
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(options):
+            return options[idx]
+        console.print("[red]Invalid choice. Please try again.[/red]")
+        return None
+    except ValueError:
+        pass
+
+    # Check if environment key
+    choice_lower = choice.lower()
+    if choice_lower in options:
+        return choice_lower
+
+    if choice_lower in ENVIRONMENTS:
+        # Not in options but valid environment
+        if discovered_envs and choice_lower not in discovered_envs:
+            console.print(
+                f"[yellow]⚠ No prompts found for '{choice_lower}'. "
+                f"Available: {', '.join(sorted(discovered_envs.keys()))}[/yellow]"
+            )
+            if typer.confirm("Continue anyway?", default=False):
+                return choice_lower
+            console.print("[red]Please enter a number or environment key.[/red]")
+            return None
+        return choice_lower
+
+    console.print("[red]Invalid choice. Please try again.[/red]")
+    return None
+
+
+def prompt_for_environment(discovered_envs: dict[str, set[str]] | None = None) -> str:
+    """Interactively ask the user which environment to use.
+
+    Args:
+        discovered_envs: Optional dict of environments discovered from prompt frontmatter.
+            If provided, only show environments that have at least one prompt.
+            Keys are environment names, values are sets of prompt names.
+    """
+    options = _build_environment_options(discovered_envs)
+    _display_environment_menu(options, discovered_envs)
+
     while True:
         choice = typer.prompt("Enter number (or environment key)")
-
-        # Check if it's a number
-        try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(options):
-                return options[idx]
-            console.print("[red]Invalid choice. Please try again.[/red]")
-        except ValueError:
-            # Check if they typed the environment key
-            choice_lower = choice.lower()
-            # Check against options first (discovered), then all ENVIRONMENTS
-            if choice_lower in options:
-                return choice_lower
-            if choice_lower in ENVIRONMENTS:
-                # If not in discovered but in ENVIRONMENTS, warn but allow
-                if discovered_envs and choice_lower not in discovered_envs:
-                    console.print(
-                        f"[yellow]⚠ No prompts found for '{choice_lower}'. "
-                        f"Available: {', '.join(sorted(discovered_envs.keys()))}[/yellow]"
-                    )
-                    if typer.confirm("Continue anyway?", default=False):
-                        return choice_lower
-                    console.print("[red]Please enter a number or environment key.[/red]")
-                else:
-                    return choice_lower
-            console.print("[red]Please enter a number or environment key.[/red]")
+        result = _validate_environment_choice(choice, options, discovered_envs)
+        if result:
+            return result
 
 
 @app.callback(invoke_without_command=True)
