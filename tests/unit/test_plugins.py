@@ -5,7 +5,12 @@ from __future__ import annotations
 import pytest
 import typer
 
-from dot_work.plugins import DotWorkPlugin, discover_plugins, register_all_plugins, register_plugin_cli
+from dot_work.plugins import (
+    DotWorkPlugin,
+    discover_plugins,
+    register_all_plugins,
+    register_plugin_cli,
+)
 
 
 class TestDotWorkPlugin:

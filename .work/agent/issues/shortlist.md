@@ -1,4 +1,266 @@
 ---
+id: "REFACTOR-007@a3b4c5"
+title: "Move prompts markdown files to assets/prompts folder"
+description: "Relocate prompt markdown files from src/dot_work/prompts/ to src/dot_work/assets/prompts/"
+created: 2025-01-03
+section: "prompts"
+tags: [prompts, assets, refactoring, file-structure]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/prompts/
+  - src/dot_work/assets/prompts/ (new)
+---
+
+### Problem
+The `src/dot_work/prompts/` directory currently contains both Python code modules and markdown prompt files. This mixes code and data assets, making the directory structure unclear and harder to maintain. The markdown files are data/content that should be separated from the implementation code.
+
+### Affected Files
+- `src/dot_work/prompts/` (24 markdown files to move: agent-prompts-reference.md, do-work.md, code-review.md, etc.)
+- `src/dot_work/prompts/global.yml` (to be moved)
+- `src/dot_work/prompts/canonical.py` (references to prompts directory)
+- `src/dot_work/prompts/wizard.py` (references to prompts directory)
+- `src/dot_work/installer.py` (uses prompts directory)
+
+### Current State
+```
+src/dot_work/prompts/
+├── agent-prompts-reference.md
+├── do-work.md
+├── code-review.md
+├── ... (21 more .md files)
+├── global.yml
+├── __init__.py
+├── canonical.py
+├── wizard.py
+└── agent_orchestrator.py
+```
+
+### Target State
+```
+src/dot_work/assets/
+└── prompts/
+    ├── agent-prompts-reference.md
+    ├── do-work.md
+    ├── code-review.md
+    └── ... (all 24 .md files + global.yml)
+
+src/dot_work/prompts/
+├── __init__.py
+├── canonical.py
+├── wizard.py
+└── agent_orchestrator.py
+```
+
+### Importance
+Separating content assets from implementation code:
+- Provides clear separation of concerns (code vs data)
+- Makes the directory structure more intuitive
+- Aligns with patterns used for skills and subagents
+- Easier to maintain and extend content independently
+- Consistent with standard Python package practices
+
+### Proposed Solution
+1. Create `src/dot_work/assets/prompts/` directory
+2. Move all 24 markdown files from `src/dot_work/prompts/` to `src/dot_work/assets/prompts/`
+3. Move `src/dot_work/prompts/global.yml` to `src/dot_work/assets/prompts/global.yml`
+4. Create a helper function `get_bundled_prompts_dir()` in `src/dot_work/prompts/`
+5. Update all code references to use the new path:
+   - `src/dot_work/prompts/canonical.py`
+   - `src/dot_work/prompts/wizard.py`
+   - `src/dot_work/installer.py`
+6. Update any tests that reference the old path
+
+### Acceptance Criteria
+- [ ] `src/dot_work/assets/prompts/` directory created
+- [ ] All 24 markdown files moved to `assets/prompts/`
+- [ ] `global.yml` moved to `assets/prompts/`
+- [ ] `get_bundled_prompts_dir()` function created
+- [ ] All code references updated to use new path
+- [ ] All tests pass with new structure
+- [ ] No hardcoded paths to old location remain
+
+### Notes
+This is Issue 1 of 3 related asset reorganization issues.
+Dependencies: None (can be done independently).
+
+---
+---
+id: "REFACTOR-008@d4e5f6"
+title: "Move bundled_skills to assets/skills folder"
+description: "Relocate bundled_skills contents to src/dot_work/assets/skills/"
+created: 2025-01-03
+section: "skills"
+tags: [skills, assets, refactoring, file-structure]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/bundled_skills/
+  - src/dot_work/assets/skills/ (new)
+---
+
+### Problem
+The `src/dot_work/bundled_skills/` directory is inconsistently named compared to the code module `src/dot_work/skills/`. This creates confusion about where bundled skill content lives versus the skills implementation code. The directory should be renamed to `assets/skills/` for clarity and consistency.
+
+### Affected Files
+- `src/dot_work/bundled_skills/` (directory to be moved/renamed)
+- `src/dot_work/bundled_skills/global.yml` (to be moved)
+- `src/dot_work/skills/discovery.py` (references bundled_skills directory)
+- `src/dot_work/installer.py` (may reference bundled_skills)
+- Any tests referencing `bundled_skills` path
+
+### Current State
+```
+src/dot_work/
+├── skills/                    # Python code module
+│   ├── __init__.py
+│   ├── cli.py
+│   ├── discovery.py
+│   ├── models.py
+│   ├── parser.py
+│   └── ...
+└── bundled_skills/            # Bundled content (confusing name)
+    ├── .gitkeep
+    └── global.yml
+```
+
+### Target State
+```
+src/dot_work/
+├── assets/
+│   └── skills/               # Clear: bundled skill assets
+│       ├── .gitkeep
+│       └── global.yml
+└── skills/                   # Python code module
+    ├── __init__.py
+    ├── cli.py
+    ├── discovery.py
+    └── ...
+```
+
+### Importance
+Renaming `bundled_skills` to `assets/skills`:
+- Provides consistent naming with `assets/prompts/`
+- Makes it clear this is content/data, not code
+- Eliminates confusion between `skills/` (code) and `bundled_skills/` (content)
+- Sets up proper `assets/` directory for future asset types
+- Aligns with user's requested structure
+
+### Proposed Solution
+1. Create `src/dot_work/assets/skills/` directory
+2. Move contents from `src/dot_work/bundled_skills/` to `src/dot_work/assets/skills/`
+3. Update `src/dot_work/skills/discovery.py` to reference new path
+4. Create/update `get_bundled_skills_dir()` helper function
+5. Update `src/dot_work/installer.py` if it references the old path
+6. Update all tests that reference `bundled_skills`
+7. Delete old `src/dot_work/bundled_skills/` directory
+
+### Acceptance Criteria
+- [ ] `src/dot_work/assets/skills/` directory created
+- [ ] Contents moved from `bundled_skills/` to `assets/skills/`
+- [ ] `global.yml` exists in new location
+- [ ] All code references updated to use `assets/skills/`
+- [ ] Old `bundled_skills/` directory removed
+- [ ] All tests pass with new structure
+- [ ] No hardcoded paths to `bundled_skills` remain
+
+### Notes
+This is Issue 2 of 3 related asset reorganization issues.
+Dependencies: None (can be done independently, but coordinates with REFACTOR-007 for consistency).
+
+---
+---
+id: "REFACTOR-009@e5f6a7"
+title: "Move bundled_subagents to assets/subagents folder"
+description: "Relocate bundled_subagents contents to src/dot_work/assets/subagents/"
+created: 2025-01-03
+section: "subagents"
+tags: [subagents, assets, refactoring, file-structure]
+type: refactor
+priority: high
+status: proposed
+references:
+  - src/dot_work/bundled_subagents/
+  - src/dot_work/assets/subagents/ (new)
+---
+
+### Problem
+The `src/dot_work/bundled_subagents/` directory is inconsistently named compared to the code module `src/dot_work/subagents/`. This creates confusion about where bundled subagent content lives versus the subagents implementation code. The directory should be renamed to `assets/subagents/` for clarity and consistency with prompts and skills.
+
+### Affected Files
+- `src/dot_work/bundled_subagents/` (directory to be moved/renamed)
+- `src/dot_work/bundled_subagents/global.yml` (to be moved)
+- `src/dot_work/subagents/discovery.py` (may reference bundled_subagents directory)
+- `src/dot_work/installer.py` (may reference bundled_subagents)
+- Any tests referencing `bundled_subagents` path
+
+### Current State
+```
+src/dot_work/
+├── subagents/                 # Python code module
+│   ├── __init__.py
+│   ├── cli.py
+│   ├── discovery.py
+│   ├── models.py
+│   ├── parser.py
+│   ├── environments/
+│   └── ...
+└── bundled_subagents/         # Bundled content (confusing name)
+    ├── .gitkeep
+    └── global.yml
+```
+
+### Target State
+```
+src/dot_work/
+├── assets/
+│   ├── prompts/              # From REFACTOR-007
+│   ├── skills/               # From REFACTOR-008
+│   └── subagents/            # Clear: bundled subagent assets
+│       ├── .gitkeep
+│       └── global.yml
+└── subagents/                # Python code module
+    ├── __init__.py
+    ├── cli.py
+    ├── discovery.py
+    ├── environments/
+    └── ...
+```
+
+### Importance
+Renaming `bundled_subagents` to `assets/subagents`:
+- Provides consistent naming across all asset types (prompts, skills, subagents)
+- Makes it clear this is content/data, not code
+- Eliminates confusion between `subagents/` (code) and `bundled_subagents/` (content)
+- Completes the assets directory reorganization
+- Aligns with user's requested structure
+
+### Proposed Solution
+1. Create `src/dot_work/assets/subagents/` directory
+2. Move contents from `src/dot_work/bundled_subagents/` to `src/dot_work/assets/subagents/`
+3. Update `src/dot_work/subagents/discovery.py` to reference new path
+4. Create/update `get_bundled_subagents_dir()` helper function
+5. Update `src/dot_work/installer.py` if it references the old path
+6. Update all tests that reference `bundled_subagents`
+7. Delete old `src/dot_work/bundled_subagents/` directory
+
+### Acceptance Criteria
+- [ ] `src/dot_work/assets/subagents/` directory created
+- [ ] Contents moved from `bundled_subagents/` to `assets/subagents/`
+- [ ] `global.yml` exists in new location
+- [ ] All code references updated to use `assets/subagents/`
+- [ ] Old `bundled_subagents/` directory removed
+- [ ] All tests pass with new structure
+- [ ] No hardcoded paths to `bundled_subagents` remain
+
+### Notes
+This is Issue 3 of 3 related asset reorganization issues.
+Dependencies: None (can be done independently, but coordinates with REFACTOR-007 and REFACTOR-008 for consistency).
+
+---
+---
 id: "REFACTOR-002@c7g4c2"
 title: "Add environment support to SKILL.md frontmatter"
 description: "Phase 2: Enable environment-aware skill installation like prompts"
@@ -412,3 +674,5 @@ Environment: cursor
 This is Phase 6 of 6 phases - final phase.
 Estimated effort: 2-4 hours.
 Dependencies: Phase 5 (all implementation must be complete).
+
+---

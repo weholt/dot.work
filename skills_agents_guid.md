@@ -2,6 +2,125 @@
 
 This guide provides comprehensive documentation for the Skills and Subagents systems implemented in dot-work. It covers architecture, implementation details, practical usage, and maintenance considerations.
 
+---
+
+## IMPORTANT: Architecture Re-Evaluation
+
+> **Status:** The current skills and subagents implementation differs significantly from how prompts work. This section documents the gaps and the target architecture to align all three systems.
+
+### Current State vs Target State
+
+| Aspect | Prompts (Reference) | Skills (Current) | Subagents (Current) | Target State |
+|--------|---------------------|------------------|---------------------|--------------|
+| **Bundled with package** | Yes (`src/dot_work/prompts/`) | No | No | Yes - bundle in package |
+| **Environment config** | `environments:` in frontmatter | None | `environments:` section | Add to skills |
+| **Installation via** | `dot-work install` | Discovery only | `dot-work subagents sync` (separate) | Unified `dot-work install` |
+| **Global defaults** | `global.yml` | None | None | Add `global.yml` for each |
+| **Discovery source** | Package prompts dir | User dirs only | User dirs only | Package dir only |
+
+### Key Architectural Gaps
+
+1. **No bundled skills/subagents** - Prompts ship with pre-defined content; skills and subagents don't
+2. **Separate installation workflows** - `dot-work install` only handles prompts, not skills/subagents
+3. **Skills lack environment awareness** - No `environments:` section in SKILL.md frontmatter
+4. **Discovery from wrong locations** - Current code discovers from user dirs, not package
+
+### Target Architecture
+
+The target is to align skills and subagents with how prompts work:
+
+```
+src/dot_work/
+├── prompts/                    # Bundled prompts (existing)
+│   ├── global.yml              # Default environment configs
+│   └── *.md                    # Prompt files with environments: frontmatter
+│
+├── skills/                     # Code module (existing)
+│   ├── __init__.py
+│   ├── models.py
+│   └── ...
+│
+├── bundled_skills/             # NEW: Bundled skills for installation
+│   ├── global.yml              # Default environment configs for skills
+│   └── <skill-name>/
+│       └── SKILL.md            # With environments: frontmatter
+│
+├── subagents/                  # Code module (existing)
+│   ├── __init__.py
+│   └── ...
+│
+└── bundled_subagents/          # NEW: Bundled subagents for installation
+    ├── global.yml              # Default environment configs
+    └── *.md                    # Canonical subagent files
+```
+
+### Environment Support Matrix
+
+Not all environments support all content types:
+
+| Environment | Prompts | Skills | Subagents | Notes |
+|-------------|---------|--------|-----------|-------|
+| Claude Code | `.claude/commands/` | `.claude/skills/` | `.claude/agents/` | Full support |
+| OpenCode | `.opencode/prompts/` | Skip | `.opencode/agent/` | No native skills |
+| Cursor | `.cursor/rules/` | Skip | Treat as prompt | No native agents/skills |
+| Copilot | `.github/prompts/` | Skip | `.github/agents/` (maybe) | Limited agent support |
+| Windsurf | `.windsurf/rules/` | Skip | Treat as prompt | No native agents/skills |
+| Others | Varies | Skip | Treat as prompt | Fall back to prompt behavior |
+
+### Required Changes for Alignment
+
+1. **Create `src/dot_work/bundled_skills/`** with pre-defined skills
+2. **Create `src/dot_work/bundled_subagents/`** with pre-defined subagents
+3. **Add `environments:` frontmatter to SKILL.md format** for environment-aware installation
+4. **Extend `dot-work install`** to install skills and subagents alongside prompts
+5. **Update discovery** to only find bundled content (not user directories)
+6. **Add `global.yml`** for skills and subagents default configs
+7. **Handle unsupported environments** by skipping or treating as prompts
+
+### Example: Environment-Aware SKILL.md (Target Format)
+
+```markdown
+---
+name: code-review
+description: Expert code review guidelines and checklists.
+license: MIT
+
+environments:
+  claude:
+    target: ".claude/skills/"
+    filename_suffix: "/SKILL.md"
+  # Other environments don't support skills - skipped automatically
+---
+
+# Code Review Skill
+
+[Skill content...]
+```
+
+### Example: Unified Installation Flow (Target)
+
+```bash
+$ dot-work install --env claude
+
+Installing for Claude Code...
+
+Prompts:
+  ✓ Installed code-review.md -> .claude/commands/code-review.md
+  ✓ Installed do-work.md -> .claude/commands/do-work.md
+
+Skills:
+  ✓ Installed code-review/ -> .claude/skills/code-review/SKILL.md
+  ✓ Installed debugging/ -> .claude/skills/debugging/SKILL.md
+
+Subagents:
+  ✓ Installed code-reviewer.md -> .claude/agents/code-reviewer.md
+  ✓ Installed architect.md -> .claude/agents/architect.md
+
+Done! Installed 2 prompts, 2 skills, 2 subagents.
+```
+
+---
+
 ## Table of Contents
 
 1. [Overview](#overview)
@@ -1019,3 +1138,285 @@ dot-work subagents show my-agent --env claude
 # List environments
 dot-work subagents envs
 ```
+
+---
+
+## Implementation Roadmap
+
+This section outlines the changes needed to align skills and subagents with the prompts installation pattern.
+
+### Phase 1: Create Bundled Content Directories
+
+**Goal:** Establish the package structure for bundled skills and subagents.
+
+**Tasks:**
+
+1. Create `src/dot_work/bundled_skills/` directory
+2. Create `src/dot_work/bundled_subagents/` directory
+3. Create `global.yml` for each with default environment configs
+4. Update `pyproject.toml` to include these directories in the wheel
+
+**Files to create:**
+
+```
+src/dot_work/bundled_skills/
+├── global.yml
+└── .gitkeep
+
+src/dot_work/bundled_subagents/
+├── global.yml
+└── .gitkeep
+```
+
+**global.yml for skills:**
+
+```yaml
+defaults:
+  environments:
+    claude:
+      target: ".claude/skills/"
+      # Skills are directories, so filename handling differs
+```
+
+**global.yml for subagents:**
+
+```yaml
+defaults:
+  environments:
+    claude:
+      target: ".claude/agents/"
+      filename_suffix: ".md"
+    
+    opencode:
+      target: ".opencode/agent/"
+      filename_suffix: ".md"
+```
+
+### Phase 2: Add Environment Support to Skills
+
+**Goal:** Enable skills to have environment-aware installation like prompts.
+
+**Tasks:**
+
+1. Update `SkillMetadata` model to include `environments` field
+2. Update `SkillParser` to parse `environments:` from SKILL.md frontmatter
+3. Add `SkillEnvironmentConfig` dataclass (similar to `EnvironmentConfig` for prompts)
+4. Update `SkillValidator` to validate environment configs
+5. Create `skill_installer.py` with installation logic
+
+**Model changes (`skills/models.py`):**
+
+```python
+@dataclass
+class SkillEnvironmentConfig:
+    """Environment-specific skill installation config."""
+    target: str  # Target directory for this environment
+
+@dataclass
+class SkillMetadata:
+    name: str
+    description: str
+    license: str | None = None
+    compatibility: str | None = None
+    metadata: dict[str, str] | None = None
+    allowed_tools: list[str] | None = None
+    environments: dict[str, SkillEnvironmentConfig] | None = None  # NEW
+```
+
+### Phase 3: Extend Installer for Skills and Subagents
+
+**Goal:** Make `dot-work install` handle all content types.
+
+**Tasks:**
+
+1. Create `get_bundled_skills_dir()` and `get_bundled_subagents_dir()` functions
+2. Create `install_skills_by_environment()` function
+3. Create `install_subagents_by_environment()` function
+4. Update `install_prompts()` to also call skill/subagent installers
+5. Handle environments that don't support skills/subagents (skip gracefully)
+
+**New installer functions:**
+
+```python
+def install_skills_by_environment(
+    env_name: str,
+    target: Path,
+    skills_dir: Path,
+    console: Console,
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+) -> int:
+    """Install bundled skills for an environment.
+    
+    Returns number of skills installed, or 0 if environment doesn't support skills.
+    """
+    # Check if environment supports skills
+    if env_name not in SKILL_SUPPORTED_ENVIRONMENTS:
+        console.print(f"[dim]Skills not supported for {env_name}, skipping...[/dim]")
+        return 0
+    
+    # Install skills...
+
+def install_subagents_by_environment(
+    env_name: str,
+    target: Path,
+    subagents_dir: Path,
+    console: Console,
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+) -> int:
+    """Install bundled subagents for an environment.
+    
+    If environment doesn't support native agents, treats subagents as prompts.
+    """
+    if env_name in SUBAGENT_SUPPORTED_ENVIRONMENTS:
+        # Install as native agents
+        ...
+    else:
+        # Install as prompts (fallback)
+        ...
+```
+
+### Phase 4: Create Bundled Content
+
+**Goal:** Ship pre-defined skills and subagents with dot-work.
+
+**Tasks:**
+
+1. Create initial bundled skills (code-review, debugging, etc.)
+2. Create initial bundled subagents (code-reviewer, architect, etc.)
+3. Each with proper `environments:` frontmatter
+4. Validate all bundled content in CI
+
+**Example bundled skill:**
+
+```
+src/dot_work/bundled_skills/code-review/
+└── SKILL.md
+```
+
+```markdown
+---
+name: code-review
+description: Comprehensive code review guidelines and checklists.
+license: MIT
+
+environments:
+  claude:
+    target: ".claude/skills/"
+---
+
+# Code Review Skill
+
+This skill provides structured guidance for performing thorough code reviews.
+
+## Review Categories
+
+### Security Review
+- Check for injection vulnerabilities
+- Verify authentication/authorization
+- Review sensitive data handling
+
+### Performance Review
+- Identify inefficient algorithms
+- Check for memory leaks
+- Review database query patterns
+
+[...]
+```
+
+**Example bundled subagent:**
+
+```
+src/dot_work/bundled_subagents/code-reviewer.md
+```
+
+```markdown
+---
+meta:
+  name: code-reviewer
+  description: Expert code reviewer for quality and security.
+
+environments:
+  claude:
+    target: ".claude/agents/"
+    filename_suffix: ".md"
+    model: sonnet
+    permissionMode: default
+  
+  opencode:
+    target: ".opencode/agent/"
+    filename_suffix: ".md"
+    mode: subagent
+---
+
+You are a senior code reviewer ensuring high standards...
+```
+
+### Phase 5: Update Discovery to Use Bundled Content Only
+
+**Goal:** Skills and subagents discovery should only find bundled content.
+
+**Tasks:**
+
+1. Update `SkillDiscovery` default paths to use `get_bundled_skills_dir()`
+2. Update `SubagentDiscovery` default paths to use `get_bundled_subagents_dir()`
+3. Remove user-global paths (`~/.config/dot-work/skills/` etc.)
+4. Keep project-local discovery for user-created content separate
+
+**Note:** User-created skills/subagents in project directories should still be discoverable via explicit `--path` arguments, but are not part of the install flow.
+
+### Phase 6: Update CLI and Documentation
+
+**Goal:** Unified user experience.
+
+**Tasks:**
+
+1. Update `dot-work install` help text to mention skills/subagents
+2. Add `--skip-skills` and `--skip-subagents` flags if needed
+3. Update `dot-work list` to show skill/subagent support per environment
+4. Update README and documentation
+
+### Implementation Priority
+
+| Phase | Priority | Estimated Effort | Dependencies |
+|-------|----------|------------------|--------------|
+| Phase 1 | High | 2-4 hours | None |
+| Phase 2 | High | 4-6 hours | Phase 1 |
+| Phase 3 | High | 6-8 hours | Phase 2 |
+| Phase 4 | Medium | 4-8 hours | Phase 3 |
+| Phase 5 | Medium | 2-4 hours | Phase 3 |
+| Phase 6 | Low | 2-4 hours | Phase 4-5 |
+
+### Code Location Reference
+
+| Component | Current Location | Changes Needed |
+|-----------|------------------|----------------|
+| Prompt installation | `installer.py` | Extend to call skill/subagent installers |
+| Prompt global.yml | `prompts/global.yml` | Reference pattern |
+| Skill models | `skills/models.py` | Add `environments` field |
+| Skill parser | `skills/parser.py` | Parse environments from frontmatter |
+| Skill discovery | `skills/discovery.py` | Change default paths |
+| Subagent models | `subagents/models.py` | Already has environments |
+| Subagent parser | `subagents/parser.py` | Already parses environments |
+| Subagent discovery | `subagents/discovery.py` | Change default paths |
+| Environment config | `environments.py` | Add skill/subagent support flags |
+
+---
+
+## Summary
+
+The current skills and subagents implementation provides the building blocks (models, parsers, validators, CLI) but lacks integration with the main `dot-work install` flow. The target architecture aligns all three content types (prompts, skills, subagents) with a consistent pattern:
+
+1. **Bundled in package** - Ship pre-defined content
+2. **Environment-aware** - Use `environments:` frontmatter for per-environment config
+3. **Unified installation** - Single `dot-work install` command handles all
+4. **Graceful fallbacks** - Skip unsupported content types or treat as prompts
+
+The existing code modules (`skills/`, `subagents/`) provide solid foundations for validation, parsing, and generation. The main work is:
+- Creating bundled content directories
+- Adding environment support to skills
+- Extending the installer to handle all content types
+- Shipping useful pre-defined skills and subagents

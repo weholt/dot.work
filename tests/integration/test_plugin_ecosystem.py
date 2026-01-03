@@ -9,15 +9,13 @@ These tests verify that:
 
 from __future__ import annotations
 
-import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from dot_work.cli import app
-from dot_work.plugins import discover_plugins, DotWorkPlugin, register_all_plugins
+from dot_work.plugins import DotWorkPlugin, discover_plugins
 
 
 class TestCoreWithoutPlugins:
@@ -105,8 +103,9 @@ class TestPluginRegistration:
 
     def test_register_plugin_adds_command(self) -> None:
         """Test that registering a plugin adds its command to the CLI."""
-        import typer
         from types import ModuleType
+
+        import typer
 
         # Create a mock plugin module
         mock_plugin = ModuleType("test_plugin")
@@ -148,8 +147,9 @@ class TestPluginRegistration:
 
     def test_register_plugin_without_cli_group(self) -> None:
         """Test that plugins without CLI_GROUP use entry point name."""
-        import typer
         from types import ModuleType
+
+        import typer
 
         # Create a mock plugin without CLI_GROUP
         mock_plugin = ModuleType("test_plugin_nogroup")
