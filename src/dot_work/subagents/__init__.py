@@ -31,6 +31,10 @@ Example:
     native_content = generator.generate_native(canonical_subagent, "claude")
 """
 
+from __future__ import annotations
+
+from pathlib import Path
+
 from dot_work.subagents.discovery import DEFAULT_DISCOVERY, SubagentDiscovery
 from dot_work.subagents.generator import SUBAGENT_GENERATOR, SubagentGenerator
 from dot_work.subagents.models import (
@@ -61,3 +65,14 @@ __all__ = [
     "SubagentGenerator",
     "SUBAGENT_GENERATOR",
 ]
+
+
+def get_bundled_subagents_dir() -> Path:
+    """Get the directory containing bundled subagent assets.
+
+    Returns:
+        Path to the bundled subagents directory (assets/subagents/).
+    """
+    # __file__ is src/dot_work/subagents/__init__.py
+    # Go up to src/dot_work/ then down to assets/subagents/
+    return Path(__file__).parent.parent / "assets" / "subagents"

@@ -1,678 +1,152 @@
----
-id: "REFACTOR-007@a3b4c5"
-title: "Move prompts markdown files to assets/prompts folder"
-description: "Relocate prompt markdown files from src/dot_work/prompts/ to src/dot_work/assets/prompts/"
-created: 2025-01-03
-section: "prompts"
-tags: [prompts, assets, refactoring, file-structure]
-type: refactor
-priority: high
-status: proposed
-references:
-  - src/dot_work/prompts/
-  - src/dot_work/assets/prompts/ (new)
----
-
-### Problem
-The `src/dot_work/prompts/` directory currently contains both Python code modules and markdown prompt files. This mixes code and data assets, making the directory structure unclear and harder to maintain. The markdown files are data/content that should be separated from the implementation code.
-
-### Affected Files
-- `src/dot_work/prompts/` (24 markdown files to move: agent-prompts-reference.md, do-work.md, code-review.md, etc.)
-- `src/dot_work/prompts/global.yml` (to be moved)
-- `src/dot_work/prompts/canonical.py` (references to prompts directory)
-- `src/dot_work/prompts/wizard.py` (references to prompts directory)
-- `src/dot_work/installer.py` (uses prompts directory)
-
-### Current State
-```
-src/dot_work/prompts/
-├── agent-prompts-reference.md
-├── do-work.md
-├── code-review.md
-├── ... (21 more .md files)
-├── global.yml
-├── __init__.py
-├── canonical.py
-├── wizard.py
-└── agent_orchestrator.py
-```
-
-### Target State
-```
-src/dot_work/assets/
-└── prompts/
-    ├── agent-prompts-reference.md
-    ├── do-work.md
-    ├── code-review.md
-    └── ... (all 24 .md files + global.yml)
-
-src/dot_work/prompts/
-├── __init__.py
-├── canonical.py
-├── wizard.py
-└── agent_orchestrator.py
-```
-
-### Importance
-Separating content assets from implementation code:
-- Provides clear separation of concerns (code vs data)
-- Makes the directory structure more intuitive
-- Aligns with patterns used for skills and subagents
-- Easier to maintain and extend content independently
-- Consistent with standard Python package practices
-
-### Proposed Solution
-1. Create `src/dot_work/assets/prompts/` directory
-2. Move all 24 markdown files from `src/dot_work/prompts/` to `src/dot_work/assets/prompts/`
-3. Move `src/dot_work/prompts/global.yml` to `src/dot_work/assets/prompts/global.yml`
-4. Create a helper function `get_bundled_prompts_dir()` in `src/dot_work/prompts/`
-5. Update all code references to use the new path:
-   - `src/dot_work/prompts/canonical.py`
-   - `src/dot_work/prompts/wizard.py`
-   - `src/dot_work/installer.py`
-6. Update any tests that reference the old path
-
-### Acceptance Criteria
-- [ ] `src/dot_work/assets/prompts/` directory created
-- [ ] All 24 markdown files moved to `assets/prompts/`
-- [ ] `global.yml` moved to `assets/prompts/`
-- [ ] `get_bundled_prompts_dir()` function created
-- [ ] All code references updated to use new path
-- [ ] All tests pass with new structure
-- [ ] No hardcoded paths to old location remain
-
-### Notes
-This is Issue 1 of 3 related asset reorganization issues.
-Dependencies: None (can be done independently).
-
----
----
-id: "REFACTOR-008@d4e5f6"
-title: "Move bundled_skills to assets/skills folder"
-description: "Relocate bundled_skills contents to src/dot_work/assets/skills/"
-created: 2025-01-03
-section: "skills"
-tags: [skills, assets, refactoring, file-structure]
-type: refactor
-priority: high
-status: proposed
-references:
-  - src/dot_work/bundled_skills/
-  - src/dot_work/assets/skills/ (new)
----
-
-### Problem
-The `src/dot_work/bundled_skills/` directory is inconsistently named compared to the code module `src/dot_work/skills/`. This creates confusion about where bundled skill content lives versus the skills implementation code. The directory should be renamed to `assets/skills/` for clarity and consistency.
-
-### Affected Files
-- `src/dot_work/bundled_skills/` (directory to be moved/renamed)
-- `src/dot_work/bundled_skills/global.yml` (to be moved)
-- `src/dot_work/skills/discovery.py` (references bundled_skills directory)
-- `src/dot_work/installer.py` (may reference bundled_skills)
-- Any tests referencing `bundled_skills` path
-
-### Current State
-```
-src/dot_work/
-├── skills/                    # Python code module
-│   ├── __init__.py
-│   ├── cli.py
-│   ├── discovery.py
-│   ├── models.py
-│   ├── parser.py
-│   └── ...
-└── bundled_skills/            # Bundled content (confusing name)
-    ├── .gitkeep
-    └── global.yml
-```
-
-### Target State
-```
-src/dot_work/
-├── assets/
-│   └── skills/               # Clear: bundled skill assets
-│       ├── .gitkeep
-│       └── global.yml
-└── skills/                   # Python code module
-    ├── __init__.py
-    ├── cli.py
-    ├── discovery.py
-    └── ...
-```
-
-### Importance
-Renaming `bundled_skills` to `assets/skills`:
-- Provides consistent naming with `assets/prompts/`
-- Makes it clear this is content/data, not code
-- Eliminates confusion between `skills/` (code) and `bundled_skills/` (content)
-- Sets up proper `assets/` directory for future asset types
-- Aligns with user's requested structure
-
-### Proposed Solution
-1. Create `src/dot_work/assets/skills/` directory
-2. Move contents from `src/dot_work/bundled_skills/` to `src/dot_work/assets/skills/`
-3. Update `src/dot_work/skills/discovery.py` to reference new path
-4. Create/update `get_bundled_skills_dir()` helper function
-5. Update `src/dot_work/installer.py` if it references the old path
-6. Update all tests that reference `bundled_skills`
-7. Delete old `src/dot_work/bundled_skills/` directory
-
-### Acceptance Criteria
-- [ ] `src/dot_work/assets/skills/` directory created
-- [ ] Contents moved from `bundled_skills/` to `assets/skills/`
-- [ ] `global.yml` exists in new location
-- [ ] All code references updated to use `assets/skills/`
-- [ ] Old `bundled_skills/` directory removed
-- [ ] All tests pass with new structure
-- [ ] No hardcoded paths to `bundled_skills` remain
-
-### Notes
-This is Issue 2 of 3 related asset reorganization issues.
-Dependencies: None (can be done independently, but coordinates with REFACTOR-007 for consistency).
-
----
----
-id: "REFACTOR-009@e5f6a7"
-title: "Move bundled_subagents to assets/subagents folder"
-description: "Relocate bundled_subagents contents to src/dot_work/assets/subagents/"
-created: 2025-01-03
-section: "subagents"
-tags: [subagents, assets, refactoring, file-structure]
-type: refactor
-priority: high
-status: proposed
-references:
-  - src/dot_work/bundled_subagents/
-  - src/dot_work/assets/subagents/ (new)
----
-
-### Problem
-The `src/dot_work/bundled_subagents/` directory is inconsistently named compared to the code module `src/dot_work/subagents/`. This creates confusion about where bundled subagent content lives versus the subagents implementation code. The directory should be renamed to `assets/subagents/` for clarity and consistency with prompts and skills.
-
-### Affected Files
-- `src/dot_work/bundled_subagents/` (directory to be moved/renamed)
-- `src/dot_work/bundled_subagents/global.yml` (to be moved)
-- `src/dot_work/subagents/discovery.py` (may reference bundled_subagents directory)
-- `src/dot_work/installer.py` (may reference bundled_subagents)
-- Any tests referencing `bundled_subagents` path
-
-### Current State
-```
-src/dot_work/
-├── subagents/                 # Python code module
-│   ├── __init__.py
-│   ├── cli.py
-│   ├── discovery.py
-│   ├── models.py
-│   ├── parser.py
-│   ├── environments/
-│   └── ...
-└── bundled_subagents/         # Bundled content (confusing name)
-    ├── .gitkeep
-    └── global.yml
-```
-
-### Target State
-```
-src/dot_work/
-├── assets/
-│   ├── prompts/              # From REFACTOR-007
-│   ├── skills/               # From REFACTOR-008
-│   └── subagents/            # Clear: bundled subagent assets
-│       ├── .gitkeep
-│       └── global.yml
-└── subagents/                # Python code module
-    ├── __init__.py
-    ├── cli.py
-    ├── discovery.py
-    ├── environments/
-    └── ...
-```
-
-### Importance
-Renaming `bundled_subagents` to `assets/subagents`:
-- Provides consistent naming across all asset types (prompts, skills, subagents)
-- Makes it clear this is content/data, not code
-- Eliminates confusion between `subagents/` (code) and `bundled_subagents/` (content)
-- Completes the assets directory reorganization
-- Aligns with user's requested structure
-
-### Proposed Solution
-1. Create `src/dot_work/assets/subagents/` directory
-2. Move contents from `src/dot_work/bundled_subagents/` to `src/dot_work/assets/subagents/`
-3. Update `src/dot_work/subagents/discovery.py` to reference new path
-4. Create/update `get_bundled_subagents_dir()` helper function
-5. Update `src/dot_work/installer.py` if it references the old path
-6. Update all tests that reference `bundled_subagents`
-7. Delete old `src/dot_work/bundled_subagents/` directory
-
-### Acceptance Criteria
-- [ ] `src/dot_work/assets/subagents/` directory created
-- [ ] Contents moved from `bundled_subagents/` to `assets/subagents/`
-- [ ] `global.yml` exists in new location
-- [ ] All code references updated to use `assets/subagents/`
-- [ ] Old `bundled_subagents/` directory removed
-- [ ] All tests pass with new structure
-- [ ] No hardcoded paths to `bundled_subagents` remain
-
-### Notes
-This is Issue 3 of 3 related asset reorganization issues.
-Dependencies: None (can be done independently, but coordinates with REFACTOR-007 and REFACTOR-008 for consistency).
-
----
----
-id: "REFACTOR-002@c7g4c2"
-title: "Add environment support to SKILL.md frontmatter"
-description: "Phase 2: Enable environment-aware skill installation like prompts"
-created: 2025-01-02
-section: "skills"
-tags: [skills, environments, phase-2, frontmatter]
-type: refactor
-priority: medium
-status: proposed
-references:
-  - src/dot_work/skills/models.py
-  - src/dot_work/skills/parser.py
-  - src/dot_work/skills/validator.py
----
-
-### Problem
-Skills currently lack the `environments:` frontmatter field that prompts have. This means skills can't be installed in an environment-aware way. Each environment would need the same skill manually, defeating the "write once, deploy everywhere" pattern.
-
-### Affected Files
-- `src/dot_work/skills/models.py` (add `SkillEnvironmentConfig` and `environments` field)
-- `src/dot_work/skills/parser.py` (parse `environments:` from frontmatter)
-- `src/dot_work/skills/validator.py` (validate environment configs)
-
-### Importance
-Adding environment support to skills enables:
-- Single skill definition that works across environments
-- Consistent installation flow with prompts
-- Skills to be installed via `dot-work install` command
-- Per-environment configuration (target paths, naming)
-
-### Proposed Solution
-**Phase 2 Tasks:**
-
-1. Update `SkillMetadata` model to include `environments` field
-2. Update `SkillParser` to parse `environments:` from SKILL.md frontmatter
-3. Add `SkillEnvironmentConfig` dataclass (similar to `EnvironmentConfig` for prompts)
-4. Update `SkillValidator` to validate environment configs
-5. Create `skill_installer.py` with installation logic
-
-**Model changes (`skills/models.py`):**
-```python
-@dataclass
-class SkillEnvironmentConfig:
-    """Environment-specific skill installation config."""
-    target: str  # Target directory for this environment
-
-@dataclass
-class SkillMetadata:
-    name: str
-    description: str
-    license: str | None = None
-    compatibility: str | None = None
-    metadata: dict[str, str] | None = None
-    allowed_tools: list[str] | None = None
-    environments: dict[str, SkillEnvironmentConfig] | None = None  # NEW
-```
-
-**Target SKILL.md format:**
-```markdown
----
-name: code-review
-description: Expert code review guidelines.
-license: MIT
-
-environments:
-  claude:
-    target: ".claude/skills/"
-  # Other environments don't support skills - skipped automatically
----
-
-# Code Review Skill
-[Skill content...]
-```
-
-### Acceptance Criteria
-- [ ] `SkillEnvironmentConfig` dataclass created
-- [ ] `SkillMetadata.environments` field added
-- [ ] `SkillParser` parses `environments:` from frontmatter
-- [ ] `SkillValidator` validates environment configs
-- [ ] Tests for new functionality added
-- [ ] Existing tests still pass
-
-### Notes
-This is Phase 2 of 6 phases.
-Estimated effort: 4-6 hours.
-Dependencies: Phase 1 (bundled_skills directory must exist).
-
----
----
-id: "REFACTOR-003@d9h5d3"
-title: "Extend installer to handle skills and subagents"
-description: "Phase 3: Make dot-work install handle prompts, skills, and subagents"
-created: 2025-01-02
-section: "installer"
-tags: [installer, skills, subagents, phase-3]
-type: refactor
-priority: medium
-status: proposed
-references:
-  - src/dot_work/installer.py
-  - src/dot_work/skills/
-  - src/dot_work/subagents/
----
-
-### Problem
-Currently `dot-work install` only handles prompts. Skills and subagents have separate workflows (`dot-work skills install`, `dot-work subagents sync`). This creates inconsistent user experience and prevents unified content installation.
-
-### Affected Files
-- `src/dot_work/installer.py` (add skill/subagent installation functions)
-- `src/dot_work/environments.py` (add skill/subagent support flags)
-
-### Importance
-Unified installation enables:
-- Single `dot-work install` command for all content types
-- Consistent experience across prompts, skills, subagents
-- Simpler onboarding for new users
-- Atomic updates to all project content
-
-### Proposed Solution
-**Phase 3 Tasks:**
-
-1. Create `get_bundled_skills_dir()` and `get_bundled_subagents_dir()` functions
-2. Create `install_skills_by_environment()` function
-3. Create `install_subagents_by_environment()` function
-4. Update `install_prompts()` to also call skill/subagent installers
-5. Handle environments that don't support skills/subagents (skip gracefully)
-
-**New installer functions:**
-```python
-SKILL_SUPPORTED_ENVIRONMENTS = {"claude"}
-SUBAGENT_SUPPORTED_ENVIRONMENTS = {"claude", "opencode", "copilot"}
-
-def install_skills_by_environment(
-    env_name: str,
-    target: Path,
-    skills_dir: Path,
-    console: Console,
-    *,
-    force: bool = False,
-    dry_run: bool = False,
-) -> int:
-    """Install bundled skills for an environment.
-
-    Returns number of skills installed, or 0 if environment doesn't support skills.
-    """
-    if env_name not in SKILL_SUPPORTED_ENVIRONMENTS:
-        console.print(f"[dim]Skills not supported for {env_name}, skipping...[/dim]")
-        return 0
-    # Install skills...
-
-def install_subagents_by_environment(
-    env_name: str,
-    target: Path,
-    subagents_dir: Path,
-    console: Console,
-    *,
-    force: bool = False,
-    dry_run: bool = False,
-) -> int:
-    """Install bundled subagents for an environment.
-
-    If environment doesn't support native agents, treats subagents as prompts.
-    """
-    if env_name in SUBAGENT_SUPPORTED_ENVIRONMENTS:
-        # Install as native agents
-        ...
-    else:
-        # Install as prompts (fallback)
-        ...
-```
-
-**Target installation flow:**
-```bash
-$ dot-work install --env claude
-
-Installing for Claude Code...
-
-Prompts:
-  ✓ Installed code-review.md -> .claude/commands/code-review.md
-
-Skills:
-  ✓ Installed code-review/ -> .claude/skills/code-review/SKILL.md
-
-Subagents:
-  ✓ Installed code-reviewer.md -> .claude/agents/code-reviewer.md
-
-Done! Installed 1 prompt, 1 skill, 1 subagent.
-```
-
-### Acceptance Criteria
-- [ ] `get_bundled_skills_dir()` function created and working
-- [ ] `get_bundled_subagents_dir()` function created and working
-- [ ] `install_skills_by_environment()` function implemented
-- [ ] `install_subagents_by_environment()` function implemented
-- [ ] `install_prompts()` updated to call skill/subagent installers
-- [ ] Unsupported environments are skipped gracefully
-- [ ] Tests for unified installation flow
-- [ ] Integration tests pass
-
-### Notes
-This is Phase 3 of 6 phases.
-Estimated effort: 6-8 hours.
-Dependencies: Phase 2 (skills must have environment support).
-
----
----
-id: "REFACTOR-004@e8j6e4"
-title: "Create bundled skills and subagents content"
-description: "Phase 4: Ship pre-defined skills and subagents with dot-work"
-created: 2025-01-02
-section: "content"
-tags: [skills, subagents, content, phase-4]
+id: "FEAT-099@d4e5f6"
+title: "Skills and Subagents marketplace/registry"
+description: "Create a community registry for sharing skills and subagents with search, install, and version management"
+created: 2026-01-03
+section: "ecosystem"
+tags: [marketplace, registry, skills, subagents, community, future]
 type: enhancement
 priority: low
 status: proposed
 references:
-  - src/dot_work/bundled_skills/
-  - src/dot_work/bundled_subagents/
+  - src/dot_work/marketplace/ (potential new module)
+  - src/dot_work/cli.py (add marketplace commands)
 ---
 
 ### Problem
-After establishing the infrastructure (Phases 1-3), users will have empty bundled content directories. To provide immediate value, we need to create useful pre-defined skills and subagents that ship with the package.
+After implementing skills and subagents, users will want to share their creations with the community. Currently there's no central way to discover, install, and update community-contributed skills and subagents.
 
 ### Affected Files
-- `src/dot_work/bundled_skills/` (new skill directories)
-- `src/dot_work/bundled_subagents/` (new subagent files)
+- **Potential new**: `src/dot_work/marketplace/` module
+- **Modify**: `src/dot_work/cli.py` (add marketplace commands)
 
 ### Importance
-Bundled content provides:
-- Immediate value upon installation
-- Examples of best practices
-- Core functionality most users need
-- Reduced time-to-first-value
+A marketplace/registry enables:
+- Community contribution and sharing
+- Discovery of useful skills/subagents
+- Version management and updates
+- Quality ratings and reviews
+- Reduced duplication of effort
 
 ### Proposed Solution
-**Phase 4 Tasks:**
 
-1. Create initial bundled skills (code-review, debugging, etc.)
-2. Create initial bundled subagents (code-reviewer, architect, etc.)
-3. Each with proper `environments:` frontmatter
-4. Validate all bundled content in CI
+**Future Considerations (from subagents spec):**
+1. **Subagent Marketplace**: Registry of community subagents
+2. **Skills Registry**: Central repository for skills
+3. **Version Management**: Track versions across environments
+4. **Metrics/Analytics**: Track usage and effectiveness
+5. **Quality Assurance**: Validation, testing, ratings
 
-**Example bundled skill structure:**
+**Implementation approaches:**
+- Simple: Git-based registry (GitHub organization with repos)
+- Medium: JSON index with HTTP fetching
+- Complex: Full marketplace backend with API, auth, reviews
+
+**CLI commands:**
+```bash
+dot-work marketplace search <query>
+dot-work marketplace install <skill|subagent> [--version]
+dot-work marketplace publish <path>
+dot-work marketplace list [--installed]
+dot-work marketplace update [name]
+dot-work marketplace info <name>
 ```
-src/dot_work/bundled_skills/code-review/
-└── SKILL.md
-```
-
-**Example bundled subagent:**
-```
-src/dot_work/bundled_subagents/code-reviewer.md
-```
-
-**Initial skills to create:**
-- `code-review` - Comprehensive code review guidelines
-- `debugging` - Systematic debugging approaches
-- `test-driven-development` - TDD workflow
-
-**Initial subagents to create:**
-- `code-reviewer` - Expert code reviewer (quality + security)
-- `architect` - Software architecture design
-- `debugger` - Root cause analysis specialist
 
 ### Acceptance Criteria
-- [ ] At least 3 bundled skills created
-- [ ] At least 3 bundled subagents created
-- [ ] All content has valid frontmatter
-- [ ] All content has `environments:` section
-- [ ] CI validates all bundled content
-- [ ] Content is tested via install command
+- [ ] Marketplace architecture designed
+- [ ] Search functionality working
+- [ ] Install from registry working
+- [ ] Publish/submit process defined
+- [ ] Version management implemented
+- [ ] Documentation for contributors
+
+### Validation Plan
+**Deferred** - This is a future enhancement. Validation plan to be determined when implementation begins.
+
+### Dependencies
+**Blocked by:** FEAT-023, FEAT-030, FEAT-031 must be complete (skills/subagents infrastructure must be stable first).
+
+### Clarifications Needed
+**User decision required:**
+1. Which implementation approach to pursue (git-based vs JSON index vs full marketplace)?
+2. Should this be hosted or self-hosted?
+3. What authentication/authorization model for publishing?
 
 ### Notes
-This is Phase 4 of 6 phases.
-Estimated effort: 4-8 hours.
-Dependencies: Phase 3 (installer must support skills/subagents).
+This is a future enhancement, not immediate priority. Should wait until skills/subagents are stable and in use. Consider starting with simple git-based approach. Could leverage existing package managers (npm, pypi) as inspiration. Estimated effort: 20-40 days (depending on scope).
 
 ---
 ---
-id: "REFACTOR-005@f7k7f5"
-title: "Update skills/subagents discovery to use bundled content only"
-description: "Phase 5: Change discovery to find only bundled package content"
-created: 2025-01-02
-section: "skills"
-tags: [skills, subagents, discovery, phase-5]
-type: refactor
+id: "FEAT-100@e5f6a7"
+title: "Cursor/Windsurf subagent support"
+description: "Add subagent support for Cursor and Windsurf AI editors (both use VS Code extension format)"
+created: 2026-01-03
+section: "subagents"
+tags: [subagents, cursor, windsurf, vscode, future]
+type: enhancement
 priority: low
 status: proposed
 references:
-  - src/dot_work/skills/discovery.py
-  - src/dot_work/subagents/discovery.py
+  - src/dot_work/subagents/environments/ (add cursor.py, windsurf.py)
+  - src/dot_work/subagents/adapter.py (may need updates)
 ---
 
 ### Problem
-Current skills and subagents discovery searches user directories (`.skills/`, `~/.config/dot-work/skills/`). This differs from how prompts work - prompts are discovered from the bundled package directory. The inconsistency creates confusion.
+The subagents specification (FEAT-030) initially supports Claude Code, OpenCode, and GitHub Copilot. Cursor and Windsurf are popular AI editors that also support custom agents but may have slightly different formats.
 
 ### Affected Files
-- `src/dot_work/skills/discovery.py` (default paths)
-- `src/dot_work/subagents/discovery.py` (default paths)
+- **New**: `src/dot_work/subagents/environments/cursor.py`
+- **New**: `src/dot_work/subagents/environments/windsurf.py`
+- `src/dot_work/subagents/adapter.py` (may need updates for shared code)
+- `src/dot_work/subagents/__init__.py` (register new environments)
+- Tests for new adapters
 
 ### Importance
-Aligning discovery behavior ensures:
-- Consistent mental model across all content types
-- Predictable behavior for users
-- Clear separation: bundled (installed) vs user-created (development)
-- Simpler maintenance
+Adding Cursor/Windsurf support:
+- Covers more popular AI editors
+- May share Copilot adapter (both VS Code-based)
+- Completes coverage of major AI coding tools
 
 ### Proposed Solution
-**Phase 5 Tasks:**
+Investigate Cursor and Windsurf subagent formats:
+1. ~~Document their file formats and locations~~ ✅ **RESEARCH COMPLETE**
+2. Determine if Copilot adapter can be reused ~~→ ❌ Cannot reuse (different formats)~~
+3. If different, create separate adapters
+4. Add to `environments:` frontmatter support
 
-1. Update `SkillDiscovery` default paths to use `get_bundled_skills_dir()`
-2. Update `SubagentDiscovery` default paths to use `get_bundled_subagents_dir()`
-3. Remove user-global paths (`~/.config/dot-work/skills/` etc.) from defaults
-4. Keep project-local discovery available via explicit `--path` arguments
+**Research completed:**
+- Cursor: `.cursor/rules/*.mdc` format with frontmatter (description, globs)
+- Windsurf: `AGENTS.md` plain markdown (no frontmatter)
+- Copilot adapter: ❌ **NOT compatible** - different frontmatter structures
+- See `.work/agent/issues/references/FEAT-100-research.md` for details
 
-**Discovery behavior changes:**
-- **Before:** `.skills/`, `~/.config/dot-work/skills/`
-- **After:** `<package>/bundled_skills/`
-
-**User-created content:**
-- Still discoverable via explicit `--path` argument
-- Not part of default install flow
-- Separated concern: bundled vs development
-
-### Acceptance Criteria
-- [ ] `SkillDiscovery` uses `get_bundled_skills_dir()` by default
-- [ ] `SubagentDiscovery` uses `get_bundled_subagents_dir()` by default
-- [ ] User-global paths removed from defaults
-- [ ] `--path` argument still works for user-created content
-- [ ] Tests updated for new discovery behavior
-- [ ] Documentation updated
-
-### Notes
-This is Phase 5 of 6 phases.
-Estimated effort: 2-4 hours.
-Dependencies: Phase 3 (installer must be complete).
-
----
----
-id: "REFACTOR-006@b1l8g6"
-title: "Update CLI and documentation for unified installation"
-description: "Phase 6: Update UX to reflect unified prompts/skills/subagents installation"
-created: 2025-01-02
-section: "cli"
-tags: [cli, documentation, phase-6]
-type: docs
-priority: low
-status: proposed
-references:
-  - src/dot_work/cli.py
-  - README.md
----
-
-### Problem
-After implementing Phases 1-5, the CLI and documentation will still refer to the old separate workflows. Users won't know about the unified installation capability.
-
-### Affected Files
-- `src/dot_work/cli.py` (help text, command descriptions)
-- `README.md` (installation instructions)
-- `skills_agents_guid.md` (update to reflect completed changes)
-
-### Importance
-Updated documentation ensures:
-- Users discover the unified installation feature
-- Clear migration path from old workflows
-- Accurate examples and tutorials
-- Reduced confusion
-
-### Proposed Solution
-**Phase 6 Tasks:**
-
-1. Update `dot-work install` help text to mention skills/subagents
-2. Add `--skip-skills` and `--skip-subagents` flags if needed
-3. Update `dot-work list` to show skill/subagent support per environment
-4. Update README and documentation
-5. Add migration guide for existing users
-
-**New help text example:**
-```
-Install AI coding prompts, skills, and subagents for your environment.
-
-Examples:
-  dot-work install --env claude         # Install all content types
-  dot-work install --env claude --skip-skills  # Skip skills
-  dot-work install --env cursor         # Cursor doesn't support skills/subagents
-```
-
-**Environment support matrix in list command:**
-```
-$ dot-work list
-
-Environment: claude
-  Prompts: ✓ Supported
-  Skills: ✓ Supported
-  Subagents: ✓ Supported
-
-Environment: cursor
-  Prompts: ✓ Supported
-  Skills: ✗ Not supported
-  Subagents: ✗ Treated as prompts
-```
+**Next steps (awaiting user decision on priority):**
+1. Create `CursorAdapter` for `.cursor/rules/*.mdc` format
+2. Create `WindsurfAdapter` for `AGENTS.md` format
+3. Register environments in `subagents/__init__.py`
+4. Add CLI support for `--env cursor` and `--env windsurf`
+5. Write tests
 
 ### Acceptance Criteria
-- [ ] `dot-work install` help text mentions skills/subagents
-- [ ] `--skip-skills` and `--skip-subagents` flags added (if needed)
-- [ ] `dot-work list` shows content type support per environment
-- [ ] README updated with unified installation examples
-- [ ] Migration guide added for existing users
-- [ ] skills_agents_guid.md updated to reflect current state
+- [x] Cursor subagent format documented → `.cursor/rules/*.mdc` with frontmatter
+- [x] Windsurf subagent format documented → `AGENTS.md` plain markdown
+- [x] Adapter approach determined → Separate adapters required (Copilot incompatible)
+- [ ] Implement CursorAdapter class
+- [ ] Implement WindsurfAdapter class
+- [ ] CLI supports `--env cursor` and `--env windsurf`
+- [ ] Tested with actual Cursor/Windsurf installations
+
+### Validation Plan
+**Deferred** - Requires research into Cursor/Windsurf formats first. Validation plan to be determined after research phase.
+
+### Dependencies
+**Blocked by:** FEAT-030 must be complete (subagent infrastructure).
+
+### Clarifications Needed
+**User decision required:**
+1. Is Cursor/Windsurf support a priority for the near term?
+2. Should we validate the VS Code extension format assumption before implementation?
 
 ### Notes
-This is Phase 6 of 6 phases - final phase.
-Estimated effort: 2-4 hours.
-Dependencies: Phase 5 (all implementation must be complete).
+Marked as future consideration in subagents spec. May be simple if VS Code extension format is compatible. Estimated effort: 2-4 days (if similar to Copilot).
 
 ---

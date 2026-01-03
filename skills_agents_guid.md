@@ -4,100 +4,41 @@ This guide provides comprehensive documentation for the Skills and Subagents sys
 
 ---
 
-## IMPORTANT: Architecture Re-Evaluation
+## ✅ Unified Installation Complete
 
-> **Status:** The current skills and subagents implementation differs significantly from how prompts work. This section documents the gaps and the target architecture to align all three systems.
+> **Status:** All 6 phases of unified skills/subagents installation are **COMPLETE** (as of 2026-01-03).
 
-### Current State vs Target State
+### Current Implementation State
 
-| Aspect | Prompts (Reference) | Skills (Current) | Subagents (Current) | Target State |
-|--------|---------------------|------------------|---------------------|--------------|
-| **Bundled with package** | Yes (`src/dot_work/prompts/`) | No | No | Yes - bundle in package |
-| **Environment config** | `environments:` in frontmatter | None | `environments:` section | Add to skills |
-| **Installation via** | `dot-work install` | Discovery only | `dot-work subagents sync` (separate) | Unified `dot-work install` |
-| **Global defaults** | `global.yml` | None | None | Add `global.yml` for each |
-| **Discovery source** | Package prompts dir | User dirs only | User dirs only | Package dir only |
+| Aspect | Prompts | Skills | Subagents |
+|--------|---------|--------|-----------|
+| **Bundled with package** | Yes (`assets/prompts/`) | Yes (`assets/skills/`) | Yes (`assets/subagents/`) |
+| **Environment config** | `environments:` in frontmatter | `environments:` in frontmatter | `environments:` in frontmatter |
+| **Installation via** | `dot-work install` | `dot-work install` (unified) | `dot-work install` (unified) |
+| **Global defaults** | `global.yml` | `global.yml` | `global.yml` |
+| **Discovery source** | Package dir | Package dir (primary) | Package dir (primary) |
 
-### Key Architectural Gaps
+### Completed Changes (REFACTOR-002 through REFACTOR-006)
 
-1. **No bundled skills/subagents** - Prompts ship with pre-defined content; skills and subagents don't
-2. **Separate installation workflows** - `dot-work install` only handles prompts, not skills/subagents
-3. **Skills lack environment awareness** - No `environments:` section in SKILL.md frontmatter
-4. **Discovery from wrong locations** - Current code discovers from user dirs, not package
-
-### Target Architecture
-
-The target is to align skills and subagents with how prompts work:
-
-```
-src/dot_work/
-├── prompts/                    # Bundled prompts (existing)
-│   ├── global.yml              # Default environment configs
-│   └── *.md                    # Prompt files with environments: frontmatter
-│
-├── skills/                     # Code module (existing)
-│   ├── __init__.py
-│   ├── models.py
-│   └── ...
-│
-├── bundled_skills/             # NEW: Bundled skills for installation
-│   ├── global.yml              # Default environment configs for skills
-│   └── <skill-name>/
-│       └── SKILL.md            # With environments: frontmatter
-│
-├── subagents/                  # Code module (existing)
-│   ├── __init__.py
-│   └── ...
-│
-└── bundled_subagents/          # NEW: Bundled subagents for installation
-    ├── global.yml              # Default environment configs
-    └── *.md                    # Canonical subagent files
-```
+1. **Asset directory structure** - `assets/prompts/`, `assets/skills/`, `assets/subagents/`
+2. **Environment support** - Skills have `environments:` frontmatter for environment-aware installation
+3. **Unified installer** - `dot-work install` handles prompts, skills, and subagents
+4. **Bundled content** - 3 skills (code-review, debugging, test-driven-development) + 6 subagents
+5. **Discovery updates** - Default discovery uses bundled content, with project-local as fallback
+6. **CLI documentation** - Updated help text reflects unified installation
 
 ### Environment Support Matrix
-
-Not all environments support all content types:
 
 | Environment | Prompts | Skills | Subagents | Notes |
 |-------------|---------|--------|-----------|-------|
 | Claude Code | `.claude/commands/` | `.claude/skills/` | `.claude/agents/` | Full support |
 | OpenCode | `.opencode/prompts/` | Skip | `.opencode/agent/` | No native skills |
-| Cursor | `.cursor/rules/` | Skip | Treat as prompt | No native agents/skills |
-| Copilot | `.github/prompts/` | Skip | `.github/agents/` (maybe) | Limited agent support |
-| Windsurf | `.windsurf/rules/` | Skip | Treat as prompt | No native agents/skills |
-| Others | Varies | Skip | Treat as prompt | Fall back to prompt behavior |
+| Cursor | `.cursor/rules/` | Skip | `.cursor/rules/` | Subagents treated as prompts |
+| Copilot | `.github/prompts/` | Skip | `.github/agents/` | Limited agent support |
+| Windsurf | `.windsurf/rules/` | Skip | `.windsurf/rules/` | Subagents treated as prompts |
+| Others | Varies | Skip | Varies | Skills not supported |
 
-### Required Changes for Alignment
-
-1. **Create `src/dot_work/bundled_skills/`** with pre-defined skills
-2. **Create `src/dot_work/bundled_subagents/`** with pre-defined subagents
-3. **Add `environments:` frontmatter to SKILL.md format** for environment-aware installation
-4. **Extend `dot-work install`** to install skills and subagents alongside prompts
-5. **Update discovery** to only find bundled content (not user directories)
-6. **Add `global.yml`** for skills and subagents default configs
-7. **Handle unsupported environments** by skipping or treating as prompts
-
-### Example: Environment-Aware SKILL.md (Target Format)
-
-```markdown
----
-name: code-review
-description: Expert code review guidelines and checklists.
-license: MIT
-
-environments:
-  claude:
-    target: ".claude/skills/"
-    filename_suffix: "/SKILL.md"
-  # Other environments don't support skills - skipped automatically
----
-
-# Code Review Skill
-
-[Skill content...]
-```
-
-### Example: Unified Installation Flow (Target)
+### Example: Unified Installation Flow (Current)
 
 ```bash
 $ dot-work install --env claude
@@ -170,24 +111,35 @@ The skills module implements the Agent Skills specification - a system for defin
 **Module Structure:**
 
 ```
-src/dot_work/skills/
-├── __init__.py           # Public API exports
-├── models.py             # Data models (Skill, SkillMetadata)
-├── parser.py             # SKILL.md file parser
-├── discovery.py          # Filesystem skill discovery
-├── validator.py          # Validation logic
-├── prompt_generator.py   # XML prompt generation
-└── cli.py                # Typer CLI commands
+src/dot_work/
+├── skills/                     # Skills module
+│   ├── __init__.py            # Public API exports, get_bundled_skills_dir()
+│   ├── models.py              # Data models (Skill, SkillMetadata, SkillEnvironmentConfig)
+│   ├── parser.py              # SKILL.md file parser
+│   ├── discovery.py           # Filesystem skill discovery
+│   ├── validator.py           # Validation logic
+│   ├── prompt_generator.py    # XML prompt generation
+│   └── cli.py                 # Typer CLI commands
+│
+└── assets/
+    └── skills/                 # Bundled skills (installed with package)
+        ├── global.yml          # Default environment configs
+        ├── code-review/
+        │   └── SKILL.md
+        ├── debugging/
+        │   └── SKILL.md
+        └── test-driven-development/
+            └── SKILL.md
 ```
 
 **Component Flow:**
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Skill Discovery Flow                         │
+│                   Skill Discovery & Installation Flow           │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  .skills/my-skill/SKILL.md   ──────►  SkillParser.parse()       │
+│  assets/skills/my-skill/SKILL.md ──►  SkillParser.parse()       │
 │                                              │                   │
 │                                              ▼                   │
 │                                    SkillMetadata / Skill         │
@@ -197,6 +149,14 @@ src/dot_work/skills/
 │                                              │                   │
 │                                              ▼                   │
 │                          generate_skills_prompt() ──► XML output │
+│                                                                  │
+│  Unified Installation (dot-work install):                       │
+│  ┌─────────────────────────────────────────────────────┐        │
+│  │ installer.install_skills_by_environment()           │        │
+│  │   ├── Reads environments: from SKILL.md frontmatter │        │
+│  │   ├── Filters by environment (Claude only)          │        │
+│  │   └── Installs to target directory                 │        │
+│  └─────────────────────────────────────────────────────┘        │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -208,23 +168,26 @@ Skills are stored as directories containing a `SKILL.md` file with YAML frontmat
 **Directory Structure:**
 
 ```
-.skills/
+# Bundled skills (installed with package)
+assets/skills/
 └── my-skill/
     ├── SKILL.md          # Required: frontmatter + content
     ├── scripts/          # Optional: executable scripts
-    │   └── setup.sh
     ├── references/       # Optional: reference documents
-    │   └── api-docs.md
     └── assets/           # Optional: static assets
-        └── diagram.png
+
+# Project-local skills (for development)
+.skills/
+└── my-custom-skill/
+    └── SKILL.md
 ```
 
 **Search Paths (in priority order):**
 
-1. `.skills/` (project-local)
-2. `~/.config/dot-work/skills/` (user-global)
+1. `assets/skills/` (bundled with package - primary)
+2. `.skills/` (project-local - for development)
 
-**SKILL.md Format:**
+**SKILL.md Format (with environment support):**
 
 ```markdown
 ---
@@ -239,6 +202,11 @@ allowed_tools:
   - Read
   - Write
   - Bash
+environments:
+  claude:
+    target: ".claude/skills/"
+    filename_suffix: "/pdf-processing/SKILL.md"
+  # Other environments don't support skills - skipped automatically
 ---
 
 # PDF Processing Skill

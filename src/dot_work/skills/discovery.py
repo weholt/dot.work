@@ -19,9 +19,9 @@ class SkillDiscovery:
     """Discover skills from configured directories.
 
     Default search paths:
+    - Bundled skills in package (assets/skills/)
     - .skills/ (project-local)
-    - ~/.config/dot-work/skills/ (user-global)
-    - Bundled skills in package (not yet implemented)
+    - ~/.config/dot-work/skills/ (user-global) - removed for consistency
 
     Example usage:
         discovery = SkillDiscovery()
@@ -50,19 +50,17 @@ class SkillDiscovery:
         """
         paths: list[Path] = []
 
-        # Project-local .skills/ directory
+        # Bundled skills from package (primary source)
+        # Use __file__ to avoid circular import with skills.__init__
+        bundled_skills = Path(__file__).parent.parent / "assets" / "skills"
+        if bundled_skills.is_dir():
+            paths.append(bundled_skills)
+
+        # Project-local .skills/ directory (optional, for development)
         cwd = Path.cwd()
         project_skills = cwd / ".skills"
         if project_skills.is_dir():
             paths.append(project_skills)
-
-        # User-global ~/.config/dot-work/skills/ directory
-        user_config = Path.home() / ".config" / "dot-work" / "skills"
-        if user_config.is_dir():
-            paths.append(user_config)
-
-        # Bundled skills (not yet implemented)
-        # TODO: Add bundled package skills
 
         return paths
 

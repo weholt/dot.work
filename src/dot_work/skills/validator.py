@@ -130,6 +130,24 @@ class SkillValidator:
         if len(words) < 3:
             result.add_warning("Skill description is very short, consider adding more detail")
 
+        # Environment validation
+        if metadata.environments is not None:
+            for env_name, env_config in metadata.environments.items():
+                # Validate environment name format (warning)
+                if not env_name:
+                    result.add_error("Environment name cannot be empty")
+
+                # Validate environment config has required target
+                if not env_config.target or not env_config.target.strip():
+                    result.add_error(f"Environment '{env_name}' must have a non-empty target")
+
+                # Warning if target doesn't start with . or /
+                if env_config.target and not env_config.target.startswith((".", "/")):
+                    result.add_warning(
+                        f"Environment '{env_name}' target '{env_config.target}' "
+                        f"should start with '.' or '/' for clarity"
+                    )
+
         return result
 
     def validate_directory(self, skill_dir: Path) -> ValidationResult:

@@ -18,8 +18,8 @@ import yaml
 
 from dot_work.skills.models import Skill, SkillEnvironmentConfig, SkillMetadata
 
-# Path to global defaults file
-GLOBAL_DEFAULTS_PATH = Path(__file__).parent / "global.yml"
+# Path to global defaults file (now in assets/skills/)
+GLOBAL_DEFAULTS_PATH = Path(__file__).parent.parent / "assets" / "skills" / "global.yml"
 
 
 def _deep_merge(a: dict, b: dict) -> dict:

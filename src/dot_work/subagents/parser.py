@@ -24,8 +24,8 @@ from dot_work.subagents.models import (
     SubagentMetadata,
 )
 
-# Path to global defaults file
-GLOBAL_DEFAULTS_PATH = Path(__file__).parent / "global.yml"
+# Path to global defaults file (now in assets/subagents/)
+GLOBAL_DEFAULTS_PATH = Path(__file__).parent.parent / "assets" / "subagents" / "global.yml"
 
 
 def _deep_merge(a: dict, b: dict) -> dict:

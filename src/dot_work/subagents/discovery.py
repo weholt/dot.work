@@ -30,8 +30,10 @@ class SubagentDiscovery:
 
     # Default search paths for canonical subagents
     DEFAULT_CANONICAL_PATHS: list[Path] = [
+        # Bundled subagents from package (primary source)
+        # Note: Set dynamically in __init__ to use get_bundled_subagents_dir()
+        # Project-local .work/subagents/ (for development)
         Path(".work/subagents"),
-        Path("~/.config/dot-work/subagents").expanduser(),
     ]
 
     def __init__(
@@ -55,6 +57,14 @@ class SubagentDiscovery:
         self.canonical_paths: list[Path] = []
         if canonical_paths:
             self.canonical_paths.extend(canonical_paths)
+
+        # Add bundled subagents from package (primary source)
+        # Use __file__ to avoid circular import with subagents.__init__
+        bundled_subagents = Path(__file__).parent.parent / "assets" / "subagents"
+        if bundled_subagents.is_dir():
+            self.canonical_paths.append(bundled_subagents)
+
+        # Add default paths (project-local)
         self.canonical_paths.extend(self.DEFAULT_CANONICAL_PATHS)
 
     def discover_native(self) -> list[SubagentConfig]:

@@ -14,9 +14,13 @@ from rich.table import Table
 from dot_work.environments import ENVIRONMENTS
 from dot_work.installer import (
     discover_available_environments,
+    get_bundled_skills_dir,
+    get_bundled_subagents_dir,
     get_prompts_dir,
     initialize_work_directory,
     install_prompts,
+    install_skills_by_environment,
+    install_subagents_by_environment,
 )
 from dot_work.plugins import discover_plugins, register_all_plugins
 from dot_work.skills.cli import app as skills_app
@@ -89,7 +93,12 @@ def install(
         ),
     ] = False,
 ) -> None:
-    """Install AI prompts to your project directory."""
+    """Install AI prompts, skills, and subagents to your project directory.
+
+    Supported content types vary by environment:
+    - Claude Code: prompts, skills, and subagents
+    - Other environments: prompts and subagents (skills not supported)
+    """
     target = target.resolve()
 
     if not target.exists():
@@ -149,6 +158,27 @@ def install(
 
     try:
         install_prompts(env_key, target, prompts_dir, console, force=force, dry_run=dry_run)
+
+        # Install skills if environment supports them
+        try:
+            skills_dir = get_bundled_skills_dir()
+            install_skills_by_environment(
+                env_key, target, skills_dir, console, force=force, dry_run=dry_run
+            )
+        except (FileNotFoundError, ValueError):
+            # No bundled skills or not supported - skip silently
+            pass
+
+        # Install subagents if environment supports them
+        try:
+            subagents_dir = get_bundled_subagents_dir()
+            install_subagents_by_environment(
+                env_key, target, subagents_dir, console, force=force, dry_run=dry_run
+            )
+        except (FileNotFoundError, ValueError):
+            # No bundled subagents or not supported - skip silently
+            pass
+
     except ValueError as e:
         console.print(f"\n[red]❌ Installation failed:[/red] {e}")
         raise typer.Exit(1) from None

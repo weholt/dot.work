@@ -1,6 +1,10 @@
 """Prompt management utilities for dot-work."""
 
-from .agent_orchestrator import (
+from __future__ import annotations
+
+from pathlib import Path
+
+from dot_work.prompts.agent_orchestrator import (
     DEFAULT_MAX_CYCLES,
     DEFAULT_STATE_PATH,
     MAX_CYCLES_BEFORE_ABORT,
@@ -11,7 +15,7 @@ from .agent_orchestrator import (
     read_state,
     write_state,
 )
-from .canonical import (
+from dot_work.prompts.canonical import (
     CANONICAL_PARSER,
     CANONICAL_VALIDATOR,
     CanonicalPrompt,
@@ -51,3 +55,14 @@ __all__ = [
     "MAX_CYCLES_BEFORE_ABORT",
     "DEFAULT_MAX_CYCLES",
 ]
+
+
+def get_bundled_prompts_dir() -> Path:
+    """Get the directory containing bundled prompt assets.
+
+    Returns:
+        Path to the bundled prompts directory (assets/prompts/).
+    """
+    # __file__ is src/dot_work/prompts/__init__.py
+    # Go up to src/dot_work/ then down to assets/prompts/
+    return Path(__file__).parent.parent / "assets" / "prompts"

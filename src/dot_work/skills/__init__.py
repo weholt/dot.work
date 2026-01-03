@@ -14,8 +14,12 @@ Example usage:
     prompt = generate_skills_prompt(skills)
 """
 
+from __future__ import annotations
+
+from pathlib import Path
+
 from dot_work.skills.discovery import DEFAULT_DISCOVERY, SkillDiscovery
-from dot_work.skills.models import Skill, SkillMetadata
+from dot_work.skills.models import Skill, SkillEnvironmentConfig, SkillMetadata
 from dot_work.skills.parser import SKILL_PARSER, SkillParser, SkillParserError
 from dot_work.skills.prompt_generator import generate_skill_prompt, generate_skills_prompt
 from dot_work.skills.validator import SKILL_VALIDATOR, SkillValidator, ValidationResult
@@ -23,6 +27,7 @@ from dot_work.skills.validator import SKILL_VALIDATOR, SkillValidator, Validatio
 __all__ = [
     # Models
     "Skill",
+    "SkillEnvironmentConfig",
     "SkillMetadata",
     # Discovery
     "SkillDiscovery",
@@ -39,3 +44,14 @@ __all__ = [
     "generate_skills_prompt",
     "generate_skill_prompt",
 ]
+
+
+def get_bundled_skills_dir() -> Path:
+    """Get the directory containing bundled skill assets.
+
+    Returns:
+        Path to the bundled skills directory (assets/skills/).
+    """
+    # __file__ is src/dot_work/skills/__init__.py
+    # Go up to src/dot_work/ then down to assets/skills/
+    return Path(__file__).parent.parent / "assets" / "skills"

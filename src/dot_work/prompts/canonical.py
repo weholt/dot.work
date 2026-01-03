@@ -35,8 +35,8 @@ from typing import Any
 
 import yaml
 
-# Path to global defaults file
-GLOBAL_DEFAULTS_PATH = Path(__file__).parent / "global.yml"
+# Path to global defaults file (now in assets/prompts/)
+GLOBAL_DEFAULTS_PATH = Path(__file__).parent.parent / "assets" / "prompts" / "global.yml"
 
 
 def _deep_merge(a: dict, b: dict) -> dict:

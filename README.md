@@ -261,6 +261,126 @@ dot-work version freeze
 
 This creates a new version, updates `version.json`, and appends to `CHANGELOG.md`.
 
+---
+
+## 🎯 Skills
+
+**Skills** are reusable capability packages that AI agents can load on-demand. They provide specialized knowledge and workflows for specific tasks.
+
+### What Skills Are
+
+Skills are complementary to prompts and subagents:
+- **Prompts** - One-time instructions for specific tasks (slash commands)
+- **Skills** - Reusable capability packages with structured knowledge
+- **Subagents** - AI personalities with specialized behaviors
+
+### Bundled Skills
+
+dot-work includes 3 pre-installed skills:
+
+| Skill | Description |
+|-------|-------------|
+| **`code-review`** | Expert code review guidelines for quality, security, and maintainability |
+| **`debugging`** | Systematic debugging approaches for isolating and fixing software defects |
+| **`test-driven-development`** | TDD workflow for writing reliable, maintainable code |
+
+### Skills Support
+
+| Environment | Skills Support |
+|-------------|----------------|
+| Claude Code | ✅ Full support (`.claude/skills/`) |
+| Other environments | ❌ Not supported (skills are Claude Code specific) |
+
+### Creating Custom Skills
+
+Skills use YAML frontmatter + markdown format:
+
+```markdown
+---
+name: my-skill
+description: A brief description of what this skill does
+license: MIT
+environments:
+  claude:
+    target: ".claude/skills/"
+    filename_suffix: "/my-skill/SKILL.md"
+---
+
+# My Skill
+
+Detailed instructions and knowledge...
+```
+
+For detailed documentation, see [skills_agents_guid.md](skills_agents_guid.md).
+
+---
+
+## 🤖 Subagents
+
+**Subagents** are custom AI agent personalities with specialized prompts and configurations for multi-environment deployment.
+
+### What Subagents Are
+
+Subagents define AI personalities that can be deployed across different AI coding environments. Each subagent has:
+- Canonical definition with environment-specific configurations
+- Specialized prompts and behaviors
+- Tool mappings per environment
+
+### Bundled Subagents
+
+dot-work includes 6 pre-installed subagents:
+
+| Subagent | Description |
+|----------|-------------|
+| **`code-reviewer`** | Senior code reviewer with security and performance focus |
+| **`test-runner`** | Test engineering specialist |
+| **`debugger`** | Systematic debugging specialist |
+| **`docs-writer`** | Technical documentation specialist |
+| **`security-auditor`** | Security-focused code reviewer |
+| **`refactorer`** | Code restructuring and optimization specialist |
+
+### Subagent Environments
+
+| Environment | Subagent Support |
+|-------------|------------------|
+| Claude Code | ✅ Native agents (`.claude/agents/`) |
+| OpenCode | ✅ Native agents (`.opencode/agent/`) |
+| GitHub Copilot | ✅ GitHub agents (`.github/agents/`) |
+| Cursor/Windsurf | Treated as prompts (`.cursor/rules/`) |
+
+### Creating Custom Subagents
+
+Subagents use canonical format with environment configs:
+
+```markdown
+---
+meta:
+  name: my-subagent
+  description: A brief description
+config:
+  name: my-subagent
+  description: A brief description
+
+environments:
+  claude:
+    target: ".claude/agents/"
+    model: claude-sonnet-4-5
+  opencode:
+    target: ".opencode/agent/"
+    mode: planner
+  copilot:
+    target: ".github/agents/"
+---
+
+# My Subagent
+
+Specialized instructions and personality...
+```
+
+For detailed documentation, see [skills_agents_guid.md](skills_agents_guid.md).
+
+---
+
 ## 🔄 Workflow Example
 
 1. **Create a new project directory**:

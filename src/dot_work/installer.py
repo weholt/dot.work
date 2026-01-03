@@ -76,11 +76,22 @@ class InstallerConfig:
 
 
 def get_prompts_dir() -> Path:
-    """Get the directory containing the bundled prompts."""
-    # Use importlib.resources to find prompts bundled with the package
+    """Get the directory containing the bundled prompts.
+
+    Deprecated: Use get_bundled_prompts_dir() instead.
+    """
+    return get_bundled_prompts_dir()
+
+
+def get_bundled_prompts_dir() -> Path:
+    """Get the directory containing bundled prompts.
+
+    Returns:
+        Path to the bundled prompts directory (assets/prompts/).
+    """
     try:
         pkg_files = importlib.resources.files("dot_work")
-        prompts_dir = Path(str(pkg_files)) / "prompts"
+        prompts_dir = Path(str(pkg_files)) / "assets" / "prompts"
         if prompts_dir.exists():
             return prompts_dir
     except (TypeError, FileNotFoundError):
@@ -89,6 +100,28 @@ def get_prompts_dir() -> Path:
     raise FileNotFoundError(
         "Could not find prompts directory. Make sure the package is installed correctly."
     )
+
+
+def get_bundled_skills_dir() -> Path:
+    """Get the directory containing bundled skills.
+
+    Returns:
+        Path to the bundled skills directory (assets/skills/).
+    """
+    from dot_work.skills import get_bundled_skills_dir as _get_bundled_skills_dir
+
+    return _get_bundled_skills_dir()
+
+
+def get_bundled_subagents_dir() -> Path:
+    """Get the directory containing bundled subagents.
+
+    Returns:
+        Path to the bundled subagents directory (assets/subagents/).
+    """
+    from dot_work.subagents import get_bundled_subagents_dir as _get_bundled_subagents_dir
+
+    return _get_bundled_subagents_dir()
 
 
 def create_jinja_env(prompts_dir: Path) -> JinjaEnvironment:
@@ -105,7 +138,7 @@ def create_jinja_env(prompts_dir: Path) -> JinjaEnvironment:
         not HTML. Markdown does not execute JavaScript or support HTML script tags,
         so XSS (Cross-Site Scripting) attacks are not possible in this context.
 
-        Templates are sourced from trusted internal directories (dot_work/prompts/),
+        Templates are sourced from trusted internal directories (dot_work/assets/prompts/),
         not from user input. Users cannot modify or inject arbitrary templates.
 
         **IMPORTANT**: If this function is ever extended to generate HTML output:
@@ -1603,3 +1636,186 @@ def install_canonical_prompts_by_environment(
 
     if skipped_count > 0:
         console.print(f"[dim]⚠ {skipped_count} file(s) skipped due to errors[/dim]")
+
+
+# ============================================================================
+# Skills and Subagents Installation
+# ============================================================================
+
+# Environments that support native skills/subagents
+SKILL_SUPPORTED_ENVIRONMENTS = {"claude"}
+SUBAGENT_SUPPORTED_ENVIRONMENTS = {"claude", "opencode", "copilot"}
+
+
+def install_skills_by_environment(
+    env_name: str,
+    target: Path,
+    skills_dir: Path,
+    console: Console,
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+) -> int:
+    """Install bundled skills for a specific environment.
+
+    Skills are only supported in Claude Code currently. For other environments,
+    this function skips silently and returns 0.
+
+    Args:
+        env_name: Name of the environment to install for (e.g., 'claude').
+        target: Target project directory to install in.
+        skills_dir: Source directory containing skill directories.
+        console: Rich console for output.
+        force: If True, overwrite existing files without prompting.
+        dry_run: If True, preview changes without writing files.
+
+    Returns:
+        Number of skills installed, or 0 if environment doesn't support skills.
+    """
+    from dot_work.skills import SKILL_PARSER
+
+    # Skip if environment doesn't support skills
+    if env_name not in SKILL_SUPPORTED_ENVIRONMENTS:
+        return 0
+
+    # Find all skill directories (containing SKILL.md)
+    skill_dirs = [d for d in skills_dir.iterdir() if d.is_dir() and (d / "SKILL.md").exists()]
+
+    if not skill_dirs:
+        console.print("[dim]No bundled skills found[/dim]")
+        return 0
+
+    console.print("\n[bold cyan]Skills[/bold cyan]")
+    installed_count = 0
+
+    for skill_dir in skill_dirs:
+        try:
+            skill = SKILL_PARSER.parse(skill_dir)
+
+            # Check if skill has environment config for this environment
+            if skill.meta.environments is None or env_name not in skill.meta.environments:
+                continue
+
+            env_config = skill.meta.environments[env_name]
+
+            # Determine output path from frontmatter target
+            if env_config.target.startswith("/"):
+                output_dir = target / env_config.target.lstrip("/")
+            elif env_config.target.startswith("./"):
+                output_dir = target / env_config.target[2:]
+            else:
+                output_dir = target / env_config.target
+
+            # Determine filename
+            if env_config.filename:
+                skill_filename = env_config.filename
+            elif env_config.filename_suffix:
+                skill_filename = skill.meta.name + env_config.filename_suffix
+            else:
+                skill_filename = skill.meta.name + "/SKILL.md"
+
+            output_path = output_dir / skill_filename
+
+            # Create parent directory
+            if not dry_run:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Write or preview
+            if dry_run:
+                action = "[CREATE]" if not output_path.exists() else "[OVERWRITE]"
+                console.print(f"  [yellow][DRY-RUN][/yellow] [dim]{action}[/dim] {output_path}")
+            else:
+                skill_file = skill_dir / "SKILL.md"
+                output_path.write_text(skill_file.read_text(encoding="utf-8"), encoding="utf-8")
+                console.print(f"  [green]✓[/green] Installed {skill.meta.name}")
+                installed_count += 1
+
+        except Exception as e:
+            console.print(f"  [red]❌ Failed to install skill {skill_dir.name}:[/red] {e}")
+
+    if installed_count > 0:
+        console.print(f"[cyan]📁 Installed {installed_count} skill(s)[/cyan]")
+
+    return installed_count
+
+
+def install_subagents_by_environment(
+    env_name: str,
+    target: Path,
+    subagents_dir: Path,
+    console: Console,
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+) -> int:
+    """Install bundled subagents for a specific environment.
+
+    For environments that support native agents (claude, opencode, copilot),
+    installs as native agent files. For other environments, treats subagents
+    as prompts and installs them using the prompt installer.
+
+    Args:
+        env_name: Name of the environment to install for.
+        target: Target project directory to install in.
+        subagents_dir: Source directory containing subagent .md files.
+        console: Rich console for output.
+        force: If True, overwrite existing files without prompting.
+        dry_run: If True, preview changes without writing files.
+
+    Returns:
+        Number of subagents installed.
+    """
+    from dot_work.subagents import SUBAGENT_PARSER
+
+    # Find all subagent files
+    subagent_files = list(subagents_dir.glob("*.md"))
+
+    if not subagent_files:
+        console.print("[dim]No bundled subagents found[/dim]")
+        return 0
+
+    console.print("\n[bold cyan]Subagents[/bold cyan]")
+    installed_count = 0
+
+    for subagent_file in subagent_files:
+        try:
+            subagent = SUBAGENT_PARSER.parse(subagent_file)
+
+            # Check if subagent has environment config for this environment
+            if subagent.environments is None or env_name not in subagent.environments:
+                continue
+
+            env_config = subagent.environments[env_name]
+
+            # Determine output path from frontmatter target
+            if env_config.target.startswith("/"):
+                output_dir = target / env_config.target.lstrip("/")
+            elif env_config.target.startswith("./"):
+                output_dir = target / env_config.target[2:]
+            else:
+                output_dir = target / env_config.target
+
+            # Use original filename for subagents (SubagentEnvironmentConfig doesn't have filename/filename_suffix)
+            output_filename = subagent_file.name
+            output_path = output_dir / output_filename
+
+            # Create parent directory
+            if not dry_run:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Write or preview
+            if dry_run:
+                action = "[CREATE]" if not output_path.exists() else "[OVERWRITE]"
+                console.print(f"  [yellow][DRY-RUN][/yellow] [dim]{action}[/dim] {output_path}")
+            else:
+                output_path.write_text(subagent_file.read_text(encoding="utf-8"), encoding="utf-8")
+                console.print(f"  [green]✓[/green] Installed {subagent.meta.name}")
+                installed_count += 1
+
+        except Exception as e:
+            console.print(f"  [red]❌ Failed to install subagent {subagent_file.name}:[/red] {e}")
+
+    if installed_count > 0:
+        console.print(f"[cyan]📁 Installed {installed_count} subagent(s)[/cyan]")
+
+    return installed_count
