@@ -1,26 +1,32 @@
 # Agent Focus
-Last updated: 2026-01-03T16:00Z
+Last updated: 2026-01-03T16:15Z
 
 ## Previous
-- Issue: DOCS-009@c3d4e5 - Document Skills and Subagents integration
-- Completed: 2026-01-03T12:00Z
-- Outcome: Documentation updated for skills and subagents features
+- Issue: FEAT-100@e5f6a7 - Cursor/Windsurf subagent support
+- Completed: 2026-01-03T16:00Z
+- Outcome: Created CursorAdapter and WindsurfAdapter, 18 new tests
 
 ## Current
-- Issue: FEAT-100@e5f6a7 - Cursor/Windsurf subagent support
-- Status: **COMPLETED** ✅
-- Started: 2026-01-03T15:30Z
-- Completed: 2026-01-03T16:00Z
-- Priority: medium
-- Implementation Summary:
-  - [x] Created `src/dot_work/subagents/environments/cursor.py`
-  - [x] Created `src/dot_work/subagents/environments/windsurf.py`
-  - [x] Registered environments in `subagents/environments/__init__.py`
-  - [x] Updated CLI to support `--env cursor` and `--env windsurf`
-  - [x] Wrote 18 tests in `tests/unit/subagents/test_adapters.py`
-  - [x] All tests passing (628 total)
-  - [x] Build successful
+- Issue: QA-001@b1c2d3 - Improve test coverage for subagents CLI
+- Status: proposed
+- Priority: high
+- Progress:
+  - [ ] Created test file tests/unit/subagents/test_cli.py
+  - [ ] Write tests for list_subagents
+  - [ ] Write tests for validate_subagent
+  - [ ] Write tests for show_subagent
+  - [ ] Write tests for generate_native
+  - [ ] Write tests for sync_subagents
+  - [ ] Write tests for init_subagent
+  - [ ] Write tests for list_environments
+  - [ ] Achieve 75%+ coverage for cli.py
 
 ## Next
-- Issue: Quality improvements
-- Reason: User requested quality improvements after FEAT-100
+- Issue: QA-002@d2e3f4 - Improve test coverage for skills CLI (priority: high)
+- After: QA-003@e3f4g5 - Improve test coverage for subagents generator (priority: medium)
+
+## Notes
+Created 3 quality improvement issues based on coverage analysis:
+- QA-001: subagents/cli.py (15% → 75%+) - HIGH PRIORITY
+- QA-002: skills/cli.py (14% → 75%+) - HIGH PRIORITY
+- QA-003: subagents/generator.py (16% → 75%+) - MEDIUM PRIORITY
