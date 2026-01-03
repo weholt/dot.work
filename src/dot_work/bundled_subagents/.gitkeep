@@ -1,0 +1,10 @@
+# Bundled Subagents Directory
+#
+# This directory contains pre-defined subagents that ship with the dot-work package.
+# Subagents can be installed via `dot-work install --env <env>`.
+#
+# Each subagent should be a markdown file with frontmatter.
+#
+# Example structure:
+# code-reviewer.md
+# architect.md

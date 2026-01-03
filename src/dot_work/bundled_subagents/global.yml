@@ -1,14 +1,11 @@
-# Global default frontmatter for subagents.
+# Global default frontmatter for bundled subagents.
 #
 # This file provides default YAML frontmatter values that are merged with each
-# subagent's frontmatter at runtime. Local values in individual subagent files
-# override these global defaults (deep merge).
-#
-# If this file is missing, the parser falls back to requiring all frontmatter
-# in individual subagent files (backward compatible).
+# bundled subagent's frontmatter at runtime. Local values in individual subagent
+# files override these global defaults (deep merge).
 
 defaults:
-  # Default environment configurations shared across all subagents.
+  # Default environment configurations shared across all bundled subagents.
   # Individual subagents can override these by redefining specific environments
   # in their own frontmatter.
   environments:

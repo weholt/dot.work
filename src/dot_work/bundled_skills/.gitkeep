@@ -1,0 +1,11 @@
+# Bundled Skills Directory
+#
+# This directory contains pre-defined skills that ship with the dot-work package.
+# Skills can be installed via `dot-work install --env <env>`.
+#
+# Each skill should be a subdirectory containing:
+# - SKILL.md (skill definition with frontmatter)
+#
+# Example structure:
+# code-review/
+# └── SKILL.md

@@ -183,3 +183,81 @@ Kept the command name as-is for backward compatibility.
 The command name remains `init` for backward compatibility, but the help text
 now makes it clear this is for adding prompts to existing projects.
 
+---
+---
+id: "CR-001@e8a3b2"
+title: "Fix validation conflict - empty strings in global.yml will crash parser"
+description: "SkillEnvironmentConfig validation rejects empty strings but global.yml uses them"
+created: 2026-01-03
+section: "skills"
+tags: [validation, bug, critical, skills, subagents]
+type: bug
+priority: critical
+status: completed
+completed: 2026-01-03
+references:
+  - src/dot_work/skills/models.py
+  - src/dot_work/skills/global.yml
+  - src/dot_work/bundled_skills/global.yml
+  - src/dot_work/bundled_subagents/global.yml
+---
+
+### Problem
+The `SkillEnvironmentConfig.__post_init__()` validation explicitly rejected empty strings, but the global.yml files used empty strings as values. This would cause ValueError when parsing skills/subagents with global defaults.
+
+### Solution Implemented
+Changed all global.yml files to remove empty string values:
+- `src/dot_work/skills/global.yml` - removed `filename_suffix: ""`
+- `src/dot_work/subagents/global.yml` - removed `filename: ""`
+- `src/dot_work/bundled_skills/global.yml` - removed `filename_suffix: ""`
+- `src/dot_work/bundled_subagents/global.yml` - removed `filename: ""`
+
+When a field is not needed, it's now simply omitted from YAML (becomes None in Python).
+
+### Verification
+- Build passes: `uv run python scripts/build.py`
+- All 517 tests pass
+- Parser no longer crashes with ValueError
+- Global defaults loaded successfully
+
+### Notes
+This was a regression introduced by REFACTOR-001 implementation. The validation was added but the configuration files were not updated to match.
+
+
+---
+---
+id: "REFACTOR-001@a4f2b1"
+title: "Create bundled_skills and bundled_subagents directories"
+description: "Phase 1: Establish package structure for bundled skills and subagents"
+created: 2025-01-02
+section: "architecture"
+tags: [skills, subagents, architecture, phase-1]
+type: refactor
+priority: medium
+status: completed
+completed: 2026-01-03
+references:
+  - src/dot_work/
+  - skills_agents_guid.md
+---
+
+### Problem
+Current skills and subagents are not bundled with the package. Prompts ship with pre-defined content in `src/dot_work/prompts/`, but skills and subagents must be manually created by users. This creates inconsistency in the user experience.
+
+### Solution Implemented
+Created `src/dot_work/bundled_skills/` and `src/dot_work/bundled_subagents/` directories with:
+- `global.yml` files for default environment configs
+- `.gitkeep` files with documentation
+- Updated `pyproject.toml` to include directories in wheel artifacts
+
+### Verification
+- [x] `src/dot_work/bundled_skills/` directory created
+- [x] `src/dot_work/bundled_subagents/` directory created
+- [x] `global.yml` files created with proper structure
+- [x] `pyproject.toml` updated to include package data
+- [x] Build successfully includes the new directories
+- [x] `importlib.resources` can access the new directories
+
+### Notes
+This is Phase 1 of 6 phases to align skills/subagents with prompts architecture.
+Fixed CR-001@e8a3b2 (validation conflict with empty strings) as part of code review validation.
