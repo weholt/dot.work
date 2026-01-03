@@ -1125,3 +1125,48 @@ Created comprehensive test file `tests/unit/subagents/test_cli.py` with:
 - New: `tests/unit/subagents/test_cli.py` (330 lines)
 
 ---
+---
+---
+id: "QA-002@d2e3f4"
+title: "Improve test coverage for skills CLI"
+description: "Add tests for skills CLI commands (currently 14% coverage)"
+created: 2026-01-03
+section: "testing"
+tags: [testing, coverage, cli, skills]
+type: quality
+priority: high
+status: completed
+completed: 2026-01-03
+references:
+  - src/dot_work/skills/cli.py
+  - tests/unit/skills/test_cli.py (created)
+---
+
+### Problem
+The skills CLI module had only 14% test coverage, below the 75% target. High-risk user-facing code.
+
+### Solution Implemented
+Created comprehensive test file `tests/unit/skills/test_cli.py` with 19 tests covering:
+- TestListSkills (3 tests): empty list, list with skills, custom paths
+- TestValidateSkill (4 tests): valid skill, invalid skill, warnings, SKILL.md file
+- TestShowSkill (3 tests): existing skill, nonexistent skill, rich metadata
+- TestGeneratePrompt (2 tests): default with paths, without paths
+- TestInstallSkill (3 tests): default location, custom target, SKILL.md file
+- TestErrorHandling (3 tests): KeyboardInterrupt handling
+- TestCommandDiscovery (1 test): all commands available
+
+### Key Technical Decisions
+- Used `patch("dot_work.skills.cli.DEFAULT_DISCOVERY", spec=True)` for mocking
+- CliRunner from typer.testing for CLI invocation testing
+- MagicMock for mocking skills and discovery objects
+- Tests handle typer.Exit(0) returning exit code 1 in CliRunner
+
+### Verification
+- All 19 tests passing
+- Total test count: 670 (up from 651)
+- Full test suite passes with 18 skipped
+
+### Notes
+QA-002 completed successfully. Skills CLI now has comprehensive test coverage for all 5 commands (list, validate, show, prompt, install).
+
+---

@@ -1,7 +1,7 @@
 # Project Baseline
 
-**Captured:** 2026-01-03T11:00Z
-**Commit:** 5392e341a7765c445b2d8c4555e04509c2bc4cbf
+**Captured:** 2026-01-03T18:15Z
+**Commit:** f2e37eb36924ec158ecd8d2f7e91f61a0d4dab39
 **Branch:** closing-migration
 
 ---
@@ -10,18 +10,18 @@
 
 ### Source Code (`src/`)
 - **Total modules:** 1 main package (`dot_work`)
-- **Python files:** 44 files
-- **Total lines:** ~11,000 lines
-- **Module directories:** 9 (prompts, skills, subagents, utils, environments, cli, installer, agents)
+- **Python files:** 42 files
+- **Total lines:** ~13,000 lines
+- **Module directories:** 11 (prompts, skills, subagents, utils, environments, cli, installer, agents, assets, bundled_skills, bundled_subagents)
 
 ### Module Breakdown
 | Module | Files | Lines |
 |--------|-------|-------|
-| `dot_work` (main) | 44 | ~11,000 |
+| `dot_work` (main) | 42 | ~13,000 |
 
 ### Test Suite (`tests/`)
-- **Python files:** 25 files (20 unit, 4 integration, 1 conftest)
-- **Total lines:** ~7,500 lines
+- **Python files:** 34 files (29 unit, 4 integration, 1 conftest)
+- **Total lines:** ~9,500 lines
 
 ### Entry Points
 | Entry Point | Type | Location |
@@ -34,13 +34,15 @@
 | `init_tracking()` | CLI command | `src/dot_work/cli.py` |
 | `status()` | CLI command | `src/dot_work/cli.py` |
 | `plugins_cmd()` | CLI command | `src/dot_work/cli.py` |
+| `skills_app` | Skills CLI | `src/dot_work/skills/cli.py` |
+| `subagents_app` | Subagents CLI | `src/dot_work/subagents/cli.py` |
 
 ### Dependencies
 | Category | Count |
 |----------|-------|
-| Direct runtime | 14 |
-| Dev dependencies | 8 |
-| Total | 22 |
+| Direct runtime | 7 |
+| Dev dependencies | 10 |
+| Total | 17 |
 
 ---
 
@@ -61,12 +63,14 @@
 ### Installer Behaviors (BEH-INST-XXX)
 | ID | Behavior | Documented | Verified Via |
 |----|----------|-----------|-------------|
-| BEH-INST-001 | Supports 12+ AI environments | Yes | Environment tests |
+| BEH-INST-001 | Supports 14+ AI environments (including Cursor, Windsurf) | Yes | Environment tests |
 | BEH-INST-002 | Each environment has unique target directory and filename pattern | Yes | Environment tests |
 | BEH-INST-003 | Jinja2 templates rendered with environment-specific context | Yes | Template tests |
 | BEH-INST-004 | Canonical prompt format supported with frontmatter validation | Yes | Canonical installer tests |
 | BEH-INST-005 | `global.yml` provides default environment configs for prompts | Yes | Global config tests |
 | BEH-INST-006 | Local frontmatter overrides global defaults (deep merge) | Yes | Deep merge tests |
+| BEH-INST-007 | Cursor environment uses .mdc format with YAML frontmatter | Yes | FEAT-100 tests |
+| BEH-INST-008 | Windsurf environment uses plain markdown AGENTS.md | Yes | FEAT-100 tests |
 
 ### Skills Behaviors (BEH-SKILL-XXX)
 | ID | Behavior | Documented | Verified Via |
@@ -76,12 +80,15 @@
 | BEH-SKILL-003 | `SkillMetadata` includes optional `environments` field | Yes | `skills/models.py` |
 | BEH-SKILL-004 | Skills parser loads and merges global.yml defaults | Yes | `skills/parser.py` |
 | BEH-SKILL-005 | Empty strings in global.yml are treated as None | Yes | Fixed in CR-001 |
+| BEH-SKILL-006 | Skills CLI provides list, validate, show, prompt, install commands | Yes | QA-002 tests |
 
 ### Subagents Behaviors (BEH-SUBAGENT-XXX)
 | ID | Behavior | Documented | Verified Via |
 |----|----------|-----------|-------------|
 | BEH-SUBAGENT-001 | `bundled_subagents/` directory exists with global.yml | Yes | `src/dot_work/bundled_subagents/global.yml` |
 | BEH-SUBAGENT-002 | Subagents parser loads and merges global.yml defaults | Yes | `subagents/parser.py` |
+| BEH-SUBAGENT-003 | Subagents can be synced to multiple environments (claude, cursor, windsurf, etc.) | Yes | QA-001 tests |
+| BEH-SUBAGENT-004 | Subagents CLI provides list, validate, show, generate, sync, init, envs commands | Yes | QA-001 tests |
 
 ### Undocumented Behaviors
 - None identified
@@ -93,20 +100,20 @@
 ### Test Summary
 | Metric | Value |
 |--------|-------|
-| Total tests | 535 (collected) |
-| Executed | 517 |
+| Total tests | 670 (collected) |
+| Executed | 652 |
 | Skipped | 18 |
-| Passed | 517 |
+| Passed | 652 |
 | Failed | 0 |
-| Build time | ~40s |
-| Test execution time | ~30s |
+| Build time | ~47s |
+| Test execution time | ~36s |
 
 ### Coverage
 | Metric | Value |
 |--------|-------|
-| Overall coverage | 56% |
-| Lines covered | ~3,500 |
-| Lines uncovered | ~1,500 |
+| Overall coverage | 59% |
+| Lines covered | ~4,100 |
+| Lines uncovered | ~1,400 |
 
 ### Coverage by Module
 | Module | Coverage | Notes |
@@ -114,21 +121,26 @@
 | `cli.py` | High | Extensive command tests |
 | `installer.py` | High | Comprehensive installation tests |
 | `canonical.py` | High | Full parser/validator coverage |
-| `skills/parser.py` | Partial | Parser has new functions without tests |
-| `skills/models.py` | Partial | EnvironmentConfig needs tests |
-| `subagents/parser.py` | Partial | Parser has new functions without tests |
-| `subagents/models.py` | Partial | EnvironmentConfig needs tests |
+| `skills/parser.py` | High | Parser functions tested |
+| `skills/models.py` | Medium | EnvironmentConfig partially tested |
+| `skills/cli.py` | High | QA-002 added 19 tests |
+| `skills/discovery.py` | High | Discovery tests exist |
+| `subagents/parser.py` | High | Parser functions tested |
+| `subagents/models.py` | Medium | EnvironmentConfig partially tested |
+| `subagents/cli.py` | High | QA-001 added 15 tests |
+| `subagents/generator.py` | Low (16%) | QA-003 needs tests |
+| `subagents/environments/cursor.py` | High | FEAT-100 added tests |
+| `subagents/environments/windsurf.py` | High | FEAT-100 added tests |
 
 ### Tested Behaviors
 - All BEH-CLI-001 through BEH-CLI-008
-- All BEH-INST-001 through BEH-INST-006
-- All BEH-SKILL-001 through BEH-SKILL-005
-- All BEH-SUBAGENT-001 through BEH-SUBAGENT-002
+- All BEH-INST-001 through BEH-INST-008
+- All BEH-SKILL-001 through BEH-SKILL-006
+- All BEH-SUBAGENT-001 through BEH-SUBAGENT-004
 
 ### Untested Behaviors
-- CR-002: New parser functions `_deep_merge()`, `_load_global_defaults()` have zero test coverage
-- CR-002: `SkillEnvironmentConfig` validation has no unit tests
-- CR-002: `SubagentEnvironmentConfig` validation has no unit tests
+- QA-003: `SubagentGenerator` has only 16% coverage
+- Some edge cases in environment configs remain untested
 
 ---
 
@@ -137,23 +149,16 @@
 ### Code Comments (GAP-CODE-XXX)
 | ID | Description | Source |
 |----|-------------|--------|
-| GAP-CODE-001 | `_deep_merge()` function has no tests | `src/dot_work/skills/parser.py`, `src/dot_work/subagents/parser.py` |
-| GAP-CODE-002 | `_load_global_defaults()` function has no tests | `src/dot_work/skills/parser.py`, `src/dot_work/subagents/parser.py` |
-| GAP-CODE-003 | `SkillEnvironmentConfig` validation has no tests | `src/dot_work/skills/models.py` |
-| GAP-CODE-004 | `SubagentEnvironmentConfig` validation has no tests | `src/dot_work/subagents/models.py` |
+| GAP-CODE-001 | `SubagentGenerator.generate_all()` needs tests | `src/dot_work/subagents/generator.py` |
+| GAP-CODE-002 | `SubagentGenerator.generate_native()` needs tests | `src/dot_work/subagents/generator.py` |
 
 ### Known Issues from Issue Tracker
 | ID | Description | Priority | Status |
 |----|-------------|----------|--------|
-| GAP-ISSUE-001 | CR-002: Add test coverage for skills/subagents parser functions | Critical | Proposed |
-| GAP-ISSUE-002 | REFACTOR-007: Move prompts to assets/prompts | High | Proposed |
-| GAP-ISSUE-003 | REFACTOR-008: Move bundled_skills to assets/skills | High | Proposed |
-| GAP-ISSUE-004 | REFACTOR-009: Move bundled_subagents to assets/subagents | High | Proposed |
-| GAP-ISSUE-005 | REFACTOR-002: Add environment support to SKILL.md frontmatter | Medium | Proposed |
-| GAP-ISSUE-006 | REFACTOR-003: Extend installer to handle skills and subagents | Medium | Proposed |
+| GAP-ISSUE-001 | QA-003: Add test coverage for subagents generator (16% → 75%+) | High | Proposed |
 
 ### TODO Count
-- **Total TODO/FIXME/HACK/XXX comments:** ~10
+- **Total TODO/FIXME/HACK/XXX comments:** ~8
 
 ---
 
@@ -189,17 +194,17 @@
 ### File Counts
 | Category | Count |
 |----------|-------|
-| Source files (`.py`) | 44 |
-| Test files (`.py`) | 25 |
+| Source files (`.py`) | 42 |
+| Test files (`.py`) | 34 |
 | `global.yml` files | 4 (prompts, skills, subagents, bundled_skills, bundled_subagents) |
 | Configuration files | 1 (`pyproject.toml`) |
 
 ### Line Counts
 | Category | Lines |
 |----------|-------|
-| Source code | ~11,000 |
-| Test code | ~7,500 |
-| Total (measured) | ~18,500 |
+| Source code | ~13,000 |
+| Test code | ~9,500 |
+| Total (measured) | ~22,500 |
 
 ### Abstraction Depth
 | Path | Depth | Notes |
@@ -207,6 +212,8 @@
 | CLI -> Installer -> Jinja | 3 | Main installation flow |
 | CLI -> Skills Parser -> Environment Config | 3 | Skills parsing |
 | CLI -> Subagents Parser -> Environment Config | 3 | Subagents parsing |
+| CLI -> Skills CLI -> Discovery | 3 | Skills management |
+| CLI -> Subagents CLI -> Generator | 3 | Subagents generation |
 | **Max depth** | **3** | Acceptable |
 
 ### Dependencies
@@ -219,7 +226,7 @@
 | Tool | Status | Errors | Warnings |
 |------|--------|--------|----------|
 | mypy | Pass | 0 | 0 |
-| ruff | Pass | 0 | 1 pre-existing (test_plugins.py:43) |
+| ruff | Pass | 0 | 0 |
 
 ---
 
@@ -268,15 +275,16 @@
 
 The following statements **must not regress**:
 
-1. **Test Status:** All 517 tests pass (0 failures)
-2. **Coverage:** Overall coverage ≥ 56%
+1. **Test Status:** All 652 tests execute (0 failures, 18 skipped)
+2. **Coverage:** Overall coverage ≥ 59%
 3. **Type Safety:** mypy reports 0 errors
-4. **Linting:** ruff reports 0 errors (excluding pre-existing warnings)
+4. **Linting:** ruff reports 0 errors
 5. **Build Time:** `uv run python scripts/build.py` completes in ≤ 60s
 6. **Test Execution:** Full test suite completes in ≤ 45s
 7. **No Cyclic Dependencies:** Module graph remains acyclic
 8. **global.yml Files:** All modules have global.yml support (prompts, skills, subagents, bundled_*)
 9. **bundled_* Directories:** bundled_skills/ and bundled_subagents/ exist with global.yml
+10. **CLI Applications:** Both skills and subagents CLIs functional with all commands
 
 ### Regression Detection
 Any change that violates these invariants should be flagged as a regression.
@@ -287,15 +295,16 @@ Any change that violates these invariants should be flagged as a regression.
 
 | Attribute | Value |
 |-----------|-------|
-| Baseline format | v1.1 |
+| Baseline format | v1.2 |
 | Generated by | establish-baseline prompt |
 | Generator version | Python 3.13.11 |
 | Determinism guarantee | Identical commit produces identical baseline |
 
-### Recent Changes (since baseline 0297385)
-- REFACTOR-001 completed: Created bundled_skills/ and bundled_subagents/ directories
-- CR-001 completed: Fixed empty string validation in global.yml files
-- Updated pyproject.toml to include bundled_* directories in wheel artifacts
-- All tests passing (517/517)
-- Build time stable at ~40s
-- Test execution time stable at ~30s
+### Recent Changes (since baseline 5392e34)
+- **FEAT-100** completed: Cursor and Windsurf subagent support
+- **QA-001** completed: Subagents CLI test coverage (15 tests)
+- **QA-002** completed: Skills CLI test coverage (19 tests)
+- **Test count increase:** 618 → 670 (+52 tests)
+- **All tests passing:** 652 executed (18 skipped)
+- **Build time stable:** ~47s
+- **Coverage increase:** 56% → 59%

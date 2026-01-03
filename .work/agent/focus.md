@@ -1,22 +1,22 @@
 # Agent Focus
-Last updated: 2026-01-03T16:30Z
+Last updated: 2026-01-03T18:00Z
 
 ## Previous
-- Issue: FEAT-100@e5f6a7 - Cursor/Windsurf subagent support
-- Completed: 2026-01-03T16:00Z
-- Outcome: Created CursorAdapter and WindsurfAdapter, 18 new tests
+- Issue: QA-002@d2e3f4 - Improve test coverage for skills CLI
+- Completed: 2026-01-03T18:00Z
+- Outcome: Created tests/unit/skills/test_cli.py, 19 new tests, all passing
 
 ## Current
-- Issue: QA-002@d2e3f4 - Improve test coverage for skills CLI
+- Issue: QA-003@e3f4g5 - Improve test coverage for subagents generator
 - Status: proposed
-- Priority: high
+- Priority: medium
 - Progress:
-  - [ ] Created test file tests/unit/skills/test_cli.py
-  - [ ] Write tests for all skills CLI commands
-  - [ ] Achieve 75%+ coverage for cli.py
+  - [ ] Create test file tests/unit/subagents/test_generator.py
+  - [ ] Write tests for generator functions
+  - [ ] Achieve 75%+ coverage for generator.py
 
 ## Next
-- Issue: QA-003@e3f4g5 - Improve test coverage for subagents generator (priority: medium)
+- (No issues queued - awaiting user direction)
 
 ## Completed This Session
 1. **FEAT-100**: Cursor/Windsurf subagent support ✅
@@ -27,9 +27,14 @@ Last updated: 2026-01-03T16:30Z
 2. **QA-001**: Subagents CLI test coverage ✅
    - Created tests/unit/subagents/test_cli.py
    - 15 tests covering all CLI commands
-   - All tests passing (651 total, up from 618)
+   - All tests passing
+
+3. **QA-002**: Skills CLI test coverage ✅
+   - Created tests/unit/skills/test_cli.py
+   - 19 tests covering all 5 CLI commands (list, validate, show, prompt, install)
+   - All tests passing (670 total, up from 651)
 
 ## Notes
-- QA-001 completed and moved to history
-- QA-002 and QA-003 remain in shortlist
-- Overall test count increased by 33 tests (18 adapters + 15 CLI)
+- QA-001 and QA-002 completed and moved to history
+- QA-003 remains in shortlist
+- Overall test count increased by 52 tests (18 adapters + 15 CLI + 19 CLI)
