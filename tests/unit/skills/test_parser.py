@@ -3,20 +3,15 @@
 Tests for _deep_merge, _load_global_defaults, and SkillParser class.
 """
 
-import tempfile
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-import yaml
 
 from dot_work.skills.models import (
     Skill,
-    SkillEnvironmentConfig,
     SkillMetadata,
 )
 from dot_work.skills.parser import (
-    GLOBAL_DEFAULTS_PATH,
     SkillParser,
     SkillParserError,
     _deep_merge,

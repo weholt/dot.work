@@ -3,8 +3,6 @@
 Tests for _deep_merge, _load_global_defaults, and SubagentParser class.
 """
 
-import tempfile
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -12,11 +10,8 @@ import pytest
 from dot_work.subagents.models import (
     CanonicalSubagent,
     SubagentConfig,
-    SubagentEnvironmentConfig,
-    SubagentMetadata,
 )
 from dot_work.subagents.parser import (
-    GLOBAL_DEFAULTS_PATH,
     SubagentParser,
     SubagentParserError,
     _deep_merge,
