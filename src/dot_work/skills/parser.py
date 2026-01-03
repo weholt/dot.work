@@ -8,6 +8,7 @@ The parser mirrors the pattern of CanonicalPromptParser for consistency.
 
 from __future__ import annotations
 
+import copy
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,7 +16,46 @@ from typing import Any
 
 import yaml
 
-from dot_work.skills.models import Skill, SkillMetadata
+from dot_work.skills.models import Skill, SkillEnvironmentConfig, SkillMetadata
+
+# Path to global defaults file
+GLOBAL_DEFAULTS_PATH = Path(__file__).parent / "global.yml"
+
+
+def _deep_merge(a: dict, b: dict) -> dict:
+    """Recursively merge dict b into dict a (a is not mutated, returns new dict).
+
+    Special handling for environment configs: if local (b) specifies 'filename',
+    any 'filename_suffix' from global (a) is removed, and vice versa.
+
+    Empty local dict {} does NOT override global defaults - global values are used.
+    This allows skills to explicitly declare environments section while relying
+    on global defaults.
+    """
+    result = copy.deepcopy(a)
+    for k, v in b.items():
+        if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+            # Recursively merge non-empty dicts (empty local dict preserves global defaults)
+            if v:
+                result[k] = _deep_merge(result[k], v)
+                # Handle filename/filename_suffix mutual exclusion for environment configs
+                if "filename" in v or "filename_suffix" in v:
+                    if "filename" in v:
+                        result[k].pop("filename_suffix", None)
+                    elif "filename_suffix" in v:
+                        result[k].pop("filename", None)
+        else:
+            result[k] = copy.deepcopy(v)
+    return result
+
+
+def _load_global_defaults() -> dict:
+    """Load global.yml defaults if present, else return empty dict."""
+    if GLOBAL_DEFAULTS_PATH.exists():
+        with GLOBAL_DEFAULTS_PATH.open("r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+            return data.get("defaults", {}) if isinstance(data, dict) else {}
+    return {}
 
 
 class SkillParserError(Exception):
@@ -134,8 +174,12 @@ class SkillParser:
         except yaml.YAMLError as e:
             raise SkillParserError(f"Invalid YAML in frontmatter: {e}") from e
 
+        # Load and merge global defaults (deep merge, local overrides global)
+        global_defaults = _load_global_defaults()
+        merged_frontmatter = _deep_merge(global_defaults, frontmatter)
+
         # Extract metadata
-        metadata = self._extract_metadata(frontmatter, skill_dir)
+        metadata = self._extract_metadata(merged_frontmatter, skill_dir)
 
         return Skill(
             meta=metadata,
@@ -172,7 +216,11 @@ class SkillParser:
         except yaml.YAMLError as e:
             raise SkillParserError(f"Invalid YAML in frontmatter: {e}") from e
 
-        return self._extract_metadata(frontmatter, skill_dir)
+        # Load and merge global defaults (deep merge, local overrides global)
+        global_defaults = _load_global_defaults()
+        merged_frontmatter = _deep_merge(global_defaults, frontmatter)
+
+        return self._extract_metadata(merged_frontmatter, skill_dir)
 
     def _extract_metadata(self, frontmatter: dict[str, Any], skill_dir: Path) -> SkillMetadata:
         """Extract and validate metadata from frontmatter dictionary.
@@ -203,6 +251,7 @@ class SkillParser:
         compatibility = frontmatter.get("compatibility")
         metadata = frontmatter.get("metadata")
         allowed_tools = frontmatter.get("allowed_tools")
+        environments = self._parse_environments(frontmatter.get("environments"), skill_dir)
 
         # Validate metadata dict if provided
         if metadata is not None and not isinstance(metadata, dict):
@@ -223,7 +272,48 @@ class SkillParser:
             compatibility=compatibility,
             metadata=metadata,
             allowed_tools=allowed_tools,
+            environments=environments,
         )
+
+    def _parse_environments(
+        self, environments_raw: Any, skill_dir: Path
+    ) -> dict[str, SkillEnvironmentConfig] | None:
+        """Parse environment configurations from raw dict.
+
+        Args:
+            environments_raw: Raw environments section from frontmatter.
+            skill_dir: Path to the skill directory (for error messages).
+
+        Returns:
+            Dict of environment name to SkillEnvironmentConfig, or None if no environments.
+
+        Raises:
+            SkillParserError: If environment configuration is invalid.
+        """
+        if not isinstance(environments_raw, dict):
+            return None
+
+        environments: dict[str, SkillEnvironmentConfig] = {}
+
+        for env_name, env_config in environments_raw.items():
+            if not isinstance(env_config, dict):
+                raise SkillParserError(
+                    f"Environment '{env_name}' must be a dictionary in {skill_dir / 'SKILL.md'}"
+                )
+
+            if "target" not in env_config:
+                raise SkillParserError(
+                    f"Environment '{env_name}' must specify 'target' in {skill_dir / 'SKILL.md'}"
+                )
+
+            # Create SkillEnvironmentConfig
+            environments[env_name] = SkillEnvironmentConfig(
+                target=env_config["target"],
+                filename=env_config.get("filename"),
+                filename_suffix=env_config.get("filename_suffix"),
+            )
+
+        return environments if environments else None
 
 
 # Singleton instance for efficiency

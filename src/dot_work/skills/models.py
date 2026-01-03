@@ -15,6 +15,34 @@ from pathlib import Path
 
 
 @dataclass
+class SkillEnvironmentConfig:
+    """Environment-specific skill installation config.
+
+    Attributes:
+        target: Target directory for this environment.
+        filename: Optional specific filename for this environment.
+        filename_suffix: Optional filename suffix for this environment.
+    """
+
+    target: str
+    filename: str | None = None
+    filename_suffix: str | None = None
+
+    def __post_init__(self) -> None:
+        """Validate environment configuration."""
+        # Check if both are provided
+        if self.filename is not None and self.filename_suffix is not None:
+            raise ValueError("Environment cannot specify both 'filename' and 'filename_suffix'")
+
+        # Check for empty strings (distinct from None)
+        if self.filename == "":
+            raise ValueError("Environment filename cannot be empty")
+
+        if self.filename_suffix == "":
+            raise ValueError("Environment filename_suffix cannot be empty")
+
+
+@dataclass
 class SkillMetadata:
     """Lightweight metadata loaded at startup (~100 tokens per skill).
 
@@ -26,6 +54,7 @@ class SkillMetadata:
         compatibility: Optional compatibility notes, max 500 chars.
         metadata: Optional string->string metadata dictionary.
         allowed_tools: Optional list of allowed tool names (experimental).
+        environments: Optional dict of environment name to SkillEnvironmentConfig.
 
     Raises:
         ValueError: If validation constraints are violated in __post_init__.
@@ -37,6 +66,7 @@ class SkillMetadata:
     compatibility: str | None = None
     metadata: dict[str, str] | None = None
     allowed_tools: list[str] | None = None
+    environments: dict[str, SkillEnvironmentConfig] | None = None
 
     # Compiled regex for name validation
     NAME_PATTERN = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")

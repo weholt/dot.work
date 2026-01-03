@@ -9,6 +9,7 @@ for consistency.
 
 from __future__ import annotations
 
+import copy
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +23,45 @@ from dot_work.subagents.models import (
     SubagentEnvironmentConfig,
     SubagentMetadata,
 )
+
+# Path to global defaults file
+GLOBAL_DEFAULTS_PATH = Path(__file__).parent / "global.yml"
+
+
+def _deep_merge(a: dict, b: dict) -> dict:
+    """Recursively merge dict b into dict a (a is not mutated, returns new dict).
+
+    Special handling for environment configs: if local (b) specifies 'filename',
+    any 'filename_suffix' from global (a) is removed, and vice versa.
+
+    Empty local dict {} does NOT override global defaults - global values are used.
+    This allows subagents to explicitly declare environments section while relying
+    on global defaults.
+    """
+    result = copy.deepcopy(a)
+    for k, v in b.items():
+        if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+            # Recursively merge non-empty dicts (empty local dict preserves global defaults)
+            if v:
+                result[k] = _deep_merge(result[k], v)
+                # Handle filename/filename_suffix mutual exclusion for environment configs
+                if "filename" in v or "filename_suffix" in v:
+                    if "filename" in v:
+                        result[k].pop("filename_suffix", None)
+                    elif "filename_suffix" in v:
+                        result[k].pop("filename", None)
+        else:
+            result[k] = copy.deepcopy(v)
+    return result
+
+
+def _load_global_defaults() -> dict:
+    """Load global.yml defaults if present, else return empty dict."""
+    if GLOBAL_DEFAULTS_PATH.exists():
+        with GLOBAL_DEFAULTS_PATH.open("r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+            return data.get("defaults", {}) if isinstance(data, dict) else {}
+    return {}
 
 
 class SubagentParserError(Exception):
@@ -147,10 +187,14 @@ class SubagentParser:
         except yaml.YAMLError as e:
             raise SubagentParserError(f"Invalid YAML in frontmatter: {e}") from e
 
+        # Load and merge global defaults (deep merge, local overrides global)
+        global_defaults = _load_global_defaults()
+        merged_frontmatter = _deep_merge(global_defaults, frontmatter)
+
         # Extract metadata and config
-        meta = self._extract_metadata(frontmatter, source_file)
-        config = self._extract_config(frontmatter, prompt_body, source_file)
-        environments = self._extract_environments(frontmatter, source_file)
+        meta = self._extract_metadata(merged_frontmatter, source_file)
+        config = self._extract_config(merged_frontmatter, prompt_body, source_file)
+        environments = self._extract_environments(merged_frontmatter, source_file)
 
         return CanonicalSubagent(
             meta=meta,
