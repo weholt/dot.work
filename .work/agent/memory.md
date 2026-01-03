@@ -32,4 +32,8 @@
 - Test coverage >=75%
 
 ## Lessons Learned
-(To be populated after completing issues)
+- [CR-006@d9b4c3] 2026-01-03: Test coverage for parser functions
+  - Testing `_deep_merge()` requires testing: basic merge, nested dicts, empty dict preservation, mutual exclusion (filename/filename_suffix), and non-mutation
+  - Testing `_load_global_defaults()` requires: file exists, file missing, malformed YAML, missing defaults key, wrong type for defaults
+  - Always test parser edge cases: invalid YAML, missing required fields, environment config validation
+  - Memory-protected pytest wrapper (`./scripts/pytest-with-cgroup.sh`) is required to prevent system freezes

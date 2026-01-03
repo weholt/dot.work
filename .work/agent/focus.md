@@ -1,18 +1,14 @@
 # Agent Focus
-Last updated: 2026-01-03T01:30Z
+Last updated: 2026-01-03T11:30Z
 
 ## Previous
-CR-001@e8a3b2: Fix validation conflict - empty strings in global.yml will crash parser (COMPLETED)
-REFACTOR-001@a4f2b1: Create bundled_skills and bundled_subagents directories (COMPLETED)
+- Issue: CR-006@d9b4c3 - Add test coverage for skills/subagents parser functions
+- Completed: 2026-01-03T11:30Z
+- Outcome: 101 new tests created, all 618 tests passing
 
 ## Current
-- Issue: CR-002@d9b4c3 - Add test coverage for skills/subagents global defaults and parser changes
-- Started: 2026-01-03T01:30Z
-- Status: in-progress
-- Phase: Implementation
-- Source: critical.md
-- Description: Zero test coverage for new parser features
+- Issue: None
+- Status: Ready for next issue
 
 ## Next
-REFACTOR-002@c7g4c2: Add environment support to SKILL.md frontmatter (Phase 2)
-CR-002@d9b4c3 requires tests for: _deep_merge, _load_global_defaults, SkillEnvironmentConfig
+(Select next issue from priority files)
