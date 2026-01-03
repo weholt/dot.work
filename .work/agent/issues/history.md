@@ -1071,3 +1071,57 @@ Research completed in previous session (documented in
 Implementation completed in 30 minutes.
 
 ---
+---
+---
+id: "QA-001@b1c2d3"
+title: "Improve test coverage for subagents CLI"
+description: "Add tests for subagents CLI commands (currently 15% coverage)"
+created: 2026-01-03
+section: "testing"
+tags: [testing, coverage, cli, subagents]
+type: quality
+priority: high
+status: completed
+started: 2026-01-03
+completed: 2026-01-03
+references:
+  - src/dot_work/subagents/cli.py
+  - tests/unit/subagents/test_cli.py
+---
+
+### Problem
+The subagents CLI module had only 15% test coverage (155 of 183 lines missing).
+
+### Solution Implemented
+Created comprehensive test file `tests/unit/subagents/test_cli.py` with:
+- 15 tests covering all CLI commands
+- Tests for list, validate, show, generate, sync, init, and envs commands
+- Error handling tests for each command
+- Keyboard interrupt handling tests
+
+### Tests Created
+1. test_list_no_subagents_found
+2. test_list_invalid_environment
+3. test_validate_valid_file
+4. test_validate_missing_file
+5. test_show_existing_agent
+6. test_show_nonexistent_agent
+7. test_generate_to_stdout
+8. test_generate_to_file
+9. test_generate_invalid_canonical
+10. test_sync_to_all_environments
+11. test_sync_no_environments
+12. test_init_basic
+13. test_init_with_environments
+14. test_list_environments
+15. test_keyboard_interrupt_handling
+
+### Results
+- All 15 tests passing
+- Total test count: 651 (up from 636)
+- Build successful
+
+### Files Changed
+- New: `tests/unit/subagents/test_cli.py` (330 lines)
+
+---
