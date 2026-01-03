@@ -7,13 +7,17 @@ and parsing subagent files across different AI coding platforms.
 from dot_work.subagents.environments.base import SubagentEnvironmentAdapter
 from dot_work.subagents.environments.claude_code import ClaudeCodeAdapter
 from dot_work.subagents.environments.copilot import CopilotAdapter
+from dot_work.subagents.environments.cursor import CursorAdapter
 from dot_work.subagents.environments.opencode import OpenCodeAdapter
+from dot_work.subagents.environments.windsurf import WindsurfAdapter
 
 __all__ = [
     "SubagentEnvironmentAdapter",
     "ClaudeCodeAdapter",
     "OpenCodeAdapter",
     "CopilotAdapter",
+    "CursorAdapter",
+    "WindsurfAdapter",
 ]
 
 
@@ -22,6 +26,8 @@ _ADAPTERS: dict[str, type[SubagentEnvironmentAdapter]] = {
     "claude": ClaudeCodeAdapter,
     "opencode": OpenCodeAdapter,
     "copilot": CopilotAdapter,
+    "cursor": CursorAdapter,
+    "windsurf": WindsurfAdapter,
 }
 
 

@@ -998,3 +998,76 @@ Skills are documented as Claude Code only (accurate - other environments don't s
 Subagents documented with multi-environment support (claude, opencode, copilot, cursor/windsurf).
 
 ---
+---
+---
+id: "FEAT-100@e5f6a7"
+title: "Cursor/Windsurf subagent support"
+description: "Add subagent support for Cursor and Windsurf AI editors"
+created: 2026-01-03
+section: "subagents"
+tags: [subagents, cursor, windsurf, implementation]
+type: enhancement
+priority: medium
+status: completed
+started: 2026-01-03
+completed: 2026-01-03
+references:
+  - src/dot_work/subagents/environments/cursor.py
+  - src/dot_work/subagents/environments/windsurf.py
+  - tests/unit/subagents/test_adapters.py
+---
+
+### Problem
+The subagents specification (FEAT-030) initially supports Claude Code, OpenCode, 
+and GitHub Copilot. Cursor and Windsurf are popular AI editors that also support 
+custom agents but use different formats.
+
+### Solution Implemented
+
+**Created CursorAdapter** (`.cursor/rules/*.mdc` format):
+- YAML frontmatter with `description:` (truncated to 120 chars)
+- Optional `globs:` for file pattern matching
+- Body content with markdown instructions
+- Generates `.mdc` file extension
+
+**Created WindsurfAdapter** (`AGENTS.md` plain markdown):
+- NO frontmatter (plain markdown)
+- Auto-discovered based on file location
+- Fixed filename: `AGENTS.md`
+- Simple passthrough for tools (no mapping needed)
+
+**Updated CLI** (`src/dot_work/subagents/cli.py`):
+- Added cursor and windsurf to all `--env` help text
+- Updated example commands to demonstrate usage
+- Updated default environments list in init command
+
+**Registered Environments** (`src/dot_work/subagents/environments/__init__.py`):
+- Added CursorAdapter and WindsurfAdapter to `_ADAPTERS` registry
+- Exported new adapters in `__all__`
+
+**Tests** (`tests/unit/subagents/test_adapters.py`):
+- 18 tests covering both adapters
+- Tests for registration, target paths, filename generation, native content generation
+- Tests for description truncation (Cursor)
+- Tests for plain markdown format (Windsurf)
+
+### Files Changed
+- New: `src/dot_work/subagents/environments/cursor.py`
+- New: `src/dot_work/subagents/environments/windsurf.py`
+- Modified: `src/dot_work/subagents/environments/__init__.py`
+- Modified: `src/dot_work/subagents/cli.py`
+- New: `tests/unit/subagents/test_adapters.py`
+
+### Verification
+- Build passes: `uv run python scripts/build.py`
+- All 628 tests passing (up from 618)
+- New tests: 18 adapter tests
+- Type checking passes
+- Linting passes
+
+### Notes
+Research completed in previous session (documented in 
+`.work/agent/issues/references/FEAT-100-research.md`). 
+Implementation completed in 30 minutes.
+
+---

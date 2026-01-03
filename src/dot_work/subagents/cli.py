@@ -31,7 +31,7 @@ def list_subagents(
         typer.Option(
             "--env",
             "-e",
-            help="Environment to query (claude, opencode, copilot)",
+            help="Environment to query (claude, opencode, copilot, cursor, windsurf)",
         ),
     ] = "claude",
     search_paths: Annotated[
@@ -51,7 +51,8 @@ def list_subagents(
     Example:
         dot-work subagents list
         dot-work subagents list --env opencode
-        dot-work subagents list --env copilot --path ./custom-subagents
+        dot-work subagents list --env cursor --path ./custom-subagents
+        dot-work subagents list --env windsurf --path ./custom-subagents
     """
     try:
         # Build discovery
@@ -185,7 +186,7 @@ def show_subagent(
         typer.Option(
             "--env",
             "-e",
-            help="Environment to query (claude, opencode, copilot)",
+            help="Environment to query (claude, opencode, copilot, cursor, windsurf)",
         ),
     ] = "claude",
 ) -> None:
@@ -193,7 +194,8 @@ def show_subagent(
 
     Example:
         dot-work subagents show code-reviewer
-        dot-work subagents show code-reviewer --env opencode
+        dot-work subagents show code-reviewer --env cursor
+        dot-work subagents show code-reviewer --env windsurf
     """
     try:
         discovery = SubagentDiscovery(project_root=".", environment=environment)
@@ -263,7 +265,7 @@ def generate_native(
         typer.Option(
             "--env",
             "-e",
-            help="Target environment (claude, opencode, copilot)",
+            help="Target environment (claude, opencode, copilot, cursor, windsurf)",
         ),
     ] = "claude",
     output: Annotated[
@@ -282,7 +284,8 @@ def generate_native(
 
     Example:
         dot-work subagents generate .work/subagents/code-reviewer.md --env claude
-        dot-work subagents generate .work/subagents/code-reviewer.md --env opencode -o .opencode/agent/code-reviewer.md
+        dot-work subagents generate .work/subagents/code-reviewer.md --env cursor -o .cursor/rules/code-reviewer.mdc
+        dot-work subagents generate .work/subagents/code-reviewer.md --env windsurf -o AGENTS.md
     """
     try:
         # Parse canonical subagent
@@ -393,7 +396,7 @@ def init_subagent(
         typer.Option(
             "--env",
             "-e",
-            help="Environments to include (claude, opencode, copilot)",
+            help="Environments to include (claude, opencode, copilot, cursor, windsurf)",
         ),
     ] = None,
     output: Annotated[
@@ -412,7 +415,8 @@ def init_subagent(
 
     Example:
         dot-work subagents init code-reviewer --description "Expert code reviewer"
-        dot-work subagents init debugger --description "Root cause analysis" --env claude opencode
+        dot-work subagents init debugger --description "Root cause analysis" --env claude cursor
+        dot-work subagents init windsurf-helper --description "Windsurf assistant" --env windsurf
     """
     try:
         # Generate template
@@ -439,7 +443,7 @@ def init_subagent(
                 f"[cyan]Name:[/cyan] {name}\n"
                 f"[cyan]Description:[/cyan] {description}\n"
                 f"[cyan]Output:[/cyan] {output}\n"
-                f"[cyan]Environments:[/cyan] {', '.join(environments or ['claude', 'opencode', 'copilot'])}\n\n"
+                f"[cyan]Environments:[/cyan] {', '.join(environments or ['claude', 'opencode', 'copilot', 'cursor', 'windsurf'])}\n\n"
                 f"[dim]Edit the file to customize the subagent, then run:[/dim]\n"
                 f"[dim]  dot-work subagents sync {output}[/dim]",
                 title="✨ Subagent Initialized",
