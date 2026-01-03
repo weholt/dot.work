@@ -319,3 +319,92 @@ Created comprehensive test coverage for the new parser functionality:
 ### Notes
 The `_deep_merge()` function has complex logic (deep merge, empty-dict-preservation, mutual-exclusion cleanup) that is now fully tested. This provides a safety net for future refactoring and helps prevent regressions like CR-001.
 
+
+---
+---
+id: "FEAT-030@a1b2c3"
+title: "Implement Subagents multi-environment support"
+description: "Implement subagent support for Claude Code, OpenCode, and GitHub Copilot with canonical format and environment adapters"
+created: 2026-01-03
+section: "subagents"
+tags: [subagents, multi-environment, claude-code, opencode, copilot, adapters]
+type: enhancement
+priority: medium
+status: completed
+completed: 2026-01-03
+references:
+  - src/dot_work/subagents/
+  - src/dot_work/subagents/models.py
+  - src/dot_work/subagents/parser.py
+  - src/dot_work/subagents/validator.py
+  - src/dot_work/subagents/discovery.py
+  - src/dot_work/subagents/generator.py
+  - src/dot_work/subagents/environments/
+  - src/dot_work/subagents/cli.py
+---
+
+### Problem
+dot-work needed subagent/custom agent support for multiple AI coding environments (Claude Code, OpenCode, GitHub Copilot). Each platform has different file formats, locations, and configuration options.
+
+### Solution Implemented
+Full subagent infrastructure implemented across 7 phases:
+
+**Phase 1: Core Models** ✓
+- `SubagentMetadata` dataclass (name, description)
+- `SubagentConfig` dataclass with all platform-specific fields
+- `SubagentEnvironmentConfig` for per-environment overrides
+- `CanonicalSubagent` combining metadata, config, and environments
+
+**Phase 2: Parser** ✓
+- `SubagentParser` with frontmatter regex pattern
+- `parse()` for canonical subagent files
+- `parse_native()` for environment-specific files
+- Support for both YAML frontmatter formats
+
+**Phase 3: Validator** ✓
+- `SubagentValidator` class
+- Validation of required fields (name, description)
+- Name format validation (lowercase + hyphens)
+- Environment-specific config validation
+
+**Phase 4: Environment Adapters** ✓
+- `SubagentEnvironmentAdapter` ABC
+- `ClaudeCodeAdapter` (.claude/agents/, tools, model, permissionMode)
+- `OpenCodeAdapter` (.opencode/agent/, tools, model, mode)
+- `CopilotAdapter` (.github/agents/, tools, infer, mcp_servers)
+- Tool name mapping (Read/read, Edit/edit, etc.)
+
+**Phase 5: Generator** ✓
+- `generate_native()` method in adapters
+- Canonical to native conversion
+- Tool name translation
+- Environment-specific YAML frontmatter generation
+
+**Phase 6: Discovery** ✓
+- `SubagentDiscovery` class
+- Discovery from native paths (.claude/agents/, etc.)
+- Discovery from canonical paths (.work/subagents/)
+- Support for bundled subagents from package
+
+**Phase 7: CLI Commands** ✓
+- `dot-work subagents list [--env ENV]`
+- `dot-work subagents validate <path>`
+- `dot-work subagents show <name>`
+- `dot-work subagents generate <file> --env ENV`
+- `dot-work subagents sync <dir>`
+- `dot-work subagents init <name> -d "description"`
+- `dot-work subagents envs`
+
+### Verification
+- All models, parsers, validators implemented
+- All three environment adapters working
+- Tool name mapping functional
+- Generator produces valid environment-specific files
+- Discovery finds native and canonical subagents
+- All CLI commands implemented and working
+- Unit tests for models and parser (CR-006)
+- Integration tests for CLI
+
+### Notes
+This was a significant multi-environment subagent implementation enabling single canonical subagent definitions that work across Claude Code, OpenCode, and GitHub Copilot platforms.
+
