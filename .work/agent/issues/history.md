@@ -1170,3 +1170,48 @@ Created comprehensive test file `tests/unit/skills/test_cli.py` with 19 tests co
 QA-002 completed successfully. Skills CLI now has comprehensive test coverage for all 5 commands (list, validate, show, prompt, install).
 
 ---
+---
+---
+id: "QA-003@e3f4g5"
+title: "Improve test coverage for subagents generator"
+description: "Add tests for subagents generator (currently 16% coverage)"
+created: 2026-01-03
+section: "testing"
+tags: [testing, coverage, generator, subagents]
+type: quality
+priority: high
+status: completed
+completed: 2026-01-03
+references:
+  - src/dot_work/subagents/generator.py
+  - tests/unit/subagents/test_generator.py (created)
+---
+
+### Problem
+The subagents generator had only 16% test coverage. Core functionality needed better testing.
+
+### Solution Implemented
+Created comprehensive test file `tests/unit/subagents/test_generator.py` with 27 tests covering:
+- TestSubagentGeneratorInit (2 tests): instance creation, singleton
+- TestGenerateNative (5 tests): basic generation, with project root, invalid environment, with overrides
+- TestGenerateNativeFile (5 tests): file creation, path return, custom output, parent dirs, invalid env
+- TestGenerateAll (4 tests): single environment, multiple environments, empty, graceful failure
+- TestMergeConfig (4 tests): no override, with overrides, partial override, all fields
+- TestGenerateCanonicalTemplate (7 tests): basic, custom envs, default envs, structure, each environment type
+
+### Key Technical Decisions
+- Used tmp_path fixture for file creation tests
+- Mocked get_adapter for failure testing
+- Covered all public methods and private _merge_config
+- Tested edge cases: empty environments, invalid env, partial overrides
+
+### Verification
+- All 27 tests passing
+- Total test count: 697 (up from 670)
+- Full build passes with 0 errors
+- Coverage for generator.py increased from 16% to 75%+
+
+### Notes
+QA-003 completed successfully. All shortlist issues have been addressed.
+
+---
