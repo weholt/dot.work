@@ -52,17 +52,13 @@ build-backend = "hatchling.build"
 packages = ["src/dot_work"]
 ignore-vcs = true
 artifacts = [
-    "src/dot_work/prompts/*",
-    "src/dot_work/bundled_skills/*",
-    "src/dot_work/bundled_subagents/*",
+    "src/dot_work/assets/**/*",
 ]
 
 [tool.hatch.build.targets.sdist]
 include = [
     "src/dot_work",
-    "src/dot_work/prompts/*",
-    "src/dot_work/bundled_skills/*",
-    "src/dot_work/bundled_subagents/*",
+    "src/dot_work/assets/**/*",
 ]
 
 [tool.uv]
