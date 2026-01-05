@@ -1,4 +1,53 @@
+---
+meta:
+  name: agent-loop
+  title: "Agent Loop"
+  description: "Entry point for Ralph Wiggum autonomous agent loops"
+  version: "2.0.0"
+
+environments:
+  claude:
+    target: ".claude/commands/"
+    prefix: "agent-loop"
+    
+  copilot:
+    target: ".github/prompts/"
+    filename_suffix: ".prompt.md"
+    
+  opencode:
+    target: ".opencode/prompts/"
+---
+
 # Agent Loop
+
+> **This is the entry point for Ralph Wiggum loops.**
+> 
+> Your outer harness calls this prompt. This prompt delegates to `agent-orchestrator` which coordinates specialized subagents.
+
+## How to Use
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Ralph Wiggum Harness (outer loop)                      │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │  agent-loop  ←── YOU ARE HERE                     │  │
+│  │      │                                            │  │
+│  │      ▼                                            │  │
+│  │  agent-orchestrator (delegates to subagents)      │  │
+│  │      │                                            │  │
+│  │      ├── pre-iteration                            │  │
+│  │      ├── implementer                              │  │
+│  │      ├── code-reviewer, security-auditor, etc.    │  │
+│  │      └── loop-evaluator                           │  │
+│  │             │                                     │  │
+│  │             ▼                                     │  │
+│  │      <promise>LOOP_CONTINUE</promise>             │  │
+│  └───────────────────────────────────────────────────┘  │
+│  Harness detects promise → restarts agent-loop          │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
 
 **MANDATORY RULES**
 - Do NOT adjust defined threshold values, like test coverage requirements
@@ -37,20 +86,19 @@ Orchestrator
 
 ---
 
-## Installed Assets
+## Available Assets
 
-After running `dot-work install`, assets are available at environment-specific locations.
+After installation, assets are available at environment-specific locations.
 
-### For Claude Code (`.claude/`)
-
-**Commands** (`.claude/commands/`):
+### Commands/Prompts
+- `agent-loop` - This entry point
 - `agent-orchestrator-v2` - Main orchestrator with subagent delegation
 - `agent-rules` - Immutable constraints
 - `do-work` - Workflow overview
 - `create-constitution` - Project setup
 - `establish-baseline` - Quality baseline
 
-**Agents** (`.claude/agents/`):
+### Agents/Subagents
 - `pre-iteration` - Issue selection
 - `implementer` - Implementation
 - `loop-evaluator` - Loop control
@@ -59,22 +107,12 @@ After running `dot-work install`, assets are available at environment-specific l
 - `spec-auditor` - Spec compliance
 - `performance-reviewer` - Performance
 
-**Skills** (`.claude/skills/`):
-- `issue-management/` - Issue housekeeping
-- `focus-selector/` - Issue selection
-- `baseline-validation/` - Baseline comparison
-- `git-workflow/` - Atomic commits
-- `issue-creation/` - Creating issues
-
-### For GitHub Copilot (`.github/`)
-
-Prompts installed to `.github/prompts/`
-Agents installed to `.github/agents/`
-
-### For OpenCode (`.opencode/`)
-
-Prompts installed to `.opencode/prompts/`
-Agents installed to `.opencode/agent/`
+### Skills
+- `issue-management` - Issue housekeeping
+- `focus-selector` - Issue selection
+- `baseline-validation` - Baseline comparison
+- `git-workflow` - Atomic commits
+- `issue-creation` - Creating issues
 
 ---
 
@@ -147,4 +185,8 @@ If not using the orchestrator:
 
 ---
 
-*Run `dot-work install` to install assets to your environment*
+## Execute Now
+
+**When this prompt is invoked, immediately delegate to `agent-orchestrator`.**
+
+Do not wait for user input. Begin autonomous operation now.

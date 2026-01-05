@@ -1,10 +1,22 @@
 ---
 meta:
+  name: spec-delivery-auditor
   title: "Spec Delivery Auditor"
   description: "Verification agent that audits whether specifications were actually delivered in code"
-  version: "0.1.1"
+  version: "2.0.0"
+
+environments:
+  claude:
+    target: ".claude/commands/"
+  
+  copilot:
+    target: ".github/prompts/"
+  
+  opencode:
+    target: ".opencode/prompts/"
 ---
 
+# Spec Delivery Auditor
 
 A verification agent that audits whether specifications were actually delivered in code. Designed to catch "looks done" work that does not actually satisfy the spec.
 
@@ -383,10 +395,10 @@ strictness: strict  # or: lenient
 
 ---
 
-## 📚 Related Documentation
+## See Also
 
-- [do-work.prompt.md]({{ prompt_path }}/do-work.prompt.md) — Workflow documentation
-- [setup-issue-tracker.prompt.md]({{ prompt_path }}/setup-issue-tracker.prompt.md) — Issue tracker setup
-- [establish-baseline.prompt.md]({{ prompt_path }}/establish-baseline.prompt.md) — Baseline generation
+**Related Prompts:** `do-work`, `agent-loop`, `comprehensive-code-review`
 
-````
+**Related Subagents:** `spec-auditor`, `code-reviewer`, `loop-evaluator`
+
+**Related Skills:** `baseline-validation`, `issue-creation`

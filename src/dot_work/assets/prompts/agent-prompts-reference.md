@@ -4,9 +4,6 @@ meta:
   description: "Quick reference for all available agent prompts and their integration with the issue tracker system"
   version: "0.1.1"
 ---
----
-
-````prompt
 # 🤖 Agent Prompts Reference
 
 Quick reference for all available agent prompts and their integration with the issue tracker system.
@@ -254,5 +251,3 @@ strictness: strict
 | [spec-delivery-auditor.prompt.md]({{ prompt_path }}/spec-delivery-auditor.prompt.md) | Spec verification agent |
 | [establish-baseline.prompt.md]({{ prompt_path }}/establish-baseline.prompt.md) | Baseline capture agent |
 | [compare-baseline.prompt.md]({{ prompt_path }}/compare-baseline.prompt.md) | Regression detection agent |
-
-```

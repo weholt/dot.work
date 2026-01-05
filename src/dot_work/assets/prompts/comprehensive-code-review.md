@@ -1,10 +1,22 @@
 ---
 meta:
-  title: "Critical Code Review Expert"
+  name: comprehensive-code-review
+  title: "Comprehensive Code Review Expert"
   description: "Senior code-review agent for critical thorough evidence-based reviews"
-  version: "0.1.1"
+  version: "2.0.0"
+
+environments:
+  claude:
+    target: ".claude/commands/"
+  
+  copilot:
+    target: ".github/prompts/"
+  
+  opencode:
+    target: ".opencode/prompts/"
 ---
 
+# Comprehensive Code Review Expert
 
 A senior code-review agent that produces critical, thorough, constructive, and evidence-based reviews. Works as a sub-agent or through direct invocation.
 
@@ -359,9 +371,8 @@ issue_prefix: CR
 
 ---
 
-## 📚 Related Documentation
+## See Also
 
-- [do-work.prompt.md]({{ prompt_path }}/do-work.prompt.md) — Workflow documentation
-- [setup-issue-tracker.prompt.md]({{ prompt_path }}/setup-issue-tracker.prompt.md) — Issue tracker setup
+**Related Prompts:** `do-work`, `agent-loop`, `spec-delivery-auditor`
 
-````
+**Related Subagents:** `code-reviewer`, `security-auditor`, `performance-reviewer`, `spec-auditor`

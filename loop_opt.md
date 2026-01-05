@@ -1,8 +1,47 @@
 # Loop Optimization Plan for Autonomous Agents
 
-**Version:** 0.1.0  
+**Version:** 1.0.0  
 **Created:** 2025-01-05  
-**Status:** Proposed
+**Updated:** 2025-01-05  
+**Status:** IMPLEMENTED
+
+---
+
+## Implementation Summary
+
+All drop-in replacement files have been created. The new architecture is ready for use.
+
+### Created Files
+
+**Prompts (src/dot_work/assets/prompts/):**
+- ✅ agent-rules.md - Immutable constraints loaded by all agents
+- ✅ agent-orchestrator-v2.md - Main orchestrator with subagent delegation
+- ✅ create-constitution.md - Platform-agnostic project setup (v2.0.0)
+- ✅ do-work.md - Lean workflow overview (v2.0.0, ~100 lines from ~700)
+
+**Subagents (src/dot_work/assets/subagents/):**
+- ✅ pre-iteration.md - Issue selection, context preparation
+- ✅ implementer.md - Focused implementation subagent
+- ✅ loop-evaluator.md - Loop continuation decisions
+- ✅ code-reviewer.md - Updated with skill/output integration
+- ✅ security-auditor.md - Updated with skill/output integration
+- ✅ performance-reviewer.md - New performance analysis subagent
+- ✅ spec-auditor.md - New specification compliance auditor
+
+**Skills (src/dot_work/assets/skills/):**
+- ✅ issue-management/SKILL.md - Issue housekeeping, moving, scanning
+- ✅ focus-selector/SKILL.md - Issue selection algorithm
+- ✅ baseline-validation/SKILL.md - Baseline comparison
+- ✅ git-workflow/SKILL.md - Atomic commits, conventional commits
+- ✅ issue-creation/SKILL.md - Creating issues from findings
+
+**Hooks (src/dot_work/assets/hooks/):**
+- ✅ stop-hooks.md - Completion promises for harness integration
+- ✅ pre-loop.md - Initialization hook
+- ✅ post-iteration.md - Cleanup and state persistence
+
+**Root:**
+- ✅ agent-loop.md - Updated as thin pointer to assets
 
 ---
 
@@ -188,14 +227,19 @@ Key principles from [Anthropic's research](https://www.anthropic.com/engineering
 
 **Proposed Solution:**
 
-1. Create `.claude/hooks/` directory structure:
+1. Create stop hook assets in `src/dot_work/assets/hooks/` with templates that install to `.claude/hooks/` (or equivalent for other environments):
    ```
-   .claude/
+   src/dot_work/assets/
      hooks/
-       pre-loop.sh       # Pre-iteration setup
-       post-iteration.sh  # After each issue
-       stop-hook.sh       # Loop continuation decision
+       pre-loop.md        # Pre-iteration setup logic
+       post-iteration.md  # After each issue logic
+       stop-hook.md       # Loop continuation decision logic
    ```
+   
+   These install to environment-specific locations:
+   - Claude Code: `.claude/hooks/`
+   - OpenCode: `.opencode/hooks/`
+   - Generic: `.work/hooks/`
 
 2. Define completion promise protocol:
    ```markdown
@@ -243,7 +287,7 @@ Key principles from [Anthropic's research](https://www.anthropic.com/engineering
 
 **Proposed Solution:**
 
-1. Create `subagents/pre-iteration.md`:
+1. Create `src/dot_work/assets/subagents/pre-iteration.md`:
    ```markdown
    # Pre-Iteration Subagent
    
@@ -264,13 +308,13 @@ Key principles from [Anthropic's research](https://www.anthropic.com/engineering
    - focus-selector
    ```
 
-2. Create `skills/issue-management/SKILL.md`:
+2. Create `src/dot_work/assets/skills/issue-management/SKILL.md`:
    - Moving completed issues to history
    - Scanning for proposed issues
    - Priority ordering logic
    - Deduplication
 
-3. Create `skills/focus-selector/SKILL.md`:
+3. Create `src/dot_work/assets/skills/focus-selector/SKILL.md`:
    - Shortlist-first priority
    - Context continuity (prefer related issues)
    - Blocked issue detection
@@ -325,7 +369,7 @@ Key principles from [Anthropic's research](https://www.anthropic.com/engineering
 
 **Proposed Solution:**
 
-1. Create `subagents/implementer.md`:
+1. Create `src/dot_work/assets/subagents/implementer.md`:
    ```markdown
    # Implementation Subagent
    
@@ -401,10 +445,10 @@ Key principles from [Anthropic's research](https://www.anthropic.com/engineering
 **Proposed Solution:**
 
 1. Update existing validation subagents for parallel execution:
-   - `subagents/code-reviewer.md` (exists, update for parallel)
-   - `subagents/security-auditor.md` (exists, update for parallel)
-   - Create `subagents/performance-reviewer.md`
-   - Create `subagents/spec-auditor.md`
+   - `src/dot_work/assets/subagents/code-reviewer.md` (exists, update for parallel)
+   - `src/dot_work/assets/subagents/security-auditor.md` (exists, update for parallel)
+   - Create `src/dot_work/assets/subagents/performance-reviewer.md`
+   - Create `src/dot_work/assets/subagents/spec-auditor.md`
 
 2. Parallel execution model:
    ```markdown
@@ -466,7 +510,7 @@ Key principles from [Anthropic's research](https://www.anthropic.com/engineering
 
 **Proposed Solution:**
 
-1. Create `subagents/loop-evaluator.md`:
+1. Create `src/dot_work/assets/subagents/loop-evaluator.md`:
    ```markdown
    # Loop Evaluator Subagent
    
@@ -656,6 +700,78 @@ Key principles from [Anthropic's research](https://www.anthropic.com/engineering
 
 ---
 
+#### ISSUE: OPT-008b — Consolidate agent-loop.md into Assets
+
+**Priority:** High  
+**Type:** Refactor  
+**Estimated Effort:** Small
+
+**Problem:**
+- `agent-loop.md` exists in project root with mandatory rules and manual execution steps
+- `src/dot_work/assets/prompts/agent-orchestrator.md` duplicates/extends this
+- Two sources of truth for the same workflow
+- Root-level file is not part of the installable assets
+
+**Proposed Solution:**
+
+1. Move core content from `agent-loop.md` to `src/dot_work/assets/prompts/agent-orchestrator.md`:
+   - Mandatory rules section (no rm -rf, no skipping tests, etc.)
+   - Manual execution steps (as fallback mode)
+   - Autonomous execution (already in orchestrator)
+
+2. Create `src/dot_work/assets/prompts/agent-rules.md`:
+   ```markdown
+   # Agent Rules (Mandatory)
+   
+   These rules apply to ALL agent operations regardless of mode.
+   
+   ## Immutable Constraints
+   - Do NOT adjust defined threshold values
+   - Do NOT skip or disable unittests
+   - Do NOT skip steps in instructions
+   - Do NOT stop for user intervention (create notes instead)
+   - Do NOT use `rm -rf` command
+   
+   ## Source Boundaries
+   - Target source: ./src folder
+   - Target tests: ./tests folder
+   - Do NOT process code outside these folders unless explicit
+   ```
+
+3. Update `agent-orchestrator.md` to reference `agent-rules.md`:
+   ```markdown
+   ## Prerequisites
+   Before any operation, load and enforce:
+   - agent-rules.md (mandatory constraints)
+   - constitution.md (project-specific rules)
+   ```
+
+4. Root `agent-loop.md` becomes a thin pointer:
+   ```markdown
+   # Agent Loop
+   
+   For autonomous agent execution, see:
+   - [Agent Orchestrator](src/dot_work/assets/prompts/agent-orchestrator.md)
+   
+   For installation: `dot-work install prompts`
+   ```
+
+**Acceptance Criteria:**
+- [ ] agent-rules.md created with immutable constraints
+- [ ] agent-orchestrator.md references agent-rules.md
+- [ ] Root agent-loop.md reduced to pointer
+- [ ] No functionality loss
+- [ ] Rules enforced in all subagents
+
+**Files to Create:**
+- `src/dot_work/assets/prompts/agent-rules.md`
+
+**Files to Modify:**
+- `src/dot_work/assets/prompts/agent-orchestrator.md`
+- `agent-loop.md` (root, becomes pointer)
+
+---
+
 ### Phase 4: New Skills
 
 ---
@@ -673,7 +789,7 @@ Key principles from [Anthropic's research](https://www.anthropic.com/engineering
 
 **Proposed Solution:**
 
-Create `skills/baseline-validation/SKILL.md`:
+Create `src/dot_work/assets/skills/baseline-validation/SKILL.md`:
 ```markdown
 # Baseline Validation Skill
 
@@ -717,7 +833,7 @@ When validating changes, use this skill to:
 
 **Proposed Solution:**
 
-Create `skills/git-workflow/SKILL.md`:
+Create `src/dot_work/assets/skills/git-workflow/SKILL.md`:
 ```markdown
 # Git Workflow Skill
 
@@ -761,7 +877,7 @@ description: imperative, <50 chars
 
 **Proposed Solution:**
 
-Create `skills/issue-creation/SKILL.md`:
+Create `src/dot_work/assets/skills/issue-creation/SKILL.md`:
 ```markdown
 # Issue Creation Skill
 
@@ -980,26 +1096,27 @@ Load skills based on issue type...
 1. **OPT-001**: Constitution generator (foundation)
 2. **OPT-007**: Refactor do-work.md (enables subagents)
 3. **OPT-008**: Refactor orchestrator (enables subagents)
+4. **OPT-008b**: Consolidate agent-loop.md into assets
 
 ### Parallel Track A (Subagents)
-4. **OPT-003**: Pre-iteration subagent
-5. **OPT-004**: Implementation subagent
-6. **OPT-005**: Validation subagents (parallel)
-7. **OPT-006**: Loop evaluator
+5. **OPT-003**: Pre-iteration subagent
+6. **OPT-004**: Implementation subagent
+7. **OPT-005**: Validation subagents (parallel)
+8. **OPT-006**: Loop evaluator
 
 ### Parallel Track B (Skills)
-8. **OPT-009**: Baseline validation skill
-9. **OPT-010**: Git workflow skill
-10. **OPT-011**: Issue creation skill
+9. **OPT-009**: Baseline validation skill
+10. **OPT-010**: Git workflow skill
+11. **OPT-011**: Issue creation skill
 
 ### Parallel Track C (Platform)
-11. **OPT-002**: Stop hook integration
-12. **OPT-012**: Remove hardcoded commands
-13. **OPT-013**: Language detection
+12. **OPT-002**: Stop hook integration
+13. **OPT-012**: Remove hardcoded commands
+14. **OPT-013**: Language detection
 
 ### Final (Documentation)
-14. **OPT-014**: Update AGENTS.md
-15. **OPT-015**: Subagent invocation guide
+15. **OPT-014**: Update AGENTS.md
+16. **OPT-015**: Subagent invocation guide
 
 ---
 
@@ -1046,7 +1163,10 @@ src/dot_work/assets/
     issue-creation/SKILL.md
   hooks/
     stop-hook.md
+    pre-loop.md
+    post-iteration.md
   prompts/
+    agent-rules.md
     detect-project.md (or merged into constitution)
 ```
 
@@ -1062,6 +1182,10 @@ src/dot_work/assets/
   subagents/
     code-reviewer.md (minor)
     security-auditor.md (minor)
+
+Project root:
+  agent-loop.md (reduce to pointer)
+  AGENTS.md (update for new architecture)
 ```
 
 ---
