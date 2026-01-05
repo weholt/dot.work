@@ -1,8 +1,9 @@
 ---
 meta:
+  name: create-constitution
   title: "Project Constitution Generator"
   description: "Create a platform-agnostic constitution.md that must exist before any autonomous work begins"
-  version: "2.0.0"
+  version: "2.1.0"
 
 environments:
   claude:
@@ -16,11 +17,42 @@ environments:
 
 # Project Constitution Generator
 
-Generate `.work/constitution.md` as the project's authoritative configuration for autonomous agent operation. The constitution provides platform-agnostic commands and rules that agents read before any work.
+Generate `.work/constitution.md` as the project's **single source of truth** for all agent operations. Every subagent MUST read this file before doing ANY work to ensure they all operate on the same codebase.
+
+---
+
+## Critical: Workspace Anchoring
+
+The constitution MUST define the **absolute workspace root** and all paths relative to it. This prevents subagents from operating on imaginary or different versions of files.
+
+```yaml
+purpose:
+  - Define THE authoritative workspace location
+  - All subagents read this FIRST
+  - No code operations without constitution loaded
+  - Prevents agents from hallucinating file paths
+```
 
 ---
 
 ## Generation Process
+
+### Step 0: Anchor Workspace Root
+
+**CRITICAL:** Determine and record the absolute workspace path FIRST:
+
+```yaml
+workspace_anchoring:
+  detection:
+    1. Find .git directory (repository root)
+    2. Or find pyproject.toml/package.json (project root)
+    3. Or use current working directory
+    
+  record:
+    - Absolute path to workspace root
+    - Source code location relative to root
+    - Tests location relative to root
+```
 
 ### Step 1: Detect Project Environment
 

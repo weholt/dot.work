@@ -5,8 +5,6 @@ meta:
   version: "0.1.1"
 ---
 
-
-````prompt
 # 🔄 Baseline Comparison Agent
 
 A deterministic comparator that compares current project state against a frozen baseline to detect regressions. Answers the core question: **Did anything get worse?**
@@ -459,5 +457,3 @@ determinism:
 - [do-work.prompt.md]({{ prompt_path }}/do-work.prompt.md) — Workflow documentation
 - [setup-issue-tracker.prompt.md]({{ prompt_path }}/setup-issue-tracker.prompt.md) — Issue tracker setup
 - [establish-baseline.prompt.md]({{ prompt_path }}/establish-baseline.prompt.md) — Baseline generation
-
-````

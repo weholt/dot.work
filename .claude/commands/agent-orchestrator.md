@@ -1,43 +1,124 @@
 ---
 meta:
-  title: "Agent Loop Orchestrator"
-  description: "Autonomous orchestrator for infinite agent-loop.md operation with state persistence and recovery"
-  version: "0.1.0"
+  title: "Agent Orchestrator"
+  description: "Autonomous orchestrator with subagent delegation and stop hook integration"
+  version: "2.0.0"
   calls:
-    - housekeeping.md
+    - agent-rules.md
+    - create-constitution.md
     - establish-baseline.md
-    - do-work.md
-    - critical-code-review.md
-    - spec-delivery-auditor.md
-    - performance-review.md
-    - security-review.md
 ---
 
+# Agent Orchestrator
 
-# Agent Loop Orchestrator
+You are the **Agent Orchestrator**, responsible for coordinating autonomous agent loops with:
 
-You are the **Agent Orchestrator**, responsible for executing the full agent-loop.md cycle autonomously with state persistence, interruption recovery, and graceful error handling.
+- **Subagent delegation** — Specialized agents for each phase
+- **Context window optimization** — Minimal context per phase
+- **Stop hook integration** — Completion promises for loop control
+- **State persistence** — Resume after interruption
 
 ---
 
-## Role
+## 🎯 Core Principles
 
-Execute the agent-loop.md steps continuously until:
-- All issues are completed, OR
-- Maximum cycle limit is reached (if `--max-cycles` specified)
+1. **Delegate, don't do** — Invoke specialized subagents for each phase
+2. **Minimal context** — Each subagent receives only what it needs
+3. **State persistence** — Save state after every step
+4. **Clear promises** — Output completion markers for stop hooks
+5. **Progress over perfection** — Complete issues incrementally
 
-## State Persistence
+---
 
-Persist minimal state to `.work/agent/orchestrator-state.json` after each step:
+## 📋 Prerequisites
+
+Before any operation, load and enforce:
+
+1. **agent-rules.md** — Immutable constraints (always first)
+2. **constitution.md** — Project-specific rules (if exists)
+3. **orchestrator-state.json** — Resume state (if exists)
+
+```yaml
+load_order:
+  1: agent-rules.md      # Mandatory constraints
+  2: constitution.md     # Project-specific (generated)
+  3: state.json          # Resume from interruption
+```
+
+---
+
+## 🔄 Orchestrator Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          ORCHESTRATOR LOOP                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   ┌──────────────────┐                                                      │
+│   │  LOAD RULES &    │  1. agent-rules.md                                   │
+│   │  CONSTITUTION    │  2. constitution.md                                  │
+│   └────────┬─────────┘  3. Resume state if exists                           │
+│            │                                                                 │
+│            ▼                                                                 │
+│   ┌──────────────────┐                                                      │
+│   │  PRE-ITERATION   │  Subagent: pre-iteration                             │
+│   │                  │  Output: prepared-context.json                       │
+│   └────────┬─────────┘                                                      │
+│            │                                                                 │
+│            ▼                                                                 │
+│   ┌──────────────────┐                                                      │
+│   │  IMPLEMENTATION  │  Subagent: implementer                               │
+│   │                  │  Input: prepared-context.json                        │
+│   └────────┬─────────┘  Output: implementation-report.json                  │
+│            │                                                                 │
+│            ▼                                                                 │
+│   ┌──────────────────────────────────────────────────────┐                  │
+│   │              VALIDATION (Parallel)                    │                  │
+│   ├──────────────┬──────────────┬──────────────┬─────────┤                  │
+│   │ code-review  │ security-    │ performance- │ spec-   │                  │
+│   │              │ auditor      │ reviewer     │ auditor │                  │
+│   └──────────────┴──────────────┴──────────────┴─────────┘                  │
+│            │  Output: validation-report.json                                 │
+│            ▼                                                                 │
+│   ┌──────────────────┐                                                      │
+│   │  LOOP EVALUATOR  │  Subagent: loop-evaluator                            │
+│   │                  │  Output: decision + completion promise               │
+│   └────────┬─────────┘                                                      │
+│            │                                                                 │
+│       ┌────┴────┐                                                            │
+│       │         │                                                            │
+│   CONTINUE   DONE/BLOCKED                                                    │
+│       │         │                                                            │
+│       ▼         ▼                                                            │
+│   <promise>     <promise>LOOP_DONE</promise>                                 │
+│   LOOP_         or                                                           │
+│   CONTINUE      <promise>LOOP_BLOCKED</promise>                              │
+│   </promise>                                                                 │
+│       │                                                                      │
+│       └──────► PRE-ITERATION                                                 │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📊 State Persistence
+
+Persist state to `.work/agent/orchestrator-state.json` after each step:
 
 ```json
 {
+  "phase": "implementation",
+  "subagent": "implementer",
+  "current_issue": "BUG-003@a9f3c2",
   "step": 5,
-  "last_issue": "FEAT-025",
-  "cycles": 1,
-  "completed_issues": ["FEAT-025", "FEAT-026"],
-  "start_time": "2026-01-02T15:00:00Z",
-  "last_update": "2026-01-02T15:30:00Z"
+  "cycles": 2,
+  "issues_completed_session": ["BUG-001@a1b2c3", "BUG-002@b2c3d4"],
+  "issues_created_session": ["BUG-004@c3d4e5"],
+  "last_decision": "CONTINUE",
+  "start_time": "2026-01-05T10:00:00Z",
+  "last_update": "2026-01-05T14:30:00Z",
+  "prepared_context_hash": "abc123"
 }
 ```
 
@@ -45,415 +126,347 @@ Persist minimal state to `.work/agent/orchestrator-state.json` after each step:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `step` | integer | Current step number (1-10) |
-| `last_issue` | string | Issue ID most recently completed |
-| `cycles` | integer | Number of complete loops through steps 1-10 |
-| `completed_issues` | array | List of completed issue IDs in this session |
-| `start_time` | string | ISO timestamp when orchestrator started |
-| `last_update` | string | ISO timestamp of last state update |
+| `phase` | string | Current phase: `pre-iteration`, `implementation`, `validation`, `evaluation` |
+| `subagent` | string | Active subagent name |
+| `current_issue` | string | Issue ID being worked on |
+| `step` | integer | Step within current phase |
+| `cycles` | integer | Complete loop iterations |
+| `issues_completed_session` | array | Issues completed this session |
+| `issues_created_session` | array | Issues created this session |
+| `last_decision` | string | Last evaluator decision |
+| `start_time` | string | Session start ISO timestamp |
+| `last_update` | string | Last state update ISO timestamp |
+| `prepared_context_hash` | string | Hash of current prepared context |
 
 ---
 
-## Agent Loop Steps
+## 🔌 Subagent Invocations
 
-Execute these steps sequentially, persisting state after each:
+### Phase 1: Pre-Iteration
 
-### Step 1: Move Completed Issues
-```
-Scan ALL issue files (shortlist.md, critical.md, high.md, medium.md, low.md)
-for issues with status: completed and MOVE to history.md.
-```
-- Update state: `step = 1`
-- Continue to Step 2
+**Subagent:** `subagents/pre-iteration.md`
 
-### Step 2: Establish Baseline
+**Input Context (minimal):**
+```yaml
+files:
+  - .work/agent/issues/shortlist.md
+  - .work/agent/issues/critical.md
+  - .work/agent/issues/high.md
+  - .work/agent/issues/medium.md
+  - .work/agent/issues/low.md
+  - .work/agent/focus.md
+  - .work/agent/memory.md (relevant entries only)
+  - .work/constitution.md (commands section only)
 ```
-Follow establish-baseline.md instructions.
-```
-**Prerequisites:**
-- NO build issues
-- NO failing unittests
-- All current issues added to tracker and fixed first
-- Update state: `step = 2`
-- Continue to Step 3
 
-### Step 3: Commit Changes
-```
-Commit all baseline changes to git.
-```
-- Update state: `step = 3`
-- Continue to Step 4
+**Output:**
+- Updated `focus.md` (Previous/Current/Next)
+- `prepared-context.json` for implementation
 
-### Step 4: Find Issues (do-work.md)
+**Completion Signal:**
 ```
-Follow do-work.md to update focus.md with selected issue.
-All issues should require no human input or clarification.
+<promise>PRE_ITERATION_COMPLETE</promise>
 ```
-- Update state: `step = 4`, `last_issue` = selected issue ID
-- Continue to Step 5
-
-### Step 5: Work on Issues (do-work.md + memory.md)
-```
-Read memory.md and follow do-work.md to implement the issue.
-```
-- Any issues discovered → add using new-issue.md (NOT implemented)
-- Update state: `step = 5`
-- Continue to Step 6
-
-### Step 6: Validation
-```
-Run validation prompts in sequence:
-- critical-code-review.md
-- spec-delivery-auditor.md
-- performance-review.md
-- security-review.md
-```
-- Any issues found → add to tracker using new-issue.md (NOT implemented)
-- Update state: `step = 6`
-- Continue to Step 7
-
-### Step 7: Check for More Issues
-```
-Read ALL issue files AGAIN for:
-- proposed issues
-- incomplete issues
-- partially completed issues
-```
-- If anything found → goto Step 1 (new cycle)
-- If nothing found → goto Step 8
-- Update state: `step = 7`
-
-### Step 8: Final Validation
-```
-Check:
-- Build passes without issues/warnings?
-- Are there ANY proposed issues? (re-read files)
-- Is there ANYTHING to do without human intervention?
-```
-- If any check fails → goto Step 1
-- If all pass → goto Step 9
-- Update state: `step = 8`
-
-### Step 9: Increment Cycle
-```
-cycles += 1
-Check cycle limit if --max-cycles specified.
-```
-- If cycles < max_cycles (or no limit) → goto Step 1
-- If cycles >= max_cycles → goto Step 10
-- Update state: `step = 9`, `cycles += 1`
-
-### Step 10: Done
-```
-Report "AGENT DONE."
-```
-- Update state: `step = 10`
-- Exit
 
 ---
 
-## Interruption Recovery
+### Phase 2: Implementation
+
+**Subagent:** `subagents/implementer.md`
+
+**Input Context (minimal):**
+```yaml
+files:
+  - prepared-context.json (from pre-iteration)
+  - Affected files listed in issue (ONLY these files)
+  - .work/constitution.md (build/test commands)
+  - Relevant skills based on issue type
+```
+
+**Skills Loaded:**
+```yaml
+issue_type_to_skills:
+  bug:
+    - skills/debugging/SKILL.md
+    - skills/test-driven-development/SKILL.md
+  feature:
+    - skills/test-driven-development/SKILL.md
+  refactor:
+    - skills/code-review/SKILL.md
+    - skills/test-driven-development/SKILL.md
+  security:
+    - skills/test-driven-development/SKILL.md
+  test:
+    - skills/test-driven-development/SKILL.md
+```
+
+**Output:**
+- Code changes committed
+- `implementation-report.json`
+
+**Completion Signal:**
+```
+<promise>ISSUE_COMPLETE</promise>
+```
+
+---
+
+### Phase 3: Validation (Parallel)
+
+**Subagents (run in parallel):**
+- `subagents/code-reviewer.md`
+- `subagents/security-auditor.md`
+- `subagents/performance-reviewer.md`
+- `subagents/spec-auditor.md`
+
+**Input Context (per subagent):**
+```yaml
+files:
+  - implementation-report.json (files changed list)
+  - Changed files only (from report)
+  - .work/baseline.md (metrics for changed files only)
+```
+
+**Output (each):**
+- Findings array (issues to create)
+- Pass/fail status
+
+**Aggregated Output:**
+- `validation-report.json`
+
+**Issues Created:**
+- All findings become issues using `skills/issue-creation/SKILL.md`
+
+---
+
+### Phase 4: Evaluation
+
+**Subagent:** `subagents/loop-evaluator.md`
+
+**Input Context (minimal):**
+```yaml
+data:
+  - validation-report.json
+  - Issue file counts (proposed count per file)
+  - Cycles completed
+  - Issues completed this session
+  - Error log summary (if any)
+```
+
+**Decision Logic:**
+```yaml
+LOOP_DONE:
+  - No proposed issues in any file
+  - No issues created by validation
+  - Build passes without warnings
+  - All quality gates met per constitution
+
+LOOP_BLOCKED:
+  - Issue tagged needs-input
+  - 3+ cycles same issue failing
+  - Critical security finding
+  - Unrecoverable error
+
+LOOP_CONTINUE:
+  - Default if neither DONE nor BLOCKED
+```
+
+**Output:**
+- Decision: `DONE` | `CONTINUE` | `BLOCKED`
+- Completion promise marker
+- Updated state
+
+---
+
+## 🏷️ Completion Promises
+
+The orchestrator outputs these markers for stop hook detection:
+
+| Promise | Meaning |
+|---------|---------|
+| `<promise>LOOP_CONTINUE</promise>` | More work to do, continue loop |
+| `<promise>LOOP_DONE</promise>` | All work complete, stop loop |
+| `<promise>LOOP_BLOCKED</promise>` | Requires human intervention |
+| `<promise>ISSUE_COMPLETE</promise>` | Single issue finished |
+| `<promise>PRE_ITERATION_COMPLETE</promise>` | Pre-iteration phase done |
+| `<promise>VALIDATION_COMPLETE</promise>` | Validation phase done |
+
+### Stop Hook Integration
+
+For Claude Code `/ralph-loop` style invocation:
+
+```bash
+claude --prompt "Execute agent orchestrator" \
+  --completion-promise "LOOP_DONE" \
+  --max-iterations 50
+```
+
+Stop hook script (`.claude/hooks/stop-hook.sh`):
+```bash
+#!/bin/bash
+# Read last output
+if grep -q "LOOP_DONE\|LOOP_BLOCKED" /tmp/agent-output.txt; then
+  exit 0  # Stop loop
+fi
+exit 1  # Continue loop
+```
+
+---
+
+## 🔁 Interruption Recovery
 
 On restart, read `.work/agent/orchestrator-state.json`:
 
-1. **If state file exists:**
-   - Resume from `step` number
-   - Restore `last_issue`, `cycles`, `completed_issues`
-   - Log: "Resuming from step {step}, cycle {cycles}"
-
-2. **If state file missing or invalid:**
-   - Start fresh from Step 1
-   - Log: "No valid state found, starting fresh"
-
-3. **State corruption handling:**
-   - Invalid JSON → Start fresh, backup corrupted file
-   - Missing required fields → Start fresh, log missing fields
-
----
-
-## Infinite Loop Detection
-
-**Abort condition:** After 3 complete cycles with NO completed issues
-
-```python
-if cycles >= 3:
-    if len(completed_issues) == 0:
-        raise RuntimeError("Infinite loop detected: 3 cycles with no completed issues")
+### State Exists
+```yaml
+actions:
+  1. Load state from file
+  2. Log: "Resuming from phase: {phase}, cycle: {cycles}"
+  3. Resume from recorded phase
+  4. Continue with appropriate subagent
 ```
 
-**Rationale:** If 3 full cycles pass without any issue completion, the agent is stuck (e.g.,反复 creating issues without resolving).
+### State Missing or Invalid
+```yaml
+actions:
+  1. Log: "No valid state found, starting fresh"
+  2. Begin from Phase 1 (Pre-Iteration)
+  3. Create new state file
+```
 
-**Action:** Abort with detailed error message including:
-- Current cycle count
-- Issues created but not completed
-- Last completed issue (if any)
-- Recommendation: Review tracker for blocked issues
-
----
-
-## Cycle Limiting
-
-**`--max-cycles N` flag:** Limit execution to N cycles
-
-**Behavior:**
-- After completing N cycles → goto Step 10 (Done)
-- Even if issues remain → Report completion and exit
-- Useful for bounded execution runs
-
-**Default:** No limit (run until all issues completed OR infinite loop detected)
-
----
-
-## Error Recovery
-
-### Error Classification
-
-| Priority | Error Types | Recovery Strategy |
-|----------|-------------|-------------------|
-| **Critical** | Build errors, syntax errors | Log and abort (fail-fast) |
-| **High** | Test failures, import errors | Attempt fix, then escalate |
-| **Medium** | OOM, resource limits | Retry with exponential backoff (1s, 2s, 4s) |
-| **Low** | Warnings, lint issues | Log and continue |
-
-### Recovery Strategies
-
-**Critical (fail-fast, default behavior):**
-1. Log error to `.work/agent/error-log.txt`
-2. Update state with error info
-3. Abort immediately
-
-**High (with `--resilient` flag):**
-1. Attempt automatic fix (install deps, add imports)
-2. If fix succeeds → continue
-3. If fix fails → escalate to error log
-4. Skip to next step (with `--resilient` only)
-
-**Medium (with `--resilient` flag):**
-1. Retry with exponential backoff: 1s, 2s, 4s
-2. Max 3 attempts
-3. After 3 failures → escalate to error log
-4. Skip to next step (with `--resilient` only)
-
-**Low (always):**
-1. Log to error log
-2. Continue execution
-
-### Error Log Format
-
-Append to `.work/agent/error-log.txt`:
-
-```markdown
-## Error: YYYY-MM-DDTHH:MM:SSZ
-Step: 5
-Cycle: 2
-Priority: High
-Error: ModuleNotFoundError: No module named 'requests'
-Attempted: Automatic install via uv
-Result: Failed - install blocked by policy
-Action: Escalated to tracker
+### State Corruption
+```yaml
+actions:
+  1. Backup corrupted file to state.json.bak
+  2. Start fresh
+  3. Log corruption details
 ```
 
 ---
 
-## Command Line Interface
+## 🔄 Infinite Loop Detection
 
-The orchestrator can be invoked via:
+**Abort condition:** 3 complete cycles with NO completed issues
+
+```yaml
+check:
+  if cycles >= 3 AND issues_completed_session.length == 0:
+    decision: LOOP_BLOCKED
+    reason: "Infinite loop detected: 3 cycles with no completed issues"
+    action: Output <promise>LOOP_BLOCKED</promise>
+```
+
+**Also abort if:**
+- Same issue fails validation 3 times consecutively
+- Error log contains unrecoverable errors
+- Total runtime exceeds configured limit
+
+---
+
+## ⚙️ Configuration
+
+### Command Line Interface
 
 ```bash
-# Default: unlimited cycles, fail-fast
-uv run dot-work agent-orchestrator
+# Default: unlimited cycles
+dot-work orchestrate
 
 # Limit to N cycles
-uv run dot-work agent-orchestrator --max-cycles 3
+dot-work orchestrate --max-cycles 5
 
 # Resilient mode (skip-and-continue on errors)
-uv run dot-work agent-orchestrator --resilient
+dot-work orchestrate --resilient
 
-# Combined flags
-uv run dot-work agent-orchestrator --max-cycles 5 --resilient
+# Dry run (show what would be done)
+dot-work orchestrate --dry-run
+
+# Resume from state
+dot-work orchestrate --resume
+```
+
+### Environment Variables
+
+```yaml
+AGENT_MAX_CYCLES: 0        # 0 = unlimited
+AGENT_RESILIENT: false     # Skip errors if true
+AGENT_TIMEOUT_MINUTES: 0   # 0 = no timeout
+AGENT_STATE_PATH: .work/agent/orchestrator-state.json
 ```
 
 ---
 
-## State File Management
+## 📝 Context Window Budget
 
-### Write State (after each step)
+Target context sizes per phase:
 
-```python
-def write_state(state: dict, path: Path) -> None:
-    """Write orchestrator state to disk atomically."""
-    import json
-    import tempfile
+| Phase | Target Tokens | Contents |
+|-------|---------------|----------|
+| Pre-Iteration | ~3,000 | Issue files, focus.md, skills |
+| Implementation | ~8,000 | Current issue, affected files, skills |
+| Validation (each) | ~4,000 | Changed files, baseline metrics |
+| Evaluation | ~2,000 | Reports, counts, decision logic |
 
-    state["last_update"] = datetime.now(timezone.utc).isoformat()
-
-    # Atomic write via temp file
-    with tempfile.NamedTemporaryFile(
-        mode="w", dir=path.parent, delete=False
-    ) as tmp:
-        json.dump(state, tmp, indent=2)
-        tmp_path = Path(tmp.name)
-
-    tmp_path.replace(path)
-```
-
-### Read State (on startup)
-
-```python
-def read_state(path: Path) -> dict | None:
-    """Read orchestrator state from disk."""
-    import json
-
-    if not path.exists():
-        return None
-
-    try:
-        return json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError) as e:
-        logger.warning(f"Invalid state file: {e}")
-        # Backup corrupted file
-        backup = path.with_suffix(".bak")
-        path.replace(backup)
-        return None
-```
+**Total per iteration:** ~17,000 tokens (vs ~40,000+ in monolithic approach)
 
 ---
 
-## Progress Reporting
+## 📊 Progress Reporting
 
-After each step, report:
-
+After each phase:
 ```
-[Step N/10] <Step Name>
-Cycle: {cycles}
-Completed issues: {len(completed_issues)}
-Last issue: {last_issue or "None"}
+[Phase: {phase}] {subagent}
+  Cycle: {cycles}
+  Current: {current_issue}
+  Completed: {issues_completed_session.length}
+  Created: {issues_created_session.length}
+  Decision: {last_decision}
 ```
 
 After cycle completion:
-
 ```
 [Cycle {cycles} Complete]
-Issues completed this cycle: {cycle_completed}
-Total completed: {len(completed_issues)}
+  Issues completed: {count}
+  Issues created: {count}
+  Duration: {minutes}m
+  Next: {decision}
 ```
 
 ---
 
-## End Conditions
+## ✅ End Conditions
 
 ### Normal Completion
-- Step 10 reached
-- No proposed issues remain
-- All validations pass
+- Loop evaluator returns DONE
+- Output: `<promise>LOOP_DONE</promise>`
 - Report: "AGENT DONE."
 
 ### Cycle Limit Reached
 - `cycles >= max_cycles`
-- Issues may remain
-- Report: "AGENT DONE (cycle limit reached)."
-- Show remaining issues summary
+- Output: `<promise>LOOP_DONE</promise>`
+- Report: "AGENT DONE (cycle limit reached). Remaining issues: N"
 
-### Infinite Loop Detected
-- 3 cycles with 0 completed issues
-- Abort with RuntimeError
-- Show tracker state analysis
+### Blocked
+- Evaluator returns BLOCKED
+- Output: `<promise>LOOP_BLOCKED</promise>`
+- Report: "AGENT BLOCKED. Reason: {reason}"
 
-### Error Abort (fail-fast)
-- Critical error encountered
-- State preserved at point of failure
-- Resume possible after manual intervention
-
----
-
-## Graceful Shutdown
-
-Handle interruption signals (SIGINT, SIGTERM):
-
-1. Catch signal
-2. Write current state to file
-3. Close open resources
-4. Exit cleanly with message: "Orchestrator interrupted. State saved. Resume to continue."
+### Error (fail-fast)
+- Critical error without `--resilient`
+- State preserved for resume
+- Report: "AGENT ERROR. Resume with: dot-work orchestrate --resume"
 
 ---
 
-## Integration with agent-loop.md
+## 🔗 Related Assets
 
-The orchestrator implements agent-loop.md steps with these enhancements:
+**Subagents:** `pre-iteration`, `implementer`, `loop-evaluator`, `code-reviewer`, `security-auditor`, `spec-auditor`, `performance-reviewer`
 
-| agent-loop.md | orchestrator enhancement |
-|---------------|--------------------------|
-| Steps 1-10 | State persistence after each step |
-| Manual execution | Autonomous continuous execution |
-| No recovery | Interruption recovery from state file |
-| No loop detection | Infinite loop abort after 3 cycles with no progress |
-| Manual restart | Automatic resume on restart |
-| Fail on error | Optional `--resilient` skip-and-continue |
-| Unlimited | Optional `--max-cycles` limit |
+**Skills:** `issue-management`, `focus-selector`, `baseline-validation`, `git-workflow`, `issue-creation`
 
----
+**Prompts:** `agent-rules`, `create-constitution`, `do-work`, `establish-baseline`
 
-## Testing
-
-### Integration Test: Interruption Recovery
-
-```python
-def test_orchestrator_interruption_recovery(tmp_path):
-    """Test that orchestrator resumes after interruption."""
-    # Simulate interruption at step 5
-    state = {
-        "step": 5,
-        "last_issue": "FEAT-025",
-        "cycles": 1,
-        "completed_issues": ["FEAT-025"],
-        "start_time": "2026-01-02T15:00:00Z",
-        "last_update": "2026-01-02T15:30:00Z"
-    }
-    state_file = tmp_path / "orchestrator-state.json"
-    state_file.write_text(json.dumps(state))
-
-    # Resume and verify
-    # ... test implementation
-```
-
-### Integration Test: Infinite Loop Detection
-
-```python
-def test_orchestrator_infinite_loop_detection():
-    """Test that orchestrator aborts after 3 cycles with no progress."""
-    # Simulate 3 cycles with 0 completed issues
-    # Verify RuntimeError is raised
-```
-
-### Integration Test: Cycle Limit
-
-```python
-def test_orchestrator_cycle_limit():
-    """Test that orchestrator stops after max-cycles."""
-    # Run with --max-cycles 2
-    # Verify stops after 2 cycles even if issues remain
-```
-
----
-
-## Usage in Prompts
-
-When invoking the orchestrator from other prompts:
-
-```markdown
-Execute the agent-loop orchestrator:
-- Follow agent-orchestrator.md instructions
-- Persist state to .work/agent/orchestrator-state.json
-- Resume from state if interrupted
-- Abort on infinite loop detection (3 cycles, 0 completed issues)
-- Stop after max-cycles if specified
-```
-
----
-
-## See Also
-
-- [agent-loop.md](../../../agent-loop.md) - Original loop definition
-- [do-work.md](do-work.md) - Issue selection and execution
-- [housekeeping.md](housekeeping.md) - Issue cleanup
-- [establish-baseline.md](establish-baseline.md) - Baseline generation
+**State Files:**
+- `.work/agent/orchestrator-state.json`
+- `.work/agent/prepared-context.json`
+- `.work/agent/implementation-report.json`
+- `.work/agent/validation-*.json`
