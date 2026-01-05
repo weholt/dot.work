@@ -108,11 +108,30 @@ Reason: All issues completed, no regressions found, quality gates met.
 
 ```yaml
 BLOCKED:
-  - any_issue_needs_input: true     # Issue tagged needs-input
+  - no_actionable_work: true        # proposed > 0 BUT actionable = 0
+  - any_issue_needs_input: true     # Issue tagged needs-input AND it's the focus
   - same_issue_failed_3x: true      # Same issue failed validation 3+ times
   - critical_security_finding: true # Security auditor found critical
   - unrecoverable_error: true       # Error log has unrecoverable error
   - infinite_loop_detected: true    # 3+ cycles with 0 completed issues
+  - only_blocked_remain: true       # proposed = 0 AND blocked > 0
+```
+
+**Actionable Issue Definition:**
+```yaml
+actionable_issue:
+  - status: proposed OR in-progress
+  - NOT tagged: needs-input
+  - NOT tagged: blocked  
+  - NOT tagged: requires-human
+  - NOT requires: unavailable-environment  # e.g., Windows-only on Linux
+```
+
+**Key Check:** Count actionable issues, not just proposed issues.
+```yaml
+no_actionable_work:
+  condition: proposed_issues > 0 AND actionable_issues == 0
+  reason: "All proposed issues require human intervention"
 ```
 
 **Output:**
@@ -127,32 +146,44 @@ Blocked on: {issue ID or error description}
 **Blocked Reasons:**
 | Trigger | Reason |
 |---------|--------|
+| no actionable work | "{N} proposed issues but none actionable autonomously" |
 | needs-input tag | "Issue {id} requires human input" |
 | 3x validation fail | "Issue {id} failed validation 3 times" |
 | critical security | "Critical security finding in {file}" |
 | unrecoverable error | "Error: {error message}" |
 | infinite loop | "3 cycles with no completed issues" |
+| only blocked remain | "Only blocked issues remain ({N} blocked)" |
 
 ---
 
 ### Decision: CONTINUE
 
-**Default if neither DONE nor BLOCKED:**
+**Requires ACTIONABLE work (not just proposed issues):**
 
 ```yaml
 CONTINUE:
-  - proposed_issues > 0
+  - actionable_issues > 0
   OR
-  - issues_created_by_validation > 0
-  OR
-  - in_progress_issues > 0
+  - issues_created_by_validation > 0  # New issues need triage
 ```
+
+**Actionable = Can be worked on autonomously:**
+```yaml
+actionable_check_per_issue:
+  - Is it tagged 'needs-input'? → NOT actionable
+  - Is it tagged 'blocked' or 'requires-human'? → NOT actionable  
+  - Does it require Windows and we're on Linux? → NOT actionable
+  - Does it explicitly need human decision? → NOT actionable
+  - Otherwise → ACTIONABLE
+```
+
+**Important:** If `proposed_issues > 0` but `actionable_issues == 0`, the decision is **BLOCKED**, not CONTINUE.
 
 **Output:**
 ```
 Decision: CONTINUE
-Reason: {N} proposed issues remain, {M} new issues from validation.
-Next priority: {next issue ID from shortlist or highest priority}
+Reason: {N} actionable issues remain.
+Next priority: {next actionable issue ID from shortlist or highest priority}
 
 <promise>LOOP_CONTINUE</promise>
 ```
@@ -232,13 +263,28 @@ Next priority: {next issue ID from shortlist or highest priority}
 Evaluate in this order (first match wins):
 
 ```
-1. Check for BLOCKED conditions
-   → If any BLOCKED trigger → Decision: BLOCKED
+1. Count actionable issues (proposed/in-progress that CAN be worked on)
+   → For each proposed issue, check if actionable (not blocked, not needs-input, etc.)
 
-2. Check for DONE conditions  
+2. Check for BLOCKED conditions
+   → If any BLOCKED trigger → Decision: BLOCKED
+   → Includes: proposed > 0 but actionable = 0
+
+3. Check for DONE conditions  
    → If all DONE conditions met → Decision: DONE
 
-3. Default → Decision: CONTINUE
+4. Check for CONTINUE conditions
+   → If actionable_issues > 0 → Decision: CONTINUE
+   
+5. Fallback
+   → If nothing to do → Decision: DONE
+```
+
+**Critical Logic:**
+```yaml
+if proposed_issues > 0 AND actionable_issues == 0:
+  decision: BLOCKED  # NOT CONTINUE
+  reason: "All proposed issues require human intervention"
 ```
 
 ---
@@ -279,6 +325,16 @@ action:
   - Decision: BLOCKED
   - Reason: "Only blocked issues remain ({N} blocked)"
   - List blocked issue IDs
+```
+
+### All Proposed Require Human Intervention
+
+```yaml
+scenario: proposed > 0, actionable = 0
+action:
+  - Decision: BLOCKED
+  - Reason: "{N} proposed issues exist but none are actionable autonomously"
+  - List reasons per issue (needs-input, Windows-only, requires-human, etc.)
 ```
 
 ### Cycle Limit Approaching
