@@ -3,11 +3,6 @@ name: code-review
 description: Expert code review guidelines for quality, security, and maintainability
 license: MIT
 compatibility: Works with Claude Code 1.0+
-
-environments:
-  claude:
-    target: ".claude/skills/"
-    filename_suffix: "/code-review/SKILL.md"
 ---
 
 # Code Review

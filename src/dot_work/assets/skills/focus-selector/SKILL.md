@@ -3,11 +3,6 @@ name: focus-selector
 description: Skill for selecting the next issue to work on based on priority, blocked status, and session context
 license: MIT
 compatibility: Works with all AI coding assistants
-
-environments:
-  claude:
-    target: ".claude/skills/"
-    filename_suffix: "/focus-selector/SKILL.md"
 ---
 
 # Focus Selector Skill

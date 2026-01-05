@@ -3,11 +3,6 @@ name: test-driven-development
 description: Test-driven development workflow for writing reliable, maintainable code
 license: MIT
 compatibility: Works with Claude Code 1.0+
-
-environments:
-  claude:
-    target: ".claude/skills/"
-    filename_suffix: "/test-driven-development/SKILL.md"
 ---
 
 # Test-Driven Development

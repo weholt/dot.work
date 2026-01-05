@@ -3,11 +3,6 @@ name: git-workflow
 description: Skill for atomic commits, branch management, and clean git history
 license: MIT
 compatibility: Works with all AI coding assistants
-
-environments:
-  claude:
-    target: ".claude/skills/"
-    filename_suffix: "/git-workflow/SKILL.md"
 ---
 
 # Git Workflow Skill

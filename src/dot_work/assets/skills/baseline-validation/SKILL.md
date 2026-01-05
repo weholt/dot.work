@@ -3,11 +3,6 @@ name: baseline-validation
 description: Skill for validating code changes against the established baseline
 license: MIT
 compatibility: Works with all AI coding assistants
-
-environments:
-  claude:
-    target: ".claude/skills/"
-    filename_suffix: "/baseline-validation/SKILL.md"
 ---
 
 # Baseline Validation Skill

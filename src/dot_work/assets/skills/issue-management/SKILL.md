@@ -3,11 +3,6 @@ name: issue-management
 description: Skill for managing file-based issue tracking - housekeeping, moving, scanning
 license: MIT
 compatibility: Works with all AI coding assistants
-
-environments:
-  claude:
-    target: ".claude/skills/"
-    filename_suffix: "/issue-management/SKILL.md"
 ---
 
 # Issue Management Skill

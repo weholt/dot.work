@@ -3,11 +3,6 @@ name: debugging
 description: Systematic debugging approaches for isolating and fixing software defects
 license: MIT
 compatibility: Works with Claude Code 1.0+
-
-environments:
-  claude:
-    target: ".claude/skills/"
-    filename_suffix: "/debugging/SKILL.md"
 ---
 
 # Debugging

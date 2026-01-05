@@ -3,11 +3,6 @@ name: issue-creation
 description: Skill for creating well-formed issues from discoveries during implementation or validation
 license: MIT
 compatibility: Works with all AI coding assistants
-
-environments:
-  claude:
-    target: ".claude/skills/"
-    filename_suffix: "/issue-creation/SKILL.md"
 ---
 
 # Issue Creation Skill
