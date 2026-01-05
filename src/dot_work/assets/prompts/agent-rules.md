@@ -71,13 +71,24 @@ They are non-negotiable and must be enforced before any other logic.
 
 ## ✅ Required Behaviors
 
-### Before Any Code Changes
+### Before Any Code Operations (CRITICAL)
 
-1. Verify `.work/` structure exists
-2. Verify baseline exists and is current
-3. Read `focus.md` for current state
-4. Check `memory.md` for relevant context
-5. Check `constitution.md` for project-specific rules
+1. **READ `.work/constitution.md` FIRST** — This defines:
+   - Workspace root (absolute path)
+   - Source code location (`src/` or similar)
+   - Test location (`tests/` or similar)
+   - Package name and import style
+   - Off-limits paths
+   
+2. **Do NOT hallucinate file paths** — Only operate on files that:
+   - Exist at the paths defined in constitution
+   - Are within `src/` or `tests/` as defined
+   - You have verified exist via Read or Glob
+
+3. Verify `.work/` structure exists
+4. Verify baseline exists and is current
+5. Read `focus.md` for current state
+6. Check `memory.md` for relevant context
 
 ### During Implementation
 

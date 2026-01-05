@@ -170,6 +170,51 @@ Generate `.work/constitution.md` with this structure:
 > Project: {project name from pyproject.toml/package.json}
 > Version: {version if found}
 
+**⚠️ ALL AGENTS MUST READ THIS FILE BEFORE ANY CODE OPERATIONS ⚠️**
+
+---
+
+## 0. Workspace (CRITICAL - READ FIRST)
+
+This section defines THE authoritative workspace. All agents MUST use these paths.
+Do NOT operate on files outside these locations.
+
+### Workspace Root
+**Absolute Path:** `{absolute_path_to_workspace}`
+
+### Source Code Location
+**Path:** `{src_dir}/` (e.g., `src/` or `lib/`)
+**Package Name:** `{package_name}` (e.g., `dot_work`)
+**Import Style:** `from {package_name} import X`
+
+### Test Location
+**Path:** `{tests_dir}/` (e.g., `tests/`)
+**Test Framework:** {pytest | jest | vitest | unittest}
+**Test Pattern:** `test_*.py` or `*.test.ts`
+
+### Configuration Files
+- Project config: `{config_file}` (e.g., `pyproject.toml`)
+- Lint config: `{lint_config}` (e.g., `pyproject.toml` or `.eslintrc`)
+- Type config: `{type_config}` (e.g., `pyproject.toml` or `tsconfig.json`)
+
+### State Files
+All agent state lives in `.work/`:
+```
+.work/
+├── constitution.md     ← YOU ARE HERE
+├── baseline.md         ← Quality metrics
+└── agent/
+    ├── focus.md        ← Current issue
+    ├── memory.md       ← Accumulated learnings
+    └── issues/         ← Issue tracker
+```
+
+### Off-Limits Paths
+These paths should NOT be modified by agents:
+- `node_modules/`, `.venv/`, `__pycache__/`
+- `.git/` (except via git commands)
+- Files in `.gitignore`
+
 ---
 
 ## 1. Project Identity

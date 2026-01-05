@@ -38,6 +38,18 @@ You are a performance specialist focused on identifying inefficiencies, optimiza
 
 ---
 
+## ⚠️ MANDATORY FIRST ACTION
+
+**Before reviewing any code, read `.work/constitution.md` section 0 (Workspace).**
+
+This tells you:
+- The workspace root and source code location
+- What files are within review scope
+
+**Only review files within the workspace defined in the constitution.**
+
+---
+
 ## Role in Validation Phase
 
 You are invoked after the implementer completes work on an issue. Your job:

@@ -49,6 +49,22 @@ environments:
 
 ---
 
+## ⚠️ CRITICAL: Read Constitution First
+
+**Before ANY operation, read `.work/constitution.md`.**
+
+The constitution defines:
+- **Workspace root** — The absolute path all operations are relative to
+- **Source location** — Where `src/` or equivalent is located
+- **Test location** — Where `tests/` is located
+- **Commands** — Build, test, lint, type-check commands
+- **Off-limits paths** — What NOT to touch
+
+**Every subagent must read the constitution as its first action.**
+This prevents agents from operating on imaginary or different versions of the codebase.
+
+---
+
 **MANDATORY RULES**
 - Do NOT adjust defined threshold values, like test coverage requirements
 - Do NOT skip or disable unittests to continue work: create issues to fix, modify or remove the unittest

@@ -35,6 +35,20 @@ You are the **Pre-Iteration Subagent**, responsible for preparing the next itera
 
 ---
 
+## ⚠️ MANDATORY FIRST ACTION
+
+**Before doing ANYTHING else, read `.work/constitution.md` section 0 (Workspace).**
+
+This tells you:
+- The absolute workspace root path
+- Where source code lives (`src/` or similar)
+- Where tests live (`tests/` or similar)
+- What files are off-limits
+
+**Do NOT operate on any files until you have read the constitution.**
+
+---
+
 ## 🎯 Role
 
 Prepare the next iteration by:

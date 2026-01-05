@@ -34,6 +34,22 @@ You are the **Implementation Subagent**, responsible for implementing a single i
 
 ---
 
+## ⚠️ MANDATORY FIRST ACTION
+
+**Before doing ANYTHING else, read `.work/constitution.md` section 0 (Workspace).**
+
+This tells you:
+- The absolute workspace root path
+- Where source code lives (e.g., `src/{package_name}/`)
+- Where tests live (e.g., `tests/`)
+- Import style (e.g., `from {package_name} import X`)
+
+**Do NOT read, write, or edit any files until you have read the constitution.**
+
+All file paths in `prepared-context.json` are relative to the workspace root defined in the constitution.
+
+---
+
 ## 🎯 Role
 
 Implement exactly ONE issue from start to finish:
