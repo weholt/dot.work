@@ -79,13 +79,17 @@ You receive only:
 
 ---
 
-## 📤 Outputs
+## 📤 Outputs — MUST CREATE THESE FILES
 
-You produce:
-1. Code changes (committed to git)
-2. Test changes (committed with code)
-3. Updated `focus.md` with progress
-4. `implementation-report.json`
+**You MUST write/update these files before completing:**
+
+1. **EDIT** source files — make the code changes
+2. **EDIT** test files — add/update tests
+3. **RUN** `git commit` — commit changes with proper message
+4. **UPDATE** `.work/agent/focus.md` — with progress and completion status
+5. **CREATE** `.work/agent/implementation-report.json` — report for validation
+
+⚠️ **Do NOT just describe what you would create — actually write the files and run the commands.**
 
 ---
 

@@ -70,11 +70,14 @@ You receive:
 
 ---
 
-## 📤 Outputs
+## 📤 Outputs — MUST CREATE THESE FILES
 
-You produce:
-1. Updated `focus.md` with Previous/Current/Next
-2. `prepared-context.json` for the implementer
+**You MUST write these files before completing:**
+
+1. **UPDATE** `.work/agent/focus.md` — with Previous/Current/Next sections
+2. **CREATE** `.work/agent/prepared-context.json` — context for implementer
+
+⚠️ **Do NOT just describe what you would create — actually write the files using the Write tool.**
 
 ---
 

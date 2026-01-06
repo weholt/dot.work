@@ -78,7 +78,7 @@ load_order:
 │   │ code-review  │ security-    │ performance- │ spec-   │                  │
 │   │              │ auditor      │ reviewer     │ auditor │                  │
 │   └──────────────┴──────────────┴──────────────┴─────────┘                  │
-│            │  Output: validation-report.json                                 │
+│            │  Output: Issues created + summaries                          │
 │            ▼                                                                 │
 │   ┌──────────────────┐                                                      │
 │   │  LOOP EVALUATOR  │  Subagent: loop-evaluator                            │
@@ -228,14 +228,10 @@ files:
 ```
 
 **Output (each):**
-- Findings array (issues to create)
-- Pass/fail status
+- Issues created directly in `.work/agent/issues/{priority}.md`
+- Summary response (pass/warn/fail + findings count)
 
-**Aggregated Output:**
-- `validation-report.json`
-
-**Issues Created:**
-- All findings become issues using `skills/issue-creation/SKILL.md`
+**No intermediate files** — subagents create issues directly using `issue-creation` skill.
 
 ---
 
@@ -246,7 +242,7 @@ files:
 **Input Context (minimal):**
 ```yaml
 data:
-  - validation-report.json
+  - Validation summaries from each reviewer (pass/warn/fail)
   - Issue file counts (proposed count per file)
   - Cycles completed
   - Issues completed this session

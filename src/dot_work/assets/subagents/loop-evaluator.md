@@ -51,20 +51,28 @@ Make a single decision after each iteration:
 ## 📥 Inputs
 
 You receive only:
-- `validation-report.json` — Results from parallel validation
+- Validation summaries — pass/warn/fail results from each reviewer
 - Issue file counts — Proposed/in-progress/blocked per file
 - Session metrics — Cycles completed, issues completed
 - Error log summary — Any errors during session
 
+**Note:** Validation subagents create issues directly. You check issue files to see what was created.
+
 ---
 
-## 📤 Outputs
+## 📤 Outputs — MUST CREATE/UPDATE THESE FILES
 
-You produce:
-1. Decision: `DONE` | `CONTINUE` | `BLOCKED`
-2. Completion promise marker
-3. Reason for decision
-4. Updated orchestrator state
+**You MUST write these before outputting your decision:**
+
+1. **UPDATE** `.work/agent/focus.md` — Update Loop Decision section with your decision
+2. **UPDATE** `.work/agent/orchestrator-state.json` — Update state with decision
+
+**Output Format (in your response):**
+- Decision: `DONE` | `CONTINUE` | `BLOCKED`
+- Completion promise marker (e.g., `<promise>LOOP_DONE</promise>`)
+- Reason for decision
+
+⚠️ **Do NOT just describe what you would update — actually write the files using the Write tool.**
 
 ---
 
@@ -192,68 +200,49 @@ Next priority: {next actionable issue ID from shortlist or highest priority}
 
 ## 📊 Input Data Structures
 
-### validation-report.json
+### Validation Summaries
 
-```json
-{
-  "status": "pass|fail",
-  "issue_id": "BUG-003@a9f3c2",
-  "subagents": {
-    "code-reviewer": {
-      "status": "pass",
-      "findings": []
-    },
-    "security-auditor": {
-      "status": "pass", 
-      "findings": []
-    },
-    "performance-reviewer": {
-      "status": "pass",
-      "findings": []
-    },
-    "spec-auditor": {
-      "status": "pass",
-      "findings": []
-    }
-  },
-  "issues_created": [],
-  "total_findings": 0
-}
+Each validation subagent provides a summary response:
+
+```markdown
+## Code Review Summary
+**Result:** pass | warn | fail
+**Findings:** Critical: 0, Important: 1, Minor: 2
+**Issues Created:** REFACTOR-015@xyz123 (medium)
 ```
+
+Parse the result and check issue files for any newly created issues.
 
 ### Issue File Counts
 
-```json
-{
-  "shortlist": {"proposed": 0, "in_progress": 0, "blocked": 0},
-  "critical": {"proposed": 1, "in_progress": 0, "blocked": 0},
-  "high": {"proposed": 3, "in_progress": 0, "blocked": 1},
-  "medium": {"proposed": 5, "in_progress": 0, "blocked": 0},
-  "low": {"proposed": 2, "in_progress": 0, "blocked": 0}
-}
+Count issues in each file by parsing status:
+
+```yaml
+shortlist.md:  proposed: 0, in_progress: 0, blocked: 0
+critical.md:   proposed: 1, in_progress: 0, blocked: 0
+high.md:       proposed: 3, in_progress: 0, blocked: 1
+medium.md:     proposed: 5, in_progress: 0, blocked: 0
+low.md:        proposed: 2, in_progress: 0, blocked: 0
 ```
 
 ### Session Metrics
 
-```json
-{
-  "cycles": 2,
-  "issues_completed": ["BUG-001@a1b2c3", "BUG-002@b2c3d4"],
-  "issues_created": ["BUG-004@c3d4e5"],
-  "start_time": "2026-01-05T10:00:00Z",
-  "current_time": "2026-01-05T14:30:00Z",
-  "consecutive_failures": 0
-}
+Track from orchestrator state:
+
+```yaml
+cycles: 2
+issues_completed: [BUG-001@a1b2c3, BUG-002@b2c3d4]
+issues_created: [BUG-004@c3d4e5]
+start_time: 2026-01-05T10:00:00Z
+consecutive_failures: 0
 ```
 
 ### Error Log Summary
 
-```json
-{
-  "errors": [],
-  "warnings": ["Memory usage high during tests"],
-  "unrecoverable": false
-}
+```yaml
+errors: []
+warnings: [Memory usage high during tests]
+unrecoverable: false
 ```
 
 ---
@@ -395,8 +384,8 @@ Reason: {explanation}
 
 Before outputting decision:
 
-- [ ] Validation report analyzed
-- [ ] Issue counts tallied from all files
+- [ ] Validation summaries reviewed (pass/warn/fail from each reviewer)
+- [ ] Issue counts tallied from all issue files
 - [ ] Session metrics reviewed
 - [ ] Error log checked
 - [ ] BLOCKED conditions evaluated first

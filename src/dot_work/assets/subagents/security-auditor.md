@@ -21,12 +21,9 @@ environments:
 skills:
   - issue-creation
 
-output:
-  file: ".work/agent/validation-security.json"
-  format: json
-
 tools:
   - Read
+  - Write
   - Grep
   - Bash
   - Glob
@@ -400,37 +397,64 @@ severity_to_priority:
 
 ---
 
-## Output Format
+## Actions — Create Issues for Vulnerabilities
 
-Write security audit report to `.work/agent/validation-security.json`:
+For each vulnerability found, **create an issue directly** using the `issue-creation` skill:
 
-```json
-{
-  "subagent": "security-auditor",
-  "timestamp": "2026-01-05T10:42:00Z",
-  "issue_reviewed": "BUG-003@a9f3c2",
-  "files_audited": ["src/config/loader.py", "tests/test_config.py"],
-  
-  "result": "pass",
-  
-  "vulnerabilities": {
-    "critical": 0,
-    "high": 0,
-    "medium": 0,
-    "low": 1
-  },
-  
-  "issues_created": [
-    {"id": "SEC-003@abc123", "priority": "low", "title": "Add input validation for config paths", "cvss": 2.1}
-  ],
-  
-  "owasp_coverage": {
-    "a03_injection": "pass",
-    "a05_misconfiguration": "pass"
-  },
-  
-  "recommendation": "No blocking security issues. Created 1 low-priority issue for hardening."
-}
+1. **Determine priority** from CVSS score
+2. **Append issue** to the appropriate file (`.work/agent/issues/{priority}.md`)
+3. **Track what you created** for your summary
+
+Use the issue-creation skill format:
+```markdown
+---
+id: "SEC-{NUM}@{HASH}"
+title: "{vulnerability title}"
+type: security
+priority: {priority from CVSS}
+status: proposed
+source: security-audit
+affected_files:
+  - {file path}
+tags:
+  - {owasp category}
+---
+### Problem
+{description with CVSS score}
+
+### Acceptance Criteria
+- [ ] {specific fix required}
+- [ ] Security test added
+```
+
+---
+
+## Output — Summary Response
+
+After auditing and creating any issues, respond with a **brief summary**:
+
+```markdown
+## Security Audit Summary
+
+**Issue Reviewed:** BUG-003@a9f3c2
+**Files Audited:** src/config/loader.py, tests/test_config.py
+
+**Result:** pass | warn | fail
+
+**Vulnerabilities:**
+- Critical: 0
+- High: 0
+- Medium: 0
+- Low: 1
+
+**Issues Created:**
+- SEC-003@abc123 (low, CVSS 2.1) - Add input validation for config paths
+
+**OWASP Coverage:**
+- A03 Injection: ✓
+- A05 Misconfiguration: ✓
+
+**Recommendation:** No blocking security issues. Created 1 low-priority issue for hardening.
 ```
 
 ### Result Values

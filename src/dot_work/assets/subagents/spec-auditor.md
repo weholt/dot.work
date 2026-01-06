@@ -21,12 +21,9 @@ environments:
 skills:
   - issue-creation
 
-output:
-  file: ".work/agent/validation-spec.json"
-  format: json
-
 tools:
   - Read
+  - Write
   - Grep
   - Glob
 ---
@@ -228,55 +225,64 @@ gap_types:
 
 ---
 
-## Output Format
+## Actions — Create Issues for Spec Gaps
 
-Write spec audit report to `.work/agent/validation-spec.json`:
+For unsatisfied criteria or scope violations, **create an issue directly** using the `issue-creation` skill:
 
-```json
-{
-  "subagent": "spec-auditor",
-  "timestamp": "2026-01-05T10:46:00Z",
-  "issue_reviewed": "BUG-003@a9f3c2",
-  
-  "result": "pass",
-  
-  "acceptance_criteria": [
-    {
-      "criterion": "Config loads correctly on Windows paths",
-      "status": "satisfied",
-      "evidence": ["src/config/loader.py:45 uses Path()"]
-    },
-    {
-      "criterion": "Uses pathlib.Path consistently",
-      "status": "satisfied",
-      "evidence": ["All 5 path operations converted"]
-    },
-    {
-      "criterion": "Tests pass on Windows CI",
-      "status": "satisfied",
-      "evidence": ["test_windows_path_loading passes locally"]
-    }
-  ],
-  
-  "criteria_summary": {
-    "total": 3,
-    "satisfied": 3,
-    "partial": 0,
-    "unsatisfied": 0
-  },
-  
-  "scope_compliance": {
-    "in_scope_changes": 2,
-    "out_of_scope_changes": 0,
-    "violations": []
-  },
-  
-  "issues_created": [],
-  
-  "issue_status_recommendation": "completed",
-  
-  "recommendation": "All acceptance criteria satisfied. Issue ready for completion."
-}
+1. **Determine priority** based on severity of the gap
+2. **Append issue** to the appropriate file (`.work/agent/issues/{priority}.md`)
+3. **Track what you created** for your summary
+
+Use the issue-creation skill format:
+```markdown
+---
+id: "{TYPE}-{NUM}@{HASH}"
+title: "{spec gap title}"
+type: {appropriate type}
+priority: {priority}
+status: proposed
+source: spec-audit
+affected_files:
+  - {file path}
+---
+### Problem
+{description of what's missing or incomplete}
+
+### Acceptance Criteria
+- [ ] {specific requirement to satisfy}
+```
+
+---
+
+## Output — Summary Response
+
+After auditing and creating any issues, respond with a **brief summary**:
+
+```markdown
+## Spec Audit Summary
+
+**Issue Reviewed:** BUG-003@a9f3c2
+
+**Result:** pass | warn | fail
+
+**Acceptance Criteria:**
+| Criterion | Status |
+|-----------|--------|
+| Config loads correctly on Windows paths | ✓ satisfied |
+| Uses pathlib.Path consistently | ✓ satisfied |
+| Tests pass on Windows CI | ✓ satisfied |
+
+**Summary:** 3/3 satisfied, 0 partial, 0 unsatisfied
+
+**Scope Compliance:**
+- In-scope changes: 2
+- Out-of-scope changes: 0
+
+**Issues Created:** None
+
+**Status Recommendation:** completed
+
+**Recommendation:** All acceptance criteria satisfied. Issue ready for completion.
 ```
 
 ### Result Values

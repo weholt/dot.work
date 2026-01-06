@@ -21,12 +21,9 @@ environments:
 skills:
   - issue-creation
 
-output:
-  file: ".work/agent/validation-performance.json"
-  format: json
-
 tools:
   - Read
+  - Write
   - Grep
   - Glob
   - Bash
@@ -233,37 +230,62 @@ severity_to_priority:
 
 ---
 
-## Output Format
+## Actions — Create Issues for Performance Problems
 
-Write performance review report to `.work/agent/validation-performance.json`:
+For each performance issue found, **create an issue directly** using the `issue-creation` skill:
 
-```json
-{
-  "subagent": "performance-reviewer",
-  "timestamp": "2026-01-05T10:44:00Z",
-  "issue_reviewed": "BUG-003@a9f3c2",
-  "files_reviewed": ["src/config/loader.py", "tests/test_config.py"],
-  
-  "result": "pass",
-  
-  "findings": {
-    "critical": 0,
-    "high": 0,
-    "medium": 1,
-    "low": 0
-  },
-  
-  "issues_created": [
-    {"id": "PERF-007@xyz789", "priority": "medium", "title": "Add caching for repeated config lookups"}
-  ],
-  
-  "complexity_analysis": {
-    "worst_case": "O(n)",
-    "acceptable": true
-  },
-  
-  "recommendation": "Implementation performance acceptable. Created 1 medium-priority optimization issue."
-}
+1. **Determine priority** based on impact (critical/high/medium/low)
+2. **Append issue** to the appropriate file (`.work/agent/issues/{priority}.md`)
+3. **Track what you created** for your summary
+
+Use the issue-creation skill format:
+```markdown
+---
+id: "PERF-{NUM}@{HASH}"
+title: "{performance issue title}"
+type: perf
+priority: {priority}
+status: proposed
+source: performance-review
+affected_files:
+  - {file path}
+---
+### Problem
+{description with complexity analysis}
+
+### Acceptance Criteria
+- [ ] {specific optimization}
+- [ ] Performance test/benchmark added
+```
+
+---
+
+## Output — Summary Response
+
+After reviewing and creating any issues, respond with a **brief summary**:
+
+```markdown
+## Performance Review Summary
+
+**Issue Reviewed:** BUG-003@a9f3c2
+**Files Reviewed:** src/config/loader.py, tests/test_config.py
+
+**Result:** pass | warn | fail
+
+**Findings:**
+- Critical: 0
+- High: 0  
+- Medium: 1
+- Low: 0
+
+**Issues Created:**
+- PERF-007@xyz789 (medium) - Add caching for repeated config lookups
+
+**Complexity Analysis:**
+- Worst case: O(n)
+- Acceptable: ✓
+
+**Recommendation:** Implementation performance acceptable. Created 1 medium-priority optimization issue.
 ```
 
 ### Result Values

@@ -21,12 +21,9 @@ environments:
 skills:
   - issue-creation
 
-output:
-  file: ".work/agent/validation-code-review.json"
-  format: json
-
 tools:
   - Read
+  - Write
   - Grep
   - Glob
   - Bash
@@ -201,42 +198,66 @@ finding_to_issue_mapping:
 
 ---
 
-## Output Format
+## Actions — Create Issues for Findings
 
-Write validation report to `.work/agent/validation-code-review.json`:
+For each finding that warrants action, **create an issue directly** using the `issue-creation` skill:
 
-```json
-{
-  "subagent": "code-reviewer",
-  "timestamp": "2026-01-05T10:40:00Z",
-  "issue_reviewed": "BUG-003@a9f3c2",
-  "files_reviewed": ["src/config/loader.py", "tests/test_config.py"],
-  
-  "result": "pass",
-  
-  "findings": {
-    "critical": 0,
-    "important": 1,
-    "minor": 2
-  },
-  
-  "issues_created": [
-    {"id": "REFACTOR-015@xyz123", "priority": "medium", "title": "Extract path normalization helper"}
-  ],
-  
-  "positive_notes": [
-    "Good test coverage for edge cases",
-    "Clear function naming"
-  ],
-  
-  "recommendation": "Implementation is solid. Created 1 non-blocking issue for future improvement."
-}
+1. **Determine priority** based on severity (critical/high/medium/low)
+2. **Append issue** to the appropriate file (`.work/agent/issues/{priority}.md`)
+3. **Track what you created** for your summary
+
+Use the issue-creation skill format:
+```markdown
+---
+id: "REFACTOR-{NUM}@{HASH}"
+title: "{specific issue title}"
+type: refactor
+priority: {priority}
+status: proposed
+source: code-review
+affected_files:
+  - {file path}
+---
+### Problem
+{description}
+
+### Acceptance Criteria
+- [ ] {criterion}
+```
+
+---
+
+## Output — Summary Response
+
+After reviewing and creating any issues, respond with a **brief summary**:
+
+```markdown
+## Code Review Summary
+
+**Issue Reviewed:** BUG-003@a9f3c2
+**Files Reviewed:** src/config/loader.py, tests/test_config.py
+
+**Result:** pass | warn | fail
+
+**Findings:**
+- Critical: 0
+- Important: 1  
+- Minor: 2
+
+**Issues Created:**
+- REFACTOR-015@xyz123 (medium) - Extract path normalization helper
+
+**Positive Notes:**
+- Good test coverage for edge cases
+- Clear function naming
+
+**Recommendation:** Implementation is solid. Created 1 non-blocking issue for future improvement.
 ```
 
 ### Result Values
 
 - `pass`: No blocking issues, implementation acceptable
-- `fail`: Critical issues found, must be addressed
+- `fail`: Critical issues found, must be addressed before proceeding
 - `warn`: Important issues found, should be addressed
 
 ---

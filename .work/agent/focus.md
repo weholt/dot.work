@@ -1,18 +1,28 @@
 # Agent Focus
-Last updated: 2026-01-03T18:30Z
+Last updated: 2026-01-05T14:00Z
+
+## Current
+- Issue: None
+- Status: Ready for new work
+- Blocker: None
+
+## Loop Decision
+- Decision: BLOCKED
+- Reason: All proposed issues require human intervention (Windows-only, needs-input, or future features)
+- Actionable issues: 0
 
 ## Previous
 - Issue: QA-003@e3f4g5 - Improve test coverage for subagents generator
 - Completed: 2026-01-03T18:30Z
 - Outcome: Created tests/unit/subagents/test_generator.py, 27 new tests, all passing
 
-## Current
-- Issue: None
-- Status: Ready for new work
-
 ## Next
 - Issue: None
-- (No issues queued - awaiting user direction)
+- (No actionable issues - all proposed require human decisions)
+
+## Blocking Issues Summary
+- **FEAT-099**: Skills/Subagents marketplace - needs user decisions (approach, hosting, auth)
+- **FEAT-100**: Cursor/Windsurf support - needs priority decision (research complete)
 
 ## Completed This Session
 1. **FEAT-100**: Cursor/Windsurf subagent support ✅
@@ -36,7 +46,6 @@ Last updated: 2026-01-03T18:30Z
    - All tests passing (697 total, up from 670)
 
 ## Notes
-- QA-001, QA-002, QA-003 completed and moved to history
-- Shortlist is now empty
-- Overall test count increased by 79 tests (18 adapters + 15 CLI + 19 CLI + 27 generator)
-- All quality issues from shortlist have been addressed
+- Overall test count increased by 79 tests this session
+- All quality issues from shortlist addressed
+- Loop blocked on user decisions, not technical issues
