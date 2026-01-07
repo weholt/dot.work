@@ -42,3 +42,4 @@ test.db
 
 # uv
 uv.lock
+.work/comments

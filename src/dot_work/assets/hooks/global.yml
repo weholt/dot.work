@@ -1,0 +1,26 @@
+# Default frontmatter for hook files
+
+# These defaults are merged with individual hook files' frontmatter
+# Individual hooks can override any of these values
+
+defaults:
+  environments:
+    claude:
+      target: ".claude/hooks/"
+      filename_suffix: ".md"
+
+    opencode:
+      target: ".opencode/hooks/"
+      filename_suffix: ".md"
+
+    copilot:
+      target: ".github/prompts/hooks/"
+      filename_suffix: ".md"
+
+    cursor:
+      target: ".cursor/hooks/"
+      filename_suffix: ".md"
+
+    windsurf:
+      target: ".windsurf/hooks/"
+      filename_suffix: ".md"

@@ -1819,3 +1819,137 @@ def install_subagents_by_environment(
         console.print(f"[cyan]📁 Installed {installed_count} subagent(s)[/cyan]")
 
     return installed_count
+
+
+# ============================================================================
+# Unified Asset Installation
+# ============================================================================
+
+
+def get_bundled_assets_dir() -> Path:
+    """Get the directory containing all bundled assets.
+
+    Returns:
+        Path to the bundled assets directory (assets/).
+    """
+    try:
+        pkg_files = importlib.resources.files("dot_work")
+        assets_dir = Path(str(pkg_files)) / "assets"
+        if assets_dir.exists():
+            return assets_dir
+    except (TypeError, FileNotFoundError):
+        pass
+
+    raise FileNotFoundError(
+        "Could not find assets directory. Make sure the package is installed correctly."
+    )
+
+
+def discover_asset_categories(assets_dir: Path) -> list[tuple[str, Path]]:
+    """Auto-discover asset categories by scanning for global.yml files.
+
+    Each asset category (prompts, skills, subagents, hooks, etc.) has a global.yml
+    file that defines default environment configurations. This function discovers
+    all such categories automatically.
+
+    Args:
+        assets_dir: Path to the assets/ directory.
+
+    Returns:
+        List of (category_name, category_dir) tuples for directories with global.yml.
+    """
+    categories: list[tuple[str, Path]] = []
+
+    if not assets_dir.exists():
+        return categories
+
+    for item in assets_dir.iterdir():
+        if not item.is_dir():
+            continue
+
+        global_yml = item / "global.yml"
+        if global_yml.exists():
+            categories.append((item.name, item))
+
+    return categories
+
+
+def install_all_assets_by_environment(
+    env_name: str,
+    target: Path,
+    assets_dir: Path,
+    console: Console,
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+) -> dict[str, int]:
+    """Install all asset categories for a specific environment.
+
+    Auto-discovers asset categories by scanning for global.yml files.
+    New categories are automatically picked up without code changes.
+
+    Args:
+        env_name: Environment to install for (e.g., 'claude').
+        target: Target project directory.
+        assets_dir: Path to assets/ directory.
+        console: Rich console for output.
+        force: Overwrite existing files.
+        dry_run: Preview changes without writing.
+
+    Returns:
+        Dict mapping category name to installed count.
+    """
+    results: dict[str, int] = {}
+
+    # Auto-discover all asset categories (directories with global.yml)
+    categories = discover_asset_categories(assets_dir)
+
+    for category_name, category_dir in categories:
+        # Skip prompts (already handled separately for backward compat)
+        if category_name == "prompts":
+            continue
+
+        try:
+            console.print(f"\n[bold cyan]Installing {category_name}...[/bold cyan]")
+
+            # Use existing specialized installer for skills
+            if category_name == "skills":
+                count = install_skills_by_environment(
+                    env_name, target, category_dir, console, force=force, dry_run=dry_run
+                )
+            # Use existing specialized installer for subagents
+            elif category_name == "subagents":
+                count = install_subagents_by_environment(
+                    env_name, target, category_dir, console, force=force, dry_run=dry_run
+                )
+            # Use canonical installer for all other categories (hooks, templates, etc.)
+            else:
+                try:
+                    install_canonical_prompts_by_environment(
+                        env_name, target, category_dir, console, force=force, dry_run=dry_run
+                    )
+                    # Count installed files by checking which had this environment
+                    from dot_work.prompts.canonical import CANONICAL_PARSER
+
+                    source_files = list(category_dir.glob("*.md"))
+                    count = sum(
+                        1
+                        for f in source_files
+                        if env_name in CANONICAL_PARSER.parse(f).environments
+                    )
+                except ValueError as e:
+                    # No files for this environment - not an error
+                    if "not found in any" in str(e):
+                        count = 0
+                    else:
+                        raise
+
+            results[category_name] = count
+            if count > 0:
+                console.print(f"  [green]✓[/green] {category_name}: {count} installed")
+
+        except Exception as e:
+            console.print(f"  [yellow]⚠[/yellow] Failed to install {category_name}: {e}")
+            results[category_name] = 0
+
+    return results

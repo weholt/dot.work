@@ -2,6 +2,16 @@
 name: post-iteration
 description: Hook run after each iteration to maintain state and log progress
 compatibility: All harnesses that support post-iteration hooks
+environments:
+  claude:
+    target: ".claude/hooks/"
+    filename: "post-iteration.md"
+  opencode:
+    target: ".opencode/hooks/"
+    filename: "post-iteration.md"
+  copilot:
+    target: ".github/prompts/hooks/"
+    filename: "post-iteration.md"
 ---
 
 # Post-Iteration Hook

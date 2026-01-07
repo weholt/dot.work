@@ -2,6 +2,16 @@
 name: stop-hooks
 description: Completion promises and stop conditions for autonomous loop control
 compatibility: Claude Code, compatible harnesses with completion detection
+environments:
+  claude:
+    target: ".claude/hooks/"
+    filename: "stop-hooks.md"
+  opencode:
+    target: ".opencode/hooks/"
+    filename: "stop-hooks.md"
+  copilot:
+    target: ".github/prompts/hooks/"
+    filename: "stop-hooks.md"
 ---
 
 # Stop Hooks

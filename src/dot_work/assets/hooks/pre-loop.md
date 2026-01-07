@@ -2,6 +2,16 @@
 name: pre-loop
 description: Initialization hook run before autonomous loop starts
 compatibility: All harnesses that support initialization hooks
+environments:
+  claude:
+    target: ".claude/hooks/"
+    filename: "pre-loop.md"
+  opencode:
+    target: ".opencode/hooks/"
+    filename: "pre-loop.md"
+  copilot:
+    target: ".github/prompts/hooks/"
+    filename: "pre-loop.md"
 ---
 
 # Pre-Loop Hook
