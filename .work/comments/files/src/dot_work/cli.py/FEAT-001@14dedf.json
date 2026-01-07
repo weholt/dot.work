@@ -1,0 +1,15 @@
+{
+  "type": "feature",
+  "identifier": "FEAT-001@14dedf",
+  "priority": "critical",
+  "description": "this is a fucking test",
+  "file_path": "src/dot_work/cli.py",
+  "anchor_line": 2,
+  "offset_start": 36,
+  "offset_end": 137,
+  "code_snapshot": "\nimport json\nimport logging\nimport re\nfrom pathlib import Path\nfrom typing import Annotated, Literal\n",
+  "author": "f1d60e28e41c1f72c01ce37acadb51b511e9d90e07697feec90ce5285f1216c7",
+  "created": "2026-01-07T22:15:17.174Z",
+  "status": "proposed",
+  "replies": []
+}

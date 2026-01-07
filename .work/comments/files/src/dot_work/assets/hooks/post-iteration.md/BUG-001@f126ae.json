@@ -1,0 +1,15 @@
+{
+  "type": "bug",
+  "identifier": "BUG-001@f126ae",
+  "priority": "critical",
+  "description": "dsfadsadsadas",
+  "file_path": "src/dot_work/assets/hooks/post-iteration.md",
+  "anchor_line": 6,
+  "offset_start": 170,
+  "offset_end": 327,
+  "code_snapshot": "\n# Post-Iteration Hook\n\nThis hook runs after each loop iteration completes, handling state persistence, logging, and preparation for the next iteration.\n\n---",
+  "author": "f1d60e28e41c1f72c01ce37acadb51b511e9d90e07697feec90ce5285f1216c7",
+  "created": "2026-01-07T21:57:50.018Z",
+  "status": "proposed",
+  "replies": []
+}

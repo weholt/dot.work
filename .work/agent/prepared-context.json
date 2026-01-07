@@ -1,0 +1,91 @@
+{
+  "issue": {
+    "id": "ARCH-100@langadapt",
+    "title": "Language Adapter Pattern for multi-language build support",
+    "type": "enhancement",
+    "priority": "medium",
+    "status": "proposed",
+    "description": "Refactor Python-specific build.py into abstract LanguageAdapter interface to enable TypeScript, .NET, and future language support"
+  },
+  "full_issue_content": "id: \"ARCH-100@langadapt\"\ntitle: \"Language Adapter Pattern for multi-language build support\"\ndescription: \"Refactor Python-specific build.py into abstract LanguageAdapter interface to enable TypeScript, .NET, and future language support\"\ncreated: 2026-01-07\nsection: \"architecture\"\ntags: [architecture, refactoring, language-support, adapter-pattern, multi-language]\ntype: enhancement\npriority: medium\nstatus: proposed\n\n### Problem\n\ndot-work currently has hardcoded Python-specific tooling in `scripts/build.py`:\n- Hardcoded commands: `uv run ruff`, `uv run mypy`, `uv run pytest`\n- Python-specific artifact cleanup: `__pycache__`, `.pytest_cache`, `.mypy_cache`\n- No abstraction for supporting other languages\n\nThis makes it difficult to add support for TypeScript/JavaScript, .NET, or other languages without duplicating code or creating separate build scripts.\n\n### Affected Files\n\n**To create:**\n- `src/dot_work/languages/base.py` - Abstract `LanguageAdapter` base class\n- `src/dot_work/languages/python.py` - `PythonAdapter` implementation\n- `src/dot_work/languages/registry.py` - Language detection and adapter instantiation\n\n**To modify:**\n- `scripts/build.py` - Refactor to use `LanguageAdapter` interface\n- `src/dot_work/installer.py` - Update `detect_project_context()` to return adapter\n\n### Proposed Solution\n\n#### Phase 1: Define LanguageAdapter Interface (1-2 days)\n\nCreate `src/dot_work/languages/base.py` with abstract `LanguageAdapter` base class containing:\n- `detect()` - Check if project uses this language\n- `get_name()` - Return human-readable name\n- `get_package_manager()` - Detect package manager\n- `format_code()` - Run formatter (ruff, prettier, dotnet format)\n- `lint_code()` - Run linter (ruff check, eslint, Roslyn analyzers)\n- `type_check()` - Run type checker (mypy, tsc, dotnet build)\n- `run_tests()` - Run tests with coverage\n- `build_project()` - Run build command\n- `clean_artifacts()` - Remove build caches\n- `install_dependencies()` - Install packages\n\n#### Phase 2: Implement PythonAdapter (1-2 days)\n\nExtract existing Python tooling from `scripts/build.py` into `PythonAdapter` class:\n- Detect via pyproject.toml, setup.py, requirements.txt\n- Detect package manager (uv, poetry, pip)\n- Implement all adapter methods with current Python commands\n\n#### Phase 3: Create Language Registry (1 day)\n\nCreate `src/dot_work/languages/registry.py`:\n- `LANGUAGE_ADAPTERS` list of all available adapters\n- `detect_language()` - Auto-detect project language\n- `get_adapter_by_name()` - Explicit adapter selection\n\n#### Phase 4: Update build.py (1 day)\n\nRefactor `scripts/build.py` to use adapter pattern:\n- Auto-detect language on startup\n- Delegate all operations to adapter instance\n- Maintain identical Python behavior\n\n### Acceptance Criteria\n\n**Phase 1 (Interface)**\n- [ ] `LanguageAdapter` ABC with all abstract methods defined\n- [ ] `BuildResult` and `TestResult` dataclasses\n\n**Phase 2 (Python Adapter)**\n- [ ] `PythonAdapter` implements all methods\n- [ ] Python projects build identically to current implementation\n\n**Phase 3 (Registry)**\n- [ ] Auto-detection works for Python projects\n- [ ] Explicit language selection via name\n\n**Phase 4 (build.py)**\n- [ ] BuildRunner uses adapter registry\n- [ ] Error handling for unsupported languages\n\n### Dependencies\n\n- **Prerequisite**: None\n- **Enables**: FEAT-102 (TypeScript/JavaScript), ARCH-101 (.NET support)\n\n### Estimated Effort: 4-7 days",
+  "relevant_files": [
+    {
+      "path": "scripts/build.py",
+      "summary": "BuildRunner class (384 lines) with hardcoded Python commands",
+      "read_required": true,
+      "key_content": {
+        "hardcoded_commands": [
+          "uv run ruff format",
+          "uv run ruff check",
+          "uv run mypy",
+          "uv run pytest"
+        ],
+        "python_artifacts": [
+          "__pycache__",
+          ".pytest_cache",
+          ".mypy_cache",
+          ".ruff_cache",
+          "*.egg-info",
+          ".coverage"
+        ]
+      }
+    },
+    {
+      "path": "src/dot_work/installer.py",
+      "summary": "Contains detect_project_context() function (lines 1015-1086)",
+      "read_required": true,
+      "key_content": {
+        "function": "detect_project_context(target: Path) -> dict[str, str]",
+        "returns": {
+          "language": "detected language",
+          "framework": "detected framework",
+          "package_manager": "detected package manager",
+          "test_framework": "detected test framework"
+        },
+        "detection_markers": {
+          "Python": "pyproject.toml, requirements.txt",
+          "JavaScript/TypeScript": "package.json",
+          "Rust": "Cargo.toml",
+          "Go": "go.mod"
+        }
+      }
+    },
+    {
+      "path": "tests/",
+      "summary": "Test directory - will need new tests for language adapters",
+      "read_required": false
+    }
+  ],
+  "constitution_excerpt": {
+    "build_command": "uv run python scripts/build.py",
+    "test_command": "./scripts/pytest-with-cgroup.sh 30",
+    "style_rules": [
+      "Use pathlib.Path for all file operations",
+      "Type hints on all functions",
+      "Google docstrings for public APIs",
+      "Use `uv run` for ALL Python commands",
+      "Test coverage >= 75%",
+      "Use `@dataclass` for structures",
+      "Functions <15 lines, nesting <3 levels, classes <200 lines"
+    ],
+    "forbidden": [
+      "Running Python directly (always use uv run)",
+      "Using rm command without explicit user permission",
+      "Hardcoded secrets",
+      "Mutable defaults",
+      "Global state"
+    ]
+  },
+  "recent_history": [
+    "FEAT-101 completed: User profile command for storing developer information"
+  ],
+  "baseline_invariants": [
+    "Test Status: All 652 tests execute (0 failures, 18 skipped)",
+    "Coverage: Overall coverage >= 59%",
+    "Type Safety: mypy reports 0 errors",
+    "Linting: ruff reports 0 errors",
+    "Build Time: uv run python scripts/build.py completes in <= 60s",
+    "Test Execution: Full test suite completes in <= 45s",
+    "No Cyclic Dependencies: Module graph remains acyclic"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "type": "bug",
+  "identifier": "BUG-002@89f8b1",
+  "priority": "high",
+  "description": "fdsafdsafdsa",
+  "file_path": "src/dot_work/installer.py",
+  "anchor_line": 8,
+  "offset_start": 204,
+  "offset_end": 367,
+  "code_snapshot": "\nimport typer\nfrom jinja2 import Environment as JinjaEnvironment\nfrom jinja2 import FileSystemLoader\nfrom rich.console import Console\nfrom rich.table import Table\n",
+  "author": "f1d60e28e41c1f72c01ce37acadb51b511e9d90e07697feec90ce5285f1216c7",
+  "created": "2026-01-07T21:58:43.453Z",
+  "status": "proposed",
+  "replies": []
+}
