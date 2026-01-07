@@ -2,7 +2,7 @@
 meta:
   name: create-constitution
   title: "Project Constitution Generator"
-  description: "Create a platform-agnostic constitution.md that must exist before any autonomous work begins"
+  description: "Create a platform-specific constitution.md that must exist before any autonomous work begins"
   version: "2.1.0"
 
 environments:
@@ -138,12 +138,6 @@ command_generation:
     test: "uv run pytest"
     build: "uv run python -m build"
     
-  python_poetry:
-    install: "poetry install"
-    run: "poetry run"
-    test: "poetry run pytest"
-    build: "poetry build"
-    
   javascript_npm:
     install: "npm install"
     run: "npm run"
@@ -226,71 +220,7 @@ These paths should NOT be modified by agents:
 
 ---
 
-## 2. Commands (Platform-Agnostic)
-
-All commands must be run from the project root.
-
-### Setup
-\`\`\`bash
-{install_command}
-\`\`\`
-
-### Build
-\`\`\`bash
-{build_command}
-\`\`\`
-
-### Test
-\`\`\`bash
-{test_command}
-\`\`\`
-
-### Test with Coverage
-\`\`\`bash
-{test_coverage_command}
-\`\`\`
-
-### Lint
-\`\`\`bash
-{lint_command}
-\`\`\`
-
-### Type Check
-\`\`\`bash
-{type_check_command}
-\`\`\`
-
-### Format
-\`\`\`bash
-{format_command}
-\`\`\`
-
-### Full Validation
-\`\`\`bash
-{full_validation_command}
-\`\`\`
-
----
-
-## 3. Memory Protection
-
-{IF memory protection script exists:}
-### Test Memory Limits
-
-Tests MUST use memory-protected execution to prevent system freezes:
-
-\`\`\`bash
-{memory_protected_test_command}
-\`\`\`
-
-Default memory limit: {limit}GB
-{ELSE:}
-No memory protection configured. Consider adding for large test suites.
-{ENDIF}
-
----
-
-## 4. Code Standards
+## 2. Code Standards
 
 ### Style
 - {detected or default style rules}
@@ -308,23 +238,7 @@ No memory protection configured. Consider adding for large test suites.
 
 ---
 
-## 5. File Structure
-
-### Source Code
-- Location: {src_dir}/
-- Import style: from {package_name} import X
-
-### Tests
-- Location: {tests_dir}/
-- Mirror source structure: {yes | no}
-
-### Configuration
-- Project config: {config_file}
-- {additional config files}
-
----
-
-## 6. Git Workflow
+## 3. Git Workflow
 
 ### Branch Strategy
 - Main branch: {main | master}
@@ -337,50 +251,7 @@ No memory protection configured. Consider adding for large test suites.
 
 ---
 
-## 7. Dependencies
-
-### Adding Dependencies
-\`\`\`bash
-{add_dependency_command}
-\`\`\`
-
-### Adding Dev Dependencies
-\`\`\`bash
-{add_dev_dependency_command}
-\`\`\`
-
-### Updating Dependencies
-\`\`\`bash
-{update_dependencies_command}
-\`\`\`
-
----
-
-## 8. CI/CD
-
-{IF ci_config exists:}
-### Detected CI: {GitHub Actions | GitLab CI | etc}
-- Config: {ci_config_path}
-- Required checks: {list}
-{ELSE:}
-No CI configuration detected.
-{ENDIF}
-
----
-
-## 9. Platform Notes
-
-### Cross-Platform Compatibility
-- File paths: Use pathlib.Path (Python) or equivalent
-- Line endings: {LF | CRLF | auto}
-- Shell commands: Prefer cross-platform alternatives
-
-### OS-Specific Considerations
-{detected OS-specific notes or "None detected"}
-
----
-
-## 10. Constraints
+## 4. Constraints
 
 ### Performance
 - Max test duration: {limit or TODO}
@@ -394,44 +265,6 @@ No CI configuration detected.
 ### Compatibility
 - Minimum language version: {detected}
 - Supported platforms: {detected or "all"}
-
----
-
-## 11. Appendix: Raw Commands
-
-For scripting or CI, here are the raw commands:
-
-| Action | Command |
-|--------|---------|
-| Install | {install_command} |
-| Build | {build_command} |
-| Test | {test_command} |
-| Lint | {lint_command} |
-| Type Check | {type_check_command} |
-| Format | {format_command} |
-
----
-
-*This constitution was auto-generated. Review and adjust as needed.*
-*Regenerate with: create-constitution*
-```
-
----
-
-## Placeholder Handling
-
-For anything that cannot be detected:
-
-```yaml
-placeholder_format: "TODO: {description}"
-
-examples:
-  - "TODO: Add test command"
-  - "TODO: Configure coverage threshold"
-  - "TODO: Add lint configuration"
-```
-
----
 
 ## Output Location
 

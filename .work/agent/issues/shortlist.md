@@ -2,6 +2,9 @@
 
 High-priority issues ready for implementation.
 
-(No issues in shortlist)
+---
+
+**No items in shortlist**
 
 ---
+

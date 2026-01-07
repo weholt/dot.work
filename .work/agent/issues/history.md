@@ -1215,3 +1215,101 @@ Created comprehensive test file `tests/unit/subagents/test_generator.py` with 27
 QA-003 completed successfully. All shortlist issues have been addressed.
 
 ---
+---
+---
+id: "FEAT-101@610364"
+title: "User profile command for storing developer information"
+description: "Add 'profile' command to create and manage ~/.work/profile.json with user metadata"
+created: 2026-01-06
+section: "cli"
+tags: [cli, profile, user-config, json, command]
+type: enhancement
+priority: medium
+status: completed
+completed: 2026-01-07
+references:
+  - src/dot_work/cli.py
+  - src/dot_work/profile/__init__.py
+  - src/dot_work/profile/models.py
+  - src/dot_work/profile/cli.py
+  - tests/unit/test_profile/test_models.py
+  - tests/unit/test_profile/test_cli.py
+---
+
+### Problem
+dot-work had no centralized way to store and retrieve user information across different projects and instances. User metadata like username, GitHub username, email, and default software license were not tracked.
+
+### Solution Implemented
+
+**1. Profile Module (`src/dot_work/profile/`)**
+- Created `models.py` with UserProfile dataclass supporting custom fields
+- Standard fields: username, github_username, first_name, last_name, email, default_license
+- Custom fields support via `_custom_fields` dict
+- Export control via `_exported_fields` list for agent/CLI exposure
+- Functions: load_profile(), save_profile(), validate_profile()
+
+**2. CLI Commands (`src/dot_work/profile/cli.py`)**
+Implemented 10 commands:
+- `init` - Interactive wizard with rich library for profile creation
+- `show` - Display current profile in table format
+- `edit` - Edit profile with wizard (pre-filled with current values)
+- `set <field> <value>` - Set any field (standard or custom)
+- `get <field>` - Get individual field value
+- `add-field <name> <value>` - Add custom field (with --export option)
+- `remove-field <name>` - Remove custom field
+- `delete` - Remove profile file
+- `export add/remove/list` - Manage field export list
+
+**3. Integration**
+- Registered `profile_app` in `src/dot_work/cli.py`
+- Profile stored at `~/.work/profile.json`
+- Uses existing `rich` library for polished terminal UI
+
+### Acceptance Criteria Met
+
+**CLI Commands:** ✅
+- `dot-work profile init` launches interactive wizard with rich.Panel, rich.Prompt, rich.Table
+- `dot-work profile show` displays current profile in table format
+- `dot-work profile set email user@example.com` updates any field
+- `dot-work profile get email` outputs just the field value
+- `dot-work profile add-field company "Acme Corp"` adds custom field
+- `dot-work profile remove-field company` removes custom field
+- `dot-work profile export add/remove/list` manage export list
+- `~/.work/profile.json` created with proper JSON schema
+- Profile validation (email format, required fields)
+
+**Custom Fields:** ✅
+- UserProfile supports arbitrary custom fields via `_custom_fields` dict
+- `profile.get(key)` works for both standard and custom fields
+- `profile.set(key, value)` sets standard or custom fields
+- `profile.to_dict()` merges custom fields into JSON output
+- Custom fields persist to profile.json correctly
+
+**Export Control:** ✅
+- `_exported_fields` list controls agent/CLI exposure
+- `profile.get_exported_data()` returns only exported fields
+- Internal fields never exported
+- Export management commands work correctly
+
+### Verification
+- 51 new unit tests created
+- All tests passing (100%)
+- Test coverage: 71% for profile module
+- Full build passes: format, type check, security, tests
+- All CLI commands functional
+
+### Files Changed
+- `src/dot_work/cli.py` - Added profile_app import and registration
+- `src/dot_work/profile/__init__.py` - New module
+- `src/dot_work/profile/models.py` - UserProfile dataclass and functions (285 lines)
+- `src/dot_work/profile/cli.py` - CLI commands (540 lines)
+- `tests/unit/test_profile/test_models.py` - Model tests (350 lines)
+- `tests/unit/test_profile/test_cli.py` - CLI tests (380 lines)
+
+### Notes
+- Default exported fields: username, email, github_username
+- Valid licenses: MIT, Apache-2.0, GPL-3.0, BSD-3-Clause
+- Rich library provides polished UX with Panel, Prompt, Confirm, Table
+- Custom fields require explicit opt-in via export list for agent exposure
+
+---

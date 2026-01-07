@@ -23,6 +23,7 @@ from dot_work.installer import (
     install_subagents_by_environment,
 )
 from dot_work.plugins import discover_plugins, register_all_plugins
+from dot_work.profile.cli import profile_app
 from dot_work.skills.cli import app as skills_app
 from dot_work.subagents.cli import app as subagents_app
 from dot_work.utils.sanitization import sanitize_error_message
@@ -1049,6 +1050,9 @@ app.add_typer(skills_app, name="skills")
 
 # Register the subagents subcommand group (retained in core)
 app.add_typer(subagents_app, name="subagents")
+
+# Register the profile subcommand group (retained in core)
+app.add_typer(profile_app, name="profile")
 
 # Discover and register all plugins
 # This registers submodules that have been extracted as plugins:
