@@ -4,6 +4,19 @@
 
 Works with: GitHub Copilot, Claude Code, Cursor, Windsurf, Aider, Continue.dev, Amazon Q, Zed AI, OpenCode, and more.
 
+> **Note:** The dot-work project is migrating to a plugin architecture. The following submodules have been extracted to standalone packages:
+> - **dot-issues**: SQLite-based issue tracking
+> - **dot-kg**: Knowledge graph with FTS5 search
+> - **dot-review**: Interactive code review with web UI
+> - **dot-container**: Docker provisioning for AI agents
+> - **dot-git**: Git history analysis and metrics
+> - **dot-harness**: Claude Agent SDK integration
+> - **dot-overview**: Codebase overview generation
+> - **dot-python**: Python build and scan utilities
+> - **dot-version**: Date-based version management
+>
+> See [docs/plugins.md](docs/plugins.md) for details on the plugin architecture.
+
 ## 🎯 What This Does
 
 This tool provides **12 AI agent prompts** for:
@@ -11,9 +24,43 @@ This tool provides **12 AI agent prompts** for:
 - **Project scaffolding** - Turn discussions into production-ready projects
 - **Workflow management** - Issue tracking, focus, and iteration loops
 - **Quality assurance** - Baselines, code reviews, and delivery auditing
-- **Version control** - Semantic versioning with safety checks
+- **Version control** - Date-based versioning with changelog generation
 
 The installer detects your AI coding environment and puts the prompts in the right place so they work as slash commands.
+
+## 🚫 Non-Goals
+
+dot-work is a **human-directed AI agent framework** for issue management and autonomous agent implementation. It does **NOT**:
+
+- Replace full project management tools (Jira, Linear, GitHub Projects, etc.)
+- Provide autonomous agents without human direction
+- Host prompts or provide cloud services
+- Manage dependencies or build systems
+- Replace git workflow tools
+- Provide CI/CD integration or deployment pipelines
+- Replace code review platforms (GitHub PRs, GitLab MRs)
+- Offer team collaboration features (comments, mentions, threads)
+- Perform automated testing or quality assurance
+
+### What dot-work Is
+
+A **local development tool** for AI-assisted coding workflows with human oversight:
+
+- Portable prompt templates for AI coding environments
+- File-based issue tracking for agent-driven development
+- Quality assurance workflows (baselines, reviews, audits)
+- Version control integration (not replacement)
+
+### What to Use Instead
+
+| For... | Use... |
+|--------|--------|
+| Project management | Jira, Linear, GitHub Projects |
+| CI/CD pipelines | GitHub Actions, GitLab CI, CircleCI |
+| Code review | GitHub PRs, GitLab MRs, Phabricator |
+| Automated testing | pytest, Jest, CI systems |
+| Team collaboration | Slack, Discord, email |
+| Dependency management | poetry, npm, cargo, pip-tools |
 
 ## 🚀 Quick Start
 
@@ -183,7 +230,7 @@ After installing, use the prompts in your AI environment:
 
 | Prompt | Description |
 |--------|-------------|
-| **`bump-version`** | Semantic version bumping with safety checks and multi-file sync |
+| **`bump-version`** | Date-based version bumping with safety checks and multi-file sync |
 | **`api-export`** | Generate API documentation or export specifications |
 
 ---
@@ -207,10 +254,132 @@ Here's my project idea: [paste discussion]
 /do-work
 ```
 
-**Bump version after changes:**
+**Freeze version after changes:**
+```bash
+dot-work version freeze
 ```
-/bump-version patch
+
+This creates a new version, updates `version.json`, and appends to `CHANGELOG.md`.
+
+---
+
+## 🎯 Skills
+
+**Skills** are reusable capability packages that AI agents can load on-demand. They provide specialized knowledge and workflows for specific tasks.
+
+### What Skills Are
+
+Skills are complementary to prompts and subagents:
+- **Prompts** - One-time instructions for specific tasks (slash commands)
+- **Skills** - Reusable capability packages with structured knowledge
+- **Subagents** - AI personalities with specialized behaviors
+
+### Bundled Skills
+
+dot-work includes 3 pre-installed skills:
+
+| Skill | Description |
+|-------|-------------|
+| **`code-review`** | Expert code review guidelines for quality, security, and maintainability |
+| **`debugging`** | Systematic debugging approaches for isolating and fixing software defects |
+| **`test-driven-development`** | TDD workflow for writing reliable, maintainable code |
+
+### Skills Support
+
+| Environment | Skills Support |
+|-------------|----------------|
+| Claude Code | ✅ Full support (`.claude/skills/`) |
+| Other environments | ❌ Not supported (skills are Claude Code specific) |
+
+### Creating Custom Skills
+
+Skills use YAML frontmatter + markdown format:
+
+```markdown
+---
+name: my-skill
+description: A brief description of what this skill does
+license: MIT
+environments:
+  claude:
+    target: ".claude/skills/"
+    filename_suffix: "/my-skill/SKILL.md"
+---
+
+# My Skill
+
+Detailed instructions and knowledge...
 ```
+
+For detailed documentation, see [skills_agents_guid.md](skills_agents_guid.md).
+
+---
+
+## 🤖 Subagents
+
+**Subagents** are custom AI agent personalities with specialized prompts and configurations for multi-environment deployment.
+
+### What Subagents Are
+
+Subagents define AI personalities that can be deployed across different AI coding environments. Each subagent has:
+- Canonical definition with environment-specific configurations
+- Specialized prompts and behaviors
+- Tool mappings per environment
+
+### Bundled Subagents
+
+dot-work includes 6 pre-installed subagents:
+
+| Subagent | Description |
+|----------|-------------|
+| **`code-reviewer`** | Senior code reviewer with security and performance focus |
+| **`test-runner`** | Test engineering specialist |
+| **`debugger`** | Systematic debugging specialist |
+| **`docs-writer`** | Technical documentation specialist |
+| **`security-auditor`** | Security-focused code reviewer |
+| **`refactorer`** | Code restructuring and optimization specialist |
+
+### Subagent Environments
+
+| Environment | Subagent Support |
+|-------------|------------------|
+| Claude Code | ✅ Native agents (`.claude/agents/`) |
+| OpenCode | ✅ Native agents (`.opencode/agent/`) |
+| GitHub Copilot | ✅ GitHub agents (`.github/agents/`) |
+| Cursor/Windsurf | Treated as prompts (`.cursor/rules/`) |
+
+### Creating Custom Subagents
+
+Subagents use canonical format with environment configs:
+
+```markdown
+---
+meta:
+  name: my-subagent
+  description: A brief description
+config:
+  name: my-subagent
+  description: A brief description
+
+environments:
+  claude:
+    target: ".claude/agents/"
+    model: claude-sonnet-4-5
+  opencode:
+    target: ".opencode/agent/"
+    mode: planner
+  copilot:
+    target: ".github/agents/"
+---
+
+# My Subagent
+
+Specialized instructions and personality...
+```
+
+For detailed documentation, see [skills_agents_guid.md](skills_agents_guid.md).
+
+---
 
 ## 🔄 Workflow Example
 
@@ -246,6 +415,41 @@ Here's my project idea: [paste discussion]
    - Issue tracking for tasks
    - Memory persistence across sessions
    - Quality assurance workflows
+
+## 📦 Version Format
+
+dot-work uses **CalVer (Calendar Versioning)** format: `YYYY.MM.PATCH`
+
+### Format Breakdown
+
+- **`YYYY`** – 4-digit year (e.g., `2025`)
+- **`MM`** – 2-digit month (e.g., `01` for January, `12` for December)
+- **`PATCH`** – 5-digit sequence number (e.g., `00001`, `00002`)
+
+### Example Versions
+
+```
+2025.01.001  # January 2025, 1st build
+2025.01.002  # January 2025, 2nd build
+2025.02.001  # February 2025, 1st build
+2026.01.001  # January 2026, 1st build
+```
+
+### Rationale for CalVer
+
+1. **Time-based ordering** – Versions naturally sort chronologically
+2. **No SemVer conflicts** – Avoids debates about "breaking changes" vs "features"
+3. **Release cadence** – Encourages frequent releases tied to time periods
+4. **Simplicity** – Easy to determine version age and ordering
+
+### Version Ordering
+
+When comparing versions:
+1. Compare year first (higher = newer)
+2. Then compare month (higher = newer)
+3. Then compare patch number (higher = newer)
+
+Example: `2025.02.001` > `2025.01.999` > `2024.12.999`
 
 ## 🛠️ Development
 

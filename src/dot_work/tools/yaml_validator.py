@@ -181,6 +181,9 @@ def extract_frontmatter(content: str) -> FrontmatterResult:
         )
 
     # Parse frontmatter
+    # Note: enumerate starts at 2, so end_idx is the actual line index
+    # lines[0] is opening "---", lines[end_idx] is closing "---"
+    # Content is everything between (exclusive of delimiters)
     fm_content = "\n".join(lines[1 : end_idx - 1])
     remaining = "\n".join(lines[end_idx:]).lstrip("\n")
 

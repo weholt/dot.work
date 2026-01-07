@@ -1,0 +1,19 @@
+# Global default frontmatter for skills.
+#
+# This file provides default YAML frontmatter values that are merged with each
+# skill's frontmatter at runtime. Local values in individual skill files
+# override these global defaults (deep merge).
+#
+# If this file is missing, the parser falls back to requiring all frontmatter
+# in individual skill files (backward compatible).
+
+defaults:
+  # Default environment configurations shared across all skills.
+  # Individual skills can override these by redefining specific environments
+  # in their own frontmatter.
+  #
+  # Note: Currently only Claude Code supports native skills. Other environments
+  # may treat skills as prompts or skip them entirely during installation.
+  environments:
+    claude:
+      target: ".claude/skills/"

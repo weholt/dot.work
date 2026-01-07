@@ -1,7 +1,10 @@
-# Shortlist (User-Directed Priority)
+# Shortlist
 
-This file represents **explicit user intent**. Agent may only modify when explicitly instructed.
+High-priority issues ready for implementation.
 
 ---
 
-(Empty - no user-specified priorities)
+**No items in shortlist**
+
+---
+

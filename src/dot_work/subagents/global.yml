@@ -1,0 +1,24 @@
+# Global default frontmatter for subagents.
+#
+# This file provides default YAML frontmatter values that are merged with each
+# subagent's frontmatter at runtime. Local values in individual subagent files
+# override these global defaults (deep merge).
+#
+# If this file is missing, the parser falls back to requiring all frontmatter
+# in individual subagent files (backward compatible).
+
+defaults:
+  # Default environment configurations shared across all subagents.
+  # Individual subagents can override these by redefining specific environments
+  # in their own frontmatter.
+  environments:
+    claude:
+      target: ".claude/agents/"
+      filename_suffix: ".md"
+
+    opencode:
+      target: ".opencode/agent/"
+      filename_suffix: ".md"
+
+    copilot:
+      target: ".github/copilot-instructions.md"

@@ -1,42 +1,127 @@
 """Installer functions for different AI environments."""
 
 import importlib.resources
+from dataclasses import dataclass, field
 from datetime import UTC
+from enum import Enum, auto
 from pathlib import Path
 
+import typer
 from jinja2 import Environment as JinjaEnvironment
 from jinja2 import FileSystemLoader
 from rich.console import Console
+from rich.table import Table
 
 from dot_work.environments import ENVIRONMENTS, Environment
+from dot_work.utils.path import PathTraversalError, safe_path_join
+
+
+class BatchChoice(Enum):
+    """User's batch overwrite choice."""
+
+    ALL = auto()  # Overwrite all existing files
+    SKIP = auto()  # Skip all existing files
+    PROMPT = auto()  # Prompt for each file individually
+    CANCEL = auto()  # Cancel installation
+
+
+@dataclass
+class InstallState:
+    """Tracks state during batch installation."""
+
+    batch_choice: BatchChoice | None = None
+    existing_files: list[Path] = field(default_factory=list)
+    new_files: list[Path] = field(default_factory=list)
+
+    @property
+    def has_existing_files(self) -> bool:
+        """Check if any existing files were found."""
+        return len(self.existing_files) > 0
+
+    @property
+    def total_files(self) -> int:
+        """Total files to process."""
+        return len(self.existing_files) + len(self.new_files)
+
+
+@dataclass
+class InstallerConfig:
+    """Configuration for an environment installer.
+
+    Attributes:
+        env_key: Environment key in ENVIRONMENTS dict
+        dest_path: Destination directory path pattern (relative to target)
+        file_naming: How to name output files ("keep", "prompt-suffix", "mdc-suffix")
+        file_extension: File extension for individual files (default: ".md")
+        combined: If True, combine all prompts into single file
+        combined_path: Path for combined output (relative to target)
+        auxiliary_files: List of (path, content_template) tuples for extra files
+        sort_files: If True, sort prompt files before processing
+        messages: Tuple of (success_msg, location_msg, tip_msg) for console output
+    """
+
+    env_key: str
+    dest_path: str
+    file_naming: str = "keep"  # "keep", "prompt-suffix", "mdc-suffix"
+    file_extension: str = ".md"
+    combined: bool = False
+    combined_path: str = ""
+    auxiliary_files: list[tuple[str, str]] = field(default_factory=list)
+    sort_files: bool = False
+    messages: tuple[str, str, str | None] = (
+        "Installed {name}",
+        "Prompts installed to: {path}",
+        None,
+    )
 
 
 def get_prompts_dir() -> Path:
-    """Get the directory containing the bundled prompts."""
-    # Use importlib.resources to find prompts bundled with the package
+    """Get the directory containing the bundled prompts.
+
+    Deprecated: Use get_bundled_prompts_dir() instead.
+    """
+    return get_bundled_prompts_dir()
+
+
+def get_bundled_prompts_dir() -> Path:
+    """Get the directory containing bundled prompts.
+
+    Returns:
+        Path to the bundled prompts directory (assets/prompts/).
+    """
     try:
         pkg_files = importlib.resources.files("dot_work")
-        prompts_dir = Path(str(pkg_files)) / "prompts"
+        prompts_dir = Path(str(pkg_files)) / "assets" / "prompts"
         if prompts_dir.exists():
             return prompts_dir
     except (TypeError, FileNotFoundError):
         pass
 
-    # Fallback: look relative to this file (for development)
-    module_dir = Path(__file__).parent
-    prompts_dir = module_dir / "prompts"
-    if prompts_dir.exists():
-        return prompts_dir
-
-    # Try project root (for development)
-    project_root = module_dir.parent.parent.parent
-    prompts_dir = project_root / "prompts"
-    if prompts_dir.exists():
-        return prompts_dir
-
     raise FileNotFoundError(
         "Could not find prompts directory. Make sure the package is installed correctly."
     )
+
+
+def get_bundled_skills_dir() -> Path:
+    """Get the directory containing bundled skills.
+
+    Returns:
+        Path to the bundled skills directory (assets/skills/).
+    """
+    from dot_work.skills import get_bundled_skills_dir as _get_bundled_skills_dir
+
+    return _get_bundled_skills_dir()
+
+
+def get_bundled_subagents_dir() -> Path:
+    """Get the directory containing bundled subagents.
+
+    Returns:
+        Path to the bundled subagents directory (assets/subagents/).
+    """
+    from dot_work.subagents import get_bundled_subagents_dir as _get_bundled_subagents_dir
+
+    return _get_bundled_subagents_dir()
 
 
 def create_jinja_env(prompts_dir: Path) -> JinjaEnvironment:
@@ -48,16 +133,28 @@ def create_jinja_env(prompts_dir: Path) -> JinjaEnvironment:
     Returns:
         Configured Jinja2 environment with FileSystemLoader.
 
-    Note:
-        Autoescape is disabled since we generate markdown, not HTML.
-        These templates are trusted internal files, not user input.
+    Security Considerations:
+        **Autoescape is disabled** because this function generates markdown files,
+        not HTML. Markdown does not execute JavaScript or support HTML script tags,
+        so XSS (Cross-Site Scripting) attacks are not possible in this context.
+
+        Templates are sourced from trusted internal directories (dot_work/assets/prompts/),
+        not from user input. Users cannot modify or inject arbitrary templates.
+
+        **IMPORTANT**: If this function is ever extended to generate HTML output:
+        - Enable autoescape or use jinja2.select_autoescape()
+        - Add HTML escaping for all user-provided variables
+        - Review all template content for XSS vulnerabilities
+        - Update security documentation (Issue SEC-006@security-review-2026)
+
+        Reference: OWASP A03:2021 (Cross-Site Scripting)
     """
     return JinjaEnvironment(  # noqa: S701 - autoescape disabled for markdown
         loader=FileSystemLoader(prompts_dir),
         keep_trailing_newline=True,
         trim_blocks=False,
         lstrip_blocks=False,
-        autoescape=False,  # Markdown templates, not HTML
+        autoescape=False,  # Markdown templates, not HTML - see security notes above
     )
 
 
@@ -84,6 +181,7 @@ def render_prompt(
     prompts_dir: Path,
     prompt_file: Path,
     env_config: Environment,
+    jinja_env: JinjaEnvironment | None = None,
 ) -> str:
     """Render a prompt template with environment-specific variables.
 
@@ -91,6 +189,8 @@ def render_prompt(
         prompts_dir: Path to the directory containing prompt templates.
         prompt_file: Path to the specific prompt file to render.
         env_config: Environment configuration with template values.
+        jinja_env: Optional pre-configured Jinja2 environment for reusing
+            across multiple calls. If not provided, creates a new one.
 
     Returns:
         Rendered prompt content with all template variables substituted.
@@ -99,19 +199,27 @@ def render_prompt(
         jinja2.TemplateNotFound: If the template file doesn't exist.
         jinja2.TemplateSyntaxError: If the template has invalid syntax.
     """
-    jinja_env = create_jinja_env(prompts_dir)
+    if jinja_env is None:
+        jinja_env = create_jinja_env(prompts_dir)
     template = jinja_env.get_template(prompt_file.name)
     context = build_template_context(env_config)
     return template.render(**context)
 
 
-def should_write_file(dest_path: Path, force: bool, console: Console) -> bool:
+def should_write_file(
+    dest_path: Path,
+    force: bool,
+    console: Console,
+    *,
+    batch_choice: BatchChoice | None = None,
+) -> bool:
     """Check if a file should be written, prompting user if it exists.
 
     Args:
         dest_path: Path to the destination file.
         force: If True, overwrite without prompting.
         console: Rich console for user interaction.
+        batch_choice: Optional batch overwrite choice for handling multiple existing files.
 
     Returns:
         True if the file should be written, False to skip.
@@ -121,10 +229,88 @@ def should_write_file(dest_path: Path, force: bool, console: Console) -> bool:
     if force:
         return True
 
-    # Prompt user for confirmation
+    # Handle batch choice if provided
+    if batch_choice is not None:
+        if batch_choice == BatchChoice.ALL:
+            return True
+        elif batch_choice == BatchChoice.SKIP:
+            return False
+        elif batch_choice == BatchChoice.CANCEL:
+            return False
+        # PROMPT falls through to individual prompt below
+
+    # Prompt user for confirmation with limited attempts and safe coercion
     console.print(f"  [yellow]⚠[/yellow] File already exists: {dest_path.name}")
-    response = console.input("    Overwrite? [y/N]: ").strip().lower()
-    return response in ("y", "yes")
+
+    max_attempts = 3
+    attempts = 0
+    while attempts < max_attempts:
+        try:
+            raw = console.input("    Overwrite? [y/N]: ")
+        except Exception:
+            # Treat input errors as invalid responses and continue
+            raw = ""
+
+        try:
+            response = str(raw).strip().lower()
+        except Exception:
+            response = ""
+
+        if response in ("y", "yes"):
+            return True
+        if response in ("n", "no", ""):
+            return False
+
+        attempts += 1
+        console.print("[red]Invalid input; please enter y or n[/red]")
+
+    console.print("[yellow]No valid response; skipping by default.[/yellow]")
+    return False
+
+
+def _prompt_batch_choice(console: Console, state: InstallState) -> BatchChoice:
+    """Prompt user for batch overwrite choice.
+
+    Args:
+        console: Rich console for output.
+        state: Current installation state with file lists.
+
+    Returns:
+        The user's batch choice.
+    """
+    # Summary table
+    table = Table(title="File Status Summary", show_header=True)
+    table.add_column("Status", style="cyan")
+    table.add_column("Count", justify="right")
+    table.add_row("[yellow]Existing[/yellow]", str(len(state.existing_files)))
+    table.add_row("[green]New[/green]", str(len(state.new_files)))
+    console.print(table)
+
+    # Menu
+    console.print("\n[yellow]⚠ Existing files found.[/yellow]")
+    console.print("How should I proceed?\n")
+    console.print("  [bold cyan][a][/bold cyan] Overwrite [bold]ALL[/bold] existing files")
+    console.print("  [bold cyan][s][/bold cyan] [bold]SKIP[/bold] all existing files")
+    console.print("  [bold cyan][p][/bold cyan] [bold]PROMPT[/bold] for each file individually")
+    console.print("  [bold cyan][c][/bold cyan] [bold]CANCEL[/bold] installation\n")
+
+    max_attempts = 5
+    attempts = 0
+    while True:
+        response = console.input("Choice [a/s/p/c]: ").strip().lower()
+        if response in ("a", "all"):
+            return BatchChoice.ALL
+        elif response in ("s", "skip"):
+            return BatchChoice.SKIP
+        elif response in ("p", "prompt"):
+            return BatchChoice.PROMPT
+        elif response in ("c", "cancel"):
+            return BatchChoice.CANCEL
+        attempts += 1
+        console.print("[red]Invalid choice. Please enter a, s, p, or c.[/red]")
+        if attempts >= max_attempts:
+            console.print("[yellow]Too many invalid attempts, cancelling installation.[/yellow]")
+            return BatchChoice.CANCEL
 
 
 def install_prompts(
@@ -134,8 +320,14 @@ def install_prompts(
     console: Console,
     *,
     force: bool = False,
+    dry_run: bool = False,
+    fallback_to_legacy: bool = True,
 ) -> None:
     """Install prompts for the specified environment.
+
+    Tries canonical prompt installation first (reads frontmatter to discover
+    supported environments). Optionally falls back to legacy template-based
+    installation if no canonical prompts are found.
 
     Args:
         env_key: The environment key (e.g., 'copilot', 'claude').
@@ -143,278 +335,444 @@ def install_prompts(
         prompts_dir: Source directory containing prompt templates.
         console: Rich console for output.
         force: If True, overwrite existing files without prompting.
+        dry_run: If True, preview changes without writing files.
+        fallback_to_legacy: If True (default), try legacy installation when
+            canonical prompts are not found. If False, raise ValueError.
+
+    Raises:
+        ValueError: If environment not found and fallback_to_legacy is False,
+            or if environment is unknown.
     """
+    # Try canonical prompt installation first
+    try:
+        install_canonical_prompts_by_environment(
+            env_key, target, prompts_dir, console, force=force, dry_run=dry_run
+        )
+        return
+    except ValueError as e:
+        # Check if error is "no canonical prompts found"
+        is_no_canonical = "not found in any prompt files" in str(e)
+
+        if is_no_canonical and fallback_to_legacy:
+            console.print(
+                "[dim]⚠ No canonical prompts found, trying legacy installation...[/dim]\n"
+            )
+        elif is_no_canonical:
+            # Re-raise if caller doesn't want fallback
+            raise
+        else:
+            # Some other ValueError - re-raise
+            raise
+
+    # Legacy fallback for non-canonical prompts (only if fallback_to_legacy=True)
+    if not fallback_to_legacy:
+        # This shouldn't be reached due to the raise above, but be defensive
+        return
+
     installer = INSTALLERS.get(env_key)
     if not installer:
-        raise ValueError(f"Unknown environment: {env_key}")
+        available = list(ENVIRONMENTS.keys())
+        raise ValueError(
+            f"Unknown environment: {env_key}\nAvailable environments: {', '.join(available)}"
+        )
 
-    installer(target, prompts_dir, console, force=force)
+    installer(target, prompts_dir, console, force=force, dry_run=dry_run)
+
+
+def install_prompts_generic(
+    config: InstallerConfig,
+    target: Path,
+    prompts_dir: Path,
+    console: Console,
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+) -> None:
+    """Generic installer function that handles all environment patterns.
+
+    Args:
+        config: Installer configuration defining behavior.
+        target: Target directory to install prompts to.
+        prompts_dir: Source directory containing prompt templates.
+        console: Rich console for output.
+        force: If True, overwrite existing files without prompting.
+        dry_run: If True, preview changes without writing files.
+    """
+    env_config = ENVIRONMENTS[config.env_key]
+
+    # Combined file mode (claude, aider, amazon-q)
+    if config.combined:
+        try:
+            combined_path = safe_path_join(target, config.combined_path)
+        except PathTraversalError as e:
+            console.print(f"  [red]❌ Invalid combined path:[/red] {config.combined_path}")
+            console.print(f"  [dim]Error: {e}[/dim]")
+            console.print("  [dim]Combined paths must be within the target directory[/dim]")
+            raise typer.Exit(1) from None
+
+        # Create parent directory if needed (skip in dry-run)
+        if not dry_run:
+            combined_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Check if we should write (in dry-run, always show what would happen)
+        if not dry_run and not should_write_file(combined_path, force, console):
+            console.print(f"  [dim]⏭[/dim] Skipped {combined_path.name}")
+            return
+
+        sections = [_build_combined_header(config)]
+
+        # Get prompt files
+        prompt_files = (
+            sorted(prompts_dir.glob("*.md")) if config.sort_files else prompts_dir.glob("*.md")
+        )
+
+        # Create Jinja2 environment once for all files
+        jinja_env = create_jinja_env(prompts_dir)
+
+        for prompt_file in prompt_files:
+            content = render_prompt(prompts_dir, prompt_file, env_config, jinja_env)
+            title = prompt_file.stem.replace("-", " ").replace("_", " ").title()
+            sections.append(f"---\n\n## {title}\n\n")
+            sections.append(content)
+            sections.append("\n\n")
+
+        if dry_run:
+            action = "Would create" if not combined_path.exists() else "Would overwrite"
+            console.print(f"  [yellow][DRY-RUN][/yellow] [dim]{action}[/dim] {combined_path}")
+        else:
+            try:
+                combined_path.write_text("".join(sections), encoding="utf-8")
+                console.print(f"  [green]✓[/green] Created {combined_path.name}")
+            except PermissionError as e:
+                console.print(f"  [red]❌ Permission denied writing to:[/red] {combined_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                raise typer.Exit(1) from None
+            except OSError as e:
+                console.print(f"  [red]❌ Failed to write file:[/red] {combined_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                raise typer.Exit(1) from None
+        console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {combined_path}")
+        if config.messages[2]:
+            console.print(f"[dim]💡 {config.messages[2]}[/dim]")
+        return
+
+    # Directory mode (copilot, cursor, windsurf, continue, zed, opencode, generic, cline, cody)
+    dest_dir = target / config.dest_path
+    if not dry_run:
+        try:
+            dest_dir.mkdir(parents=True, exist_ok=True)
+        except PermissionError as e:
+            console.print(f"  [red]❌ Permission denied creating directory:[/red] {dest_dir}")
+            console.print(f"  [dim]Error: {e}[/dim]")
+            console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
+            raise typer.Exit(1) from None
+        except OSError as e:
+            console.print(f"  [red]❌ Failed to create directory:[/red] {dest_dir}")
+            console.print(f"  [dim]Error: {e}[/dim]")
+            raise typer.Exit(1) from None
+
+    # Scan phase: collect all destination paths and categorize
+    state = InstallState()
+    prompt_files = list(prompts_dir.glob("*.md"))
+
+    for prompt_file in prompt_files:
+        dest_name = _get_dest_filename(prompt_file, config)
+        dest_path = dest_dir / dest_name
+        if dest_path.exists():
+            state.existing_files.append(dest_path)
+        else:
+            state.new_files.append(dest_path)
+
+    # Add auxiliary files to scan
+    for aux_path, _aux_content in config.auxiliary_files:
+        try:
+            aux_full_path = safe_path_join(target, aux_path)
+        except PathTraversalError:
+            # Skip unsafe auxiliary paths
+            console.print(f"  [yellow]⚠[/yellow] Skipping unsafe auxiliary path: {aux_path}")
+            continue
+        if aux_full_path.exists():
+            state.existing_files.append(aux_full_path)
+        else:
+            state.new_files.append(aux_full_path)
+
+    # Show batch menu if there are existing files and not in force/dry-run mode
+    batch_choice: BatchChoice | None = None
+    if state.has_existing_files and not force and not dry_run:
+        batch_choice = _prompt_batch_choice(console, state)
+        if batch_choice == BatchChoice.CANCEL:
+            console.print("[yellow]Installation cancelled.[/yellow]")
+            return
+
+    # Create Jinja2 environment once for all files
+    jinja_env = create_jinja_env(prompts_dir)
+
+    # Process each file
+    for prompt_file in prompt_files:
+        # Determine destination filename
+        dest_name = _get_dest_filename(prompt_file, config)
+        dest_path = dest_dir / dest_name
+
+        # Check if we should write (pass batch_choice)
+        if not dry_run and not should_write_file(
+            dest_path, force, console, batch_choice=batch_choice
+        ):
+            console.print(f"  [dim]⏭[/dim] Skipped {dest_name}")
+            continue
+
+        if dry_run:
+            action = "[CREATE]" if not dest_path.exists() else "[OVERWRITE]"
+            console.print(f"  [yellow][DRY-RUN][/yellow] [dim]{action}[/dim] {dest_path}")
+        else:
+            # Render and write
+            try:
+                rendered_content = render_prompt(prompts_dir, prompt_file, env_config, jinja_env)
+                dest_path.write_text(rendered_content, encoding="utf-8")
+                console.print(f"  [green]✓[/green] {config.messages[0].format(name=dest_name)}")
+            except PermissionError as e:
+                console.print(f"  [red]❌ Permission denied writing to:[/red] {dest_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                raise typer.Exit(1) from None
+            except OSError as e:
+                console.print(f"  [red]❌ Failed to write file:[/red] {dest_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                raise typer.Exit(1) from None
+
+    # Create auxiliary files
+    for aux_path, aux_content in config.auxiliary_files:
+        aux_full_path = target / aux_path
+        if dry_run:
+            action = "[CREATE]" if not aux_full_path.exists() else "[OVERWRITE]"
+            console.print(f"  [yellow][DRY-RUN][/yellow] [dim]{action}[/dim] {aux_full_path}")
+        elif should_write_file(aux_full_path, force, console, batch_choice=batch_choice):
+            try:
+                aux_full_path.write_text(aux_content, encoding="utf-8")
+                console.print(f"  [green]✓[/green] Created {aux_full_path.name}")
+            except PermissionError as e:
+                console.print(f"  [red]❌ Permission denied writing to:[/red] {aux_full_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                raise typer.Exit(1) from None
+            except OSError as e:
+                console.print(f"  [red]❌ Failed to write file:[/red] {aux_full_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                raise typer.Exit(1) from None
+        elif aux_full_path.exists():
+            console.print(f"  [dim]⏭[/dim] Skipped {aux_full_path.name}")
+
+    console.print(f"\n[cyan]📁 {config.messages[1].format(path=dest_dir)}")
+    if config.messages[2]:
+        console.print(f"[dim]💡 {config.messages[2]}[/dim]")
+
+
+def _build_combined_header(config: InstallerConfig) -> str:
+    """Build the header for a combined file.
+
+    Args:
+        config: Installer configuration.
+
+    Returns:
+        Header string for the combined file.
+    """
+    if config.env_key == "claude":
+        return "# Claude Code Instructions\n\nThis file contains AI agent instructions for this project.\n\n"
+    elif config.env_key == "aider":
+        return "# Project Conventions\n\n"
+    elif config.env_key == "amazon-q":
+        return "# Amazon Q Project Rules\n\n"
+    else:
+        return "# AI Agent Instructions\n\n"
+
+
+def _get_dest_filename(prompt_file: Path, config: InstallerConfig) -> str:
+    """Get the destination filename for a prompt file.
+
+    Args:
+        prompt_file: The source prompt file.
+        config: Installer configuration.
+
+    Returns:
+        Destination filename.
+    """
+    if config.file_naming == "keep":
+        # keep: use original name
+        return prompt_file.name
+    elif config.file_naming == "mdc-suffix":
+        # cursor: use .mdc extension
+        return f"{prompt_file.stem}.mdc"
+    else:
+        # keep: use original name or configured extension
+        if config.file_extension != ".md":
+            return f"{prompt_file.stem}{config.file_extension}"
+        return prompt_file.name
 
 
 def install_for_copilot(
-    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False, dry_run: bool = False
 ) -> None:
     """Install prompts for GitHub Copilot (VS Code)."""
-    dest_dir = target / ".github" / "prompts"
-    dest_dir.mkdir(parents=True, exist_ok=True)
-
-    env_config = ENVIRONMENTS["copilot"]
-
-    for prompt_file in prompts_dir.glob("*.md"):
-        if prompt_file.name.endswith(".prompt.md"):
-            dest_name = prompt_file.name
-        else:
-            dest_name = prompt_file.stem + ".prompt.md"
-
-        dest_path = dest_dir / dest_name
-        if not should_write_file(dest_path, force, console):
-            console.print(f"  [dim]⏭[/dim] Skipped {dest_name}")
-            continue
-
-        # Render template with environment-specific values
-        rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-        dest_path.write_text(rendered_content, encoding="utf-8")
-        console.print(f"  [green]✓[/green] Installed {dest_name}")
-
-    console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {dest_dir}")
-    console.print("[dim]💡 Use with: /project-from-discussion or /issue-tracker-setup[/dim]")
+    config = InstallerConfig(
+        env_key="copilot",
+        dest_path=".github/prompts",
+        file_naming="keep",
+        messages=(
+            "Installed {name}",
+            "Prompts installed to: {path}",
+            "Use with: /project-from-discussion or /issue-tracker-setup",
+        ),
+    )
+    install_prompts_generic(config, target, prompts_dir, console, force=force, dry_run=dry_run)
 
 
 def install_for_claude(
-    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False, dry_run: bool = False
 ) -> None:
     """Install prompts for Claude Code."""
-    claude_md = target / "CLAUDE.md"
-
-    if not should_write_file(claude_md, force, console):
-        console.print(f"  [dim]⏭[/dim] Skipped {claude_md.name}")
-        return
-
-    env_config = ENVIRONMENTS["claude"]
-
-    sections = [
-        "# Claude Code Instructions\n\n",
-        "This file contains AI agent instructions for this project.\n\n",
-    ]
-
-    for prompt_file in sorted(prompts_dir.glob("*.md")):
-        # Render template with environment-specific values
-        content = render_prompt(prompts_dir, prompt_file, env_config)
-        title = prompt_file.stem.replace("-", " ").replace("_", " ").title()
-        sections.append(f"---\n\n## {title}\n\n")
-        sections.append(content)
-        sections.append("\n\n")
-
-    claude_md.write_text("".join(sections), encoding="utf-8")
-    console.print(f"  [green]✓[/green] Created {claude_md.name}")
-    console.print(f"\n[cyan]📁 Instructions installed to:[/cyan] {claude_md}")
-    console.print("[dim]💡 Claude will automatically read CLAUDE.md[/dim]")
+    config = InstallerConfig(
+        env_key="claude",
+        dest_path="",
+        combined=True,
+        combined_path="CLAUDE.md",
+        sort_files=True,
+        messages=(
+            "Created {name}",
+            "Instructions installed to: {path}",
+            "Claude will automatically read CLAUDE.md",
+        ),
+    )
+    install_prompts_generic(config, target, prompts_dir, console, force=force, dry_run=dry_run)
 
 
 def install_for_cursor(
-    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False, dry_run: bool = False
 ) -> None:
     """Install prompts for Cursor."""
-    rules_dir = target / ".cursor" / "rules"
-    rules_dir.mkdir(parents=True, exist_ok=True)
-
-    env_config = ENVIRONMENTS["cursor"]
-
-    for prompt_file in prompts_dir.glob("*.md"):
-        dest_name = prompt_file.stem + ".mdc"
-        dest_path = rules_dir / dest_name
-
-        if not should_write_file(dest_path, force, console):
-            console.print(f"  [dim]⏭[/dim] Skipped {dest_name}")
-            continue
-
-        # Render template with environment-specific values
-        rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-        dest_path.write_text(rendered_content, encoding="utf-8")
-        console.print(f"  [green]✓[/green] Installed {dest_name}")
-
-    cursorrules = target / ".cursorrules"
-    if should_write_file(cursorrules, force, console):
-        cursorrules.write_text(
-            "# Cursor Rules\n\n"
-            "See .cursor/rules/ for detailed prompts.\n\n"
-            "## General Guidelines\n"
-            "- Follow the project structure defined in prompts\n"
-            "- Use type hints on all functions\n"
-            "- Write tests for new functionality\n",
-            encoding="utf-8",
-        )
-        console.print(f"  [green]✓[/green] Created {cursorrules.name}")
-    elif cursorrules.exists():
-        console.print(f"  [dim]⏭[/dim] Skipped {cursorrules.name}")
-
-    console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {rules_dir}")
-    console.print("[dim]💡 Rules available in Cursor's @ menu[/dim]")
+    config = InstallerConfig(
+        env_key="cursor",
+        dest_path=".cursor/rules",
+        file_naming="mdc-suffix",
+        auxiliary_files=[
+            (
+                ".cursorrules",
+                "# Cursor Rules\n\n"
+                "See .cursor/rules/ for detailed prompts.\n\n"
+                "## General Guidelines\n"
+                "- Follow the project structure defined in prompts\n"
+                "- Use type hints on all functions\n"
+                "- Write tests for new functionality\n",
+            )
+        ],
+        messages=(
+            "Installed {name}",
+            "Prompts installed to: {path}",
+            "Rules available in Cursor's @ menu",
+        ),
+    )
+    install_prompts_generic(config, target, prompts_dir, console, force=force, dry_run=dry_run)
 
 
 def install_for_windsurf(
-    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False, dry_run: bool = False
 ) -> None:
     """Install prompts for Windsurf."""
-    rules_dir = target / ".windsurf" / "rules"
-    rules_dir.mkdir(parents=True, exist_ok=True)
-
-    env_config = ENVIRONMENTS["windsurf"]
-
-    for prompt_file in prompts_dir.glob("*.md"):
-        dest_path = rules_dir / prompt_file.name
-
-        if not should_write_file(dest_path, force, console):
-            console.print(f"  [dim]⏭[/dim] Skipped {prompt_file.name}")
-            continue
-
-        # Render template with environment-specific values
-        rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-        dest_path.write_text(rendered_content, encoding="utf-8")
-        console.print(f"  [green]✓[/green] Installed {prompt_file.name}")
-
-    windsurfrules = target / ".windsurfrules"
-    if should_write_file(windsurfrules, force, console):
-        windsurfrules.write_text(
-            "# Windsurf Rules\n\nSee .windsurf/rules/ for detailed prompts.\n", encoding="utf-8"
-        )
-        console.print(f"  [green]✓[/green] Created {windsurfrules.name}")
-    elif windsurfrules.exists():
-        console.print(f"  [dim]⏭[/dim] Skipped {windsurfrules.name}")
-
-    console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {rules_dir}")
+    config = InstallerConfig(
+        env_key="windsurf",
+        dest_path=".windsurf/rules",
+        auxiliary_files=[
+            (".windsurfrules", "# Windsurf Rules\n\nSee .windsurf/rules/ for detailed prompts.\n")
+        ],
+        messages=(
+            "Installed {name}",
+            "Prompts installed to: {path}",
+            None,
+        ),
+    )
+    install_prompts_generic(config, target, prompts_dir, console, force=force, dry_run=dry_run)
 
 
 def install_for_aider(
-    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False, dry_run: bool = False
 ) -> None:
     """Install prompts for Aider."""
-    conventions_md = target / "CONVENTIONS.md"
-
-    if not should_write_file(conventions_md, force, console):
-        console.print(f"  [dim]⏭[/dim] Skipped {conventions_md.name}")
-        return
-
-    env_config = ENVIRONMENTS["aider"]
-
-    sections = ["# Project Conventions\n\n"]
-
-    for prompt_file in sorted(prompts_dir.glob("*.md")):
-        # Render template with environment-specific values
-        content = render_prompt(prompts_dir, prompt_file, env_config)
-        title = prompt_file.stem.replace("-", " ").replace("_", " ").title()
-        sections.append(f"---\n\n## {title}\n\n")
-        sections.append(content)
-        sections.append("\n\n")
-
-    conventions_md.write_text("".join(sections), encoding="utf-8")
-    console.print(f"  [green]✓[/green] Created {conventions_md.name}")
-    console.print(f"\n[cyan]📁 Conventions installed to:[/cyan] {conventions_md}")
-    console.print("[dim]💡 Aider will read CONVENTIONS.md automatically[/dim]")
+    config = InstallerConfig(
+        env_key="aider",
+        dest_path="",
+        combined=True,
+        combined_path="CONVENTIONS.md",
+        sort_files=True,
+        messages=(
+            "Created {name}",
+            "Conventions installed to: {path}",
+            "Aider will read CONVENTIONS.md automatically",
+        ),
+    )
+    install_prompts_generic(config, target, prompts_dir, console, force=force, dry_run=dry_run)
 
 
 def install_for_continue(
-    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False, dry_run: bool = False
 ) -> None:
     """Install prompts for Continue.dev."""
-    dest_dir = target / ".continue" / "prompts"
-    dest_dir.mkdir(parents=True, exist_ok=True)
-
-    env_config = ENVIRONMENTS["continue"]
-
-    for prompt_file in prompts_dir.glob("*.md"):
-        dest_path = dest_dir / prompt_file.name
-
-        if not should_write_file(dest_path, force, console):
-            console.print(f"  [dim]⏭[/dim] Skipped {prompt_file.name}")
-            continue
-
-        # Render template with environment-specific values
-        rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-        dest_path.write_text(rendered_content, encoding="utf-8")
-        console.print(f"  [green]✓[/green] Installed {prompt_file.name}")
-
-    console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {dest_dir}")
-    console.print("[dim]💡 Access prompts via Continue's slash commands[/dim]")
+    config = InstallerConfig(
+        env_key="continue",
+        dest_path=".continue/prompts",
+        messages=(
+            "Installed {name}",
+            "Prompts installed to: {path}",
+            "Access prompts via Continue's slash commands",
+        ),
+    )
+    install_prompts_generic(config, target, prompts_dir, console, force=force, dry_run=dry_run)
 
 
 def install_for_amazon_q(
-    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False, dry_run: bool = False
 ) -> None:
     """Install prompts for Amazon Q Developer."""
-    amazonq_dir = target / ".amazonq"
-    amazonq_dir.mkdir(parents=True, exist_ok=True)
-
-    rules_md = amazonq_dir / "rules.md"
-
-    if not should_write_file(rules_md, force, console):
-        console.print(f"  [dim]⏭[/dim] Skipped {rules_md.name}")
-        return
-
-    env_config = ENVIRONMENTS["amazon-q"]
-    sections = ["# Amazon Q Project Rules\n\n"]
-
-    for prompt_file in sorted(prompts_dir.glob("*.md")):
-        # Render template with environment-specific values
-        content = render_prompt(prompts_dir, prompt_file, env_config)
-        title = prompt_file.stem.replace("-", " ").replace("_", " ").title()
-        sections.append(f"---\n\n## {title}\n\n")
-        sections.append(content)
-        sections.append("\n\n")
-
-    rules_md.write_text("".join(sections), encoding="utf-8")
-    console.print(f"  [green]✓[/green] Created {rules_md.name}")
-    console.print(f"\n[cyan]📁 Rules installed to:[/cyan] {rules_md}")
+    config = InstallerConfig(
+        env_key="amazon-q",
+        dest_path="",
+        combined=True,
+        combined_path=".amazonq/rules.md",
+        sort_files=True,
+        messages=(
+            "Created {name}",
+            "Rules installed to: {path}",
+            None,
+        ),
+    )
+    install_prompts_generic(config, target, prompts_dir, console, force=force, dry_run=dry_run)
 
 
 def install_for_zed(
-    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False, dry_run: bool = False
 ) -> None:
     """Install prompts for Zed AI."""
-    dest_dir = target / ".zed" / "prompts"
-    dest_dir.mkdir(parents=True, exist_ok=True)
-
-    env_config = ENVIRONMENTS["zed"]
-
-    for prompt_file in prompts_dir.glob("*.md"):
-        dest_path = dest_dir / prompt_file.name
-
-        if not should_write_file(dest_path, force, console):
-            console.print(f"  [dim]⏭[/dim] Skipped {prompt_file.name}")
-            continue
-
-        # Render template with environment-specific values
-        rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-        dest_path.write_text(rendered_content, encoding="utf-8")
-        console.print(f"  [green]✓[/green] Installed {prompt_file.name}")
-
-    console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {dest_dir}")
+    config = InstallerConfig(
+        env_key="zed",
+        dest_path=".zed/prompts",
+        messages=(
+            "Installed {name}",
+            "Prompts installed to: {path}",
+            None,
+        ),
+    )
+    install_prompts_generic(config, target, prompts_dir, console, force=force, dry_run=dry_run)
 
 
 def install_for_opencode(
-    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False, dry_run: bool = False
 ) -> None:
     """Install prompts for OpenCode."""
-    opencode_prompts_dir = target / ".opencode" / "prompts"
-    opencode_prompts_dir.mkdir(parents=True, exist_ok=True)
-
-    env_config = ENVIRONMENTS["opencode"]
-
-    for prompt_file in prompts_dir.glob("*.md"):
-        dest_path = opencode_prompts_dir / prompt_file.name
-
-        if not should_write_file(dest_path, force, console):
-            console.print(f"  [dim]⏭[/dim] Skipped {prompt_file.name}")
-            continue
-
-        # Render template with environment-specific values
-        rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-        dest_path.write_text(rendered_content, encoding="utf-8")
-        console.print(f"  [green]✓[/green] Installed {prompt_file.name}")
-
-    agents_md = target / "AGENTS.md"
-    if should_write_file(agents_md, force, console):
-        agents_content = """# AI Agent Instructions
+    config = InstallerConfig(
+        env_key="opencode",
+        dest_path=".opencode/prompts",
+        auxiliary_files=[
+            (
+                "AGENTS.md",
+                """# AI Agent Instructions
 
 This file provides instructions for AI agents working on this codebase.
 
@@ -428,8 +786,8 @@ The following prompts are available in `.opencode/prompts/`:
 ## Usage
 
 Reference these prompts in your conversation:
-- "Read and follow .opencode/prompts/project-from-discussion.prompt.md"
-- "Initialize issue tracking per .opencode/prompts/issue-tracker-setup.prompt.md"
+- "Read and follow .opencode/prompts/project-from-discussion.md"
+- "Initialize issue tracking per .opencode/prompts/issue-tracker-setup.md"
 
 Or use the slash command syntax if supported:
 - `/project-from-discussion`
@@ -442,60 +800,90 @@ Or use the slash command syntax if supported:
 - Use `pathlib.Path` for file operations
 - Run `python scripts/build.py` before committing
 - Maintain test coverage ≥75%
-"""
-        agents_md.write_text(agents_content, encoding="utf-8")
-        console.print(f"  [green]✓[/green] Created {agents_md.name}")
-    elif agents_md.exists():
-        console.print(f"  [dim]⏭[/dim] Skipped {agents_md.name}")
+""",
+            )
+        ],
+        messages=(
+            "Installed {name}",
+            "Prompts installed to: {path}",
+            "Reference prompts with: 'Read .opencode/prompts/<name>.md'",
+        ),
+    )
+    install_prompts_generic(config, target, prompts_dir, console, force=force, dry_run=dry_run)
 
-    console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {opencode_prompts_dir}")
-    console.print(f"[cyan]📄 Instructions in:[/cyan] {agents_md}")
-    console.print("[dim]💡 Reference prompts with: 'Read .opencode/prompts/<name>.prompt.md'[/dim]")
+
+def install_for_cline(
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False, dry_run: bool = False
+) -> None:
+    """Install prompts for Cline.
+
+    Cline uses a folder-based system: all .md files in .clinerules/ are processed.
+    Files can have numeric prefixes for ordering (e.g., 01-coding.md, 02-docs.md).
+    """
+    config = InstallerConfig(
+        env_key="cline",
+        dest_path=".clinerules",
+        messages=(
+            "Installed {name}",
+            "Prompts installed to: {path}",
+            "Cline will automatically process all .md files in .clinerules/",
+        ),
+    )
+    install_prompts_generic(config, target, prompts_dir, console, force=force, dry_run=dry_run)
+
+
+def install_for_cody(
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False, dry_run: bool = False
+) -> None:
+    """Install prompts for Sourcegraph Cody.
+
+    Cody uses a Prompt Library for shared prompts, but local .cody/ directory
+    can be used for project-specific context and instructions.
+    """
+    config = InstallerConfig(
+        env_key="cody",
+        dest_path=".cody",
+        messages=(
+            "Installed {name}",
+            "Prompts installed to: {path}",
+            "Use Cody @-mentions to reference these files in chat",
+        ),
+    )
+    install_prompts_generic(config, target, prompts_dir, console, force=force, dry_run=dry_run)
 
 
 def install_for_generic(
-    target: Path, prompts_dir: Path, console: Console, *, force: bool = False
+    target: Path, prompts_dir: Path, console: Console, *, force: bool = False, dry_run: bool = False
 ) -> None:
     """Install prompts for generic/manual use."""
-    dest_dir = target / "prompts"
-    dest_dir.mkdir(parents=True, exist_ok=True)
-
-    env_config = ENVIRONMENTS["generic"]
-
-    for prompt_file in prompts_dir.glob("*.md"):
-        dest_path = dest_dir / prompt_file.name
-
-        if not should_write_file(dest_path, force, console):
-            console.print(f"  [dim]⏭[/dim] Skipped {prompt_file.name}")
-            continue
-
-        # Render template with environment-specific values
-        rendered_content = render_prompt(prompts_dir, prompt_file, env_config)
-        dest_path.write_text(rendered_content, encoding="utf-8")
-        console.print(f"  [green]✓[/green] Installed {prompt_file.name}")
-
-    agents_md = target / "AGENTS.md"
-    if should_write_file(agents_md, force, console):
-        agents_md.write_text(
-            "# AI Agent Instructions\n\n"
-            "See the `prompts/` directory for detailed instructions:\n\n"
-            "- `project-from-discussion.prompt.md` - Convert discussions to projects\n"
-            "- `issue-tracker-setup.prompt.md` - Set up file-based issue tracking\n\n"
-            "When starting a new project, ask the AI to read and follow these prompts.\n",
-            encoding="utf-8",
-        )
-        console.print(f"  [green]✓[/green] Created {agents_md.name}")
-    elif agents_md.exists():
-        console.print(f"  [dim]⏭[/dim] Skipped {agents_md.name}")
-
-    console.print(f"\n[cyan]📁 Prompts installed to:[/cyan] {dest_dir}")
-    console.print("[dim]💡 Reference these prompts manually in your AI conversations[/dim]")
+    config = InstallerConfig(
+        env_key="generic",
+        dest_path="prompts",
+        auxiliary_files=[
+            (
+                "AGENTS.md",
+                "# AI Agent Instructions\n\n"
+                "See the `prompts/` directory for detailed instructions:\n\n"
+                "- `project-from-discussion.md` - Convert discussions to projects\n"
+                "- `issue-tracker-setup.md` - Set up file-based issue tracking\n\n"
+                "When starting a new project, ask the AI to read and follow these prompts.\n",
+            )
+        ],
+        messages=(
+            "Installed {name}",
+            "Prompts installed to: {path}",
+            "Reference these prompts manually in your AI conversations",
+        ),
+    )
+    install_prompts_generic(config, target, prompts_dir, console, force=force, dry_run=dry_run)
 
 
 # Installer dispatch table
 INSTALLERS = {
     "copilot": install_for_copilot,
     "claude": install_for_claude,
+    "cline": install_for_cline,
+    "cody": install_for_cody,
     "cursor": install_for_cursor,
     "windsurf": install_for_windsurf,
     "aider": install_for_aider,
@@ -640,12 +1028,11 @@ def detect_project_context(target: Path) -> dict[str, str]:
         "test_framework": "unknown",
     }
 
-    # Detect Python
-    if (target / "pyproject.toml").exists():
+    # Detect Python - read file once
+    try:
+        pyproject_content = (target / "pyproject.toml").read_text(encoding="utf-8")
         context["language"] = "Python"
         context["package_manager"] = "uv or pip"
-
-        pyproject_content = (target / "pyproject.toml").read_text(encoding="utf-8")
         if "pytest" in pyproject_content:
             context["test_framework"] = "pytest"
         if "typer" in pyproject_content:
@@ -656,38 +1043,41 @@ def detect_project_context(target: Path) -> dict[str, str]:
             context["framework"] = "Django"
         elif "flask" in pyproject_content:
             context["framework"] = "Flask"
+    except FileNotFoundError:
+        # Check for requirements.txt as fallback
+        if (target / "requirements.txt").exists():
+            context["language"] = "Python"
+            context["package_manager"] = "pip"
 
-    elif (target / "requirements.txt").exists():
-        context["language"] = "Python"
-        context["package_manager"] = "pip"
-
-    # Detect Node.js
-    elif (target / "package.json").exists():
-        context["language"] = "JavaScript/TypeScript"
-        context["package_manager"] = "npm or yarn"
-
-        pkg_content = (target / "package.json").read_text(encoding="utf-8")
-        if "jest" in pkg_content:
-            context["test_framework"] = "Jest"
-        elif "mocha" in pkg_content:
-            context["test_framework"] = "Mocha"
-        if "next" in pkg_content:
-            context["framework"] = "Next.js"
-        elif "react" in pkg_content:
-            context["framework"] = "React"
-        elif "vue" in pkg_content:
-            context["framework"] = "Vue"
-        elif "express" in pkg_content:
-            context["framework"] = "Express"
+    # Detect Node.js - read file once
+    if context["language"] == "unknown":
+        try:
+            pkg_content = (target / "package.json").read_text(encoding="utf-8")
+            context["language"] = "JavaScript/TypeScript"
+            context["package_manager"] = "npm or yarn"
+            if "jest" in pkg_content:
+                context["test_framework"] = "Jest"
+            elif "mocha" in pkg_content:
+                context["test_framework"] = "Mocha"
+            if "next" in pkg_content:
+                context["framework"] = "Next.js"
+            elif "react" in pkg_content:
+                context["framework"] = "React"
+            elif "vue" in pkg_content:
+                context["framework"] = "Vue"
+            elif "express" in pkg_content:
+                context["framework"] = "Express"
+        except FileNotFoundError:
+            pass
 
     # Detect Rust
-    elif (target / "Cargo.toml").exists():
+    if context["language"] == "unknown" and (target / "Cargo.toml").exists():
         context["language"] = "Rust"
         context["package_manager"] = "cargo"
         context["test_framework"] = "cargo test"
 
     # Detect Go
-    elif (target / "go.mod").exists():
+    if context["language"] == "unknown" and (target / "go.mod").exists():
         context["language"] = "Go"
         context["package_manager"] = "go modules"
         context["test_framework"] = "go test"
@@ -758,3 +1148,674 @@ def initialize_work_directory(
 
     console.print(f"\n[cyan]📁 Work directory initialized at:[/cyan] {work_dir}")
     console.print("[dim]💡 Run 'generate-baseline' before making code changes[/dim]")
+
+
+def validate_canonical_prompt_file(prompt_file: Path, strict: bool = False) -> None:
+    """Validate a canonical prompt file and raise exception if invalid.
+
+    Args:
+        prompt_file: Path to canonical prompt file (.canon.md or similar).
+        strict: Whether to use strict validation mode.
+
+    Raises:
+        ValueError: If the file is not a valid canonical prompt.
+    """
+    from dot_work.prompts.canonical import (
+        CANONICAL_PARSER,
+        CANONICAL_VALIDATOR,
+    )
+
+    if not prompt_file.exists():
+        raise FileNotFoundError(f"Canonical prompt file not found: {prompt_file}")
+
+    try:
+        prompt = CANONICAL_PARSER.parse(prompt_file)
+
+        errors = CANONICAL_VALIDATOR.validate(prompt, strict=strict)
+
+        # Filter errors by severity
+        error_messages = [e.message for e in errors if e.severity == "error"]
+        warning_messages = [e.message for e in errors if e.severity == "warning"]
+
+        # In strict mode, treat errors starting with "Strict mode:" differently
+        strict_mode_errors = [msg for msg in error_messages if msg.startswith("Strict mode:")]
+        regular_errors = [msg for msg in error_messages if not msg.startswith("Strict mode:")]
+
+        if regular_errors:
+            error_text = "\n  ".join(regular_errors)
+            raise ValueError(f"Canonical prompt validation failed:\n  {error_text}")
+
+        if strict_mode_errors or (warning_messages and strict):
+            all_strict_issues = strict_mode_errors + (warning_messages if strict else [])
+            error_text = "\n  ".join(all_strict_issues)
+            raise ValueError(f"Canonical prompt strict validation failed:\n  {error_text}")
+
+    except ValueError as e:
+        # For strict validation failures, wrap them appropriately
+        if "Canonical prompt strict validation failed" in str(e):
+            raise
+        # For validation errors from parse/validate, wrap them
+        if "Canonical prompt validation failed" in str(e):
+            raise
+        # For other ValueError exceptions from parsing, wrap them
+        error_msg = str(e)
+        raise ValueError(f"Canonical prompt validation failed:\n  {error_msg}") from e
+    except Exception as e:
+        raise ValueError(f"Canonical prompt validation failed:\n  {e}") from e
+
+
+def install_canonical_prompt(
+    prompt_file: Path,
+    env_key: str,
+    target: Path,
+    console: Console,
+    *,
+    force: bool = False,
+) -> None:
+    """Install a canonical prompt file to the specified environment.
+
+    Args:
+        prompt_file: Path to canonical prompt file.
+        env_key: Environment key to install for (e.g., 'copilot', 'claude').
+        target: Target directory to install in.
+        console: Rich console for output.
+        force: Whether to overwrite existing files.
+
+    Raises:
+        ValueError: If the environment is not supported or prompt is invalid.
+        FileNotFoundError: If the prompt file doesn't exist.
+    """
+    from dot_work.prompts.canonical import CANONICAL_PARSER, CanonicalPromptError
+
+    # First validate canonical prompt
+    validate_canonical_prompt_file(prompt_file, strict=False)
+
+    # Parse canonical prompt
+    prompt = CANONICAL_PARSER.parse(prompt_file)
+
+    # Get environment configuration (will raise CanonicalPromptError if not found)
+    try:
+        env_config = prompt.get_environment(env_key)
+    except CanonicalPromptError as e:
+        # Convert CanonicalPromptError to ValueError for consistent API
+        raise ValueError(str(e)) from e
+
+    # Validate target path is not empty
+    if not env_config.target or not env_config.target.strip():
+        raise ValueError(
+            f"Environment '{env_key}' has an empty or missing 'target' path. "
+            f"The target path must be specified and non-empty."
+        )
+
+    # Determine output path
+    if env_config.target.startswith("/"):
+        # Absolute path
+        output_dir = Path(env_config.target.lstrip("/"))
+    elif env_config.target.startswith("./"):
+        # Relative to current directory
+        output_dir = target / env_config.target[2:]
+    else:
+        # Relative to target
+        output_dir = target / env_config.target
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Determine filename
+    if env_config.filename:
+        # Validate filename is not empty
+        if not env_config.filename or not env_config.filename.strip():
+            raise ValueError(
+                f"Environment '{env_key}' has an empty 'filename'. The filename must be non-empty."
+            )
+        output_filename = env_config.filename
+    elif env_config.filename_suffix:
+        # Validate filename_suffix is not empty
+        if not env_config.filename_suffix or not env_config.filename_suffix.strip():
+            raise ValueError(
+                f"Environment '{env_key}' has an empty 'filename_suffix'. "
+                f"The filename_suffix must be non-empty."
+            )
+        # Use prompt file stem with suffix, stripping .canon/.canonical prefix
+        base_name = prompt_file.stem
+        # Remove .canon or .canonical suffix if present
+        if base_name.endswith(".canon"):
+            base_name = base_name[:-6]  # Remove ".canon"
+        elif base_name.endswith(".canonical"):
+            base_name = base_name[:-10]  # Remove ".canonical"
+        output_filename = base_name + env_config.filename_suffix
+    else:
+        raise ValueError(
+            f"Environment '{env_key}' must specify either 'filename' or 'filename_suffix'. "
+            f"Both are missing or None."
+        )
+
+    output_path = output_dir / output_filename
+
+    # Check if we should write to file
+    if not should_write_file(output_path, force, console):
+        console.print(f"  [dim]⏭[/dim] Skipped {output_filename}")
+        return
+
+    # Create output directory if needed
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    except PermissionError as e:
+        console.print(f"  [red]❌ Permission denied creating directory:[/red] {output_dir}")
+        console.print(f"  [dim]Error: {e}[/dim]")
+        console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
+        raise typer.Exit(1) from None
+    except OSError as e:
+        console.print(f"  [red]❌ Failed to create directory:[/red] {output_dir}")
+        console.print(f"  [dim]Error: {e}[/dim]")
+        raise typer.Exit(1) from None
+
+    # Build environment-specific frontmatter
+    env_config_dict = dict(vars(env_config))
+    # Remove filename and filename_suffix from config since we computed output_filename
+    env_config_dict.pop("filename", None)
+    env_config_dict.pop("filename_suffix", None)
+    frontmatter = {
+        "meta": prompt.meta,
+        "filename": output_filename,
+        **env_config_dict,
+    }
+
+    # Write the prompt with environment-specific frontmatter
+    import yaml
+
+    output_content = f"""---
+{yaml.safe_dump(frontmatter, default_flow_style=False)}---
+
+    {prompt.content}"""
+
+    try:
+        output_path.write_text(output_content, encoding="utf-8")
+        console.print(f"  [green]✓[/green] Installed {output_filename}")
+    except PermissionError as e:
+        console.print(f"  [red]❌ Permission denied writing to:[/red] {output_path}")
+        console.print(f"  [dim]Error: {e}[/dim]")
+        console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
+        raise typer.Exit(1) from None
+    except OSError as e:
+        console.print(f"  [red]❌ Failed to write file:[/red] {output_path}")
+        console.print(f"  [dim]Error: {e}[/dim]")
+        raise typer.Exit(1) from None
+
+
+def install_canonical_prompt_directory(
+    prompts_dir: Path,
+    env_key: str,
+    target: Path,
+    console: Console,
+    *,
+    force: bool = False,
+) -> None:
+    """Install all canonical prompt files from a directory to the specified environment.
+
+    Args:
+        prompts_dir: Directory containing canonical prompt files.
+        env_key: Environment key to install for.
+        target: Target directory to install in.
+        console: Rich console for output.
+        force: Whether to overwrite existing files.
+
+    Raises:
+        ValueError: If no canonical prompts found or invalid.
+    """
+    from dot_work.prompts.canonical import CANONICAL_PARSER
+
+    # Find canonical prompt files
+    canonical_files = list(prompts_dir.glob("*.canon.md"))
+    canonical_files.extend(prompts_dir.glob("*.canonical.md"))
+
+    if not canonical_files:
+        raise ValueError(f"No canonical prompt files found in {prompts_dir}")
+
+    installed_count = 0
+
+    console.print(f"Installing {len(canonical_files)} canonical prompt(s) for {env_key}...")
+
+    for prompt_file in canonical_files:
+        try:
+            # Check if this file has the target environment before installing
+            prompt = CANONICAL_PARSER.parse(prompt_file)
+            if env_key not in prompt.environments:
+                available = ", ".join(prompt.list_environments())
+                console.print(
+                    f"  [dim]⏭[/dim] Skipped {prompt_file.name} (no '{env_key}' environment, available: {available})"
+                )
+                continue
+
+            install_canonical_prompt(prompt_file, env_key, target, console, force=force)
+            installed_count += 1
+        except Exception as e:
+            console.print(f"  [red]✗[/red] Failed to install {prompt_file.name}: {e}")
+
+    if installed_count == 0:
+        raise ValueError(
+            f"Environment '{env_key}' not found in any canonical prompt. "
+            f"Processed {len(canonical_files)} canonical prompt file(s), but none contained "
+            f"the '{env_key}' environment."
+        )
+
+        console.print(
+            f"[green]✓[/green] Completed installation of {installed_count} canonical prompt(s)"
+        )
+
+
+# =============================================================================
+# Canonical Prompt Frontmatter Discovery
+# =============================================================================
+
+
+def discover_available_environments(prompts_dir: Path) -> dict[str, set[str]]:
+    """Discover available environments from prompt file frontmatter.
+
+    Scans all *.md files, parses their canonical frontmatter,
+    and returns which environments each prompt supports.
+
+    Args:
+        prompts_dir: Directory containing prompt files with canonical frontmatter.
+
+    Returns:
+        Dictionary mapping environment names to sets of prompt file names that support them.
+        Example: {"claude": {"do-work", "new-issue"}, "copilot": {"do-work"}}
+    """
+    from dot_work.prompts.canonical import CANONICAL_PARSER
+
+    environments: dict[str, set[str]] = {}
+
+    # Find all prompt files with canonical frontmatter
+    for prompt_file in prompts_dir.glob("*.md"):
+        try:
+            prompt = CANONICAL_PARSER.parse(prompt_file)
+            prompt_name = prompt_file.stem
+
+            # Add this prompt to each environment it supports
+            for env_name in prompt.environments:
+                if env_name not in environments:
+                    environments[env_name] = set()
+                environments[env_name].add(prompt_name)
+        except Exception:  # noqa: S112, pylint: disable=broad-except
+            # Skip files that can't be parsed (not canonical format)
+            # Logging here would be too verbose during discovery
+            continue
+
+    return environments
+
+
+def install_canonical_prompts_by_environment(
+    env_name: str,
+    target: Path,
+    prompts_dir: Path,
+    console: Console,
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+) -> None:
+    """Install canonical prompts for a specific environment using frontmatter paths.
+
+    For each prompt file that supports the specified environment, reads the
+    environment configuration from its frontmatter and installs it to the
+    target path specified in the frontmatter.
+
+    Args:
+        env_name: Name of the environment to install for (e.g., 'claude', 'copilot').
+        target: Target project directory to install in.
+        prompts_dir: Source directory containing canonical prompt files.
+        console: Rich console for output.
+        force: If True, overwrite existing files without prompting.
+        dry_run: If True, preview changes without writing files.
+
+    Raises:
+        ValueError: If environment not found in any prompts or installation fails.
+    """
+    from dot_work.prompts.canonical import CANONICAL_PARSER
+
+    prompt_files = list(prompts_dir.glob("*.md"))
+    installed_count = 0
+    skipped_count = 0
+
+    if not prompt_files:
+        raise ValueError(f"No prompt files found in {prompts_dir}")
+
+    console.print(f"Installing prompts for environment: [bold cyan]{env_name}[/bold cyan]")
+    console.print(f"Source: {prompts_dir}")
+    console.print(f"Target: {target}\n")
+
+    # Scan phase: categorize files
+    state = InstallState()
+    install_plan: list[tuple[Path, Path, Path]] = []  # (prompt_file, output_dir, output_path)
+
+    for prompt_file in prompt_files:
+        try:
+            prompt = CANONICAL_PARSER.parse(prompt_file)
+
+            # Skip if prompt doesn't support this environment
+            if env_name not in prompt.environments:
+                continue
+
+            # Get environment config from frontmatter
+            env_config = prompt.get_environment(env_name)
+
+            # Determine output directory from frontmatter target
+            if env_config.target.startswith("/"):
+                # Absolute path (relative to target root)
+                output_dir = target / env_config.target.lstrip("/")
+            elif env_config.target.startswith("./"):
+                # Relative path
+                output_dir = target / env_config.target[2:]
+            else:
+                # Relative path
+                output_dir = target / env_config.target
+
+            # Determine filename from frontmatter
+            if env_config.filename:
+                output_filename = env_config.filename
+            elif env_config.filename_suffix:
+                # Use prompt file stem with suffix
+                stem = prompt_file.stem
+                output_filename = stem + env_config.filename_suffix
+            else:
+                # Default to original filename
+                output_filename = prompt_file.name
+
+            output_path = output_dir / output_filename
+            install_plan.append((prompt_file, output_dir, output_path))
+
+            # Track for batch prompting
+            if output_path.exists():
+                state.existing_files.append(output_path)
+            else:
+                state.new_files.append(output_path)
+
+        except Exception as e:
+            error_str = str(e)
+
+            console.print(f"  [yellow]⚠[/yellow] Skipping {prompt_file.name}")
+            console.print(f"  [dim]Error: {error_str}[/dim]")
+
+            # Provide actionable guidance for common errors
+            if "filename" in error_str.lower() or "filename_suffix" in error_str.lower():
+                console.print(
+                    "  [dim]💡 Fix: Add 'environments.YOUR_ENV.filename' or 'environments.YOUR_ENV.filename_suffix' to the prompt frontmatter[/dim]"
+                )
+            elif "yaml" in error_str.lower() or "frontmatter" in error_str.lower():
+                console.print(
+                    "  [dim]💡 Fix: Check that the frontmatter section (before the first ---) has valid YAML syntax[/dim]"
+                )
+                console.print(
+                    "  [dim]💡 Fix: Ensure multi-line values are properly indented or quoted[/dim]"
+                )
+            elif "document" in error_str.lower():
+                console.print(
+                    "  [dim]💡 Fix: Ensure there's only one --- separator and one YAML document in the frontmatter[/dim]"
+                )
+
+            skipped_count += 1
+
+    if not install_plan:
+        console.print(f"  [red]❌ Environment '{env_name}' not found in any prompt files.[/red]")
+        console.print(
+            f"  [dim]💡 Fix: Ensure at least one prompt file has an 'environments.{env_name}' section in its frontmatter[/dim]"
+        )
+        console.print(
+            "  [dim]💡 Fix: Run 'dot-work list' to see available environments and their expected frontmatter structure[/dim]"
+        )
+        raise ValueError(
+            f"Environment '{env_name}' not found in any prompt files. "
+            f"Checked {len(prompt_files)} file(s). "
+            f"Add 'environments.{env_name}' section to at least one prompt file."
+        )
+
+    # Show batch menu if there are existing files and not in force/dry-run mode
+    batch_choice: BatchChoice | None = None
+    if state.has_existing_files and not force and not dry_run:
+        batch_choice = _prompt_batch_choice(console, state)
+        if batch_choice == BatchChoice.CANCEL:
+            console.print("[yellow]Installation cancelled.[/yellow]")
+            return
+
+    # Installation phase
+    if not dry_run:
+        console.print(f"Installing {len(install_plan)} prompt(s)...\n")
+    else:
+        console.print(f"[yellow][DRY-RUN] Would install {len(install_plan)} prompt(s):[/yellow]\n")
+
+    for prompt_file, output_dir, output_path in install_plan:
+        # Check if we should write
+        if not dry_run and not should_write_file(
+            output_path, force, console, batch_choice=batch_choice
+        ):
+            console.print(f"  [dim]⏭[/dim] Skipped {output_path.name}")
+            continue
+
+        # Create directory if needed
+        if not dry_run:
+            try:
+                output_dir.mkdir(parents=True, exist_ok=True)
+            except PermissionError as e:
+                console.print(f"  [red]❌ Permission denied creating directory:[/red] {output_dir}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                raise typer.Exit(1) from None
+            except OSError as e:
+                console.print(f"  [red]❌ Failed to create directory:[/red] {output_dir}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                raise typer.Exit(1) from None
+
+        # Read prompt content
+        prompt = CANONICAL_PARSER.parse(prompt_file)
+
+        # Write output (without extra frontmatter - prompts already have it)
+        if dry_run:
+            action = "[CREATE]" if not output_path.exists() else "[OVERWRITE]"
+            console.print(f"  [yellow][DRY-RUN][/yellow] [dim]{action}[/dim] {output_path}")
+        else:
+            # Write the prompt file as-is (it already has proper frontmatter)
+            try:
+                output_path.write_text(prompt_file.read_text(encoding="utf-8"), encoding="utf-8")
+                console.print(f"  [green]✓[/green] Installed {output_path.name}")
+                installed_count += 1
+            except PermissionError as e:
+                console.print(f"  [red]❌ Permission denied writing to:[/red] {output_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                console.print("  [dim]Try running with sudo or fixing directory permissions[/dim]")
+                raise typer.Exit(1) from None
+            except OSError as e:
+                console.print(f"  [red]❌ Failed to write file:[/red] {output_path}")
+                console.print(f"  [dim]Error: {e}[/dim]")
+                raise typer.Exit(1) from None
+
+    if dry_run:
+        console.print(
+            f"\n[cyan]📁 Dry-run complete: {len(install_plan)} file(s) would be installed[/cyan]"
+        )
+    else:
+        console.print(f"\n[cyan]📁 Installed {installed_count} prompt(s) for {env_name}[/cyan]")
+
+    if skipped_count > 0:
+        console.print(f"[dim]⚠ {skipped_count} file(s) skipped due to errors[/dim]")
+
+
+# ============================================================================
+# Skills and Subagents Installation
+# ============================================================================
+
+# Environments that support native skills/subagents
+SKILL_SUPPORTED_ENVIRONMENTS = {"claude"}
+SUBAGENT_SUPPORTED_ENVIRONMENTS = {"claude", "opencode", "copilot"}
+
+
+def install_skills_by_environment(
+    env_name: str,
+    target: Path,
+    skills_dir: Path,
+    console: Console,
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+) -> int:
+    """Install bundled skills for a specific environment.
+
+    Skills are only supported in Claude Code currently. For other environments,
+    this function skips silently and returns 0.
+
+    Args:
+        env_name: Name of the environment to install for (e.g., 'claude').
+        target: Target project directory to install in.
+        skills_dir: Source directory containing skill directories.
+        console: Rich console for output.
+        force: If True, overwrite existing files without prompting.
+        dry_run: If True, preview changes without writing files.
+
+    Returns:
+        Number of skills installed, or 0 if environment doesn't support skills.
+    """
+    from dot_work.skills import SKILL_PARSER
+
+    # Skip if environment doesn't support skills
+    if env_name not in SKILL_SUPPORTED_ENVIRONMENTS:
+        return 0
+
+    # Find all skill directories (containing SKILL.md)
+    skill_dirs = [d for d in skills_dir.iterdir() if d.is_dir() and (d / "SKILL.md").exists()]
+
+    if not skill_dirs:
+        console.print("[dim]No bundled skills found[/dim]")
+        return 0
+
+    console.print("\n[bold cyan]Skills[/bold cyan]")
+    installed_count = 0
+
+    for skill_dir in skill_dirs:
+        try:
+            skill = SKILL_PARSER.parse(skill_dir)
+
+            # Check if skill has environment config for this environment
+            if skill.meta.environments is None or env_name not in skill.meta.environments:
+                continue
+
+            env_config = skill.meta.environments[env_name]
+
+            # Determine output path from frontmatter target
+            if env_config.target.startswith("/"):
+                output_dir = target / env_config.target.lstrip("/")
+            elif env_config.target.startswith("./"):
+                output_dir = target / env_config.target[2:]
+            else:
+                output_dir = target / env_config.target
+
+            # Determine filename
+            if env_config.filename:
+                skill_filename = env_config.filename
+            elif env_config.filename_suffix:
+                skill_filename = skill.meta.name + env_config.filename_suffix
+            else:
+                skill_filename = skill.meta.name + "/SKILL.md"
+
+            output_path = output_dir / skill_filename
+
+            # Create parent directory
+            if not dry_run:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Write or preview
+            if dry_run:
+                action = "[CREATE]" if not output_path.exists() else "[OVERWRITE]"
+                console.print(f"  [yellow][DRY-RUN][/yellow] [dim]{action}[/dim] {output_path}")
+            else:
+                skill_file = skill_dir / "SKILL.md"
+                output_path.write_text(skill_file.read_text(encoding="utf-8"), encoding="utf-8")
+                console.print(f"  [green]✓[/green] Installed {skill.meta.name}")
+                installed_count += 1
+
+        except Exception as e:
+            console.print(f"  [red]❌ Failed to install skill {skill_dir.name}:[/red] {e}")
+
+    if installed_count > 0:
+        console.print(f"[cyan]📁 Installed {installed_count} skill(s)[/cyan]")
+
+    return installed_count
+
+
+def install_subagents_by_environment(
+    env_name: str,
+    target: Path,
+    subagents_dir: Path,
+    console: Console,
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+) -> int:
+    """Install bundled subagents for a specific environment.
+
+    For environments that support native agents (claude, opencode, copilot),
+    installs as native agent files. For other environments, treats subagents
+    as prompts and installs them using the prompt installer.
+
+    Args:
+        env_name: Name of the environment to install for.
+        target: Target project directory to install in.
+        subagents_dir: Source directory containing subagent .md files.
+        console: Rich console for output.
+        force: If True, overwrite existing files without prompting.
+        dry_run: If True, preview changes without writing files.
+
+    Returns:
+        Number of subagents installed.
+    """
+    from dot_work.subagents import SUBAGENT_PARSER
+
+    # Find all subagent files
+    subagent_files = list(subagents_dir.glob("*.md"))
+
+    if not subagent_files:
+        console.print("[dim]No bundled subagents found[/dim]")
+        return 0
+
+    console.print("\n[bold cyan]Subagents[/bold cyan]")
+    installed_count = 0
+
+    for subagent_file in subagent_files:
+        try:
+            subagent = SUBAGENT_PARSER.parse(subagent_file)
+
+            # Check if subagent has environment config for this environment
+            if subagent.environments is None or env_name not in subagent.environments:
+                continue
+
+            env_config = subagent.environments[env_name]
+
+            # Determine output path from frontmatter target
+            if env_config.target.startswith("/"):
+                output_dir = target / env_config.target.lstrip("/")
+            elif env_config.target.startswith("./"):
+                output_dir = target / env_config.target[2:]
+            else:
+                output_dir = target / env_config.target
+
+            # Use original filename for subagents (SubagentEnvironmentConfig doesn't have filename/filename_suffix)
+            output_filename = subagent_file.name
+            output_path = output_dir / output_filename
+
+            # Create parent directory
+            if not dry_run:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Write or preview
+            if dry_run:
+                action = "[CREATE]" if not output_path.exists() else "[OVERWRITE]"
+                console.print(f"  [yellow][DRY-RUN][/yellow] [dim]{action}[/dim] {output_path}")
+            else:
+                output_path.write_text(subagent_file.read_text(encoding="utf-8"), encoding="utf-8")
+                console.print(f"  [green]✓[/green] Installed {subagent.meta.name}")
+                installed_count += 1
+
+        except Exception as e:
+            console.print(f"  [red]❌ Failed to install subagent {subagent_file.name}:[/red] {e}")
+
+    if installed_count > 0:
+        console.print(f"[cyan]📁 Installed {installed_count} subagent(s)[/cyan]")
+
+    return installed_count

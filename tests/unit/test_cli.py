@@ -9,7 +9,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import pytest
 from typer.testing import CliRunner
 
 from dot_work.cli import app
@@ -66,7 +65,7 @@ class TestHelpCommand:
         assert "list" in result.stdout
         assert "detect" in result.stdout
         assert "init" in result.stdout
-        assert "init-work" in result.stdout
+        assert "init-tracking" in result.stdout
         assert "validate" in result.stdout
 
     def test_no_args_shows_help(self) -> None:
@@ -105,8 +104,8 @@ class TestHelpCommand:
         assert "--env" in result.stdout
 
     def test_init_work_help(self) -> None:
-        """init-work --help should show options."""
-        result = runner.invoke(app, ["init-work", "--help"])
+        """init-tracking --help should show options."""
+        result = runner.invoke(app, ["init-tracking", "--help"])
         assert result.exit_code == 0
         assert "--target" in result.stdout
         assert "--force" in result.stdout
@@ -207,11 +206,11 @@ class TestDetectCommand:
 
 
 class TestInitWorkCommand:
-    """Tests for the 'init-work' command."""
+    """Tests for the 'init-tracking' command."""
 
     def test_init_work_creates_structure(self, tmp_path: Path) -> None:
-        """init-work should create .work directory structure."""
-        result = runner.invoke(app, ["init-work", "--target", str(tmp_path)])
+        """init-tracking should create .work directory structure."""
+        result = runner.invoke(app, ["init-tracking", "--target", str(tmp_path)])
         assert result.exit_code == 0
         assert "initialized" in result.stdout.lower()
         assert (tmp_path / ".work").exists()
@@ -219,8 +218,8 @@ class TestInitWorkCommand:
         assert (tmp_path / ".work" / "agent" / "issues").exists()
 
     def test_init_work_creates_issue_files(self, tmp_path: Path) -> None:
-        """init-work should create priority issue files."""
-        runner.invoke(app, ["init-work", "--target", str(tmp_path)])
+        """init-tracking should create priority issue files."""
+        runner.invoke(app, ["init-tracking", "--target", str(tmp_path)])
         issues_dir = tmp_path / ".work" / "agent" / "issues"
         assert (issues_dir / "critical.md").exists()
         assert (issues_dir / "high.md").exists()
@@ -228,25 +227,25 @@ class TestInitWorkCommand:
         assert (issues_dir / "low.md").exists()
 
     def test_init_work_creates_focus_and_memory(self, tmp_path: Path) -> None:
-        """init-work should create focus.md and memory.md."""
-        runner.invoke(app, ["init-work", "--target", str(tmp_path)])
+        """init-tracking should create focus.md and memory.md."""
+        runner.invoke(app, ["init-tracking", "--target", str(tmp_path)])
         agent_dir = tmp_path / ".work" / "agent"
         assert (agent_dir / "focus.md").exists()
         assert (agent_dir / "memory.md").exists()
 
     def test_init_work_nonexistent_directory(self, tmp_path: Path) -> None:
-        """init-work should error on nonexistent directory."""
+        """init-tracking should error on nonexistent directory."""
         fake_path = tmp_path / "nonexistent"
-        result = runner.invoke(app, ["init-work", "--target", str(fake_path)])
+        result = runner.invoke(app, ["init-tracking", "--target", str(fake_path)])
         assert result.exit_code == 1
         assert "does not exist" in result.stdout
 
     def test_init_work_with_force(self, tmp_path: Path) -> None:
-        """init-work --force should work on existing structure."""
+        """init-tracking --force should work on existing structure."""
         # First init
-        runner.invoke(app, ["init-work", "--target", str(tmp_path)])
+        runner.invoke(app, ["init-tracking", "--target", str(tmp_path)])
         # Second init with force
-        result = runner.invoke(app, ["init-work", "--target", str(tmp_path), "--force"])
+        result = runner.invoke(app, ["init-tracking", "--target", str(tmp_path), "--force"])
         assert result.exit_code == 0
 
 
@@ -273,7 +272,9 @@ class TestInstallCommand:
 
     def test_install_with_force_succeeds(self, tmp_path: Path) -> None:
         """install with --force should complete successfully."""
-        result = runner.invoke(app, ["install", "--target", str(tmp_path), "--env", "copilot", "--force"])
+        result = runner.invoke(
+            app, ["install", "--target", str(tmp_path), "--env", "copilot", "--force"]
+        )
         assert result.exit_code == 0
         assert "complete" in result.stdout.lower()
 
@@ -288,7 +289,7 @@ class TestInstallCommand:
         prompts_dir = tmp_path / ".github" / "prompts"
         assert prompts_dir.exists()
         # Should have at least one prompt file
-        prompt_files = list(prompts_dir.glob("*.prompt.md"))
+        prompt_files = list(prompts_dir.glob("*.md"))
         assert len(prompt_files) > 0
 
 
@@ -309,7 +310,9 @@ class TestInitCommand:
 
     def test_init_with_env_succeeds(self, tmp_path: Path) -> None:
         """init with env should complete successfully."""
-        result = runner.invoke(app, ["init", "--target", str(tmp_path), "--env", "copilot"], input="y\n")
+        result = runner.invoke(
+            app, ["init", "--target", str(tmp_path), "--env", "copilot"], input="y\n"
+        )
         # May prompt for confirmation, handle that
         assert result.exit_code == 0 or "complete" in result.stdout.lower()
 
@@ -334,7 +337,7 @@ class TestValidateJsonCommand:
     def test_validate_json_invalid_file(self, tmp_path: Path) -> None:
         """validate json should fail for invalid JSON."""
         json_file = tmp_path / "test.json"
-        json_file.write_text('{key: value}')  # Invalid JSON
+        json_file.write_text("{key: value}")  # Invalid JSON
 
         result = runner.invoke(app, ["validate", "json", str(json_file)])
         assert result.exit_code == 1
@@ -367,7 +370,7 @@ class TestValidateJsonCommand:
         json_file.write_text('{"name": "test"}')
 
         schema_file = tmp_path / "schema.json"
-        schema_file.write_text('not valid json')
+        schema_file.write_text("not valid json")
 
         result = runner.invoke(
             app, ["validate", "json", str(json_file), "--schema", str(schema_file)]
@@ -473,8 +476,8 @@ class TestEdgeCases:
         assert "Detected" in result.stdout
 
     def test_init_work_then_validate_structure(self, tmp_path: Path) -> None:
-        """After init-work, the full structure should exist."""
-        runner.invoke(app, ["init-work", "--target", str(tmp_path)])
+        """After init-tracking, the full structure should exist."""
+        runner.invoke(app, ["init-tracking", "--target", str(tmp_path)])
 
         # Check all expected files
         work_dir = tmp_path / ".work"
@@ -502,102 +505,4 @@ class TestEdgeCases:
         found = sum(1 for env in environments if env in result.stdout.lower())
         assert found >= 3, f"Expected at least 3 environments in output: {result.stdout}"
 
-
-# =============================================================================
-# Review Command Tests (MIGRATE-011)
-# =============================================================================
-
-
-class TestReviewHelpCommands:
-    """Tests for review command help output."""
-
-    def test_review_help(self) -> None:
-        """review --help should show subcommands."""
-        result = runner.invoke(app, ["review", "--help"])
-        assert result.exit_code == 0
-        assert "start" in result.stdout
-        assert "export" in result.stdout
-        assert "clear" in result.stdout
-
-    def test_review_start_help(self) -> None:
-        """review start --help should show options."""
-        result = runner.invoke(app, ["review", "start", "--help"])
-        assert result.exit_code == 0
-        assert "--port" in result.stdout
-        assert "--base" in result.stdout
-        assert "--head" in result.stdout
-
-    def test_review_export_help(self) -> None:
-        """review export --help should show options."""
-        result = runner.invoke(app, ["review", "export", "--help"])
-        assert result.exit_code == 0
-        assert "--output" in result.stdout
-        assert "--review-id" in result.stdout
-
-    def test_review_clear_help(self) -> None:
-        """review clear --help should show options."""
-        result = runner.invoke(app, ["review", "clear", "--help"])
-        assert result.exit_code == 0
-        assert "--review-id" in result.stdout
-        assert "--force" in result.stdout
-
-
-class TestReviewExportCommand:
-    """Tests for review export command."""
-
-    def test_review_export_no_git_repo(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """review export should fail when not in a git repo."""
-        monkeypatch.chdir(tmp_path)
-
-        result = runner.invoke(app, ["review", "export"])
-        # Should fail - not in a git repo
-        assert result.exit_code == 1
-        output = result.stdout.lower()
-        assert "git" in output or "repository" in output or "no review" in output
-
-    def test_review_export_no_reviews(self, git_repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """review export should fail when no reviews exist."""
-        monkeypatch.chdir(git_repo)
-
-        result = runner.invoke(app, ["review", "export"])
-        # Should exit with code 1 - no reviews found
-        assert result.exit_code == 1
-        output = result.stdout.lower()
-        assert "no review" in output or "not found" in output
-
-
-class TestReviewClearCommand:
-    """Tests for review clear command."""
-
-    def test_review_clear_no_reviews_dir(
-        self, git_repo: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """review clear should handle missing reviews directory."""
-        monkeypatch.chdir(git_repo)
-
-        result = runner.invoke(app, ["review", "clear", "--force"])
-        # Should succeed or warn - no reviews to clear
-        assert result.exit_code == 0
-        output = result.stdout.lower()
-        assert "no review" in output or "warning" in output or "⚠" in result.stdout
-
-    def test_review_clear_specific_review_not_found(
-        self, git_repo: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """review clear with non-existent review ID should fail."""
-        monkeypatch.chdir(git_repo)
-
-        # Create the reviews directory but no reviews
-        reviews_dir = git_repo / ".work" / "reviews" / "reviews"
-        reviews_dir.mkdir(parents=True, exist_ok=True)
-
-        result = runner.invoke(
-            app, ["review", "clear", "--review-id", "nonexistent-review", "--force"]
-        )
-        # Should exit with code 1 - review not found
-        assert result.exit_code == 1
-        output = result.stdout.lower()
-        assert "not found" in output or "nonexistent" in output
-
+# Review command tests have been removed - module exported to dot-review plugin

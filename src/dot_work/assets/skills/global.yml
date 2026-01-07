@@ -1,0 +1,20 @@
+# Global default frontmatter for bundled skills.
+#
+# This file provides default YAML frontmatter values that are merged with each
+# bundled skill's frontmatter at runtime. Local values in individual skill files
+# override these global defaults (deep merge).
+
+defaults:
+  # Default environment configurations shared across all bundled skills.
+  # Individual skills can override these by redefining specific environments
+  # in their own frontmatter.
+  #
+  # Skills are installed as: <target>/<skill_name>/SKILL.md
+  # Example: .claude/skills/code-review/SKILL.md
+  #
+  # Note: Currently only Claude Code supports native skills. Other environments
+  # may treat skills as prompts or skip them entirely during installation.
+  environments:
+    claude:
+      target: ".claude/skills/"
+      filename_suffix: "/SKILL.md"

@@ -1,37 +1,39 @@
 # Agent Memory
 
 ## Project Context
-- Primary language: Python
-- Framework: Typer (CLI)
+- Project: dot-work
+- Description: Portable AI coding prompts for project scaffolding and issue tracking
+- Primary language: Python 3.11+
 - Package manager: uv
 - Test framework: pytest
+- Type checking: mypy
+- Linting: ruff
+- CLI framework: typer
+- License: MIT
+- Development status: Beta
 
 ## User Preferences
-- No external dependencies for validation tools (Python 3.11+ stdlib only)
-- Follow AGENTS.md guidelines
+(To be populated as preferences are discovered)
 
 ## Architectural Decisions
-- Jinja2 templates for prompt file processing
-- Dataclass-based environment configurations
+(To be populated as decisions are made)
 
 ## Patterns & Conventions
-- Google-style docstrings
-- Type annotations on all functions
-- pathlib.Path for file operations
+- Use `uv run` for ALL Python commands
+- Use memory-protected wrapper for pytest: `./scripts/pytest-with-cgroup.sh`
+- Type hints on ALL functions, Google docstrings for public APIs
+- Functions <15 lines, nesting <3 levels, classes <200 lines
 
 ## Known Constraints
-- Must use `uv run` for all Python commands
-- Coverage minimum: 15% (growing)
-
-## Version Management (MANDATORY)
-- **Scheme:** SemVer (MAJOR.MINOR.PATCH)
-- **Source of truth:** `pyproject.toml`
-- **Sync locations:** none (removed `__version__` from `__init__.py`)
-- **Default bump:** patch (no argument = increment patch)
-- **Added:** 2024-12-20
+- Python 3.11+ required
+- No business logic in cli.py
+- Use `logging` not `print()`
+- No bare except clauses
+- Test coverage >=75%
 
 ## Lessons Learned
-- [BUG-001@c5e8f1] 2024-12-20: Use `importlib.metadata.version()` to get package version at runtime instead of maintaining `__version__` in code. Single source of truth = pyproject.toml
-- [FEAT-004@b8e1d4] 2024-12-20: Project context detection can auto-populate memory.md by scanning pyproject.toml, package.json, Cargo.toml, go.mod etc.
-- [TEST-002@d8c4e1] 2024-12-20: typer.testing.CliRunner is excellent for CLI testing. When typer uses `no_args_is_help=True`, exit code is 2 not 0. Check `result.output` not just `result.stdout` for full output.
-- [TEST-002@d8c4e1] 2024-12-20: Environment detection markers in ENVIRONMENTS dict - always verify actual detection patterns before writing tests (e.g., copilot uses `.github/prompts` not `copilot-instructions.md`).
+- [CR-006@d9b4c3] 2026-01-03: Test coverage for parser functions
+  - Testing `_deep_merge()` requires testing: basic merge, nested dicts, empty dict preservation, mutual exclusion (filename/filename_suffix), and non-mutation
+  - Testing `_load_global_defaults()` requires: file exists, file missing, malformed YAML, missing defaults key, wrong type for defaults
+  - Always test parser edge cases: invalid YAML, missing required fields, environment config validation
+  - Memory-protected pytest wrapper (`./scripts/pytest-with-cgroup.sh`) is required to prevent system freezes

@@ -2,6 +2,4 @@
 
 Blockers, security issues, data loss risks.
 
----
-
 (No critical issues)
